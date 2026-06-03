@@ -42,6 +42,7 @@ raw function fixture が runtime 境界を通じて stdout に
 - `probe-binary <path>` の安定 JSON report 出力
 - Mach-O 64-bit little-endian header の typed `filetype` metadata
 - Mach-O 64-bit little-endian header の typed `ncmds` / `sizeofcmds` metadata
+- Mach-O 64-bit little-endian load command table bounds validation
 - Mach-O probe fixture / expected JSON と `check-binary-probe`
 
 ## マイルストーン
@@ -455,6 +456,29 @@ manifest
 
 - Mach-O executable header fixture の probe JSON に load command count / size が含まれる。
 - public primitive API を増やさず、domain type と serializer で表現する。
+
+状態:
+
+- 完了。
+
+### HW7b: load command table bounds validation
+
+目的:
+
+- Mach-O header が宣言する load command table の byte range が、入力 binary 内に
+  収まることを検証する。
+
+方針:
+
+- load command 本体の種類や内容はまだ parse しない。
+- table start は 64-bit Mach-O header 直後とし、`sizeofcmds` で終端を決める。
+- range overflow / input 不足は分類 error とする。
+- `sizeofcmds == 0` は valid な empty table として扱う。
+
+成功条件:
+
+- `sizeofcmds == 0` の既存 fixture は valid のまま通る。
+- `sizeofcmds` が入力長を超える fixture は分類 error になる。
 
 状態:
 

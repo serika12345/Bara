@@ -94,6 +94,8 @@ pub(crate) fn parse_mach_o_64_little_endian_metadata(
         .read_little_endian_u32_at(MACH_O_SIZEOFCMDS_OFFSET)
         .map(MachOLoadCommandByteSize::from_public_header_value)
         .ok_or(BinaryFormatProbeError::HeaderTooShort)?;
+    let _load_command_table_range =
+        validate_load_command_table_bounds(input, load_command_byte_size)?;
 
     Ok(MachOMetadata::new(
         file_type,
@@ -108,6 +110,26 @@ impl MachOFileType {
             _ => None,
         }
     }
+}
+
+fn validate_load_command_table_bounds(
+    input: &BinaryInput,
+    byte_size: MachOLoadCommandByteSize,
+) -> Result<MachOLoadCommandTableRange, BinaryFormatProbeError> {
+    let table_end = MACH_O_64_HEADER_WIDTH
+        .checked_add(byte_size.value as usize)
+        .ok_or(BinaryFormatProbeError::LoadCommandsOutOfBounds)?;
+
+    if input.has_len_at_least(table_end) {
+        Ok(MachOLoadCommandTableRange { end: table_end })
+    } else {
+        Err(BinaryFormatProbeError::LoadCommandsOutOfBounds)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct MachOLoadCommandTableRange {
+    end: usize,
 }
 
 const MACH_O_64_HEADER_WIDTH: usize = 32;

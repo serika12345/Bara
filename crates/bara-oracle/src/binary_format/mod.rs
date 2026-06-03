@@ -48,9 +48,12 @@ mod tests {
 
     #[test]
     fn reads_mach_o_load_command_header_fields_as_typed_metadata() {
-        let input = BinaryInput::from_hex(
+        let input = BinaryInput::from_hex(concat!(
             "cffaedfe07000001030000000200000003000000300000000000000000000000",
-        )
+            "00000000000000000000000000000000",
+            "00000000000000000000000000000000",
+            "00000000000000000000000000000000",
+        ))
         .expect("hex fixture is valid");
 
         assert_eq!(
@@ -121,6 +124,19 @@ mod tests {
         assert_eq!(
             probe_public_binary_format(&input),
             Err(BinaryFormatProbeError::UnsupportedMachOFileType)
+        );
+    }
+
+    #[test]
+    fn rejects_mach_o_load_command_table_outside_input() {
+        let input = BinaryInput::from_hex(
+            "cffaedfe07000001030000000200000001000000010000000000000000000000",
+        )
+        .expect("hex fixture is valid");
+
+        assert_eq!(
+            probe_public_binary_format(&input),
+            Err(BinaryFormatProbeError::LoadCommandsOutOfBounds)
         );
     }
 
