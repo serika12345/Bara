@@ -1,4 +1,4 @@
-use crate::{CorpusReport, ObservedResult};
+use crate::{BinaryFormatProbeReport, CorpusReport, ObservedResult};
 
 #[derive(Debug)]
 pub struct JsonError {
@@ -35,11 +35,19 @@ pub fn corpus_report_to_json(report: &CorpusReport) -> Result<String, JsonError>
     serde_json::to_string(report).map_err(JsonError::new)
 }
 
+pub fn binary_format_probe_report_to_json(
+    report: &BinaryFormatProbeReport,
+) -> Result<String, JsonError> {
+    serde_json::to_string(report).map_err(JsonError::new)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
-        corpus_report_to_json, observed_result_from_json, observed_result_to_json, CaseId,
-        CorpusReport, FailureKind, FailureMessage, FixtureOutcome, FixtureReport, ObservedResult,
+        binary_format_probe_report_to_json, corpus_report_to_json, observed_result_from_json,
+        observed_result_to_json, BinaryFormat, BinaryFormatProbeReport, BinaryFormatProbeStatus,
+        CaseId, CorpusReport, FailureKind, FailureMessage, FixtureOutcome, FixtureReport,
+        ObservedResult,
     };
 
     #[test]
@@ -98,6 +106,19 @@ mod tests {
         assert_eq!(
             corpus_report_to_json(&report).expect("report serializes"),
             "{\"fixtures\":[{\"case_id\":\"return_42\",\"outcome\":\"passed\"},{\"case_id\":\"bad_case\",\"outcome\":{\"failed\":{\"kind\":\"decode_error\",\"message\":\"decode failed\"}}}]}"
+        );
+    }
+
+    #[test]
+    fn binary_format_probe_report_serializes_as_stable_json() {
+        let report = BinaryFormatProbeReport::new(
+            BinaryFormat::MachO64LittleEndian,
+            BinaryFormatProbeStatus::RecognizedButUnsupported,
+        );
+
+        assert_eq!(
+            binary_format_probe_report_to_json(&report).expect("probe report serializes"),
+            "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\"}"
         );
     }
 }

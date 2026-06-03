@@ -1,16 +1,21 @@
 use super::input::{BinaryInput, BinaryMagic};
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+use serde::Serialize;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum BinaryFormat {
+    #[serde(rename = "mach_o_64_little_endian")]
     MachO64LittleEndian,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum BinaryFormatProbeStatus {
     RecognizedButUnsupported,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 pub struct BinaryFormatProbeReport {
     format: BinaryFormat,
     status: BinaryFormatProbeStatus,

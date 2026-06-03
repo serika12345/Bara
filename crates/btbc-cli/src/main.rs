@@ -5,9 +5,9 @@ use std::{
 };
 
 use bara_oracle::{
-    compare_observed_results, corpus_report_to_json, executable_manifest_from_json,
-    observed_result_from_json, observed_result_to_json, probe_public_binary_format,
-    test_case_from_json, BinaryFileBytes, BinaryFormatProbeError, BinaryFormatProbeReport,
+    binary_format_probe_report_to_json, compare_observed_results, corpus_report_to_json,
+    executable_manifest_from_json, observed_result_from_json, observed_result_to_json,
+    probe_public_binary_format, test_case_from_json, BinaryFileBytes, BinaryFormatProbeError,
     BinaryInput, CaseId, ComparisonReport, CorpusReport, ExecutableManifest, ExpectedResult,
     FailureKind, FailureMessage, FixtureOutcome, FixtureReport, ObservedResult, TestCase,
 };
@@ -94,11 +94,7 @@ fn run_probe_binary(binary_path: &Path) -> Result<String, CliError> {
     let input = BinaryInput::from_file_bytes(BinaryFileBytes::from_untrusted_file_contents(bytes));
     let report = probe_public_binary_format(&input).map_err(CliError::BinaryFormatProbe)?;
 
-    Ok(format_binary_format_probe_report(report))
-}
-
-fn format_binary_format_probe_report(report: BinaryFormatProbeReport) -> String {
-    format!("{:?}: {:?}", report.format(), report.status())
+    binary_format_probe_report_to_json(&report).map_err(CliError::Json)
 }
 
 fn run_check_corpus(cases_dir: &Path, expected_dir: &Path) -> Result<String, CliError> {
@@ -567,7 +563,10 @@ mod tests {
         ])
         .expect("binary probe succeeds for recognized public binary format");
 
-        assert_eq!(output, "MachO64LittleEndian: RecognizedButUnsupported");
+        assert_eq!(
+            output,
+            "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\"}"
+        );
     }
 
     #[test]

@@ -39,6 +39,7 @@ raw function fixture が runtime 境界を通じて stdout に
 - public binary format の最小 probe
 - Mach-O 64-bit little-endian magic の recognized-but-unsupported 分類
 - `probe-binary <path>` CLI による public binary probe
+- `probe-binary <path>` の安定 JSON report 出力
 
 ## マイルストーン
 
@@ -344,6 +345,30 @@ manifest
 - Mach-O magic を持つ fixture file に対して `probe-binary` が
   recognized-but-unsupported を報告する。
 - 短すぎる入力、unknown magic は分類された CLI error として扱う。
+
+状態:
+
+- 完了。
+
+### HW6b: probe report JSON
+
+目的:
+
+- `probe-binary <path>` の成功出力を、機械的に比較しやすい安定 JSON にする。
+
+方針:
+
+- JSON serialization は `bara-oracle::json` の純粋関数へ寄せる。
+- `btbc-cli` は filesystem I/O と probe 呼び出しだけを担当し、JSON 文字列を
+  ad hoc に組み立てない。
+- 失敗時は既存の分類 error を維持する。
+
+成功条件:
+
+- Mach-O magic を持つ fixture file に対して `probe-binary` が
+  `{"format":"mach_o_64_little_endian","status":"recognized_but_unsupported"}`
+  を返す。
+- probe report serializer の単体テストで JSON field と enum 名が固定される。
 
 状態:
 
