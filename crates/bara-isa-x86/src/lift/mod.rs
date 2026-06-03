@@ -26,6 +26,12 @@ pub fn lift_decoded_function(decoded: &DecodedFunction) -> Result<Program, LiftE
                     src: Operand::ImmU64(u64::from(*imm)),
                 });
             }
+            DecodedInstructionKind::AddEaxImm32 { imm } => {
+                ops.push(IrOp::Add {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(imm.as_i64() as u64),
+                });
+            }
             DecodedInstructionKind::AddEaxImm8 { imm } => {
                 ops.push(IrOp::Add {
                     dst: Operand::Reg(X86Reg::Rax),
@@ -113,6 +119,34 @@ mod tests {
             ],
         )
         .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded add function lifts");
+        let block = &program.blocks()[0];
+
+        assert_eq!(
+            block.ops(),
+            &[
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(42)
+                },
+                IrOp::Add {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(3)
+                }
+            ]
+        );
+        assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_add_eax_imm32_to_add_rax_immediate() {
+        let input = crate::X86Bytes::new(
+            X86Va::new(0),
+            vec![0xb8, 0x2a, 0, 0, 0, 0x05, 0x03, 0, 0, 0, 0xc3],
+        )
+        .expect("test bytes are non-empty");
+        let decoded = crate::decode_function(&input).expect("test bytes decode");
 
         let program = lift_decoded_function(&decoded).expect("decoded add function lifts");
         let block = &program.blocks()[0];

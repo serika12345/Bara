@@ -79,9 +79,25 @@ impl DecodedInstruction {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DecodedInstructionKind {
     MovEaxImm32 { imm: u32 },
+    AddEaxImm32 { imm: X86Imm32 },
     AddEaxImm8 { imm: X86Imm8 },
     Ret,
     Unsupported { reason: UnsupportedReason },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct X86Imm32 {
+    value: i32,
+}
+
+impl X86Imm32 {
+    pub(crate) const fn new(value: i32) -> Self {
+        Self { value }
+    }
+
+    pub(crate) fn as_i64(self) -> i64 {
+        i64::from(self.value)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -120,6 +136,27 @@ pub fn decode_function(input: &X86Bytes) -> Result<DecodedFunction, DecodeError>
         let opcode = input.bytes()[offset];
 
         match opcode {
+            0x05 => {
+                let end_offset = offset + 5;
+                let imm_bytes = input
+                    .bytes()
+                    .get((offset + 1)..end_offset)
+                    .ok_or(DecodeError::TruncatedInstruction { at, opcode })?;
+                let imm =
+                    i32::from_le_bytes([imm_bytes[0], imm_bytes[1], imm_bytes[2], imm_bytes[3]]);
+                let end = input
+                    .entry()
+                    .checked_add(end_offset as u64)
+                    .map_err(|_| DecodeError::AddressOverflow { at, byte_len: 5 })?;
+                instructions.push(DecodedInstruction::new(
+                    at,
+                    end,
+                    DecodedInstructionKind::AddEaxImm32 {
+                        imm: X86Imm32::new(imm),
+                    },
+                ));
+                offset = end_offset;
+            }
             0xb8 => {
                 let end_offset = offset + 5;
                 let imm_bytes = input
@@ -331,6 +368,40 @@ mod tests {
                     }
                 ),
                 DecodedInstruction::new(X86Va::new(8), X86Va::new(9), DecodedInstructionKind::Ret)
+            ]
+        );
+    }
+
+    #[test]
+    fn decodes_add_eax_imm32_between_mov_and_ret() {
+        let input = X86Bytes::new(
+            X86Va::new(0),
+            vec![0xb8, 0x2a, 0, 0, 0, 0x05, 0x03, 0, 0, 0, 0xc3],
+        )
+        .expect("test bytes are non-empty");
+
+        let decoded = decode_function(&input).expect("test bytes decode");
+
+        assert_eq!(
+            decoded.instructions(),
+            &[
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(5),
+                    DecodedInstructionKind::MovEaxImm32 { imm: 42 }
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(5),
+                    X86Va::new(10),
+                    DecodedInstructionKind::AddEaxImm32 {
+                        imm: crate::decode::X86Imm32::new(3)
+                    }
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(10),
+                    X86Va::new(11),
+                    DecodedInstructionKind::Ret
+                )
             ]
         );
     }
