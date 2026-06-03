@@ -32,6 +32,8 @@ raw function fixture が runtime 境界を通じて stdout に
 - ARM64 native runner による `u64` 戻り値比較
 - file-based corpus fixture と `actual.json` / `report.json` 出力
 - stdout / stderr / return_value の expected / actual 比較
+- Bara executable manifest v0 から raw function pipeline への変換
+- `check-executable <manifest.json> <expected.json>`
 
 ## マイルストーン
 
@@ -209,6 +211,10 @@ manifest
 - `hello_world_executable_manifest` が existing raw function pipeline へ変換され、
   stdout `hello world\n`、`return_value` 0 として比較できる。
 - manifest parser の失敗理由が分類されている。
+
+状態:
+
+- 完了。
 
 ### HW5b: executable image / segment model
 

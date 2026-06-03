@@ -1,10 +1,14 @@
 pub mod compare;
+pub mod executable_manifest;
 pub mod json;
 pub mod observation;
 pub mod report;
 pub mod testcase;
 
 pub use compare::{compare_observed_results, ComparisonIssue, ComparisonReport};
+pub use executable_manifest::{
+    executable_manifest_from_json, ExecutableManifest, ExecutableManifestJsonError,
+};
 pub use json::{
     corpus_report_to_json, observed_result_from_json, observed_result_to_json, JsonError,
 };

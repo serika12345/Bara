@@ -4,3 +4,7 @@ set -eu
 cd "$(dirname "$0")/.."
 
 cargo run -p btbc-cli -- check-corpus tests/cases tests/expected --out target/bara-blackbox
+cargo run -p btbc-cli -- check-executable \
+  tests/executables/hello_world_executable_manifest.json \
+  tests/expected/hello_world_executable_manifest.json \
+  > target/bara-blackbox/actual/hello_world_executable_manifest.json

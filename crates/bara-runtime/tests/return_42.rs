@@ -2,8 +2,8 @@ use bara_arm64::{emit_program, EmittedFunction, EmittedHostTrapRequests};
 use bara_ir::X86Va;
 use bara_isa_x86::{decode_function, lift_decoded_function};
 use bara_oracle::{
-    compare_observed_results, observed_result_from_json, test_case_from_json, ExpectedResult,
-    ObservedResult, TestCase, TestCaseAbi,
+    compare_observed_results, executable_manifest_from_json, observed_result_from_json,
+    test_case_from_json, ExpectedResult, ObservedResult, TestCase, TestCaseAbi,
 };
 use bara_runtime::{
     run_no_args_u64_with_host_traps, run_one_input_memory_ptr, run_one_u64, HostTrapPlan,
@@ -267,6 +267,22 @@ fn hello_world_stdout_return_0_runs_on_supported_aarch64_unix_hosts() -> Result<
         include_str!("../../../tests/cases/hello_world_stdout_return_0.json"),
         include_str!("../../../tests/expected/hello_world_stdout_return_0.json"),
     )
+}
+
+#[test]
+fn hello_world_executable_manifest_runs_through_raw_function_pipeline() -> Result<(), String> {
+    let manifest = executable_manifest_from_json(include_str!(
+        "../../../tests/executables/hello_world_executable_manifest.json"
+    ))
+    .map_err(|error| format!("hello_world_executable_manifest parses: {error}"))?;
+    let expected = read_expected_result(
+        "hello_world_executable_manifest",
+        include_str!("../../../tests/expected/hello_world_executable_manifest.json"),
+    )?;
+    let test_case = manifest.into_entry_function();
+    let emitted = decode_lift_emit("hello_world_executable_manifest", &test_case)?;
+
+    assert_native_run_matches_expected(&test_case, &expected, &emitted)
 }
 
 fn assert_fixture_emits_arm64(

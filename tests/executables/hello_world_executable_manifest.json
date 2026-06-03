@@ -1,0 +1,16 @@
+{
+  "executable_id": "hello_world_executable_manifest",
+  "format": "bara-executable-v0",
+  "entry": 0,
+  "code": "0f0b31c0c3",
+  "abi": {
+    "args": [],
+    "return": "u64"
+  },
+  "host_traps": [
+    {
+      "kind": "stdout",
+      "text": "hello world\n"
+    }
+  ]
+}

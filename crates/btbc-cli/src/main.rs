@@ -7,10 +7,10 @@ use std::{
 use bara_arm64::{emit_program, EmittedHostTrapRequests};
 use bara_isa_x86::{decode_function, lift_decoded_function};
 use bara_oracle::{
-    compare_observed_results, corpus_report_to_json, observed_result_from_json,
-    observed_result_to_json, test_case_from_json, CaseId, ComparisonReport, CorpusReport,
-    ExpectedResult, FailureKind, FailureMessage, FixtureOutcome, FixtureReport, ObservedResult,
-    TestCase, TestCaseAbi,
+    compare_observed_results, corpus_report_to_json, executable_manifest_from_json,
+    observed_result_from_json, observed_result_to_json, test_case_from_json, CaseId,
+    ComparisonReport, CorpusReport, ExpectedResult, FailureKind, FailureMessage, FixtureOutcome,
+    FixtureReport, ObservedResult, TestCase, TestCaseAbi,
 };
 use bara_runtime::{
     run_no_args_u64_with_host_traps, run_one_input_memory_ptr, run_one_u64, HostTrapPlan,
@@ -35,6 +35,9 @@ fn run_cli(args: Vec<String>) -> Result<String, CliError> {
         [command] if command == "check-m1" => run_m1_check(),
         [command, case_path, expected_path] if command == "check-fixture" => {
             run_check_fixture(Path::new(case_path), Path::new(expected_path))
+        }
+        [command, manifest_path, expected_path] if command == "check-executable" => {
+            run_check_executable(Path::new(manifest_path), Path::new(expected_path))
         }
         [command, cases_dir, expected_dir] if command == "check-corpus" => {
             run_check_corpus(Path::new(cases_dir), Path::new(expected_dir))
@@ -70,6 +73,16 @@ fn run_check_fixture(case_path: &Path, expected_path: &Path) -> Result<String, C
     let expected_json = read_text_file(expected_path)?;
 
     run_m1_check_from_fixtures(&case_json, &expected_json)
+}
+
+fn run_check_executable(manifest_path: &Path, expected_path: &Path) -> Result<String, CliError> {
+    let manifest_json = read_text_file(manifest_path)?;
+    let expected_json = read_text_file(expected_path)?;
+    let manifest =
+        executable_manifest_from_json(&manifest_json).map_err(CliError::ExecutableManifest)?;
+    let expected = observed_result_from_json(&expected_json).map_err(CliError::ExpectedJson)?;
+
+    run_test_case(manifest.into_entry_function(), expected)
 }
 
 fn run_check_corpus(cases_dir: &Path, expected_dir: &Path) -> Result<String, CliError> {
@@ -352,6 +365,7 @@ enum CliError {
     ReadDir { path: PathBuf, source: io::Error },
     ReadDirEntry { path: PathBuf, source: io::Error },
     EmptyCorpus { cases_dir: PathBuf },
+    ExecutableManifest(bara_oracle::ExecutableManifestJsonError),
     TestCase(bara_oracle::TestCaseJsonError),
     ExpectedJson(bara_oracle::JsonError),
     Decode(bara_isa_x86::DecodeError),
@@ -369,6 +383,7 @@ impl CliError {
     fn failure_kind(&self) -> FailureKind {
         match self {
             Self::TestCase(_) => FailureKind::InvalidTestCase,
+            Self::ExecutableManifest(_) => FailureKind::InvalidTestCase,
             Self::ExpectedJson(_) => FailureKind::InvalidExpected,
             Self::Decode(_) => FailureKind::DecodeError,
             Self::Lift(_) => FailureKind::LiftError,
@@ -395,7 +410,7 @@ impl std::fmt::Display for CliError {
         match self {
             Self::Usage => write!(
                 formatter,
-                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>]"
+                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>]"
             ),
             Self::ReadFile { path, source } => {
                 write!(formatter, "failed to read file {}: {source}", path.display())
@@ -434,6 +449,9 @@ impl std::fmt::Display for CliError {
                     "no testcase json files found in {}",
                     cases_dir.display()
                 )
+            }
+            Self::ExecutableManifest(error) => {
+                write!(formatter, "executable manifest error: {error}")
             }
             Self::TestCase(error) => write!(formatter, "testcase error: {error}"),
             Self::ExpectedJson(error) => write!(formatter, "expected json error: {error}"),
@@ -518,6 +536,33 @@ mod tests {
             observed_result_from_json(include_str!("../../../tests/expected/return_42.json"))
                 .and_then(|result| observed_result_to_json(&result))
                 .expect("expected fixture normalizes to output json");
+
+        assert_eq!(output, expected);
+    }
+
+    #[test]
+    fn check_executable_reads_manifest_and_expected_files() {
+        let temp_dir = TestTempDir::new("check_executable_reads_manifest_and_expected_files");
+        let manifest_path = temp_dir.write_file(
+            "manifest.json",
+            include_str!("../../../tests/executables/hello_world_executable_manifest.json"),
+        );
+        let expected_path = temp_dir.write_file(
+            "expected.json",
+            include_str!("../../../tests/expected/hello_world_executable_manifest.json"),
+        );
+
+        let output = run_cli(vec![
+            String::from("check-executable"),
+            manifest_path.to_string_lossy().into_owned(),
+            expected_path.to_string_lossy().into_owned(),
+        ])
+        .expect("executable manifest check succeeds on supported host");
+        let expected = observed_result_from_json(include_str!(
+            "../../../tests/expected/hello_world_executable_manifest.json"
+        ))
+        .and_then(|result| observed_result_to_json(&result))
+        .expect("expected executable fixture normalizes to output json");
 
         assert_eq!(output, expected);
     }

@@ -1,0 +1,7 @@
+{
+  "case_id": "hello_world_executable_manifest",
+  "exit_status": 0,
+  "return_value": 0,
+  "stdout": "hello world\n",
+  "stderr": ""
+}
