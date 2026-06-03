@@ -17,7 +17,7 @@ impl JsonError {
 
 impl std::fmt::Display for JsonError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(formatter, "json serialization error: {}", self.source)
+        write!(formatter, "json error: {}", self.source)
     }
 }
 
@@ -27,9 +27,13 @@ pub fn observed_result_to_json(result: &ObservedResult) -> Result<String, JsonEr
     serde_json::to_string(result).map_err(JsonError::new)
 }
 
+pub fn observed_result_from_json(input: &str) -> Result<ObservedResult, JsonError> {
+    serde_json::from_str(input).map_err(JsonError::new)
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{observed_result_to_json, CaseId, ObservedResult};
+    use crate::{observed_result_from_json, observed_result_to_json, CaseId, ObservedResult};
 
     #[test]
     fn observed_result_serializes_as_m1_json() {
@@ -44,6 +48,25 @@ mod tests {
         assert_eq!(
             observed_result_to_json(&result).expect("test result serializes"),
             "{\"case_id\":\"return_42\",\"exit_status\":0,\"return_value\":42,\"stdout\":\"\",\"stderr\":\"\"}"
+        );
+    }
+
+    #[test]
+    fn observed_result_parses_from_m1_json() {
+        let result = observed_result_from_json(
+            "{\"case_id\":\"return_42\",\"exit_status\":0,\"return_value\":42,\"stdout\":\"\",\"stderr\":\"\"}",
+        )
+        .expect("expected result json parses");
+
+        assert_eq!(
+            result,
+            ObservedResult::new(
+                CaseId::new("return_42").expect("test case id is non-empty"),
+                0,
+                42,
+                String::new(),
+                String::new()
+            )
         );
     }
 }

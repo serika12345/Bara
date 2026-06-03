@@ -1,0 +1,9 @@
+{
+  "case_id": "return_42",
+  "entry": 0,
+  "bytes": "b82a000000c3",
+  "abi": {
+    "args": [],
+    "return": "u64"
+  }
+}

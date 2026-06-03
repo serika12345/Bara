@@ -24,6 +24,8 @@ dependencies = [
 name = "bara-oracle"
 version = "0.1.0"
 dependencies = [
+ "bara-ir",
+ "bara-isa-x86",
  "serde",
  "serde_json",
 ]
@@ -35,6 +37,7 @@ dependencies = [
  "bara-arm64",
  "bara-ir",
  "bara-isa-x86",
+ "bara-oracle",
  "libc",
 ]
 
