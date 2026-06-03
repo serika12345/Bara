@@ -119,11 +119,19 @@ nix develop
 ```sh
 nix develop -c cargo --version
 nix develop -c cargo fmt --all -- --check
+nix develop -c ./scripts/check-no-invisible-chars
 nix develop -c ./scripts/check-domain-types
+nix develop -c ./scripts/verify-security
+nix develop -c ./scripts/verify-supply-chain
 nix develop -c cargo check --workspace --all-targets
 nix develop -c cargo test --workspace
 nix develop -c cargo run -p btbc-cli -- check-m1
 ```
+
+依存関係、`Cargo.lock`、`deny.toml`、`flake.nix` を変更した場合は
+`./scripts/verify-supply-chain` を必ず実行します。詳細は
+[Supply Chain Policy](docs/supply-chain.md) を参照してください。
+セキュリティ関連の変更では `./scripts/verify-security` も実行します。
 
 direnv を使う場合は `.envrc` の `use flake` を有効にします。
 

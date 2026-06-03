@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+set -eu
+
+cd "$(dirname "$0")/.."
+
+./scripts/check-no-invisible-chars
+./scripts/check-domain-types
+./scripts/verify-supply-chain

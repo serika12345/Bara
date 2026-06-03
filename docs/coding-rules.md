@@ -251,6 +251,21 @@ crates/
 
 Nix Flake で dev shell を定義し、Rust toolchain、formatter、linter、test runner、assembler/linker などをそこから使う。Haskell など追加の言語 toolchain は、実装対象になった時点で dev shell に追加する。
 
+依存関係、lockfile、`deny.toml`、`flake.nix` を変更した場合は、supply-chain 検証を必ず実行する。
+
+```sh
+nix develop -c ./scripts/verify-supply-chain
+```
+
+依存追加は、テストで必要性が示され、ドメイン上の理由を説明できる場合だけ許可する。未知の registry、Git dependency、未審査 license、既知 advisory、duplicate crate version は、明示的な狭い例外なしに受け入れない。
+
+不可視文字、Unicode format character、BiDi override、通常のテキストに不要な制御文字は、悪意あるコードを隠す手段として扱う。Git 管理下のファイルは `scripts/check-no-invisible-chars` で検査し、検出された場合は削除する。例外が必要なファイルは、境界を分離して理由を説明できる状態にする。
+
+```sh
+nix develop -c ./scripts/check-no-invisible-chars
+nix develop -c ./scripts/verify-security
+```
+
 優先すること:
 
 - Rust、formatter、linter、test runner、assembler/linker などは Nix dev shell から使う。
@@ -336,6 +351,8 @@ impl ExecutableBuffer {
 - ルート直下に実装ファイルを増やしていないか。
 - I/O が専用ディレクトリに集約され、ドメインロジックへ散っていないか。
 - 開発手順が Nix dev shell 前提になっているか。
+- 依存や toolchain を変更した場合、supply-chain 検証が通っているか。
+- 不可視文字 / Unicode 制御文字の検査が通っているか。
 - 新規または変更された振る舞いに、先に書かれたテストがあるか。
 - `scripts/check-domain-types` が通り、baseline 更新がある場合は例外理由を説明できるか。
 - EditorConfig と formatter の責務が分かれているか。

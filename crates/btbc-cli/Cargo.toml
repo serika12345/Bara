@@ -6,11 +6,11 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-bara-arm64 = { path = "../bara-arm64" }
-bara-ir = { path = "../bara-ir" }
-bara-isa-x86 = { path = "../bara-isa-x86" }
-bara-oracle = { path = "../bara-oracle" }
-bara-runtime = { path = "../bara-runtime" }
+bara-arm64 = { path = "../bara-arm64", version = "0.1.0" }
+bara-ir = { path = "../bara-ir", version = "0.1.0" }
+bara-isa-x86 = { path = "../bara-isa-x86", version = "0.1.0" }
+bara-oracle = { path = "../bara-oracle", version = "0.1.0" }
+bara-runtime = { path = "../bara-runtime", version = "0.1.0" }
 
 [lints]
 workspace = true

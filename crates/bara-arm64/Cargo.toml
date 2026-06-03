@@ -6,7 +6,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-bara-ir = { path = "../bara-ir" }
+bara-ir = { path = "../bara-ir", version = "0.1.0" }
 
 [lints]
 workspace = true

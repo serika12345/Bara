@@ -78,6 +78,30 @@ working in the shell.
 Rust tooling is provided by `flake.nix`. Add more tools to the flake before
 making them required in scripts or documentation.
 
+Supply-chain checks are mandatory for dependency, lockfile, or toolchain
+changes:
+
+```sh
+nix develop -c ./scripts/verify-supply-chain
+```
+
+Do not add dependencies without a test-backed need and a domain-level reason.
+Keep `Cargo.lock` committed. Do not weaken `deny.toml` to make a dependency
+pass; narrow exceptions must be documented in the same change.
+
+Repository security checks must reject Trojan Source-style invisible/control
+Unicode characters:
+
+```sh
+nix develop -c ./scripts/check-no-invisible-chars
+```
+
+For security-relevant changes, run the aggregate check:
+
+```sh
+nix develop -c ./scripts/verify-security
+```
+
 Use `.editorconfig` for baseline text formatting:
 
 - UTF-8
@@ -316,6 +340,18 @@ nix develop -c cargo --version
 
 Once Rust crates exist, prefer checks through the Nix dev shell.
 
+For dependency, lockfile, `deny.toml`, or `flake.nix` changes, also run:
+
+```sh
+nix develop -c ./scripts/verify-supply-chain
+```
+
+For security-relevant changes, also run:
+
+```sh
+nix develop -c ./scripts/verify-security
+```
+
 ## Review Checklist
 
 Before completing a change, check:
@@ -337,6 +373,9 @@ Before completing a change, check:
 - Is I/O isolated in dedicated directories?
 - Were commands run through the Nix dev shell?
 - Was new or changed behavior driven by a test first?
+- Did supply-chain checks pass when dependencies, lockfiles, or toolchain
+  settings changed?
+- Did invisible/control Unicode checks pass?
 - Are EditorConfig and language formatter responsibilities respected?
 - Does internal mutation preserve external purity?
 - Is `unsafe` absent from core logic and documented at runtime boundaries?

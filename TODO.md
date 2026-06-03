@@ -127,6 +127,8 @@ Output / Runner
 - [x] `btbc-cli` crate を作る。
 - [ ] `btbc-tests` または integration test 用 crate を作る。
 - [ ] 後で Haskell verifier を追加できるディレクトリ構成にする。
+- [x] Rust supply-chain 検証を追加する。
+- [x] 不可視文字 / Unicode 制御文字検査を追加する。
 
 候補構成:
 

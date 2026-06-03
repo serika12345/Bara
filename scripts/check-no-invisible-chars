@@ -1,0 +1,32 @@
+#!/usr/bin/env sh
+set -eu
+
+cd "$(dirname "$0")/.."
+
+matches="$(mktemp "${TMPDIR:-/tmp}/bara-invisible-chars.XXXXXX")"
+trap 'rm -f "$matches"' EXIT
+
+set +e
+git grep -I -n -P \
+  '[\x{0000}-\x{0008}\x{000B}\x{000C}\x{000E}-\x{001F}\x{007F}]|\p{Cf}' \
+  -- . > "$matches"
+status="$?"
+set -e
+
+if [ "$status" -eq 0 ]; then
+  cat >&2 <<'MESSAGE'
+Suspicious invisible/control Unicode characters were found.
+
+Remove the characters or document and isolate the file before allowing it.
+Matches:
+MESSAGE
+  cat "$matches" >&2
+  exit 1
+fi
+
+if [ "$status" -ne 1 ]; then
+  echo "check-no-invisible-chars: git grep failed with status $status" >&2
+  exit "$status"
+fi
+
+echo "check-no-invisible-chars: OK"
