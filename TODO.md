@@ -122,7 +122,7 @@ Output / Runner
 - [x] `bara-isa-x86` crate を作る。
 - [x] `bara-ir` crate を作る。
 - [x] `bara-arm64` crate を作る。
-- [ ] `bara-oracle` crate を作る。
+- [x] `bara-oracle` crate を作る。
 - [x] `bara-runtime` crate を作る。
 - [x] `btbc-cli` crate を作る。
 - [ ] `btbc-tests` または integration test 用 crate を作る。

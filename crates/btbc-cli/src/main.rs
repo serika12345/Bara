@@ -3,6 +3,10 @@ use std::{env, process::ExitCode};
 use bara_arm64::emit_program;
 use bara_ir::X86Va;
 use bara_isa_x86::{decode_function, lift_decoded_function, X86Bytes};
+use bara_oracle::{
+    compare_observed_results, observed_result_to_json, CaseId, ComparisonReport, ExpectedResult,
+    ObservedResult,
+};
 use bara_runtime::run_no_args_u64;
 
 fn main() -> ExitCode {
@@ -33,17 +37,26 @@ fn run_m1_check() -> Result<String, CliError> {
     let emitted = emit_program(&program).map_err(CliError::Emit)?;
     let result = run_no_args_u64(emitted.code().bytes()).map_err(CliError::Run)?;
 
-    if result.return_value() != 42 {
-        return Err(CliError::WrongReturnValue {
-            expected: 42,
-            actual: result.return_value(),
-        });
+    let expected = ExpectedResult::new(
+        CaseId::new("return_42").map_err(CliError::CaseId)?,
+        0,
+        42,
+        String::new(),
+        String::new(),
+    );
+    let actual = ObservedResult::new(
+        CaseId::new("return_42").map_err(CliError::CaseId)?,
+        0,
+        result.return_value(),
+        String::new(),
+        String::new(),
+    );
+    let comparison = compare_observed_results(&expected, &actual);
+    if !comparison.is_match() {
+        return Err(CliError::Comparison(comparison));
     }
 
-    Ok(format!(
-        "{{\"case_id\":\"return_42\",\"exit_status\":0,\"return_value\":{},\"stdout\":\"\",\"stderr\":\"\"}}",
-        result.return_value()
-    ))
+    observed_result_to_json(&actual).map_err(CliError::Json)
 }
 
 #[derive(Debug)]
@@ -54,7 +67,9 @@ enum CliError {
     Lift(bara_isa_x86::LiftError),
     Emit(bara_arm64::EmitError),
     Run(bara_runtime::RunError),
-    WrongReturnValue { expected: u64, actual: u64 },
+    CaseId(bara_oracle::CaseIdError),
+    Comparison(ComparisonReport),
+    Json(bara_oracle::JsonError),
 }
 
 impl std::fmt::Display for CliError {
@@ -66,12 +81,9 @@ impl std::fmt::Display for CliError {
             Self::Lift(error) => write!(formatter, "lift error: {error:?}"),
             Self::Emit(error) => write!(formatter, "emit error: {error:?}"),
             Self::Run(error) => write!(formatter, "run error: {error:?}"),
-            Self::WrongReturnValue { expected, actual } => {
-                write!(
-                    formatter,
-                    "wrong return value: expected {expected}, actual {actual}"
-                )
-            }
+            Self::CaseId(error) => write!(formatter, "case id error: {error:?}"),
+            Self::Comparison(report) => write!(formatter, "comparison failed: {report:?}"),
+            Self::Json(error) => write!(formatter, "{error}"),
         }
     }
 }
