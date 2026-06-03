@@ -10,7 +10,8 @@ pub use binary_format::{
     probe_public_binary_format, BinaryFileBytes, BinaryFormat, BinaryFormatProbeError,
     BinaryFormatProbeMetadata, BinaryFormatProbeReport, BinaryFormatProbeStatus, BinaryInput,
     BinaryInputError, MachOFileType, MachOLoadCommandByteSize, MachOLoadCommandCount,
-    MachOLoadCommands, MachOMetadata,
+    MachOLoadCommandSummary, MachOLoadCommandType, MachOLoadCommands, MachOMetadata,
+    UnsupportedMachOLoadCommand,
 };
 pub use compare::{compare_observed_results, ComparisonIssue, ComparisonReport};
 pub use executable_manifest::{

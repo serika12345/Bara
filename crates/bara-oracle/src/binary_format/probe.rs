@@ -18,7 +18,7 @@ pub enum BinaryFormatProbeStatus {
     RecognizedButUnsupported,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BinaryFormatProbeReport {
     format: BinaryFormat,
     status: BinaryFormatProbeStatus,
@@ -38,20 +38,20 @@ impl BinaryFormatProbeReport {
         }
     }
 
-    pub const fn format(self) -> BinaryFormat {
+    pub const fn format(&self) -> BinaryFormat {
         self.format
     }
 
-    pub const fn status(self) -> BinaryFormatProbeStatus {
+    pub const fn status(&self) -> BinaryFormatProbeStatus {
         self.status
     }
 
-    pub const fn metadata(self) -> BinaryFormatProbeMetadata {
-        self.metadata
+    pub const fn metadata(&self) -> &BinaryFormatProbeMetadata {
+        &self.metadata
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BinaryFormatProbeMetadata {
     mach_o: MachOMetadata,
 }
@@ -61,8 +61,8 @@ impl BinaryFormatProbeMetadata {
         Self { mach_o }
     }
 
-    pub const fn mach_o_metadata(self) -> MachOMetadata {
-        self.mach_o
+    pub const fn mach_o_metadata(&self) -> &MachOMetadata {
+        &self.mach_o
     }
 }
 
@@ -70,6 +70,7 @@ impl BinaryFormatProbeMetadata {
 pub enum BinaryFormatProbeError {
     InputTooShort,
     HeaderTooShort,
+    LoadCommandTooSmall,
     LoadCommandsOutOfBounds,
     UnknownMagic,
     UnsupportedMachOFileType,

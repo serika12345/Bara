@@ -1,11 +1,13 @@
 mod input;
 mod mach_o;
+mod mach_o_load_command;
 mod probe;
 
 pub use input::{BinaryFileBytes, BinaryInput, BinaryInputError};
-pub use mach_o::{
-    MachOFileType, MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommands,
-    MachOMetadata,
+pub use mach_o::{MachOFileType, MachOLoadCommands, MachOMetadata};
+pub use mach_o_load_command::{
+    MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommandSummary, MachOLoadCommandType,
+    UnsupportedMachOLoadCommand,
 };
 pub use probe::{
     probe_public_binary_format, BinaryFormat, BinaryFormatProbeError, BinaryFormatProbeMetadata,
@@ -17,14 +19,17 @@ mod tests {
     use super::{
         probe_public_binary_format, BinaryFileBytes, BinaryFormat, BinaryFormatProbeError,
         BinaryFormatProbeMetadata, BinaryFormatProbeReport, BinaryFormatProbeStatus, BinaryInput,
-        MachOFileType, MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommands,
-        MachOMetadata,
+        MachOFileType, MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommandSummary,
+        MachOLoadCommandType, MachOLoadCommands, MachOMetadata, UnsupportedMachOLoadCommand,
     };
 
-    const EMPTY_LOAD_COMMANDS: MachOLoadCommands = MachOLoadCommands::new(
-        MachOLoadCommandCount::from_public_header_value(0),
-        MachOLoadCommandByteSize::from_public_header_value(0),
-    );
+    fn empty_load_commands() -> MachOLoadCommands {
+        MachOLoadCommands::new(
+            MachOLoadCommandCount::from_public_header_value(0),
+            MachOLoadCommandByteSize::from_public_header_value(0),
+            MachOLoadCommandSummary::empty(),
+        )
+    }
 
     #[test]
     fn recognizes_mach_o_64_little_endian_executable_as_unsupported_binary_with_metadata() {
@@ -40,7 +45,7 @@ mod tests {
                 BinaryFormatProbeStatus::RecognizedButUnsupported,
                 BinaryFormatProbeMetadata::mach_o(MachOMetadata::new(
                     MachOFileType::Executable,
-                    EMPTY_LOAD_COMMANDS
+                    empty_load_commands()
                 ))
             ))
         );
@@ -50,9 +55,9 @@ mod tests {
     fn reads_mach_o_load_command_header_fields_as_typed_metadata() {
         let input = BinaryInput::from_hex(concat!(
             "cffaedfe07000001030000000200000003000000300000000000000000000000",
-            "00000000000000000000000000000000",
-            "00000000000000000000000000000000",
-            "00000000000000000000000000000000",
+            "01000000100000000000000000000000",
+            "02000000100000000000000000000000",
+            "03000000100000000000000000000000",
         ))
         .expect("hex fixture is valid");
 
@@ -65,10 +70,82 @@ mod tests {
                     MachOFileType::Executable,
                     MachOLoadCommands::new(
                         MachOLoadCommandCount::from_public_header_value(3),
-                        MachOLoadCommandByteSize::from_public_header_value(48)
+                        MachOLoadCommandByteSize::from_public_header_value(48),
+                        MachOLoadCommandSummary::from_unsupported_commands(vec![
+                            UnsupportedMachOLoadCommand::new(
+                                MachOLoadCommandType::from_public_command_value(1),
+                                MachOLoadCommandByteSize::from_public_header_value(16)
+                            ),
+                            UnsupportedMachOLoadCommand::new(
+                                MachOLoadCommandType::from_public_command_value(2),
+                                MachOLoadCommandByteSize::from_public_header_value(16)
+                            ),
+                            UnsupportedMachOLoadCommand::new(
+                                MachOLoadCommandType::from_public_command_value(3),
+                                MachOLoadCommandByteSize::from_public_header_value(16)
+                            )
+                        ])
                     )
                 ))
             ))
+        );
+    }
+
+    #[test]
+    fn summarizes_unsupported_mach_o_load_command_envelopes() {
+        let input = BinaryInput::from_hex(concat!(
+            "cffaedfe07000001030000000200000001000000080000000000000000000000",
+            "0100000008000000",
+        ))
+        .expect("hex fixture is valid");
+
+        assert_eq!(
+            probe_public_binary_format(&input),
+            Ok(BinaryFormatProbeReport::new(
+                BinaryFormat::MachO64LittleEndian,
+                BinaryFormatProbeStatus::RecognizedButUnsupported,
+                BinaryFormatProbeMetadata::mach_o(MachOMetadata::new(
+                    MachOFileType::Executable,
+                    MachOLoadCommands::new(
+                        MachOLoadCommandCount::from_public_header_value(1),
+                        MachOLoadCommandByteSize::from_public_header_value(8),
+                        MachOLoadCommandSummary::from_unsupported_commands(vec![
+                            UnsupportedMachOLoadCommand::new(
+                                MachOLoadCommandType::from_public_command_value(1),
+                                MachOLoadCommandByteSize::from_public_header_value(8)
+                            )
+                        ])
+                    )
+                ))
+            ))
+        );
+    }
+
+    #[test]
+    fn rejects_mach_o_load_command_smaller_than_envelope() {
+        let input = BinaryInput::from_hex(concat!(
+            "cffaedfe07000001030000000200000001000000080000000000000000000000",
+            "0100000007000000",
+        ))
+        .expect("hex fixture is valid");
+
+        assert_eq!(
+            probe_public_binary_format(&input),
+            Err(BinaryFormatProbeError::LoadCommandTooSmall)
+        );
+    }
+
+    #[test]
+    fn rejects_mach_o_load_command_range_outside_table() {
+        let input = BinaryInput::from_hex(concat!(
+            "cffaedfe07000001030000000200000001000000080000000000000000000000",
+            "0100000010000000",
+        ))
+        .expect("hex fixture is valid");
+
+        assert_eq!(
+            probe_public_binary_format(&input),
+            Err(BinaryFormatProbeError::LoadCommandsOutOfBounds)
         );
     }
 
@@ -88,7 +165,7 @@ mod tests {
                 BinaryFormatProbeStatus::RecognizedButUnsupported,
                 BinaryFormatProbeMetadata::mach_o(MachOMetadata::new(
                     MachOFileType::Executable,
-                    EMPTY_LOAD_COMMANDS
+                    empty_load_commands()
                 ))
             ))
         );

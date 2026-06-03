@@ -43,6 +43,7 @@ raw function fixture が runtime 境界を通じて stdout に
 - Mach-O 64-bit little-endian header の typed `filetype` metadata
 - Mach-O 64-bit little-endian header の typed `ncmds` / `sizeofcmds` metadata
 - Mach-O 64-bit little-endian load command table bounds validation
+- Mach-O 64-bit little-endian unsupported load command summary
 - Mach-O probe fixture / expected JSON と `check-binary-probe`
 
 ## マイルストーン
@@ -479,6 +480,31 @@ manifest
 
 - `sizeofcmds == 0` の既存 fixture は valid のまま通る。
 - `sizeofcmds` が入力長を超える fixture は分類 error になる。
+
+状態:
+
+- 完了。
+
+### HW7c: unsupported load command summary
+
+目的:
+
+- Mach-O load command table の各 command envelope を読み、未対応 command として
+  summary metadata に残す。
+
+方針:
+
+- command の意味解釈や segment extraction はまだしない。
+- 各 command は `cmd` と `cmdsize` だけを typed value として読む。
+- command range が table 内に収まらない場合は分類 error とする。
+- `ncmds == 0` は empty summary として扱う。
+- 実行、loader 変換、relocation、imports はしない。
+
+成功条件:
+
+- unknown load command を含む Mach-O fixture を probe すると、report JSON に
+  unsupported command summary が含まれる。
+- malformed command size / range は分類 error になる。
 
 状態:
 

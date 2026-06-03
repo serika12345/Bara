@@ -1,8 +1,15 @@
-use super::{input::BinaryInput, probe::BinaryFormatProbeError};
+use super::{
+    input::BinaryInput,
+    mach_o_load_command::{
+        parse_mach_o_load_command_summary, MachOLoadCommandByteSize, MachOLoadCommandCount,
+        MachOLoadCommandSummary, MachOLoadCommandTableRange,
+    },
+    probe::BinaryFormatProbeError,
+};
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct MachOMetadata {
     file_type: MachOFileType,
     load_commands: MachOLoadCommands,
@@ -16,12 +23,12 @@ impl MachOMetadata {
         }
     }
 
-    pub const fn file_type(self) -> MachOFileType {
+    pub const fn file_type(&self) -> MachOFileType {
         self.file_type
     }
 
-    pub const fn load_commands(self) -> MachOLoadCommands {
-        self.load_commands
+    pub const fn load_commands(&self) -> &MachOLoadCommands {
+        &self.load_commands
     }
 }
 
@@ -31,47 +38,37 @@ pub enum MachOFileType {
     Executable,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct MachOLoadCommands {
     count: MachOLoadCommandCount,
     byte_size: MachOLoadCommandByteSize,
+    #[serde(flatten)]
+    summary: MachOLoadCommandSummary,
 }
 
 impl MachOLoadCommands {
-    pub const fn new(count: MachOLoadCommandCount, byte_size: MachOLoadCommandByteSize) -> Self {
-        Self { count, byte_size }
+    pub const fn new(
+        count: MachOLoadCommandCount,
+        byte_size: MachOLoadCommandByteSize,
+        summary: MachOLoadCommandSummary,
+    ) -> Self {
+        Self {
+            count,
+            byte_size,
+            summary,
+        }
     }
 
-    pub const fn count(self) -> MachOLoadCommandCount {
+    pub const fn count(&self) -> MachOLoadCommandCount {
         self.count
     }
 
-    pub const fn byte_size(self) -> MachOLoadCommandByteSize {
+    pub const fn byte_size(&self) -> MachOLoadCommandByteSize {
         self.byte_size
     }
-}
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(transparent)]
-pub struct MachOLoadCommandCount {
-    value: u32,
-}
-
-impl MachOLoadCommandCount {
-    pub(crate) const fn from_public_header_value(value: u32) -> Self {
-        Self { value }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(transparent)]
-pub struct MachOLoadCommandByteSize {
-    value: u32,
-}
-
-impl MachOLoadCommandByteSize {
-    pub(crate) const fn from_public_header_value(value: u32) -> Self {
-        Self { value }
+    pub const fn summary(&self) -> &MachOLoadCommandSummary {
+        &self.summary
     }
 }
 
@@ -94,12 +91,18 @@ pub(crate) fn parse_mach_o_64_little_endian_metadata(
         .read_little_endian_u32_at(MACH_O_SIZEOFCMDS_OFFSET)
         .map(MachOLoadCommandByteSize::from_public_header_value)
         .ok_or(BinaryFormatProbeError::HeaderTooShort)?;
-    let _load_command_table_range =
+    let load_command_table_range =
         validate_load_command_table_bounds(input, load_command_byte_size)?;
+    let load_command_summary =
+        parse_mach_o_load_command_summary(input, load_command_table_range, load_command_count)?;
 
     Ok(MachOMetadata::new(
         file_type,
-        MachOLoadCommands::new(load_command_count, load_command_byte_size),
+        MachOLoadCommands::new(
+            load_command_count,
+            load_command_byte_size,
+            load_command_summary,
+        ),
     ))
 }
 
@@ -117,19 +120,17 @@ fn validate_load_command_table_bounds(
     byte_size: MachOLoadCommandByteSize,
 ) -> Result<MachOLoadCommandTableRange, BinaryFormatProbeError> {
     let table_end = MACH_O_64_HEADER_WIDTH
-        .checked_add(byte_size.value as usize)
+        .checked_add(byte_size.as_usize())
         .ok_or(BinaryFormatProbeError::LoadCommandsOutOfBounds)?;
 
     if input.has_len_at_least(table_end) {
-        Ok(MachOLoadCommandTableRange { end: table_end })
+        Ok(MachOLoadCommandTableRange::new(
+            MACH_O_64_HEADER_WIDTH,
+            table_end,
+        ))
     } else {
         Err(BinaryFormatProbeError::LoadCommandsOutOfBounds)
     }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct MachOLoadCommandTableRange {
-    end: usize,
 }
 
 const MACH_O_64_HEADER_WIDTH: usize = 32;
