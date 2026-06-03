@@ -38,6 +38,7 @@ raw function fixture が runtime 境界を通じて stdout に
 - `check-executable <manifest.json> <expected.json>`
 - public binary format の最小 probe
 - Mach-O 64-bit little-endian magic の recognized-but-unsupported 分類
+- `probe-binary <path>` CLI による public binary probe
 
 ## マイルストーン
 
@@ -184,6 +185,7 @@ ret
 - HW5c: entry point と process-like run result
 - HW5d: host helper import table
 - HW5e: public binary format の最小 probe
+- HW6: public binary probe の I/O 境界
 
 ### HW5a: Bara executable manifest v0
 
@@ -304,6 +306,44 @@ manifest
 
 - ELF / Mach-O / PE のうち 1 形式について、最小 header を分類して
   unsupported-but-recognized として報告できる。
+
+状態:
+
+- 完了。
+
+### HW6: public binary probe の I/O 境界
+
+目的:
+
+- core の binary format probe を、CLI / filesystem 境界から使えるようにする。
+- 実行や loader 変換へ進む前に、未知形式や未対応形式を安定して報告する。
+
+分割:
+
+- HW6a: `probe-binary <path>` CLI
+- HW6b: probe report JSON
+- HW6c: Mach-O header metadata の最小 typed field
+- HW6d: probe fixture corpus
+
+### HW6a: `probe-binary <path>` CLI
+
+目的:
+
+- ファイルから public binary bytes を読み込み、既存の binary format probe に渡す
+  I/O 境界を作る。
+
+方針:
+
+- filesystem access は `btbc-cli` に閉じる。
+- `bara-oracle::binary_format` は純粋な bytes probe のままにする。
+- CLI は実行や loader 変換を行わず、recognized-but-unsupported / error を
+  user-visible に返すだけにする。
+
+成功条件:
+
+- Mach-O magic を持つ fixture file に対して `probe-binary` が
+  recognized-but-unsupported を報告する。
+- 短すぎる入力、unknown magic は分類された CLI error として扱う。
 
 状態:
 

@@ -1,7 +1,7 @@
 mod input;
 mod probe;
 
-pub use input::{BinaryInput, BinaryInputError};
+pub use input::{BinaryFileBytes, BinaryInput, BinaryInputError};
 pub use probe::{
     probe_public_binary_format, BinaryFormat, BinaryFormatProbeError, BinaryFormatProbeReport,
     BinaryFormatProbeStatus,
@@ -10,8 +10,8 @@ pub use probe::{
 #[cfg(test)]
 mod tests {
     use super::{
-        probe_public_binary_format, BinaryFormat, BinaryFormatProbeError, BinaryFormatProbeReport,
-        BinaryFormatProbeStatus, BinaryInput,
+        probe_public_binary_format, BinaryFileBytes, BinaryFormat, BinaryFormatProbeError,
+        BinaryFormatProbeReport, BinaryFormatProbeStatus, BinaryInput,
     };
 
     #[test]
@@ -20,6 +20,22 @@ mod tests {
             "cffaedfe00000000000000000000000000000000000000000000000000000000",
         )
         .expect("hex fixture is valid");
+
+        assert_eq!(
+            probe_public_binary_format(&input),
+            Ok(BinaryFormatProbeReport::new(
+                BinaryFormat::MachO64LittleEndian,
+                BinaryFormatProbeStatus::RecognizedButUnsupported
+            ))
+        );
+    }
+
+    #[test]
+    fn constructs_binary_input_from_owned_file_bytes() {
+        let input =
+            BinaryInput::from_file_bytes(BinaryFileBytes::from_untrusted_file_contents(vec![
+                0xcf, 0xfa, 0xed, 0xfe,
+            ]));
 
         assert_eq!(
             probe_public_binary_format(&input),

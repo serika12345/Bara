@@ -7,8 +7,8 @@ pub mod report;
 pub mod testcase;
 
 pub use binary_format::{
-    probe_public_binary_format, BinaryFormat, BinaryFormatProbeError, BinaryFormatProbeReport,
-    BinaryFormatProbeStatus, BinaryInput, BinaryInputError,
+    probe_public_binary_format, BinaryFileBytes, BinaryFormat, BinaryFormatProbeError,
+    BinaryFormatProbeReport, BinaryFormatProbeStatus, BinaryInput, BinaryInputError,
 };
 pub use compare::{compare_observed_results, ComparisonIssue, ComparisonReport};
 pub use executable_manifest::{

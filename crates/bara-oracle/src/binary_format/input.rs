@@ -4,6 +4,10 @@ pub struct BinaryInput {
 }
 
 impl BinaryInput {
+    pub fn from_file_bytes(bytes: BinaryFileBytes) -> Self {
+        Self { bytes: bytes.bytes }
+    }
+
     pub fn from_hex(input: &str) -> Result<Self, BinaryInputError> {
         let bytes = decode_hex_bytes(input)?;
 
@@ -18,6 +22,22 @@ impl BinaryInput {
 
     pub(crate) fn starts_with_magic(&self, magic: BinaryMagic) -> bool {
         self.bytes.starts_with(magic.bytes())
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BinaryFileBytes {
+    bytes: Box<[u8]>,
+}
+
+impl BinaryFileBytes {
+    pub fn from_untrusted_file_contents<T>(bytes: T) -> Self
+    where
+        T: Into<Box<[u8]>>,
+    {
+        Self {
+            bytes: bytes.into(),
+        }
     }
 }
 
