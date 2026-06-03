@@ -18,8 +18,8 @@ pub use executable_manifest::{
     HostHelperImportTable, HostHelperImportTableError, HostHelperName, HostHelperSignature,
 };
 pub use json::{
-    binary_format_probe_report_to_json, corpus_report_to_json, observed_result_from_json,
-    observed_result_to_json, JsonError,
+    binary_format_probe_report_from_json, binary_format_probe_report_to_json,
+    corpus_report_to_json, observed_result_from_json, observed_result_to_json, JsonError,
 };
 pub use observation::{CaseId, CaseIdError, ExpectedResult, ObservedResult};
 pub use report::{CorpusReport, FailureKind, FailureMessage, FixtureOutcome, FixtureReport};

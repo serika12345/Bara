@@ -41,6 +41,7 @@ raw function fixture が runtime 境界を通じて stdout に
 - `probe-binary <path>` CLI による public binary probe
 - `probe-binary <path>` の安定 JSON report 出力
 - Mach-O 64-bit little-endian header の typed `filetype` metadata
+- Mach-O probe fixture / expected JSON と `check-binary-probe`
 
 ## マイルストーン
 
@@ -394,6 +395,28 @@ manifest
 - Mach-O 64-bit little-endian executable header を probe すると、report JSON に
   file type metadata が含まれる。
 - 未対応 filetype は分類 error または unsupported metadata として扱い、panic しない。
+
+状態:
+
+- 完了。
+
+### HW6d: probe fixture corpus
+
+目的:
+
+- public binary probe を file-based fixture / expected JSON で回帰確認できるようにする。
+
+方針:
+
+- fixture binary は self-authored な最小 header bytes とする。
+- expected は `probe-binary` と同じ stable JSON report にする。
+- 比較 I/O は CLI / scripts 境界に閉じ、`bara-oracle::binary_format` は純粋 probe のままにする。
+- 実行、loader 変換、load commands parse はしない。
+
+成功条件:
+
+- Mach-O executable header fixture と expected probe JSON が repository にある。
+- binary probe fixture を検証する CLI または script があり、`verify-blackbox` から通る。
 
 状態:
 

@@ -12,3 +12,7 @@ cargo run -p btbc-cli -- check-executable \
   tests/executables/entry_offset_return_42_manifest.json \
   tests/expected/entry_offset_return_42_manifest.json \
   > target/bara-blackbox/actual/entry_offset_return_42_manifest.json
+cargo run -p btbc-cli -- check-binary-probe \
+  tests/binaries/mach_o_execute_header.bin \
+  tests/expected-probes/mach_o_execute_header.json \
+  > target/bara-blackbox/actual/mach_o_execute_header_probe.json

@@ -3,22 +3,22 @@ use super::{
     mach_o::{parse_mach_o_64_little_endian_metadata, MachOMetadata},
 };
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BinaryFormat {
     #[serde(rename = "mach_o_64_little_endian")]
     MachO64LittleEndian,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BinaryFormatProbeStatus {
     RecognizedButUnsupported,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BinaryFormatProbeReport {
     format: BinaryFormat,
     status: BinaryFormatProbeStatus,
@@ -51,7 +51,7 @@ impl BinaryFormatProbeReport {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BinaryFormatProbeMetadata {
     mach_o: MachOMetadata,
 }

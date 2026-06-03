@@ -1,8 +1,8 @@
 use super::{input::BinaryInput, probe::BinaryFormatProbeError};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct MachOMetadata {
     file_type: MachOFileType,
 }
@@ -17,7 +17,7 @@ impl MachOMetadata {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MachOFileType {
     Executable,

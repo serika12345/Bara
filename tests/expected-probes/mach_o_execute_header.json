@@ -1,0 +1,9 @@
+{
+  "format": "mach_o_64_little_endian",
+  "status": "recognized_but_unsupported",
+  "metadata": {
+    "mach_o": {
+      "file_type": "executable"
+    }
+  }
+}

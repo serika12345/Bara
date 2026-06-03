@@ -41,13 +41,20 @@ pub fn binary_format_probe_report_to_json(
     serde_json::to_string(report).map_err(JsonError::new)
 }
 
+pub fn binary_format_probe_report_from_json(
+    input: &str,
+) -> Result<BinaryFormatProbeReport, JsonError> {
+    serde_json::from_str(input).map_err(JsonError::new)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
-        binary_format_probe_report_to_json, corpus_report_to_json, observed_result_from_json,
-        observed_result_to_json, BinaryFormat, BinaryFormatProbeMetadata, BinaryFormatProbeReport,
-        BinaryFormatProbeStatus, CaseId, CorpusReport, FailureKind, FailureMessage, FixtureOutcome,
-        FixtureReport, MachOFileType, MachOMetadata, ObservedResult,
+        binary_format_probe_report_from_json, binary_format_probe_report_to_json,
+        corpus_report_to_json, observed_result_from_json, observed_result_to_json, BinaryFormat,
+        BinaryFormatProbeMetadata, BinaryFormatProbeReport, BinaryFormatProbeStatus, CaseId,
+        CorpusReport, FailureKind, FailureMessage, FixtureOutcome, FixtureReport, MachOFileType,
+        MachOMetadata, ObservedResult,
     };
 
     #[test]
@@ -120,6 +127,23 @@ mod tests {
         assert_eq!(
             binary_format_probe_report_to_json(&report).expect("probe report serializes"),
             "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\",\"metadata\":{\"mach_o\":{\"file_type\":\"executable\"}}}"
+        );
+    }
+
+    #[test]
+    fn binary_format_probe_report_parses_from_expected_json() {
+        let report = binary_format_probe_report_from_json(
+            "{\n  \"format\": \"mach_o_64_little_endian\",\n  \"status\": \"recognized_but_unsupported\",\n  \"metadata\": {\n    \"mach_o\": {\n      \"file_type\": \"executable\"\n    }\n  }\n}\n",
+        )
+        .expect("probe report json parses");
+
+        assert_eq!(
+            report,
+            BinaryFormatProbeReport::new(
+                BinaryFormat::MachO64LittleEndian,
+                BinaryFormatProbeStatus::RecognizedButUnsupported,
+                BinaryFormatProbeMetadata::mach_o(MachOMetadata::new(MachOFileType::Executable))
+            )
         );
     }
 }

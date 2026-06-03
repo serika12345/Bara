@@ -5,9 +5,10 @@ use std::{
 };
 
 use bara_oracle::{
-    binary_format_probe_report_to_json, compare_observed_results, corpus_report_to_json,
-    executable_manifest_from_json, observed_result_from_json, observed_result_to_json,
-    probe_public_binary_format, test_case_from_json, BinaryFileBytes, BinaryFormatProbeError,
+    binary_format_probe_report_from_json, binary_format_probe_report_to_json,
+    compare_observed_results, corpus_report_to_json, executable_manifest_from_json,
+    observed_result_from_json, observed_result_to_json, probe_public_binary_format,
+    test_case_from_json, BinaryFileBytes, BinaryFormatProbeError, BinaryFormatProbeReport,
     BinaryInput, CaseId, ComparisonReport, CorpusReport, ExecutableManifest, ExpectedResult,
     FailureKind, FailureMessage, FixtureOutcome, FixtureReport, ObservedResult, TestCase,
 };
@@ -42,6 +43,9 @@ fn run_cli(args: Vec<String>) -> Result<String, CliError> {
         }
         [command, binary_path] if command == "probe-binary" => {
             run_probe_binary(Path::new(binary_path))
+        }
+        [command, binary_path, expected_path] if command == "check-binary-probe" => {
+            run_check_binary_probe(Path::new(binary_path), Path::new(expected_path))
         }
         [command, cases_dir, expected_dir] if command == "check-corpus" => {
             run_check_corpus(Path::new(cases_dir), Path::new(expected_dir))
@@ -95,6 +99,21 @@ fn run_probe_binary(binary_path: &Path) -> Result<String, CliError> {
     let report = probe_public_binary_format(&input).map_err(CliError::BinaryFormatProbe)?;
 
     binary_format_probe_report_to_json(&report).map_err(CliError::Json)
+}
+
+fn run_check_binary_probe(binary_path: &Path, expected_path: &Path) -> Result<String, CliError> {
+    let bytes = read_binary_file(binary_path)?;
+    let expected_json = read_text_file(expected_path)?;
+    let expected = binary_format_probe_report_from_json(&expected_json)
+        .map_err(CliError::ExpectedProbeJson)?;
+    let input = BinaryInput::from_file_bytes(BinaryFileBytes::from_untrusted_file_contents(bytes));
+    let actual = probe_public_binary_format(&input).map_err(CliError::BinaryFormatProbe)?;
+
+    if actual != expected {
+        return Err(CliError::BinaryProbeComparisonMismatch { expected, actual });
+    }
+
+    binary_format_probe_report_to_json(&actual).map_err(CliError::Json)
 }
 
 fn run_check_corpus(cases_dir: &Path, expected_dir: &Path) -> Result<String, CliError> {
@@ -351,16 +370,38 @@ fn case_id_from_path(path: &Path) -> CaseId {
 #[derive(Debug)]
 enum CliError {
     Usage,
-    ReadFile { path: PathBuf, source: io::Error },
-    WriteFile { path: PathBuf, source: io::Error },
-    CreateDir { path: PathBuf, source: io::Error },
-    ReadDir { path: PathBuf, source: io::Error },
-    ReadDirEntry { path: PathBuf, source: io::Error },
-    EmptyCorpus { cases_dir: PathBuf },
+    ReadFile {
+        path: PathBuf,
+        source: io::Error,
+    },
+    WriteFile {
+        path: PathBuf,
+        source: io::Error,
+    },
+    CreateDir {
+        path: PathBuf,
+        source: io::Error,
+    },
+    ReadDir {
+        path: PathBuf,
+        source: io::Error,
+    },
+    ReadDirEntry {
+        path: PathBuf,
+        source: io::Error,
+    },
+    EmptyCorpus {
+        cases_dir: PathBuf,
+    },
     ExecutableManifest(bara_oracle::ExecutableManifestJsonError),
     TestCase(bara_oracle::TestCaseJsonError),
     ExpectedJson(bara_oracle::JsonError),
+    ExpectedProbeJson(bara_oracle::JsonError),
     BinaryFormatProbe(BinaryFormatProbeError),
+    BinaryProbeComparisonMismatch {
+        expected: BinaryFormatProbeReport,
+        actual: BinaryFormatProbeReport,
+    },
     FunctionRun(FunctionRunError),
     ExecutableRun(ExecutableRunError),
     Comparison(ComparisonReport),
@@ -374,7 +415,9 @@ impl CliError {
             Self::TestCase(_) => FailureKind::InvalidTestCase,
             Self::ExecutableManifest(_) => FailureKind::InvalidTestCase,
             Self::ExpectedJson(_) => FailureKind::InvalidExpected,
+            Self::ExpectedProbeJson(_) => FailureKind::InvalidExpected,
             Self::BinaryFormatProbe(_) => FailureKind::InvalidTestCase,
+            Self::BinaryProbeComparisonMismatch { .. } => FailureKind::ComparisonMismatch,
             Self::FunctionRun(error) => error.failure_kind(),
             Self::ExecutableRun(error) => error.failure_kind(),
             Self::Comparison(_) => FailureKind::ComparisonMismatch,
@@ -396,7 +439,7 @@ impl std::fmt::Display for CliError {
         match self {
             Self::Usage => write!(
                 formatter,
-                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path>"
+                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json>"
             ),
             Self::ReadFile { path, source } => {
                 write!(formatter, "failed to read file {}: {source}", path.display())
@@ -441,8 +484,17 @@ impl std::fmt::Display for CliError {
             }
             Self::TestCase(error) => write!(formatter, "testcase error: {error}"),
             Self::ExpectedJson(error) => write!(formatter, "expected json error: {error}"),
+            Self::ExpectedProbeJson(error) => {
+                write!(formatter, "expected probe json error: {error}")
+            }
             Self::BinaryFormatProbe(error) => {
                 write!(formatter, "binary format probe error: {error:?}")
+            }
+            Self::BinaryProbeComparisonMismatch { expected, actual } => {
+                write!(
+                    formatter,
+                    "binary probe comparison failed: expected {expected:?}, actual {actual:?}"
+                )
             }
             Self::FunctionRun(error) => write!(formatter, "function run error: {error}"),
             Self::ExecutableRun(error) => write!(formatter, "executable run error: {error}"),
@@ -577,6 +629,36 @@ mod tests {
     }
 
     #[test]
+    fn check_binary_probe_compares_probe_report_with_expected_json() {
+        let temp_dir =
+            TestTempDir::new("check_binary_probe_compares_probe_report_with_expected_json");
+        let binary_path = temp_dir.write_binary_file(
+            "fixture.bin",
+            &[
+                0xcf, 0xfa, 0xed, 0xfe, 0x07, 0x00, 0x00, 0x01, 0x03, 0x00, 0x00, 0x00, 0x02, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00,
+            ],
+        );
+        let expected_path = temp_dir.write_file(
+            "expected.json",
+            "{\n  \"format\": \"mach_o_64_little_endian\",\n  \"status\": \"recognized_but_unsupported\",\n  \"metadata\": {\n    \"mach_o\": {\n      \"file_type\": \"executable\"\n    }\n  }\n}\n",
+        );
+
+        let output = run_cli(vec![
+            String::from("check-binary-probe"),
+            binary_path.to_string_lossy().into_owned(),
+            expected_path.to_string_lossy().into_owned(),
+        ])
+        .expect("binary probe check succeeds");
+
+        assert_eq!(
+            output,
+            "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\",\"metadata\":{\"mach_o\":{\"file_type\":\"executable\"}}}"
+        );
+    }
+
+    #[test]
     fn probe_binary_reports_short_input_as_classified_error() {
         let temp_dir = TestTempDir::new("probe_binary_reports_short_input_as_classified_error");
         let binary_path = temp_dir.write_binary_file("fixture.bin", &[0xcf, 0xfa, 0xed]);
@@ -620,6 +702,9 @@ mod tests {
         let error = run_cli(Vec::new()).expect_err("missing command reports usage");
 
         assert!(error.to_string().contains("probe-binary <path>"));
+        assert!(error
+            .to_string()
+            .contains("check-binary-probe <binary> <expected.json>"));
     }
 
     #[test]
