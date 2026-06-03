@@ -59,7 +59,7 @@ pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
     };
 
     let mut code = Vec::new();
-    let mut last_rax_imm = None;
+    let mut has_rax_value = false;
 
     for op in block.ops() {
         match op {
@@ -67,9 +67,24 @@ pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
                 dst: Operand::Reg(X86Reg::Rax),
                 src: Operand::ImmU64(value),
             } => {
-                last_rax_imm = Some(*value);
+                emit_mov_x0_u64(&mut code, *value);
+                has_rax_value = true;
             }
             IrOp::Mov { .. } => {
+                return Err(EmitError::UnsupportedIr {
+                    reason: UnsupportedReason::EmitUnsupportedIr,
+                });
+            }
+            IrOp::Add {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(value),
+            } => {
+                if !has_rax_value {
+                    return Err(EmitError::UnsupportedShape);
+                }
+                emit_add_x0_imm12(&mut code, *value)?;
+            }
+            IrOp::Add { .. } => {
                 return Err(EmitError::UnsupportedIr {
                     reason: UnsupportedReason::EmitUnsupportedIr,
                 });
@@ -84,8 +99,9 @@ pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
 
     match block.terminator() {
         Terminator::Return => {
-            let value = last_rax_imm.ok_or(EmitError::UnsupportedShape)?;
-            emit_mov_x0_u64(&mut code, value);
+            if !has_rax_value {
+                return Err(EmitError::UnsupportedShape);
+            }
             emit_u32_le(&mut code, 0xd65f_03c0);
         }
         Terminator::Unsupported { reason } => {
@@ -119,6 +135,22 @@ fn emit_mov_x0_u64(code: &mut Vec<u8>, value: u64) -> usize {
     }
 
     emitted
+}
+
+fn emit_add_x0_imm12(code: &mut Vec<u8>, value: u64) -> Result<usize, EmitError> {
+    let Ok(imm12) = u32::try_from(value) else {
+        return Err(EmitError::UnsupportedIr {
+            reason: UnsupportedReason::EmitUnsupportedIr,
+        });
+    };
+
+    if imm12 > 0xfff {
+        return Err(EmitError::UnsupportedIr {
+            reason: UnsupportedReason::EmitUnsupportedIr,
+        });
+    }
+
+    Ok(emit_u32_le(code, 0x9100_0000 | (imm12 << 10)))
 }
 
 fn emit_u32_le(code: &mut Vec<u8>, instruction: u32) -> usize {
@@ -169,6 +201,30 @@ mod tests {
         );
         assert_eq!(emitted.pc_map()[0].source(), X86Va::new(0));
         assert_eq!(emitted.pc_map()[0].target(), ArmPc::new(0));
+    }
+
+    #[test]
+    fn emits_add_x0_immediate_for_rax_add_immediate() {
+        let program = program_with_ops(
+            vec![
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(42),
+                },
+                IrOp::Add {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(3),
+                },
+            ],
+            Terminator::Return,
+        );
+
+        let emitted = emit_program(&program).expect("add immediate IR emits");
+
+        assert_eq!(
+            emitted.code().bytes(),
+            &[0x40, 0x05, 0x80, 0xd2, 0x00, 0x0c, 0x00, 0x91, 0xc0, 0x03, 0x5f, 0xd6]
+        );
     }
 
     #[test]

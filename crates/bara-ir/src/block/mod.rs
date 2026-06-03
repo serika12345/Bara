@@ -72,6 +72,7 @@ pub enum BasicBlockError {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum IrOp {
     Mov { dst: Operand, src: Operand },
+    Add { dst: Operand, src: Operand },
     Unsupported { reason: UnsupportedReason },
 }
 
