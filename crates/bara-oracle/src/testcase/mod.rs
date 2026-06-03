@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use crate::{CaseId, CaseIdError};
 
-mod host_trap;
+pub(crate) mod host_trap;
 
 pub use host_trap::{TestCaseHostTrapPlan, TestCaseStdoutTrap, TestCaseStdoutTrapError};
 
@@ -190,19 +190,19 @@ struct TestCaseDto {
 }
 
 #[derive(Deserialize)]
-struct TestCaseAbiDto {
-    args: Vec<String>,
+pub(crate) struct TestCaseAbiDto {
+    pub(crate) args: Vec<String>,
     #[serde(rename = "return")]
-    return_value: String,
+    pub(crate) return_value: String,
 }
 
 #[derive(Deserialize)]
-struct TestCaseMemoryDto {
-    input: String,
+pub(crate) struct TestCaseMemoryDto {
+    pub(crate) input: String,
 }
 
 impl TestCaseAbi {
-    fn try_from_parts(
+    pub(crate) fn try_from_parts(
         abi: TestCaseAbiDto,
         arguments: Vec<u64>,
         memory: Option<TestCaseMemoryDto>,
@@ -250,7 +250,7 @@ impl TestCaseAbi {
     }
 }
 
-fn decode_hex_bytes(input: &str) -> Result<Vec<u8>, TestCaseJsonError> {
+pub(crate) fn decode_hex_bytes(input: &str) -> Result<Vec<u8>, TestCaseJsonError> {
     if !input.len().is_multiple_of(2) {
         return Err(TestCaseJsonError::OddHexLength {
             hex_len: input.len(),

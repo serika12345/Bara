@@ -33,6 +33,7 @@ raw function fixture が runtime 境界を通じて stdout に
 - file-based corpus fixture と `actual.json` / `report.json` 出力
 - stdout / stderr / return_value の expected / actual 比較
 - Bara executable manifest v0 から raw function pipeline への変換
+- executable image の code segment と entry offset validation
 - `check-executable <manifest.json> <expected.json>`
 
 ## マイルストーン
@@ -232,6 +233,10 @@ manifest
 成功条件:
 
 - entry offset 付き image から既存 decode/lift/emit pipeline へ渡せる。
+
+状態:
+
+- 完了。
 
 ### HW5c: entry point と process-like run result
 

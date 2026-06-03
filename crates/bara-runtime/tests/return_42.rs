@@ -279,7 +279,9 @@ fn hello_world_executable_manifest_runs_through_raw_function_pipeline() -> Resul
         "hello_world_executable_manifest",
         include_str!("../../../tests/expected/hello_world_executable_manifest.json"),
     )?;
-    let test_case = manifest.into_entry_function();
+    let test_case = manifest
+        .into_entry_function()
+        .map_err(|error| format!("hello_world_executable_manifest entry resolves: {error}"))?;
     let emitted = decode_lift_emit("hello_world_executable_manifest", &test_case)?;
 
     assert_native_run_matches_expected(&test_case, &expected, &emitted)

@@ -1,21 +1,35 @@
 use std::{error::Error, fmt};
 
+use bara_ir::X86Va;
+use bara_isa_x86::X86Bytes;
 use serde::Deserialize;
-use serde_json::json;
 
-use crate::{test_case_from_json, CaseId, CaseIdError, TestCase, TestCaseJsonError};
+use crate::{CaseId, CaseIdError, TestCase, TestCaseAbi, TestCaseHostTrapPlan, TestCaseJsonError};
+
+mod image;
+
+pub use image::{CodeSegment, ExecutableEntry, ExecutableImage, ExecutableImageError};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ExecutableManifest {
     executable_id: CaseId,
-    entry_function: TestCase,
+    image: ExecutableImage,
+    abi: TestCaseAbi,
+    host_trap_plan: TestCaseHostTrapPlan,
 }
 
 impl ExecutableManifest {
-    const fn new(executable_id: CaseId, entry_function: TestCase) -> Self {
+    const fn new(
+        executable_id: CaseId,
+        image: ExecutableImage,
+        abi: TestCaseAbi,
+        host_trap_plan: TestCaseHostTrapPlan,
+    ) -> Self {
         Self {
             executable_id,
-            entry_function,
+            image,
+            abi,
+            host_trap_plan,
         }
     }
 
@@ -23,12 +37,26 @@ impl ExecutableManifest {
         &self.executable_id
     }
 
-    pub const fn entry_function(&self) -> &TestCase {
-        &self.entry_function
+    pub const fn image(&self) -> &ExecutableImage {
+        &self.image
     }
 
-    pub fn into_entry_function(self) -> TestCase {
-        self.entry_function
+    pub fn entry_function(&self) -> Result<TestCase, ExecutableManifestJsonError> {
+        let entry_bytes = self
+            .image
+            .entry_function_bytes()
+            .map_err(ExecutableManifestJsonError::Image)?;
+
+        Ok(TestCase::with_host_traps(
+            self.executable_id.clone(),
+            entry_bytes,
+            self.abi.clone(),
+            self.host_trap_plan.clone(),
+        ))
+    }
+
+    pub fn into_entry_function(self) -> Result<TestCase, ExecutableManifestJsonError> {
+        self.entry_function()
     }
 }
 
@@ -38,6 +66,7 @@ pub enum ExecutableManifestJsonError {
     ExecutableId(CaseIdError),
     UnsupportedFormat { format: String },
     EntryFunction(TestCaseJsonError),
+    Image(ExecutableImageError),
 }
 
 impl fmt::Display for ExecutableManifestJsonError {
@@ -54,6 +83,7 @@ impl fmt::Display for ExecutableManifestJsonError {
                 )
             }
             Self::EntryFunction(error) => write!(formatter, "invalid entry function: {error}"),
+            Self::Image(error) => write!(formatter, "invalid executable image: {error:?}"),
         }
     }
 }
@@ -72,18 +102,27 @@ pub fn executable_manifest_from_json(
 
     let executable_id =
         CaseId::new(dto.executable_id).map_err(ExecutableManifestJsonError::ExecutableId)?;
-    let entry_function_json = json!({
-        "case_id": executable_id.as_str(),
-        "entry": dto.entry,
-        "bytes": dto.code,
-        "abi": dto.abi,
-        "host_traps": dto.host_traps,
-    })
-    .to_string();
-    let entry_function = test_case_from_json(&entry_function_json)
+    let abi = TestCaseAbi::try_from_parts(dto.abi, dto.arguments, dto.memory)
         .map_err(ExecutableManifestJsonError::EntryFunction)?;
+    let host_trap_plan = crate::testcase::host_trap::host_trap_plan_from_dtos(dto.host_traps)
+        .map_err(ExecutableManifestJsonError::EntryFunction)?;
+    let bytes = crate::testcase::decode_hex_bytes(&dto.code)
+        .map_err(ExecutableManifestJsonError::EntryFunction)?;
+    let code_segment = CodeSegment::from_x86_bytes(
+        X86Bytes::new(X86Va::new(0), bytes)
+            .map_err(TestCaseJsonError::DecodeInput)
+            .map_err(ExecutableManifestJsonError::EntryFunction)?,
+    );
+    let entry = ExecutableEntry::new(X86Va::new(dto.entry));
+    let image =
+        ExecutableImage::new(code_segment, entry).map_err(ExecutableManifestJsonError::Image)?;
 
-    Ok(ExecutableManifest::new(executable_id, entry_function))
+    Ok(ExecutableManifest::new(
+        executable_id,
+        image,
+        abi,
+        host_trap_plan,
+    ))
 }
 
 #[derive(Deserialize)]
@@ -92,16 +131,19 @@ struct ExecutableManifestDto {
     format: String,
     entry: u64,
     code: String,
-    abi: serde_json::Value,
+    abi: crate::testcase::TestCaseAbiDto,
     #[serde(default)]
-    host_traps: Vec<serde_json::Value>,
+    arguments: Vec<u64>,
+    memory: Option<crate::testcase::TestCaseMemoryDto>,
+    #[serde(default)]
+    host_traps: Vec<crate::testcase::host_trap::TestCaseHostTrapDto>,
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        executable_manifest_from_json, CaseId, ExecutableManifestJsonError, TestCaseAbi,
-        TestCaseJsonError,
+        executable_manifest_from_json, CaseId, ExecutableImageError, ExecutableManifestJsonError,
+        TestCaseAbi, TestCaseJsonError,
     };
 
     #[test]
@@ -115,19 +157,61 @@ mod tests {
             manifest.executable_id(),
             &CaseId::new("hello_world_executable_manifest").expect("id is non-empty")
         );
+        let entry_function = manifest
+            .entry_function()
+            .expect("entry function is inside image");
         assert_eq!(
-            manifest.entry_function().case_id().as_str(),
+            entry_function.case_id().as_str(),
             "hello_world_executable_manifest"
         );
-        assert_eq!(manifest.entry_function().abi(), &TestCaseAbi::NoArgsU64);
+        assert_eq!(entry_function.abi(), &TestCaseAbi::NoArgsU64);
         assert_eq!(
-            manifest
-                .entry_function()
+            entry_function
                 .host_trap_plan()
                 .stdout_trap()
                 .expect("stdout trap exists")
                 .text(),
             "hello world\n"
+        );
+    }
+
+    #[test]
+    fn entry_function_starts_at_manifest_entry_offset() {
+        let manifest = executable_manifest_from_json(
+            r#"{
+  "executable_id": "entry_offset",
+  "format": "bara-executable-v0",
+  "entry": 2,
+  "code": "0f0b31c0c3",
+  "abi": { "args": [], "return": "u64" }
+}"#,
+        )
+        .expect("entry offset manifest parses");
+
+        let entry_function = manifest
+            .entry_function()
+            .expect("entry offset is in segment");
+
+        assert_eq!(entry_function.x86_bytes().bytes(), &[0x31, 0xc0, 0xc3]);
+    }
+
+    #[test]
+    fn rejects_entry_outside_code_segment() {
+        let result = executable_manifest_from_json(
+            r#"{
+  "executable_id": "bad_entry",
+  "format": "bara-executable-v0",
+  "entry": 1,
+  "code": "c3",
+  "abi": { "args": [], "return": "u64" }
+}"#,
+        );
+
+        assert_eq!(
+            result,
+            Err(ExecutableManifestJsonError::Image(
+                ExecutableImageError::EntryOutOfCodeSegment
+            ))
         );
     }
 

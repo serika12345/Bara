@@ -82,7 +82,11 @@ fn run_check_executable(manifest_path: &Path, expected_path: &Path) -> Result<St
         executable_manifest_from_json(&manifest_json).map_err(CliError::ExecutableManifest)?;
     let expected = observed_result_from_json(&expected_json).map_err(CliError::ExpectedJson)?;
 
-    run_test_case(manifest.into_entry_function(), expected)
+    let entry_function = manifest
+        .into_entry_function()
+        .map_err(CliError::ExecutableManifest)?;
+
+    run_test_case(entry_function, expected)
 }
 
 fn run_check_corpus(cases_dir: &Path, expected_dir: &Path) -> Result<String, CliError> {

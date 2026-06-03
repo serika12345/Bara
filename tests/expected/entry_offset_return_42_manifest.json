@@ -1,0 +1,7 @@
+{
+  "case_id": "entry_offset_return_42_manifest",
+  "exit_status": 0,
+  "return_value": 42,
+  "stdout": "",
+  "stderr": ""
+}

@@ -64,11 +64,11 @@ pub enum TestCaseStdoutTrapError {
 #[derive(Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "kind")]
-pub(super) enum TestCaseHostTrapDto {
+pub(crate) enum TestCaseHostTrapDto {
     Stdout { text: String },
 }
 
-pub(super) fn host_trap_plan_from_dtos(
+pub(crate) fn host_trap_plan_from_dtos(
     traps: Vec<TestCaseHostTrapDto>,
 ) -> Result<TestCaseHostTrapPlan, TestCaseJsonError> {
     let mut stdout = None;

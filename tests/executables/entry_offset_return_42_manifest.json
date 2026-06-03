@@ -1,0 +1,10 @@
+{
+  "executable_id": "entry_offset_return_42_manifest",
+  "format": "bara-executable-v0",
+  "entry": 1,
+  "code": "ffb82a000000c3",
+  "abi": {
+    "args": [],
+    "return": "u64"
+  }
+}
