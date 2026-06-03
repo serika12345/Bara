@@ -50,6 +50,12 @@ pub fn lift_decoded_function(decoded: &DecodedFunction) -> Result<Program, LiftE
                     src: Operand::ImmU64(imm.as_i64() as u64),
                 });
             }
+            DecodedInstructionKind::XorEaxEax => {
+                ops.push(IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(0),
+                });
+            }
             DecodedInstructionKind::Ret => {
                 terminator = Some(Terminator::Return);
                 break;
@@ -261,6 +267,34 @@ mod tests {
                     src: Operand::ImmU64(3)
                 }
             ]
+        );
+        assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_xor_eax_eax_to_mov_rax_zero() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(2),
+                    DecodedInstructionKind::XorEaxEax,
+                ),
+                DecodedInstruction::new(X86Va::new(2), X86Va::new(3), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded xor function lifts");
+        let block = &program.blocks()[0];
+
+        assert_eq!(
+            block.ops(),
+            &[IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(0)
+            }]
         );
         assert_eq!(block.terminator(), &Terminator::Return);
     }

@@ -61,6 +61,7 @@ pub enum DecodedInstructionKind {
     AddEaxImm8 { imm: X86Imm8 },
     SubEaxImm32 { imm: X86Imm32 },
     SubEaxImm8 { imm: X86Imm8 },
+    XorEaxEax,
     Ret,
     Unsupported { reason: UnsupportedReason },
 }

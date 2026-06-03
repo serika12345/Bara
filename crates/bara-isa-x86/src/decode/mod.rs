@@ -68,6 +68,38 @@ pub fn decode_function(input: &X86Bytes) -> Result<DecodedFunction, DecodeError>
                 ));
                 offset = end_offset;
             }
+            0x31 => {
+                let end_offset = offset + 2;
+                let operand = input
+                    .bytes()
+                    .get(offset + 1)
+                    .ok_or(DecodeError::TruncatedInstruction { at, opcode })?;
+                let end = input
+                    .entry()
+                    .checked_add(end_offset as u64)
+                    .map_err(|_| DecodeError::AddressOverflow { at, byte_len: 2 })?;
+
+                match *operand {
+                    0xc0 => {
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::XorEaxEax,
+                        ));
+                        offset = end_offset;
+                    }
+                    _ => {
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::Unsupported {
+                                reason: UnsupportedReason::DecodeUnsupportedOpcode { opcode, at },
+                            },
+                        ));
+                        return DecodedFunction::new(input.entry(), instructions);
+                    }
+                }
+            }
             0xb8 => {
                 let end_offset = offset + 5;
                 let imm_bytes = input
@@ -388,6 +420,30 @@ mod tests {
                 DecodedInstruction::new(
                     X86Va::new(10),
                     X86Va::new(11),
+                    DecodedInstructionKind::Ret
+                )
+            ]
+        );
+    }
+
+    #[test]
+    fn decodes_xor_eax_eax_then_ret() {
+        let input = X86Bytes::new(X86Va::new(0x1000), vec![0x31, 0xc0, 0xc3])
+            .expect("test bytes are non-empty");
+
+        let decoded = decode_function(&input).expect("test bytes decode");
+
+        assert_eq!(
+            decoded.instructions(),
+            &[
+                DecodedInstruction::new(
+                    X86Va::new(0x1000),
+                    X86Va::new(0x1002),
+                    DecodedInstructionKind::XorEaxEax
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(0x1002),
+                    X86Va::new(0x1003),
                     DecodedInstructionKind::Ret
                 )
             ]
