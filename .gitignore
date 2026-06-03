@@ -1,2 +1,21 @@
+# Rust build output
 /target/
-.direnv
+**/*.rs.bk
+
+# Nix and direnv local state
+/.direnv/
+/result
+/result-*
+
+# Local editor and OS files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Local logs and scratch output
+*.log
+/tmp/
+/temp/
