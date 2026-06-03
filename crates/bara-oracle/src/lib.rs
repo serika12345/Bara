@@ -1,3 +1,4 @@
+pub mod binary_format;
 pub mod compare;
 pub mod executable_manifest;
 pub mod json;
@@ -5,6 +6,10 @@ pub mod observation;
 pub mod report;
 pub mod testcase;
 
+pub use binary_format::{
+    probe_public_binary_format, BinaryFormat, BinaryFormatProbeError, BinaryFormatProbeReport,
+    BinaryFormatProbeStatus, BinaryInput, BinaryInputError,
+};
 pub use compare::{compare_observed_results, ComparisonIssue, ComparisonReport};
 pub use executable_manifest::{
     executable_manifest_from_json, CodeSegment, ExecutableEntry, ExecutableImage,

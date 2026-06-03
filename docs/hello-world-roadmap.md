@@ -36,6 +36,8 @@ raw function fixture が runtime 境界を通じて stdout に
 - executable image の code segment と entry offset validation
 - executable manifest の `write_stdout` host helper import declaration / validation
 - `check-executable <manifest.json> <expected.json>`
+- public binary format の最小 probe
+- Mach-O 64-bit little-endian magic の recognized-but-unsupported 分類
 
 ## マイルストーン
 
@@ -302,6 +304,10 @@ manifest
 
 - ELF / Mach-O / PE のうち 1 形式について、最小 header を分類して
   unsupported-but-recognized として報告できる。
+
+状態:
+
+- 完了。
 
 ## 判断基準
 
