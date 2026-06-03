@@ -5,7 +5,9 @@ use bara_oracle::{
     compare_observed_results, observed_result_from_json, test_case_from_json, ExpectedResult,
     ObservedResult, TestCase, TestCaseAbi,
 };
-use bara_runtime::{run_no_args_u64, run_one_u64, RunArgumentU64, RunError};
+use bara_runtime::{
+    run_no_args_u64, run_one_input_memory_ptr, run_one_u64, InputMemory, RunArgumentU64, RunError,
+};
 
 #[test]
 fn return_42_decodes_lifts_and_emits_arm64() -> Result<(), String> {
@@ -183,6 +185,24 @@ fn identity_u64_runs_on_supported_aarch64_unix_hosts() -> Result<(), String> {
     )
 }
 
+#[test]
+fn load_u8_from_rdi_return_72_decodes_lifts_and_emits_arm64() -> Result<(), String> {
+    assert_fixture_emits_arm64(
+        "load_u8_from_rdi_return_72",
+        include_str!("../../../tests/cases/load_u8_from_rdi_return_72.json"),
+        &[0x00, 0x00, 0x40, 0x39, 0xc0, 0x03, 0x5f, 0xd6],
+    )
+}
+
+#[test]
+fn load_u8_from_rdi_return_72_runs_on_supported_aarch64_unix_hosts() -> Result<(), String> {
+    assert_fixture_runs_like_expected(
+        "load_u8_from_rdi_return_72",
+        include_str!("../../../tests/cases/load_u8_from_rdi_return_72.json"),
+        include_str!("../../../tests/expected/load_u8_from_rdi_return_72.json"),
+    )
+}
+
 fn assert_fixture_emits_arm64(
     case_name: &str,
     test_case_json: &str,
@@ -243,6 +263,11 @@ fn assert_native_run_matches_expected(
             emitted.code().bytes(),
             RunArgumentU64::new(argument.value()),
         ),
+        TestCaseAbi::OneInputMemoryPtrReturnsU64 { memory } => {
+            let memory = InputMemory::from_bytes(memory.bytes().to_vec())
+                .map_err(|error| format!("testcase input memory converts: {error:?}"))?;
+            run_one_input_memory_ptr(emitted.code().bytes(), memory)
+        }
     };
 
     match result {

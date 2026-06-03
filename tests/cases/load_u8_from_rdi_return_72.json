@@ -1,0 +1,12 @@
+{
+  "case_id": "load_u8_from_rdi_return_72",
+  "entry": 0,
+  "bytes": "0fb607c3",
+  "abi": {
+    "args": ["ptr"],
+    "return": "u64"
+  },
+  "memory": {
+    "input": "48"
+  }
+}

@@ -87,6 +87,7 @@ pub enum Terminator {
 pub enum Operand {
     Reg(X86Reg),
     ImmU64(u64),
+    Mem8 { base: X86Reg },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -18,8 +18,10 @@ raw function fixture が runtime 境界を通じて stdout に
 - entry offset `0`
 - 引数なし
 - `u64` 引数 1 個
+- pointer 引数 1 個と read-only input memory
 - `rax` return value
 - `mov rax, rdi`
+- `movzx eax, byte ptr [rdi]`
 - `mov eax, imm32`
 - `add eax, imm8` / `add eax, imm32`
 - `sub eax, imm8` / `sub eax, imm32`
@@ -98,6 +100,10 @@ ret
 成功条件:
 
 - input memory の先頭 byte を `return_value` として比較できる。
+
+状態:
+
+- 完了。
 
 ### HW3: stdout host trap
 

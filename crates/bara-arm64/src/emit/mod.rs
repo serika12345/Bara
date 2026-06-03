@@ -76,6 +76,13 @@ pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
             } => {
                 has_rax_value = true;
             }
+            IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::Mem8 { base: X86Reg::Rdi },
+            } => {
+                emit_ldrb_w0_x0(&mut code);
+                has_rax_value = true;
+            }
             IrOp::Mov { .. } => {
                 return Err(EmitError::UnsupportedIr {
                     reason: UnsupportedReason::EmitUnsupportedIr,
@@ -189,6 +196,10 @@ fn emit_sub_x0_imm12(code: &mut Vec<u8>, value: u64) -> Result<usize, EmitError>
     Ok(emit_u32_le(code, 0xd100_0000 | (imm12 << 10)))
 }
 
+fn emit_ldrb_w0_x0(code: &mut Vec<u8>) -> usize {
+    emit_u32_le(code, 0x3940_0000)
+}
+
 fn emit_u32_le(code: &mut Vec<u8>, instruction: u32) -> usize {
     code.extend_from_slice(&instruction.to_le_bytes());
     code.len()
@@ -252,6 +263,24 @@ mod tests {
         let emitted = emit_program(&program).expect("identity argument IR emits");
 
         assert_eq!(emitted.code().bytes(), &[0xc0, 0x03, 0x5f, 0xd6]);
+    }
+
+    #[test]
+    fn emits_ldrb_w0_x0_for_rax_from_rdi_mem8() {
+        let program = program_with_ops(
+            vec![IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::Mem8 { base: X86Reg::Rdi },
+            }],
+            Terminator::Return,
+        );
+
+        let emitted = emit_program(&program).expect("memory load IR emits");
+
+        assert_eq!(
+            emitted.code().bytes(),
+            &[0x00, 0x00, 0x40, 0x39, 0xc0, 0x03, 0x5f, 0xd6]
+        );
     }
 
     #[test]

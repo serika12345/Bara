@@ -49,9 +49,34 @@ impl TestCaseU64 {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TestCaseInputMemory {
+    bytes: Vec<u8>,
+}
+
+impl TestCaseInputMemory {
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, TestCaseInputMemoryError> {
+        if bytes.is_empty() {
+            return Err(TestCaseInputMemoryError::Empty);
+        }
+
+        Ok(Self { bytes })
+    }
+
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TestCaseInputMemoryError {
+    Empty,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TestCaseAbi {
     NoArgsU64,
     OneU64ArgReturnsU64 { argument: TestCaseU64 },
+    OneInputMemoryPtrReturnsU64 { memory: TestCaseInputMemory },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -66,6 +91,8 @@ pub enum TestCaseJsonError {
         expected: String,
         actual_len: usize,
     },
+    MissingInputMemory,
+    EmptyInputMemory,
     OddHexLength {
         hex_len: usize,
     },
@@ -95,6 +122,8 @@ impl fmt::Display for TestCaseJsonError {
                     "unsupported testcase arguments: expected {expected}, got {actual_len} value(s)"
                 )
             }
+            Self::MissingInputMemory => write!(formatter, "missing testcase input memory"),
+            Self::EmptyInputMemory => write!(formatter, "testcase input memory is empty"),
             Self::OddHexLength { hex_len } => {
                 write!(formatter, "hex byte string has odd length: {hex_len}")
             }
@@ -110,7 +139,7 @@ pub fn test_case_from_json(input: &str) -> Result<TestCase, TestCaseJsonError> {
     let dto: TestCaseDto =
         serde_json::from_str(input).map_err(|error| TestCaseJsonError::Json(error.to_string()))?;
     let case_id = CaseId::new(dto.case_id).map_err(TestCaseJsonError::CaseId)?;
-    let abi = TestCaseAbi::try_from_parts(dto.abi, dto.arguments)?;
+    let abi = TestCaseAbi::try_from_parts(dto.abi, dto.arguments, dto.memory)?;
     let bytes = decode_hex_bytes(&dto.bytes)?;
     let x86_bytes =
         X86Bytes::new(X86Va::new(dto.entry), bytes).map_err(TestCaseJsonError::DecodeInput)?;
@@ -126,6 +155,7 @@ struct TestCaseDto {
     abi: TestCaseAbiDto,
     #[serde(default)]
     arguments: Vec<u64>,
+    memory: Option<TestCaseMemoryDto>,
 }
 
 #[derive(Deserialize)]
@@ -135,8 +165,17 @@ struct TestCaseAbiDto {
     return_value: String,
 }
 
+#[derive(Deserialize)]
+struct TestCaseMemoryDto {
+    input: String,
+}
+
 impl TestCaseAbi {
-    fn try_from_parts(abi: TestCaseAbiDto, arguments: Vec<u64>) -> Result<Self, TestCaseJsonError> {
+    fn try_from_parts(
+        abi: TestCaseAbiDto,
+        arguments: Vec<u64>,
+        memory: Option<TestCaseMemoryDto>,
+    ) -> Result<Self, TestCaseJsonError> {
         if abi.args.is_empty() && abi.return_value == "u64" {
             if !arguments.is_empty() {
                 return Err(TestCaseJsonError::UnsupportedArguments {
@@ -157,6 +196,20 @@ impl TestCaseAbi {
             return Ok(Self::OneU64ArgReturnsU64 {
                 argument: TestCaseU64::new(*argument),
             });
+        }
+
+        if abi.args == ["ptr"] && abi.return_value == "u64" {
+            if !arguments.is_empty() {
+                return Err(TestCaseJsonError::UnsupportedArguments {
+                    expected: String::from("no integer arguments for input memory pointer"),
+                    actual_len: arguments.len(),
+                });
+            }
+            let memory = memory.ok_or(TestCaseJsonError::MissingInputMemory)?;
+            let bytes = decode_hex_bytes(&memory.input)?;
+            let memory = TestCaseInputMemory::from_bytes(bytes)
+                .map_err(|_| TestCaseJsonError::EmptyInputMemory)?;
+            return Ok(Self::OneInputMemoryPtrReturnsU64 { memory });
         }
 
         Err(TestCaseJsonError::UnsupportedAbi {
@@ -212,7 +265,7 @@ mod tests {
     use bara_ir::X86Va;
     use bara_isa_x86::X86Bytes;
 
-    use super::TestCaseU64;
+    use super::{TestCaseInputMemory, TestCaseU64};
     use crate::{test_case_from_json, CaseId, TestCase, TestCaseAbi, TestCaseJsonError};
 
     #[test]
@@ -263,6 +316,27 @@ mod tests {
                     .expect("fixture bytes are non-empty"),
                 TestCaseAbi::OneU64ArgReturnsU64 {
                     argument: TestCaseU64::new(123)
+                }
+            )
+        );
+    }
+
+    #[test]
+    fn parses_ptr_input_memory_test_case() {
+        let test_case = test_case_from_json(include_str!(
+            "../../../../tests/cases/load_u8_from_rdi_return_72.json"
+        ))
+        .expect("fixture parses");
+
+        assert_eq!(
+            test_case,
+            TestCase::new(
+                CaseId::new("load_u8_from_rdi_return_72").expect("case id is non-empty"),
+                X86Bytes::new(X86Va::new(0), vec![0x0f, 0xb6, 0x07, 0xc3])
+                    .expect("fixture bytes are non-empty"),
+                TestCaseAbi::OneInputMemoryPtrReturnsU64 {
+                    memory: TestCaseInputMemory::from_bytes(vec![0x48])
+                        .expect("input memory is non-empty")
                 }
             )
         );

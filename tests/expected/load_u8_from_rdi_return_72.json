@@ -1,0 +1,7 @@
+{
+  "case_id": "load_u8_from_rdi_return_72",
+  "exit_status": 0,
+  "return_value": 72,
+  "stdout": "",
+  "stderr": ""
+}

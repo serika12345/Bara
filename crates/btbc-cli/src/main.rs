@@ -12,7 +12,10 @@ use bara_oracle::{
     ExpectedResult, FailureKind, FailureMessage, FixtureOutcome, FixtureReport, ObservedResult,
     TestCase, TestCaseAbi,
 };
-use bara_runtime::{run_no_args_u64, run_one_u64, RunArgumentU64};
+use bara_runtime::{
+    run_no_args_u64, run_one_input_memory_ptr, run_one_u64, InputMemory, InputMemoryError,
+    RunArgumentU64,
+};
 
 fn main() -> ExitCode {
     match run_cli(env::args().skip(1).collect()) {
@@ -181,6 +184,11 @@ fn observe_test_case(test_case: &TestCase) -> Result<ObservedResult, CliError> {
             emitted.code().bytes(),
             RunArgumentU64::new(argument.value()),
         ),
+        TestCaseAbi::OneInputMemoryPtrReturnsU64 { memory } => {
+            let memory =
+                InputMemory::from_bytes(memory.bytes().to_vec()).map_err(CliError::InputMemory)?;
+            run_one_input_memory_ptr(emitted.code().bytes(), memory)
+        }
     }
     .map_err(CliError::Run)?;
 
@@ -330,6 +338,7 @@ enum CliError {
     Decode(bara_isa_x86::DecodeError),
     Lift(bara_isa_x86::LiftError),
     Emit(bara_arm64::EmitError),
+    InputMemory(InputMemoryError),
     Run(bara_runtime::RunError),
     Comparison(ComparisonReport),
     Json(bara_oracle::JsonError),
@@ -344,6 +353,7 @@ impl CliError {
             Self::Decode(_) => FailureKind::DecodeError,
             Self::Lift(_) => FailureKind::LiftError,
             Self::Emit(_) => FailureKind::EmitError,
+            Self::InputMemory(_) => FailureKind::RunError,
             Self::Run(_) => FailureKind::RunError,
             Self::Comparison(_) => FailureKind::ComparisonMismatch,
             Self::ReadFile { .. } | Self::WriteFile { .. } | Self::CreateDir { .. } => {
@@ -409,6 +419,7 @@ impl std::fmt::Display for CliError {
             Self::Decode(error) => write!(formatter, "decode error: {error:?}"),
             Self::Lift(error) => write!(formatter, "lift error: {error:?}"),
             Self::Emit(error) => write!(formatter, "emit error: {error:?}"),
+            Self::InputMemory(error) => write!(formatter, "input memory error: {error:?}"),
             Self::Run(error) => write!(formatter, "run error: {error:?}"),
             Self::Comparison(report) => write!(formatter, "comparison failed: {report:?}"),
             Self::Json(error) => write!(formatter, "{error}"),

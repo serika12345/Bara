@@ -14,6 +14,27 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
         let opcode = input.bytes()[offset];
 
         match opcode {
+            0x0f => {
+                let end_offset = offset + 3;
+                let opcode2 = read_u8(input, offset + 1, at, opcode)?;
+                let operand = read_u8(input, offset + 2, at, opcode)?;
+                let end = instruction_end(input, at, end_offset, 3)?;
+
+                match (opcode2, operand) {
+                    (0xb6, 0x07) => {
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::MovzxEaxBytePtrRdi,
+                        ));
+                        offset = end_offset;
+                    }
+                    _ => {
+                        instructions.push(unsupported_instruction(at, end, opcode));
+                        return DecodedFunction::new(input.entry(), instructions);
+                    }
+                }
+            }
             0x05 => {
                 let end_offset = offset + 5;
                 let imm = read_i32(input, offset, end_offset, at, opcode)?;

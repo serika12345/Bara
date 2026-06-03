@@ -32,6 +32,12 @@ pub fn lift_decoded_function(decoded: &DecodedFunction) -> Result<Program, LiftE
                     src: Operand::Reg(X86Reg::Rdi),
                 });
             }
+            DecodedInstructionKind::MovzxEaxBytePtrRdi => {
+                ops.push(IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::Mem8 { base: X86Reg::Rdi },
+                });
+            }
             DecodedInstructionKind::AddEaxImm32 { imm } => {
                 ops.push(IrOp::Add {
                     dst: Operand::Reg(X86Reg::Rax),
@@ -145,6 +151,34 @@ mod tests {
             &[IrOp::Mov {
                 dst: Operand::Reg(X86Reg::Rax),
                 src: Operand::Reg(X86Reg::Rdi)
+            }]
+        );
+        assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_movzx_eax_byte_ptr_rdi_to_memory_load() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(3),
+                    DecodedInstructionKind::MovzxEaxBytePtrRdi,
+                ),
+                DecodedInstruction::new(X86Va::new(3), X86Va::new(4), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded memory load lifts");
+        let block = &program.blocks()[0];
+
+        assert_eq!(
+            block.ops(),
+            &[IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::Mem8 { base: X86Reg::Rdi }
             }]
         );
         assert_eq!(block.terminator(), &Terminator::Return);

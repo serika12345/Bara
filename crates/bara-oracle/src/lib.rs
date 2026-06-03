@@ -10,4 +10,7 @@ pub use json::{
 };
 pub use observation::{CaseId, CaseIdError, ExpectedResult, ObservedResult};
 pub use report::{CorpusReport, FailureKind, FailureMessage, FixtureOutcome, FixtureReport};
-pub use testcase::{test_case_from_json, TestCase, TestCaseAbi, TestCaseJsonError, TestCaseU64};
+pub use testcase::{
+    test_case_from_json, TestCase, TestCaseAbi, TestCaseInputMemory, TestCaseInputMemoryError,
+    TestCaseJsonError, TestCaseU64,
+};
