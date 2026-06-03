@@ -9,7 +9,8 @@ pub mod testcase;
 pub use binary_format::{
     probe_public_binary_format, BinaryFileBytes, BinaryFormat, BinaryFormatProbeError,
     BinaryFormatProbeMetadata, BinaryFormatProbeReport, BinaryFormatProbeStatus, BinaryInput,
-    BinaryInputError, MachOFileType, MachOMetadata,
+    BinaryInputError, MachOFileType, MachOLoadCommandByteSize, MachOLoadCommandCount,
+    MachOLoadCommands, MachOMetadata,
 };
 pub use compare::{compare_observed_results, ComparisonIssue, ComparisonReport};
 pub use executable_manifest::{

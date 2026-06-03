@@ -54,8 +54,14 @@ mod tests {
         corpus_report_to_json, observed_result_from_json, observed_result_to_json, BinaryFormat,
         BinaryFormatProbeMetadata, BinaryFormatProbeReport, BinaryFormatProbeStatus, CaseId,
         CorpusReport, FailureKind, FailureMessage, FixtureOutcome, FixtureReport, MachOFileType,
-        MachOMetadata, ObservedResult,
+        MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommands, MachOMetadata,
+        ObservedResult,
     };
+
+    const EMPTY_LOAD_COMMANDS: MachOLoadCommands = MachOLoadCommands::new(
+        MachOLoadCommandCount::from_public_header_value(0),
+        MachOLoadCommandByteSize::from_public_header_value(0),
+    );
 
     #[test]
     fn observed_result_serializes_as_m1_json() {
@@ -121,19 +127,22 @@ mod tests {
         let report = BinaryFormatProbeReport::new(
             BinaryFormat::MachO64LittleEndian,
             BinaryFormatProbeStatus::RecognizedButUnsupported,
-            BinaryFormatProbeMetadata::mach_o(MachOMetadata::new(MachOFileType::Executable)),
+            BinaryFormatProbeMetadata::mach_o(MachOMetadata::new(
+                MachOFileType::Executable,
+                EMPTY_LOAD_COMMANDS,
+            )),
         );
 
         assert_eq!(
             binary_format_probe_report_to_json(&report).expect("probe report serializes"),
-            "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\",\"metadata\":{\"mach_o\":{\"file_type\":\"executable\"}}}"
+            "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\",\"metadata\":{\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":0,\"byte_size\":0}}}}"
         );
     }
 
     #[test]
     fn binary_format_probe_report_parses_from_expected_json() {
         let report = binary_format_probe_report_from_json(
-            "{\n  \"format\": \"mach_o_64_little_endian\",\n  \"status\": \"recognized_but_unsupported\",\n  \"metadata\": {\n    \"mach_o\": {\n      \"file_type\": \"executable\"\n    }\n  }\n}\n",
+            "{\n  \"format\": \"mach_o_64_little_endian\",\n  \"status\": \"recognized_but_unsupported\",\n  \"metadata\": {\n    \"mach_o\": {\n      \"file_type\": \"executable\",\n      \"load_commands\": {\n        \"count\": 0,\n        \"byte_size\": 0\n      }\n    }\n  }\n}\n",
         )
         .expect("probe report json parses");
 
@@ -142,7 +151,10 @@ mod tests {
             BinaryFormatProbeReport::new(
                 BinaryFormat::MachO64LittleEndian,
                 BinaryFormatProbeStatus::RecognizedButUnsupported,
-                BinaryFormatProbeMetadata::mach_o(MachOMetadata::new(MachOFileType::Executable))
+                BinaryFormatProbeMetadata::mach_o(MachOMetadata::new(
+                    MachOFileType::Executable,
+                    EMPTY_LOAD_COMMANDS
+                ))
             )
         );
     }

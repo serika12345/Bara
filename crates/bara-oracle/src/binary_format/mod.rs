@@ -3,7 +3,10 @@ mod mach_o;
 mod probe;
 
 pub use input::{BinaryFileBytes, BinaryInput, BinaryInputError};
-pub use mach_o::{MachOFileType, MachOMetadata};
+pub use mach_o::{
+    MachOFileType, MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommands,
+    MachOMetadata,
+};
 pub use probe::{
     probe_public_binary_format, BinaryFormat, BinaryFormatProbeError, BinaryFormatProbeMetadata,
     BinaryFormatProbeReport, BinaryFormatProbeStatus,
@@ -14,8 +17,14 @@ mod tests {
     use super::{
         probe_public_binary_format, BinaryFileBytes, BinaryFormat, BinaryFormatProbeError,
         BinaryFormatProbeMetadata, BinaryFormatProbeReport, BinaryFormatProbeStatus, BinaryInput,
-        MachOFileType, MachOMetadata,
+        MachOFileType, MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommands,
+        MachOMetadata,
     };
+
+    const EMPTY_LOAD_COMMANDS: MachOLoadCommands = MachOLoadCommands::new(
+        MachOLoadCommandCount::from_public_header_value(0),
+        MachOLoadCommandByteSize::from_public_header_value(0),
+    );
 
     #[test]
     fn recognizes_mach_o_64_little_endian_executable_as_unsupported_binary_with_metadata() {
@@ -29,7 +38,33 @@ mod tests {
             Ok(BinaryFormatProbeReport::new(
                 BinaryFormat::MachO64LittleEndian,
                 BinaryFormatProbeStatus::RecognizedButUnsupported,
-                BinaryFormatProbeMetadata::mach_o(MachOMetadata::new(MachOFileType::Executable))
+                BinaryFormatProbeMetadata::mach_o(MachOMetadata::new(
+                    MachOFileType::Executable,
+                    EMPTY_LOAD_COMMANDS
+                ))
+            ))
+        );
+    }
+
+    #[test]
+    fn reads_mach_o_load_command_header_fields_as_typed_metadata() {
+        let input = BinaryInput::from_hex(
+            "cffaedfe07000001030000000200000003000000300000000000000000000000",
+        )
+        .expect("hex fixture is valid");
+
+        assert_eq!(
+            probe_public_binary_format(&input),
+            Ok(BinaryFormatProbeReport::new(
+                BinaryFormat::MachO64LittleEndian,
+                BinaryFormatProbeStatus::RecognizedButUnsupported,
+                BinaryFormatProbeMetadata::mach_o(MachOMetadata::new(
+                    MachOFileType::Executable,
+                    MachOLoadCommands::new(
+                        MachOLoadCommandCount::from_public_header_value(3),
+                        MachOLoadCommandByteSize::from_public_header_value(48)
+                    )
+                ))
             ))
         );
     }
@@ -48,7 +83,10 @@ mod tests {
             Ok(BinaryFormatProbeReport::new(
                 BinaryFormat::MachO64LittleEndian,
                 BinaryFormatProbeStatus::RecognizedButUnsupported,
-                BinaryFormatProbeMetadata::mach_o(MachOMetadata::new(MachOFileType::Executable))
+                BinaryFormatProbeMetadata::mach_o(MachOMetadata::new(
+                    MachOFileType::Executable,
+                    EMPTY_LOAD_COMMANDS
+                ))
             ))
         );
     }

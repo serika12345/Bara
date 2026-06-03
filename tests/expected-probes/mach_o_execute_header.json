@@ -3,7 +3,11 @@
   "status": "recognized_but_unsupported",
   "metadata": {
     "mach_o": {
-      "file_type": "executable"
+      "file_type": "executable",
+      "load_commands": {
+        "count": 0,
+        "byte_size": 0
+      }
     }
   }
 }

@@ -41,6 +41,7 @@ raw function fixture が runtime 境界を通じて stdout に
 - `probe-binary <path>` CLI による public binary probe
 - `probe-binary <path>` の安定 JSON report 出力
 - Mach-O 64-bit little-endian header の typed `filetype` metadata
+- Mach-O 64-bit little-endian header の typed `ncmds` / `sizeofcmds` metadata
 - Mach-O probe fixture / expected JSON と `check-binary-probe`
 
 ## マイルストーン
@@ -327,6 +328,7 @@ manifest
 - HW6b: probe report JSON
 - HW6c: Mach-O header metadata の最小 typed field
 - HW6d: probe fixture corpus
+- HW7: Mach-O load command envelope
 
 ### HW6a: `probe-binary <path>` CLI
 
@@ -417,6 +419,42 @@ manifest
 
 - Mach-O executable header fixture と expected probe JSON が repository にある。
 - binary probe fixture を検証する CLI または script があり、`verify-blackbox` から通る。
+
+状態:
+
+- 完了。
+
+### HW7: Mach-O load command envelope
+
+目的:
+
+- Mach-O header の load command table を、実 loader に入る前の typed metadata として
+  検証できるようにする。
+
+分割:
+
+- HW7a: `ncmds` / `sizeofcmds` typed metadata
+- HW7b: load command table bounds validation
+- HW7c: unsupported load command summary
+
+### HW7a: `ncmds` / `sizeofcmds` typed metadata
+
+目的:
+
+- Mach-O 64-bit little-endian header から load command count と command byte size を
+  typed value として取り出し、probe report に含める。
+
+方針:
+
+- load command 本体はまだ parse しない。
+- `ncmds` / `sizeofcmds` の primitive 値は parser 境界で newtype に変換する。
+- 0 commands / 0 command bytes の扱いは、分類 error ではなく typed metadata とする。
+- 実行、loader 変換、segment extraction はしない。
+
+成功条件:
+
+- Mach-O executable header fixture の probe JSON に load command count / size が含まれる。
+- public primitive API を増やさず、domain type と serializer で表現する。
 
 状態:
 
