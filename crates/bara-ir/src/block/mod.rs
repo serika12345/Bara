@@ -73,6 +73,7 @@ pub enum BasicBlockError {
 pub enum IrOp {
     Mov { dst: Operand, src: Operand },
     Add { dst: Operand, src: Operand },
+    Sub { dst: Operand, src: Operand },
     Unsupported { reason: UnsupportedReason },
 }
 

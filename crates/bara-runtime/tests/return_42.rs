@@ -165,6 +165,61 @@ fn add_eax_imm32_return_45_runs_on_supported_aarch64_unix_hosts() -> Result<(), 
     Ok(())
 }
 
+#[test]
+fn sub_eax_imm_return_39_decodes_lifts_and_emits_arm64() {
+    let test_case = test_case_from_json(include_str!(
+        "../../../tests/cases/sub_eax_imm_return_39.json"
+    ))
+    .expect("sub_eax_imm_return_39 test case parses");
+    let input = test_case.x86_bytes().clone();
+    let decoded = decode_function(&input).expect("sub eax imm8 bytes decode");
+    let program = lift_decoded_function(&decoded).expect("sub eax imm8 bytes lift");
+    let emitted = emit_program(&program).expect("sub eax imm8 IR emits");
+
+    assert_eq!(
+        emitted.code().bytes(),
+        &[0x40, 0x05, 0x80, 0xd2, 0x00, 0x0c, 0x00, 0xd1, 0xc0, 0x03, 0x5f, 0xd6]
+    );
+    assert_eq!(emitted.pc_map()[0].source(), X86Va::new(0));
+}
+
+#[test]
+fn sub_eax_imm_return_39_runs_on_supported_aarch64_unix_hosts() -> Result<(), String> {
+    let test_case = test_case_from_json(include_str!(
+        "../../../tests/cases/sub_eax_imm_return_39.json"
+    ))
+    .expect("sub_eax_imm_return_39 test case parses");
+    assert_eq!(test_case.abi(), &TestCaseAbi::NoArgsU64);
+
+    let expected = observed_result_from_json(include_str!(
+        "../../../tests/expected/sub_eax_imm_return_39.json"
+    ))
+    .expect("sub_eax_imm_return_39 expected result parses");
+    let input = test_case.x86_bytes().clone();
+    let decoded = decode_function(&input).expect("sub eax imm8 bytes decode");
+    let program = lift_decoded_function(&decoded).expect("sub eax imm8 bytes lift");
+    let emitted = emit_program(&program).expect("sub eax imm8 IR emits");
+
+    match run_no_args_u64(emitted.code().bytes()) {
+        Ok(result) => {
+            let actual = ObservedResult::new(
+                test_case.case_id().clone(),
+                0,
+                result.return_value(),
+                String::new(),
+                String::new(),
+            );
+            assert!(compare_observed_results(&expected, &actual).is_match());
+        }
+        Err(RunError::ExecutableMemory(error)) if cfg!(not(all(unix, target_arch = "aarch64"))) => {
+            assert_eq!(error, bara_runtime::ExecutableMemoryError::UnsupportedHost);
+        }
+        Err(error) => return Err(format!("unexpected run error: {error:?}")),
+    }
+
+    Ok(())
+}
+
 fn return_42_x86_bytes() -> X86Bytes {
     test_case_from_json(include_str!("../../../tests/cases/return_42.json"))
         .expect("return_42 test case parses")

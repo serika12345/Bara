@@ -38,6 +38,12 @@ pub fn lift_decoded_function(decoded: &DecodedFunction) -> Result<Program, LiftE
                     src: Operand::ImmU64(imm.as_i64() as u64),
                 });
             }
+            DecodedInstructionKind::SubEaxImm8 { imm } => {
+                ops.push(IrOp::Sub {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(imm.as_i64() as u64),
+                });
+            }
             DecodedInstructionKind::Ret => {
                 terminator = Some(Terminator::Return);
                 break;
@@ -159,6 +165,47 @@ mod tests {
                     src: Operand::ImmU64(42)
                 },
                 IrOp::Add {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(3)
+                }
+            ]
+        );
+        assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_sub_eax_imm8_to_sub_rax_immediate() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(5),
+                    DecodedInstructionKind::MovEaxImm32 { imm: 42 },
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(5),
+                    X86Va::new(8),
+                    DecodedInstructionKind::SubEaxImm8 {
+                        imm: crate::X86Imm8::new(3),
+                    },
+                ),
+                DecodedInstruction::new(X86Va::new(8), X86Va::new(9), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded sub function lifts");
+        let block = &program.blocks()[0];
+
+        assert_eq!(
+            block.ops(),
+            &[
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(42)
+                },
+                IrOp::Sub {
                     dst: Operand::Reg(X86Reg::Rax),
                     src: Operand::ImmU64(3)
                 }

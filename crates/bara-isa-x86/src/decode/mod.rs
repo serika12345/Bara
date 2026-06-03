@@ -81,6 +81,7 @@ pub enum DecodedInstructionKind {
     MovEaxImm32 { imm: u32 },
     AddEaxImm32 { imm: X86Imm32 },
     AddEaxImm8 { imm: X86Imm8 },
+    SubEaxImm8 { imm: X86Imm8 },
     Ret,
     Unsupported { reason: UnsupportedReason },
 }
@@ -191,24 +192,37 @@ pub fn decode_function(input: &X86Bytes) -> Result<DecodedFunction, DecodeError>
                     .checked_add(end_offset as u64)
                     .map_err(|_| DecodeError::AddressOverflow { at, byte_len: 3 })?;
 
-                if *operand == 0xc0 {
-                    instructions.push(DecodedInstruction::new(
-                        at,
-                        end,
-                        DecodedInstructionKind::AddEaxImm8 {
-                            imm: X86Imm8::new(i8::from_le_bytes([*imm])),
-                        },
-                    ));
-                    offset = end_offset;
-                } else {
-                    instructions.push(DecodedInstruction::new(
-                        at,
-                        end,
-                        DecodedInstructionKind::Unsupported {
-                            reason: UnsupportedReason::DecodeUnsupportedOpcode { opcode, at },
-                        },
-                    ));
-                    return DecodedFunction::new(input.entry(), instructions);
+                match *operand {
+                    0xc0 => {
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::AddEaxImm8 {
+                                imm: X86Imm8::new(i8::from_le_bytes([*imm])),
+                            },
+                        ));
+                        offset = end_offset;
+                    }
+                    0xe8 => {
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::SubEaxImm8 {
+                                imm: X86Imm8::new(i8::from_le_bytes([*imm])),
+                            },
+                        ));
+                        offset = end_offset;
+                    }
+                    _ => {
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::Unsupported {
+                                reason: UnsupportedReason::DecodeUnsupportedOpcode { opcode, at },
+                            },
+                        ));
+                        return DecodedFunction::new(input.entry(), instructions);
+                    }
                 }
             }
             0xc3 => {
@@ -402,6 +416,36 @@ mod tests {
                     X86Va::new(11),
                     DecodedInstructionKind::Ret
                 )
+            ]
+        );
+    }
+
+    #[test]
+    fn decodes_sub_eax_imm8_between_mov_and_ret() {
+        let input = X86Bytes::new(
+            X86Va::new(0),
+            vec![0xb8, 0x2a, 0, 0, 0, 0x83, 0xe8, 0x03, 0xc3],
+        )
+        .expect("test bytes are non-empty");
+
+        let decoded = decode_function(&input).expect("test bytes decode");
+
+        assert_eq!(
+            decoded.instructions(),
+            &[
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(5),
+                    DecodedInstructionKind::MovEaxImm32 { imm: 42 }
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(5),
+                    X86Va::new(8),
+                    DecodedInstructionKind::SubEaxImm8 {
+                        imm: crate::X86Imm8::new(3)
+                    }
+                ),
+                DecodedInstruction::new(X86Va::new(8), X86Va::new(9), DecodedInstructionKind::Ret)
             ]
         );
     }
