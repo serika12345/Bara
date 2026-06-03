@@ -78,6 +78,16 @@ working in the shell.
 Rust tooling is provided by `flake.nix`. Add more tools to the flake before
 making them required in scripts or documentation.
 
+The default local verification gate is:
+
+```sh
+nix develop -c ./scripts/verify
+```
+
+Run it before completing any coding-agent task that changes code, scripts,
+configuration, lockfiles, or repository policy. If the task is documentation
+only, run the narrower relevant checks and state what was skipped.
+
 Supply-chain checks are mandatory for dependency, lockfile, or toolchain
 changes:
 
@@ -340,6 +350,12 @@ nix develop -c cargo --version
 
 Once Rust crates exist, prefer checks through the Nix dev shell.
 
+For ordinary code, script, policy, or configuration changes, run:
+
+```sh
+nix develop -c ./scripts/verify
+```
+
 For dependency, lockfile, `deny.toml`, or `flake.nix` changes, also run:
 
 ```sh
@@ -372,6 +388,8 @@ Before completing a change, check:
 - Are implementation files kept out of the repository root?
 - Is I/O isolated in dedicated directories?
 - Were commands run through the Nix dev shell?
+- Did `nix develop -c ./scripts/verify` pass for code/script/policy/config
+  changes?
 - Was new or changed behavior driven by a test first?
 - Did supply-chain checks pass when dependencies, lockfiles, or toolchain
   settings changed?

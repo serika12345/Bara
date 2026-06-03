@@ -118,6 +118,7 @@ nix develop
 
 ```sh
 nix develop -c cargo --version
+nix develop -c ./scripts/verify
 nix develop -c cargo fmt --all -- --check
 nix develop -c ./scripts/check-no-invisible-chars
 nix develop -c ./scripts/check-domain-types
@@ -127,6 +128,9 @@ nix develop -c cargo check --workspace --all-targets
 nix develop -c cargo test --workspace
 nix develop -c cargo run -p btbc-cli -- check-m1
 ```
+
+通常のコード、script、設定、repository policy の変更では
+`nix develop -c ./scripts/verify` を完了前に通します。
 
 依存関係、`Cargo.lock`、`deny.toml`、`flake.nix` を変更した場合は
 `./scripts/verify-supply-chain` を必ず実行します。詳細は

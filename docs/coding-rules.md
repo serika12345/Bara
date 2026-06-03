@@ -251,6 +251,12 @@ crates/
 
 Nix Flake で dev shell を定義し、Rust toolchain、formatter、linter、test runner、assembler/linker などをそこから使う。Haskell など追加の言語 toolchain は、実装対象になった時点で dev shell に追加する。
 
+通常の code / script / 設定 / repository policy 変更では、完了前に local verification gate を通す。
+
+```sh
+nix develop -c ./scripts/verify
+```
+
 依存関係、lockfile、`deny.toml`、`flake.nix` を変更した場合は、supply-chain 検証を必ず実行する。
 
 ```sh
@@ -268,6 +274,7 @@ nix develop -c ./scripts/verify-security
 
 優先すること:
 
+- coding agent は作業完了前に `scripts/verify` を通し、通せない場合は理由と残リスクを報告する。
 - Rust、formatter、linter、test runner、assembler/linker などは Nix dev shell から使う。
 - Haskell など追加の toolchain は、必要になった時点で Nix dev shell に定義してから使う。
 - 日常コマンドは `nix develop -c ...` または direnv 経由の dev shell 内で実行する前提にする。
@@ -351,6 +358,7 @@ impl ExecutableBuffer {
 - ルート直下に実装ファイルを増やしていないか。
 - I/O が専用ディレクトリに集約され、ドメインロジックへ散っていないか。
 - 開発手順が Nix dev shell 前提になっているか。
+- local verification gate が通っているか。
 - 依存や toolchain を変更した場合、supply-chain 検証が通っているか。
 - 不可視文字 / Unicode 制御文字の検査が通っているか。
 - 新規または変更された振る舞いに、先に書かれたテストがあるか。

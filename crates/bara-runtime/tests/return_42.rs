@@ -19,7 +19,7 @@ fn return_42_decodes_lifts_and_emits_arm64() {
 }
 
 #[test]
-fn return_42_runs_on_supported_aarch64_unix_hosts() {
+fn return_42_runs_on_supported_aarch64_unix_hosts() -> Result<(), String> {
     let input = X86Bytes::new(X86Va::new(0), vec![0xb8, 0x2a, 0x00, 0x00, 0x00, 0xc3])
         .expect("self-authored M1 bytes are non-empty");
     let decoded = decode_function(&input).expect("M1 bytes decode");
@@ -31,6 +31,8 @@ fn return_42_runs_on_supported_aarch64_unix_hosts() {
         Err(RunError::ExecutableMemory(error)) if cfg!(not(all(unix, target_arch = "aarch64"))) => {
             assert_eq!(error, bara_runtime::ExecutableMemoryError::UnsupportedHost);
         }
-        Err(error) => panic!("unexpected run error: {error:?}"),
+        Err(error) => return Err(format!("unexpected run error: {error:?}")),
     }
+
+    Ok(())
 }

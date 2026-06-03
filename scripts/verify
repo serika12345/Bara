@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+set -eu
+
+cd "$(dirname "$0")/.."
+
+cargo fmt --all -- --check
+./scripts/check-no-invisible-chars
+./scripts/check-domain-types
+./scripts/verify-security
+cargo check --workspace --all-targets
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
