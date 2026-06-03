@@ -17,7 +17,9 @@ raw function fixture が runtime 境界を通じて stdout に
 - raw x86_64 function bytes
 - entry offset `0`
 - 引数なし
+- `u64` 引数 1 個
 - `rax` return value
+- `mov rax, rdi`
 - `mov eax, imm32`
 - `add eax, imm8` / `add eax, imm32`
 - `sub eax, imm8` / `sub eax, imm32`
@@ -68,6 +70,10 @@ ret
 
 - `identity_u64` fixture が `return_value` で入力引数を返す。
 - no-args fixture と one-arg fixture が同じ corpus runner で比較できる。
+
+状態:
+
+- 完了。
 
 ### HW2: 最小 memory read
 
