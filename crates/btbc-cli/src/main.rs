@@ -1,11 +1,10 @@
 use std::{env, process::ExitCode};
 
 use bara_arm64::emit_program;
-use bara_ir::X86Va;
-use bara_isa_x86::{decode_function, lift_decoded_function, X86Bytes};
+use bara_isa_x86::{decode_function, lift_decoded_function};
 use bara_oracle::{
-    compare_observed_results, observed_result_to_json, CaseId, ComparisonReport, ExpectedResult,
-    ObservedResult,
+    compare_observed_results, observed_result_from_json, observed_result_to_json,
+    test_case_from_json, ComparisonReport, ObservedResult,
 };
 use bara_runtime::run_no_args_u64;
 
@@ -30,22 +29,23 @@ fn run_cli(args: Vec<String>) -> Result<String, CliError> {
 }
 
 fn run_m1_check() -> Result<String, CliError> {
-    let input = X86Bytes::new(X86Va::new(0), vec![0xb8, 0x2a, 0x00, 0x00, 0x00, 0xc3])
-        .map_err(CliError::DecodeInput)?;
+    run_m1_check_from_fixtures(
+        include_str!("../../../tests/cases/return_42.json"),
+        include_str!("../../../tests/expected/return_42.json"),
+    )
+}
+
+fn run_m1_check_from_fixtures(case_json: &str, expected_json: &str) -> Result<String, CliError> {
+    let test_case = test_case_from_json(case_json).map_err(CliError::TestCase)?;
+    let expected = observed_result_from_json(expected_json).map_err(CliError::ExpectedJson)?;
+    let input = test_case.x86_bytes().clone();
     let decoded = decode_function(&input).map_err(CliError::Decode)?;
     let program = lift_decoded_function(&decoded).map_err(CliError::Lift)?;
     let emitted = emit_program(&program).map_err(CliError::Emit)?;
     let result = run_no_args_u64(emitted.code().bytes()).map_err(CliError::Run)?;
 
-    let expected = ExpectedResult::new(
-        CaseId::new("return_42").map_err(CliError::CaseId)?,
-        0,
-        42,
-        String::new(),
-        String::new(),
-    );
     let actual = ObservedResult::new(
-        CaseId::new("return_42").map_err(CliError::CaseId)?,
+        test_case.case_id().clone(),
         0,
         result.return_value(),
         String::new(),
@@ -62,12 +62,12 @@ fn run_m1_check() -> Result<String, CliError> {
 #[derive(Debug)]
 enum CliError {
     Usage,
-    DecodeInput(bara_isa_x86::DecodeError),
+    TestCase(bara_oracle::TestCaseJsonError),
+    ExpectedJson(bara_oracle::JsonError),
     Decode(bara_isa_x86::DecodeError),
     Lift(bara_isa_x86::LiftError),
     Emit(bara_arm64::EmitError),
     Run(bara_runtime::RunError),
-    CaseId(bara_oracle::CaseIdError),
     Comparison(ComparisonReport),
     Json(bara_oracle::JsonError),
 }
@@ -76,12 +76,12 @@ impl std::fmt::Display for CliError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Usage => write!(formatter, "usage: btbc-cli check-m1"),
-            Self::DecodeInput(error) => write!(formatter, "decode input error: {error:?}"),
+            Self::TestCase(error) => write!(formatter, "testcase error: {error}"),
+            Self::ExpectedJson(error) => write!(formatter, "expected json error: {error}"),
             Self::Decode(error) => write!(formatter, "decode error: {error:?}"),
             Self::Lift(error) => write!(formatter, "lift error: {error:?}"),
             Self::Emit(error) => write!(formatter, "emit error: {error:?}"),
             Self::Run(error) => write!(formatter, "run error: {error:?}"),
-            Self::CaseId(error) => write!(formatter, "case id error: {error:?}"),
             Self::Comparison(report) => write!(formatter, "comparison failed: {report:?}"),
             Self::Json(error) => write!(formatter, "{error}"),
         }
@@ -90,7 +90,9 @@ impl std::fmt::Display for CliError {
 
 #[cfg(test)]
 mod tests {
-    use super::{run_cli, CliError};
+    use bara_oracle::{observed_result_from_json, observed_result_to_json};
+
+    use super::{run_cli, run_m1_check_from_fixtures, CliError};
 
     #[test]
     fn unknown_command_reports_usage() {
@@ -103,5 +105,20 @@ mod tests {
     #[test]
     fn no_command_reports_usage() {
         assert!(matches!(run_cli(Vec::new()), Err(CliError::Usage)));
+    }
+
+    #[test]
+    fn check_m1_matches_return_42_fixtures() {
+        let output = run_m1_check_from_fixtures(
+            include_str!("../../../tests/cases/return_42.json"),
+            include_str!("../../../tests/expected/return_42.json"),
+        )
+        .expect("return_42 fixture check succeeds on supported host");
+        let expected =
+            observed_result_from_json(include_str!("../../../tests/expected/return_42.json"))
+                .and_then(|result| observed_result_to_json(&result))
+                .expect("expected fixture normalizes to output json");
+
+        assert_eq!(output, expected);
     }
 }
