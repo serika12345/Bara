@@ -1,0 +1,7 @@
+{
+  "case_id": "identity_u64",
+  "exit_status": 0,
+  "return_value": 123,
+  "stdout": "",
+  "stderr": ""
+}

@@ -5,7 +5,7 @@ use bara_oracle::{
     compare_observed_results, observed_result_from_json, test_case_from_json, ExpectedResult,
     ObservedResult, TestCase, TestCaseAbi,
 };
-use bara_runtime::{run_no_args_u64, RunError};
+use bara_runtime::{run_no_args_u64, run_one_u64, RunArgumentU64, RunError};
 
 #[test]
 fn return_42_decodes_lifts_and_emits_arm64() -> Result<(), String> {
@@ -165,6 +165,24 @@ fn xor_then_add_eax_return_7_runs_on_supported_aarch64_unix_hosts() -> Result<()
     )
 }
 
+#[test]
+fn identity_u64_decodes_lifts_and_emits_arm64() -> Result<(), String> {
+    assert_fixture_emits_arm64(
+        "identity_u64",
+        include_str!("../../../tests/cases/identity_u64.json"),
+        &[0xc0, 0x03, 0x5f, 0xd6],
+    )
+}
+
+#[test]
+fn identity_u64_runs_on_supported_aarch64_unix_hosts() -> Result<(), String> {
+    assert_fixture_runs_like_expected(
+        "identity_u64",
+        include_str!("../../../tests/cases/identity_u64.json"),
+        include_str!("../../../tests/expected/identity_u64.json"),
+    )
+}
+
 fn assert_fixture_emits_arm64(
     case_name: &str,
     test_case_json: &str,
@@ -184,8 +202,6 @@ fn assert_fixture_runs_like_expected(
     expected_json: &str,
 ) -> Result<(), String> {
     let test_case = read_test_case(case_name, test_case_json)?;
-    assert_eq!(test_case.abi(), &TestCaseAbi::NoArgsU64);
-
     let expected = read_expected_result(case_name, expected_json)?;
     let emitted = decode_lift_emit(case_name, &test_case)?;
 
@@ -221,7 +237,15 @@ fn assert_native_run_matches_expected(
     expected: &ExpectedResult,
     emitted: &EmittedFunction,
 ) -> Result<(), String> {
-    match run_no_args_u64(emitted.code().bytes()) {
+    let result = match test_case.abi() {
+        TestCaseAbi::NoArgsU64 => run_no_args_u64(emitted.code().bytes()),
+        TestCaseAbi::OneU64ArgReturnsU64 { argument } => run_one_u64(
+            emitted.code().bytes(),
+            RunArgumentU64::new(argument.value()),
+        ),
+    };
+
+    match result {
         Ok(result) => {
             let actual = ObservedResult::new(
                 test_case.case_id().clone(),

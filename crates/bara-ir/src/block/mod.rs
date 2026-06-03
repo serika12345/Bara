@@ -92,6 +92,7 @@ pub enum Operand {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum X86Reg {
     Rax,
+    Rdi,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

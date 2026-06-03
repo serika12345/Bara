@@ -70,6 +70,12 @@ pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
                 emit_mov_x0_u64(&mut code, *value);
                 has_rax_value = true;
             }
+            IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::Reg(X86Reg::Rdi),
+            } => {
+                has_rax_value = true;
+            }
             IrOp::Mov { .. } => {
                 return Err(EmitError::UnsupportedIr {
                     reason: UnsupportedReason::EmitUnsupportedIr,
@@ -231,6 +237,21 @@ mod tests {
         );
         assert_eq!(emitted.pc_map()[0].source(), X86Va::new(0));
         assert_eq!(emitted.pc_map()[0].target(), ArmPc::new(0));
+    }
+
+    #[test]
+    fn emits_ret_only_for_rax_from_rdi_identity() {
+        let program = program_with_ops(
+            vec![IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::Reg(X86Reg::Rdi),
+            }],
+            Terminator::Return,
+        );
+
+        let emitted = emit_program(&program).expect("identity argument IR emits");
+
+        assert_eq!(emitted.code().bytes(), &[0xc0, 0x03, 0x5f, 0xd6]);
     }
 
     #[test]

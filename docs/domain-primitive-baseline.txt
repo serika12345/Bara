@@ -24,8 +24,13 @@ crates/bara-oracle/src/observation/mod.rs:    pub const fn return_value(&self) -
 crates/bara-oracle/src/observation/mod.rs:    pub fn new(value: impl Into<String>) -> Result<Self, CaseIdError> {
 crates/bara-oracle/src/observation/mod.rs:pub struct CaseId(String);
 crates/bara-oracle/src/report/mod.rs:pub struct FailureMessage(String);
+crates/bara-oracle/src/testcase/mod.rs:    pub const fn value(self) -> u64 {
+crates/bara-oracle/src/testcase/mod.rs:pub struct TestCaseU64(u64);
 crates/bara-runtime/src/executable_memory/mod.rs:    pub const fn entry_ptr(&self) -> NonNull<u8> {
 crates/bara-runtime/src/executable_memory/mod.rs:    pub fn allocate(code: &[u8]) -> Result<Self, ExecutableMemoryError> {
 crates/bara-runtime/src/runner/mod.rs:    pub const fn new(return_value: u64) -> Self {
+crates/bara-runtime/src/runner/mod.rs:    pub const fn new(value: u64) -> Self {
 crates/bara-runtime/src/runner/mod.rs:    pub const fn return_value(&self) -> u64 {
 crates/bara-runtime/src/runner/mod.rs:pub fn run_no_args_u64(code: &[u8]) -> Result<RunResult, RunError> {
+crates/bara-runtime/src/runner/mod.rs:pub fn run_one_u64(code: &[u8], argument: RunArgumentU64) -> Result<RunResult, RunError> {
+crates/bara-runtime/src/runner/mod.rs:pub struct RunArgumentU64(u64);

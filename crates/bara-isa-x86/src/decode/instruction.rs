@@ -57,6 +57,7 @@ impl DecodedInstruction {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DecodedInstructionKind {
     MovEaxImm32 { imm: u32 },
+    MovRaxRdi,
     AddEaxImm32 { imm: X86Imm32 },
     AddEaxImm8 { imm: X86Imm8 },
     SubEaxImm32 { imm: X86Imm32 },

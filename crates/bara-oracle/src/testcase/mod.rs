@@ -35,9 +35,23 @@ impl TestCase {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TestCaseU64(u64);
+
+impl TestCaseU64 {
+    const fn new(value: u64) -> Self {
+        Self(value)
+    }
+
+    pub const fn value(self) -> u64 {
+        self.0
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TestCaseAbi {
     NoArgsU64,
+    OneU64ArgReturnsU64 { argument: TestCaseU64 },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -47,6 +61,10 @@ pub enum TestCaseJsonError {
     UnsupportedAbi {
         args: Vec<String>,
         return_value: String,
+    },
+    UnsupportedArguments {
+        expected: String,
+        actual_len: usize,
     },
     OddHexLength {
         hex_len: usize,
@@ -68,6 +86,15 @@ impl fmt::Display for TestCaseJsonError {
                     "unsupported testcase abi: args={args:?}, return={return_value}"
                 )
             }
+            Self::UnsupportedArguments {
+                expected,
+                actual_len,
+            } => {
+                write!(
+                    formatter,
+                    "unsupported testcase arguments: expected {expected}, got {actual_len} value(s)"
+                )
+            }
             Self::OddHexLength { hex_len } => {
                 write!(formatter, "hex byte string has odd length: {hex_len}")
             }
@@ -83,7 +110,7 @@ pub fn test_case_from_json(input: &str) -> Result<TestCase, TestCaseJsonError> {
     let dto: TestCaseDto =
         serde_json::from_str(input).map_err(|error| TestCaseJsonError::Json(error.to_string()))?;
     let case_id = CaseId::new(dto.case_id).map_err(TestCaseJsonError::CaseId)?;
-    let abi = TestCaseAbi::try_from(dto.abi)?;
+    let abi = TestCaseAbi::try_from_parts(dto.abi, dto.arguments)?;
     let bytes = decode_hex_bytes(&dto.bytes)?;
     let x86_bytes =
         X86Bytes::new(X86Va::new(dto.entry), bytes).map_err(TestCaseJsonError::DecodeInput)?;
@@ -97,6 +124,8 @@ struct TestCaseDto {
     entry: u64,
     bytes: String,
     abi: TestCaseAbiDto,
+    #[serde(default)]
+    arguments: Vec<u64>,
 }
 
 #[derive(Deserialize)]
@@ -106,17 +135,33 @@ struct TestCaseAbiDto {
     return_value: String,
 }
 
-impl TryFrom<TestCaseAbiDto> for TestCaseAbi {
-    type Error = TestCaseJsonError;
-
-    fn try_from(value: TestCaseAbiDto) -> Result<Self, Self::Error> {
-        if value.args.is_empty() && value.return_value == "u64" {
+impl TestCaseAbi {
+    fn try_from_parts(abi: TestCaseAbiDto, arguments: Vec<u64>) -> Result<Self, TestCaseJsonError> {
+        if abi.args.is_empty() && abi.return_value == "u64" {
+            if !arguments.is_empty() {
+                return Err(TestCaseJsonError::UnsupportedArguments {
+                    expected: String::from("no arguments"),
+                    actual_len: arguments.len(),
+                });
+            }
             return Ok(Self::NoArgsU64);
         }
 
+        if abi.args == ["u64"] && abi.return_value == "u64" {
+            let [argument] = arguments.as_slice() else {
+                return Err(TestCaseJsonError::UnsupportedArguments {
+                    expected: String::from("one u64 argument"),
+                    actual_len: arguments.len(),
+                });
+            };
+            return Ok(Self::OneU64ArgReturnsU64 {
+                argument: TestCaseU64::new(*argument),
+            });
+        }
+
         Err(TestCaseJsonError::UnsupportedAbi {
-            args: value.args,
-            return_value: value.return_value,
+            args: abi.args,
+            return_value: abi.return_value,
         })
     }
 }
@@ -167,6 +212,7 @@ mod tests {
     use bara_ir::X86Va;
     use bara_isa_x86::X86Bytes;
 
+    use super::TestCaseU64;
     use crate::{test_case_from_json, CaseId, TestCase, TestCaseAbi, TestCaseJsonError};
 
     #[test]
@@ -204,15 +250,34 @@ mod tests {
     }
 
     #[test]
+    fn parses_identity_u64_test_case() {
+        let test_case =
+            test_case_from_json(include_str!("../../../../tests/cases/identity_u64.json"))
+                .expect("fixture parses");
+
+        assert_eq!(
+            test_case,
+            TestCase::new(
+                CaseId::new("identity_u64").expect("case id is non-empty"),
+                X86Bytes::new(X86Va::new(0), vec![0x48, 0x89, 0xf8, 0xc3])
+                    .expect("fixture bytes are non-empty"),
+                TestCaseAbi::OneU64ArgReturnsU64 {
+                    argument: TestCaseU64::new(123)
+                }
+            )
+        );
+    }
+
+    #[test]
     fn rejects_unsupported_abi() {
         let result = test_case_from_json(
-            r#"{"case_id":"bad","entry":0,"bytes":"c3","abi":{"args":["u64"],"return":"u64"}}"#,
+            r#"{"case_id":"bad","entry":0,"bytes":"c3","abi":{"args":["u64","u64"],"return":"u64"}}"#,
         );
 
         assert_eq!(
             result,
             Err(TestCaseJsonError::UnsupportedAbi {
-                args: vec![String::from("u64")],
+                args: vec![String::from("u64"), String::from("u64")],
                 return_value: String::from("u64")
             })
         );

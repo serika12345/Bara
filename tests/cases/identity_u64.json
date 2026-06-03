@@ -1,0 +1,10 @@
+{
+  "case_id": "identity_u64",
+  "entry": 0,
+  "bytes": "4889f8c3",
+  "abi": {
+    "args": ["u64"],
+    "return": "u64"
+  },
+  "arguments": [123]
+}

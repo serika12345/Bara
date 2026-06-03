@@ -10,9 +10,9 @@ use bara_oracle::{
     compare_observed_results, corpus_report_to_json, observed_result_from_json,
     observed_result_to_json, test_case_from_json, CaseId, ComparisonReport, CorpusReport,
     ExpectedResult, FailureKind, FailureMessage, FixtureOutcome, FixtureReport, ObservedResult,
-    TestCase,
+    TestCase, TestCaseAbi,
 };
-use bara_runtime::run_no_args_u64;
+use bara_runtime::{run_no_args_u64, run_one_u64, RunArgumentU64};
 
 fn main() -> ExitCode {
     match run_cli(env::args().skip(1).collect()) {
@@ -175,7 +175,14 @@ fn observe_test_case(test_case: &TestCase) -> Result<ObservedResult, CliError> {
     let decoded = decode_function(&input).map_err(CliError::Decode)?;
     let program = lift_decoded_function(&decoded).map_err(CliError::Lift)?;
     let emitted = emit_program(&program).map_err(CliError::Emit)?;
-    let result = run_no_args_u64(emitted.code().bytes()).map_err(CliError::Run)?;
+    let result = match test_case.abi() {
+        TestCaseAbi::NoArgsU64 => run_no_args_u64(emitted.code().bytes()),
+        TestCaseAbi::OneU64ArgReturnsU64 { argument } => run_one_u64(
+            emitted.code().bytes(),
+            RunArgumentU64::new(argument.value()),
+        ),
+    }
+    .map_err(CliError::Run)?;
 
     let actual = ObservedResult::new(
         test_case.case_id().clone(),
