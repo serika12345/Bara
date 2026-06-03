@@ -254,6 +254,10 @@ manifest
 
 - manifest executable の実行結果を `actual.json` として保存できる。
 
+状態:
+
+- 完了。
+
 ### HW5d: host helper import table
 
 目的:

@@ -4,18 +4,18 @@ use std::{
     process::ExitCode,
 };
 
-use bara_arm64::{emit_program, EmittedHostTrapRequests};
-use bara_isa_x86::{decode_function, lift_decoded_function};
 use bara_oracle::{
     compare_observed_results, corpus_report_to_json, executable_manifest_from_json,
     observed_result_from_json, observed_result_to_json, test_case_from_json, CaseId,
-    ComparisonReport, CorpusReport, ExpectedResult, FailureKind, FailureMessage, FixtureOutcome,
-    FixtureReport, ObservedResult, TestCase, TestCaseAbi,
+    ComparisonReport, CorpusReport, ExecutableManifest, ExpectedResult, FailureKind,
+    FailureMessage, FixtureOutcome, FixtureReport, ObservedResult, TestCase,
 };
-use bara_runtime::{
-    run_no_args_u64_with_host_traps, run_one_input_memory_ptr, run_one_u64, HostTrapPlan,
-    InputMemory, InputMemoryError, RunArgumentU64, RunStdoutError,
-};
+
+mod executable_run;
+mod function_run;
+
+use executable_run::{run_executable_manifest, ExecutableRunError};
+use function_run::{run_test_case_function, FunctionRunError};
 
 fn main() -> ExitCode {
     match run_cli(env::args().skip(1).collect()) {
@@ -82,11 +82,7 @@ fn run_check_executable(manifest_path: &Path, expected_path: &Path) -> Result<St
         executable_manifest_from_json(&manifest_json).map_err(CliError::ExecutableManifest)?;
     let expected = observed_result_from_json(&expected_json).map_err(CliError::ExpectedJson)?;
 
-    let entry_function = manifest
-        .into_entry_function()
-        .map_err(CliError::ExecutableManifest)?;
-
-    run_test_case(entry_function, expected)
+    run_executable(manifest, expected)
 }
 
 fn run_check_corpus(cases_dir: &Path, expected_dir: &Path) -> Result<String, CliError> {
@@ -191,51 +187,24 @@ fn run_test_case(test_case: TestCase, expected: ExpectedResult) -> Result<String
 }
 
 fn observe_test_case(test_case: &TestCase) -> Result<ObservedResult, CliError> {
-    let input = test_case.x86_bytes().clone();
-    let decoded = decode_function(&input).map_err(CliError::Decode)?;
-    let program = lift_decoded_function(&decoded).map_err(CliError::Lift)?;
-    let emitted = emit_program(&program).map_err(CliError::Emit)?;
-    let result = match test_case.abi() {
-        TestCaseAbi::NoArgsU64 => run_no_args_u64_with_host_traps(
-            emitted.code().bytes(),
-            runtime_host_trap_plan(test_case.host_trap_plan(), emitted.host_trap_requests())?,
-        ),
-        TestCaseAbi::OneU64ArgReturnsU64 { argument } => run_one_u64(
-            emitted.code().bytes(),
-            RunArgumentU64::new(argument.value()),
-        ),
-        TestCaseAbi::OneInputMemoryPtrReturnsU64 { memory } => {
-            let memory =
-                InputMemory::from_bytes(memory.bytes().to_vec()).map_err(CliError::InputMemory)?;
-            run_one_input_memory_ptr(emitted.code().bytes(), memory)
-        }
-    }
-    .map_err(CliError::Run)?;
-
-    let actual = ObservedResult::new(
-        test_case.case_id().clone(),
-        0,
-        result.return_value(),
-        result.stdout().to_owned(),
-        String::new(),
-    );
-    Ok(actual)
+    run_test_case_function(test_case)
+        .map_err(CliError::FunctionRun)
+        .map(|result| result.into_observed_result(test_case.case_id().clone()))
 }
 
-fn runtime_host_trap_plan(
-    plan: &bara_oracle::TestCaseHostTrapPlan,
-    requests: &EmittedHostTrapRequests,
-) -> Result<HostTrapPlan, CliError> {
-    if !requests.stdout_requested() {
-        return Ok(HostTrapPlan::none());
+fn run_executable(
+    manifest: ExecutableManifest,
+    expected: ExpectedResult,
+) -> Result<String, CliError> {
+    let actual = run_executable_manifest(&manifest)
+        .map_err(CliError::ExecutableRun)?
+        .into_observed_result();
+    let comparison = compare_observed_results(&expected, &actual);
+    if !comparison.is_match() {
+        return Err(CliError::Comparison(comparison));
     }
 
-    let Some(stdout) = plan.stdout_trap() else {
-        return Ok(HostTrapPlan::none());
-    };
-    let stdout = bara_runtime::RunStdout::from_text(stdout.text().to_owned())
-        .map_err(CliError::StdoutTrap)?;
-    Ok(HostTrapPlan::stdout(stdout))
+    observed_result_to_json(&actual).map_err(CliError::Json)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -372,12 +341,8 @@ enum CliError {
     ExecutableManifest(bara_oracle::ExecutableManifestJsonError),
     TestCase(bara_oracle::TestCaseJsonError),
     ExpectedJson(bara_oracle::JsonError),
-    Decode(bara_isa_x86::DecodeError),
-    Lift(bara_isa_x86::LiftError),
-    Emit(bara_arm64::EmitError),
-    InputMemory(InputMemoryError),
-    StdoutTrap(RunStdoutError),
-    Run(bara_runtime::RunError),
+    FunctionRun(FunctionRunError),
+    ExecutableRun(ExecutableRunError),
     Comparison(ComparisonReport),
     Json(bara_oracle::JsonError),
     CorpusFailures(CorpusReport),
@@ -389,12 +354,8 @@ impl CliError {
             Self::TestCase(_) => FailureKind::InvalidTestCase,
             Self::ExecutableManifest(_) => FailureKind::InvalidTestCase,
             Self::ExpectedJson(_) => FailureKind::InvalidExpected,
-            Self::Decode(_) => FailureKind::DecodeError,
-            Self::Lift(_) => FailureKind::LiftError,
-            Self::Emit(_) => FailureKind::EmitError,
-            Self::InputMemory(_) => FailureKind::RunError,
-            Self::StdoutTrap(_) => FailureKind::RunError,
-            Self::Run(_) => FailureKind::RunError,
+            Self::FunctionRun(error) => error.failure_kind(),
+            Self::ExecutableRun(error) => error.failure_kind(),
             Self::Comparison(_) => FailureKind::ComparisonMismatch,
             Self::ReadFile { .. } | Self::WriteFile { .. } | Self::CreateDir { .. } => {
                 FailureKind::InvalidTestCase
@@ -459,12 +420,8 @@ impl std::fmt::Display for CliError {
             }
             Self::TestCase(error) => write!(formatter, "testcase error: {error}"),
             Self::ExpectedJson(error) => write!(formatter, "expected json error: {error}"),
-            Self::Decode(error) => write!(formatter, "decode error: {error:?}"),
-            Self::Lift(error) => write!(formatter, "lift error: {error:?}"),
-            Self::Emit(error) => write!(formatter, "emit error: {error:?}"),
-            Self::InputMemory(error) => write!(formatter, "input memory error: {error:?}"),
-            Self::StdoutTrap(error) => write!(formatter, "stdout trap error: {error:?}"),
-            Self::Run(error) => write!(formatter, "run error: {error:?}"),
+            Self::FunctionRun(error) => write!(formatter, "function run error: {error}"),
+            Self::ExecutableRun(error) => write!(formatter, "executable run error: {error}"),
             Self::Comparison(report) => write!(formatter, "comparison failed: {report:?}"),
             Self::Json(error) => write!(formatter, "{error}"),
             Self::CorpusFailures(report) => match corpus_report_to_json(report) {
@@ -569,6 +526,24 @@ mod tests {
         .expect("expected executable fixture normalizes to output json");
 
         assert_eq!(output, expected);
+    }
+
+    #[test]
+    fn executable_manifest_run_result_converts_to_observed_result() {
+        let manifest = bara_oracle::executable_manifest_from_json(include_str!(
+            "../../../tests/executables/hello_world_executable_manifest.json"
+        ))
+        .expect("executable manifest parses");
+
+        let actual = super::run_executable_manifest(&manifest)
+            .expect("executable manifest runs on supported host")
+            .into_observed_result();
+        let expected = observed_result_from_json(include_str!(
+            "../../../tests/expected/hello_world_executable_manifest.json"
+        ))
+        .expect("expected executable fixture parses");
+
+        assert_eq!(actual, expected);
     }
 
     #[test]
