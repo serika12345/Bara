@@ -119,6 +119,14 @@ M1 では以下だけを比較する。
 ## コマンド案
 
 ```text
+btbc-cli check-fixture tests/cases/return_42.json tests/expected/return_42.json
+btbc-cli check-corpus tests/cases tests/expected
+./scripts/verify-blackbox
+```
+
+将来の分割案:
+
+```text
 btbc-oracle-x64 testcase.json > expected.json
 btbc compile testcase.json --emit-ir compiled.ir.json --emit-pcmap pcmap.json --out compiled.bin
 btbc-run-arm64 compiled.bin > actual.json
@@ -151,4 +159,3 @@ WrongExternalCall
 RunnerCrash
 OracleCrash
 ```
-
