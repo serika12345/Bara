@@ -34,6 +34,7 @@ raw function fixture が runtime 境界を通じて stdout に
 - stdout / stderr / return_value の expected / actual 比較
 - Bara executable manifest v0 から raw function pipeline への変換
 - executable image の code segment と entry offset validation
+- executable manifest の `write_stdout` host helper import declaration / validation
 - `check-executable <manifest.json> <expected.json>`
 
 ## マイルストーン
@@ -270,9 +271,19 @@ manifest
 - helper id / name / signature の typed representation。
 - 未宣言 helper を使った場合の validation error。
 
+方針:
+
+- executable manifest の `imports` に `write_stdout` host helper を宣言する。
+- `host_traps` で stdout を要求する manifest は、`write_stdout` import を必須にする。
+- import table は manifest parser 境界で検証し、runtime には既存の trap plan だけを渡す。
+
 成功条件:
 
 - stdout helper が manifest に宣言され、実行時 trap plan と対応づく。
+
+状態:
+
+- 完了。
 
 ### HW5e: public binary format の最小 probe
 

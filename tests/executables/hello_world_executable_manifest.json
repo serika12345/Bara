@@ -7,6 +7,13 @@
     "args": [],
     "return": "u64"
   },
+  "imports": [
+    {
+      "kind": "host_helper",
+      "name": "write_stdout",
+      "signature": "ptr_len_to_unit"
+    }
+  ],
   "host_traps": [
     {
       "kind": "stdout",

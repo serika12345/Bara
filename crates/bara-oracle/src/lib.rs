@@ -8,7 +8,8 @@ pub mod testcase;
 pub use compare::{compare_observed_results, ComparisonIssue, ComparisonReport};
 pub use executable_manifest::{
     executable_manifest_from_json, CodeSegment, ExecutableEntry, ExecutableImage,
-    ExecutableImageError, ExecutableManifest, ExecutableManifestJsonError,
+    ExecutableImageError, ExecutableManifest, ExecutableManifestJsonError, HostHelperImport,
+    HostHelperImportTable, HostHelperImportTableError, HostHelperName, HostHelperSignature,
 };
 pub use json::{
     corpus_report_to_json, observed_result_from_json, observed_result_to_json, JsonError,

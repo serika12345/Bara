@@ -6,8 +6,13 @@ use serde::Deserialize;
 
 use crate::{CaseId, CaseIdError, TestCase, TestCaseAbi, TestCaseHostTrapPlan, TestCaseJsonError};
 
+mod host_helper;
 mod image;
 
+pub use host_helper::{
+    HostHelperImport, HostHelperImportTable, HostHelperImportTableError, HostHelperName,
+    HostHelperSignature,
+};
 pub use image::{CodeSegment, ExecutableEntry, ExecutableImage, ExecutableImageError};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -15,6 +20,7 @@ pub struct ExecutableManifest {
     executable_id: CaseId,
     image: ExecutableImage,
     abi: TestCaseAbi,
+    host_helper_imports: HostHelperImportTable,
     host_trap_plan: TestCaseHostTrapPlan,
 }
 
@@ -23,12 +29,14 @@ impl ExecutableManifest {
         executable_id: CaseId,
         image: ExecutableImage,
         abi: TestCaseAbi,
+        host_helper_imports: HostHelperImportTable,
         host_trap_plan: TestCaseHostTrapPlan,
     ) -> Self {
         Self {
             executable_id,
             image,
             abi,
+            host_helper_imports,
             host_trap_plan,
         }
     }
@@ -39,6 +47,10 @@ impl ExecutableManifest {
 
     pub const fn image(&self) -> &ExecutableImage {
         &self.image
+    }
+
+    pub const fn host_helper_imports(&self) -> &HostHelperImportTable {
+        &self.host_helper_imports
     }
 
     pub fn entry_function(&self) -> Result<TestCase, ExecutableManifestJsonError> {
@@ -67,6 +79,7 @@ pub enum ExecutableManifestJsonError {
     UnsupportedFormat { format: String },
     EntryFunction(TestCaseJsonError),
     Image(ExecutableImageError),
+    HostHelperImports(HostHelperImportTableError),
 }
 
 impl fmt::Display for ExecutableManifestJsonError {
@@ -84,6 +97,9 @@ impl fmt::Display for ExecutableManifestJsonError {
             }
             Self::EntryFunction(error) => write!(formatter, "invalid entry function: {error}"),
             Self::Image(error) => write!(formatter, "invalid executable image: {error:?}"),
+            Self::HostHelperImports(error) => {
+                write!(formatter, "invalid host helper imports: {error:?}")
+            }
         }
     }
 }
@@ -106,6 +122,10 @@ pub fn executable_manifest_from_json(
         .map_err(ExecutableManifestJsonError::EntryFunction)?;
     let host_trap_plan = crate::testcase::host_trap::host_trap_plan_from_dtos(dto.host_traps)
         .map_err(ExecutableManifestJsonError::EntryFunction)?;
+    let host_helper_imports = host_helper::host_helper_import_table_from_dtos(dto.imports)
+        .map_err(ExecutableManifestJsonError::HostHelperImports)?;
+    host_helper::validate_host_trap_imports(&host_trap_plan, &host_helper_imports)
+        .map_err(ExecutableManifestJsonError::HostHelperImports)?;
     let bytes = crate::testcase::decode_hex_bytes(&dto.code)
         .map_err(ExecutableManifestJsonError::EntryFunction)?;
     let code_segment = CodeSegment::from_x86_bytes(
@@ -121,6 +141,7 @@ pub fn executable_manifest_from_json(
         executable_id,
         image,
         abi,
+        host_helper_imports,
         host_trap_plan,
     ))
 }
@@ -137,13 +158,16 @@ struct ExecutableManifestDto {
     memory: Option<crate::testcase::TestCaseMemoryDto>,
     #[serde(default)]
     host_traps: Vec<crate::testcase::host_trap::TestCaseHostTrapDto>,
+    #[serde(default)]
+    imports: Vec<host_helper::ExecutableImportDto>,
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
         executable_manifest_from_json, CaseId, ExecutableImageError, ExecutableManifestJsonError,
-        TestCaseAbi, TestCaseJsonError,
+        HostHelperImportTableError, HostHelperName, HostHelperSignature, TestCaseAbi,
+        TestCaseJsonError,
     };
 
     #[test]
@@ -173,6 +197,12 @@ mod tests {
                 .text(),
             "hello world\n"
         );
+        let write_stdout = manifest
+            .host_helper_imports()
+            .write_stdout()
+            .expect("write_stdout import exists");
+        assert_eq!(write_stdout.name(), HostHelperName::WriteStdout);
+        assert_eq!(write_stdout.signature(), HostHelperSignature::PtrLenToUnit);
     }
 
     #[test]
@@ -251,6 +281,31 @@ mod tests {
             result,
             Err(ExecutableManifestJsonError::EntryFunction(
                 TestCaseJsonError::OddHexLength { hex_len: 1 }
+            ))
+        );
+    }
+
+    #[test]
+    fn rejects_stdout_trap_without_write_stdout_import() {
+        let result = executable_manifest_from_json(
+            r#"{
+  "executable_id": "missing_stdout_import",
+  "format": "bara-executable-v0",
+  "entry": 0,
+  "code": "0f0b31c0c3",
+  "abi": { "args": [], "return": "u64" },
+  "host_traps": [
+    { "kind": "stdout", "text": "hello world\n" }
+  ]
+}"#,
+        );
+
+        assert_eq!(
+            result,
+            Err(ExecutableManifestJsonError::HostHelperImports(
+                HostHelperImportTableError::MissingRequiredImport {
+                    helper: HostHelperName::WriteStdout
+                }
             ))
         );
     }
