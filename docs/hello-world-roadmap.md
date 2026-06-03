@@ -171,6 +171,112 @@ ret
 - loader、relocation、imports、process memory、OS ABI が必要になるため、
   現在の初期スコープとは分けて扱う。
 
+分割:
+
+- HW5a: Bara executable manifest v0
+- HW5b: executable image / segment model
+- HW5c: entry point と process-like run result
+- HW5d: host helper import table
+- HW5e: public binary format の最小 probe
+
+### HW5a: Bara executable manifest v0
+
+目的:
+
+- OS の実行ファイル形式へ入る前に、loader 境界の最小入力形式を定義する。
+- raw function fixture と同じ bytes / abi / host_traps を、Bara 専用 executable
+  manifest として読み込めるようにする。
+
+方針:
+
+- ELF / Mach-O / PE はまだ parse しない。
+- manifest は clean-room な Bara 独自 JSON とする。
+- manifest parser は filesystem I/O を持たず、文字列から typed executable
+  fixture へ変換する。
+- CLI や corpus runner の filesystem I/O は境界層に閉じる。
+
+最初の fixture:
+
+```text
+manifest
+  -> entry function bytes: ud2; xor eax, eax; ret
+  -> host_traps stdout: "hello world\n"
+  -> expected stdout / return_value
+```
+
+成功条件:
+
+- `hello_world_executable_manifest` が existing raw function pipeline へ変換され、
+  stdout `hello world\n`、`return_value` 0 として比較できる。
+- manifest parser の失敗理由が分類されている。
+
+### HW5b: executable image / segment model
+
+目的:
+
+- manifest 内の bytes を単なる function bytes ではなく、entry point を持つ
+  executable image として扱う。
+
+必要なもの:
+
+- code segment と entry offset の domain type。
+- section / segment の最小 model。
+- entry が code segment 範囲内にあることの validation。
+
+成功条件:
+
+- entry offset 付き image から既存 decode/lift/emit pipeline へ渡せる。
+
+### HW5c: entry point と process-like run result
+
+目的:
+
+- function-level runner と process-like runner の境界を分ける。
+
+必要なもの:
+
+- executable entry を起動する API。
+- exit status / return value / stdout / stderr の扱いを明確化する型。
+- raw function runner との重複を避ける委譲。
+
+成功条件:
+
+- manifest executable の実行結果を `actual.json` として保存できる。
+
+### HW5d: host helper import table
+
+目的:
+
+- sentinel だけでなく、manifest が利用する host helper を明示する。
+
+必要なもの:
+
+- `write_stdout` 相当の Bara helper import。
+- helper id / name / signature の typed representation。
+- 未宣言 helper を使った場合の validation error。
+
+成功条件:
+
+- stdout helper が manifest に宣言され、実行時 trap plan と対応づく。
+
+### HW5e: public binary format の最小 probe
+
+目的:
+
+- Bara manifest で固めた境界を、公開仕様に基づく実ファイル形式へ接続する
+  検討を開始する。
+
+方針:
+
+- 最初は parse probe のみ。実行までは目標にしない。
+- public spec に基づく magic / header / entry metadata の読み取りに限定する。
+- format-specific parser は executable image model へ変換する境界として扱う。
+
+成功条件:
+
+- ELF / Mach-O / PE のうち 1 形式について、最小 header を分類して
+  unsupported-but-recognized として報告できる。
+
 ## 判断基準
 
 - 先に raw function で外部観測を増やす。
