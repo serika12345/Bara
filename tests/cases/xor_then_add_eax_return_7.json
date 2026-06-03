@@ -1,0 +1,9 @@
+{
+  "case_id": "xor_then_add_eax_return_7",
+  "entry": 0,
+  "bytes": "b82a00000031c083c007c3",
+  "abi": {
+    "args": [],
+    "return": "u64"
+  }
+}

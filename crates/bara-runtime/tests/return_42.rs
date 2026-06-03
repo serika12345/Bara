@@ -144,6 +144,27 @@ fn xor_eax_eax_return_0_runs_on_supported_aarch64_unix_hosts() -> Result<(), Str
     )
 }
 
+#[test]
+fn xor_then_add_eax_return_7_decodes_lifts_and_emits_arm64() -> Result<(), String> {
+    assert_fixture_emits_arm64(
+        "xor_then_add_eax_return_7",
+        include_str!("../../../tests/cases/xor_then_add_eax_return_7.json"),
+        &[
+            0x40, 0x05, 0x80, 0xd2, 0x00, 0x00, 0x80, 0xd2, 0x00, 0x1c, 0x00, 0x91, 0xc0, 0x03,
+            0x5f, 0xd6,
+        ],
+    )
+}
+
+#[test]
+fn xor_then_add_eax_return_7_runs_on_supported_aarch64_unix_hosts() -> Result<(), String> {
+    assert_fixture_runs_like_expected(
+        "xor_then_add_eax_return_7",
+        include_str!("../../../tests/cases/xor_then_add_eax_return_7.json"),
+        include_str!("../../../tests/expected/xor_then_add_eax_return_7.json"),
+    )
+}
+
 fn assert_fixture_emits_arm64(
     case_name: &str,
     test_case_json: &str,

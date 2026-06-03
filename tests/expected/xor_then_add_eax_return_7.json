@@ -1,0 +1,7 @@
+{
+  "case_id": "xor_then_add_eax_return_7",
+  "exit_status": 0,
+  "return_value": 7,
+  "stdout": "",
+  "stderr": ""
+}
