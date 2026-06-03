@@ -20,6 +20,7 @@ raw function fixture が runtime 境界を通じて stdout に
 - `u64` 引数 1 個
 - pointer 引数 1 個と read-only input memory
 - Bara 専用 stdout host trap
+- raw x86 function bytes 上の Bara 専用 stdout sentinel
 - `rax` return value
 - `mov rax, rdi`
 - `movzx eax, byte ptr [rdi]`
@@ -153,6 +154,10 @@ ret
   "return_value": 0
 }
 ```
+
+状態:
+
+- 完了。
 
 ### HW5: loader 付き hello world
 

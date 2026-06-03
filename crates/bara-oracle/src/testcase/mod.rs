@@ -384,11 +384,33 @@ mod tests {
             test_case,
             TestCase::with_host_traps(
                 CaseId::new("stdout_trap_return_0").expect("case id is non-empty"),
-                X86Bytes::new(X86Va::new(0), vec![0x31, 0xc0, 0xc3])
+                X86Bytes::new(X86Va::new(0), vec![0x0f, 0x0b, 0x31, 0xc0, 0xc3])
                     .expect("fixture bytes are non-empty"),
                 TestCaseAbi::NoArgsU64,
                 super::TestCaseHostTrapPlan::stdout(
                     TestCaseStdoutTrap::from_text(String::from("hello trap\n"))
+                        .expect("stdout trap text is valid")
+                )
+            )
+        );
+    }
+
+    #[test]
+    fn parses_hello_world_stdout_test_case() {
+        let test_case = test_case_from_json(include_str!(
+            "../../../../tests/cases/hello_world_stdout_return_0.json"
+        ))
+        .expect("fixture parses");
+
+        assert_eq!(
+            test_case,
+            TestCase::with_host_traps(
+                CaseId::new("hello_world_stdout_return_0").expect("case id is non-empty"),
+                X86Bytes::new(X86Va::new(0), vec![0x0f, 0x0b, 0x31, 0xc0, 0xc3])
+                    .expect("fixture bytes are non-empty"),
+                TestCaseAbi::NoArgsU64,
+                super::TestCaseHostTrapPlan::stdout(
+                    TestCaseStdoutTrap::from_text(String::from("hello world\n"))
                         .expect("stdout trap text is valid")
                 )
             )

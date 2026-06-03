@@ -74,6 +74,7 @@ pub enum IrOp {
     Mov { dst: Operand, src: Operand },
     Add { dst: Operand, src: Operand },
     Sub { dst: Operand, src: Operand },
+    HostTrap { kind: HostTrapKind },
     Unsupported { reason: UnsupportedReason },
 }
 
@@ -94,6 +95,11 @@ pub enum Operand {
 pub enum X86Reg {
     Rax,
     Rdi,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HostTrapKind {
+    Stdout,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

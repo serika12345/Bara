@@ -1,5 +1,5 @@
 {
-  "case_id": "stdout_trap_return_0",
+  "case_id": "hello_world_stdout_return_0",
   "entry": 0,
   "bytes": "0f0b31c0c3",
   "abi": {
@@ -9,7 +9,7 @@
   "host_traps": [
     {
       "kind": "stdout",
-      "text": "hello trap\n"
+      "text": "hello world\n"
     }
   ]
 }

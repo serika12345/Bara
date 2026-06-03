@@ -1,4 +1,6 @@
-use bara_ir::{validate_program, IrOp, Operand, Program, Terminator, UnsupportedReason, X86Reg};
+use bara_ir::{
+    validate_program, HostTrapKind, IrOp, Operand, Program, Terminator, UnsupportedReason, X86Reg,
+};
 
 use crate::{ArmPc, PcMapEntry};
 
@@ -25,11 +27,24 @@ impl Arm64MachineCode {
 pub struct EmittedFunction {
     code: Arm64MachineCode,
     pc_map: Vec<PcMapEntry>,
+    host_trap_requests: EmittedHostTrapRequests,
 }
 
 impl EmittedFunction {
     pub fn new(code: Arm64MachineCode, pc_map: Vec<PcMapEntry>) -> Self {
-        Self { code, pc_map }
+        Self::with_host_trap_requests(code, pc_map, EmittedHostTrapRequests::none())
+    }
+
+    pub const fn with_host_trap_requests(
+        code: Arm64MachineCode,
+        pc_map: Vec<PcMapEntry>,
+        host_trap_requests: EmittedHostTrapRequests,
+    ) -> Self {
+        Self {
+            code,
+            pc_map,
+            host_trap_requests,
+        }
     }
 
     pub const fn code(&self) -> &Arm64MachineCode {
@@ -38,6 +53,29 @@ impl EmittedFunction {
 
     pub fn pc_map(&self) -> &[PcMapEntry] {
         &self.pc_map
+    }
+
+    pub const fn host_trap_requests(&self) -> &EmittedHostTrapRequests {
+        &self.host_trap_requests
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct EmittedHostTrapRequests {
+    stdout: bool,
+}
+
+impl EmittedHostTrapRequests {
+    pub const fn none() -> Self {
+        Self { stdout: false }
+    }
+
+    pub const fn stdout() -> Self {
+        Self { stdout: true }
+    }
+
+    pub const fn stdout_requested(self) -> bool {
+        self.stdout
     }
 }
 
@@ -60,9 +98,15 @@ pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
 
     let mut code = Vec::new();
     let mut has_rax_value = false;
+    let mut host_trap_requests = EmittedHostTrapRequests::none();
 
     for op in block.ops() {
         match op {
+            IrOp::HostTrap {
+                kind: HostTrapKind::Stdout,
+            } => {
+                host_trap_requests = EmittedHostTrapRequests::stdout();
+            }
             IrOp::Mov {
                 dst: Operand::Reg(X86Reg::Rax),
                 src: Operand::ImmU64(value),
@@ -140,7 +184,11 @@ pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
 
     let machine_code = Arm64MachineCode::new(code)?;
     let pc_map = vec![PcMapEntry::new(block.start(), ArmPc::new(0))];
-    Ok(EmittedFunction::new(machine_code, pc_map))
+    Ok(EmittedFunction::with_host_trap_requests(
+        machine_code,
+        pc_map,
+        host_trap_requests,
+    ))
 }
 
 fn emit_mov_x0_u64(code: &mut Vec<u8>, value: u64) -> usize {
@@ -208,7 +256,8 @@ fn emit_u32_le(code: &mut Vec<u8>, instruction: u32) -> usize {
 #[cfg(test)]
 mod tests {
     use bara_ir::{
-        BasicBlock, BlockId, IrOp, Operand, Program, Terminator, UnsupportedReason, X86Reg, X86Va,
+        BasicBlock, BlockId, HostTrapKind, IrOp, Operand, Program, Terminator, UnsupportedReason,
+        X86Reg, X86Va,
     };
 
     use crate::{emit_program, Arm64MachineCode, ArmPc, EmitError};
@@ -280,6 +329,30 @@ mod tests {
         assert_eq!(
             emitted.code().bytes(),
             &[0x00, 0x00, 0x40, 0x39, 0xc0, 0x03, 0x5f, 0xd6]
+        );
+    }
+
+    #[test]
+    fn records_stdout_host_trap_request_without_emitting_code_for_it() {
+        let program = program_with_ops(
+            vec![
+                IrOp::HostTrap {
+                    kind: HostTrapKind::Stdout,
+                },
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(0),
+                },
+            ],
+            Terminator::Return,
+        );
+
+        let emitted = emit_program(&program).expect("host trap IR emits");
+
+        assert!(emitted.host_trap_requests().stdout_requested());
+        assert_eq!(
+            emitted.code().bytes(),
+            &[0x00, 0x00, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]
         );
     }
 

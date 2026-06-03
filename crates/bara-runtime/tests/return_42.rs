@@ -1,4 +1,4 @@
-use bara_arm64::{emit_program, EmittedFunction};
+use bara_arm64::{emit_program, EmittedFunction, EmittedHostTrapRequests};
 use bara_ir::X86Va;
 use bara_isa_x86::{decode_function, lift_decoded_function};
 use bara_oracle::{
@@ -213,6 +213,62 @@ fn stdout_trap_return_0_runs_on_supported_aarch64_unix_hosts() -> Result<(), Str
     )
 }
 
+#[test]
+fn stdout_metadata_without_sentinel_does_not_emit_stdout() -> Result<(), String> {
+    assert_fixture_runs_like_expected(
+        "stdout_metadata_without_sentinel",
+        r#"{
+  "case_id": "stdout_metadata_without_sentinel",
+  "entry": 0,
+  "bytes": "31c0c3",
+  "abi": {
+    "args": [],
+    "return": "u64"
+  },
+  "host_traps": [
+    {
+      "kind": "stdout",
+      "text": "hello trap\n"
+    }
+  ]
+}"#,
+        r#"{
+  "case_id": "stdout_metadata_without_sentinel",
+  "exit_status": 0,
+  "return_value": 0,
+  "stdout": "",
+  "stderr": ""
+}"#,
+    )
+}
+
+#[test]
+fn stdout_trap_return_0_decodes_lifts_and_emits_arm64() -> Result<(), String> {
+    assert_fixture_emits_arm64(
+        "stdout_trap_return_0",
+        include_str!("../../../tests/cases/stdout_trap_return_0.json"),
+        &[0x00, 0x00, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6],
+    )
+}
+
+#[test]
+fn hello_world_stdout_return_0_decodes_lifts_and_emits_arm64() -> Result<(), String> {
+    assert_fixture_emits_arm64(
+        "hello_world_stdout_return_0",
+        include_str!("../../../tests/cases/hello_world_stdout_return_0.json"),
+        &[0x00, 0x00, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6],
+    )
+}
+
+#[test]
+fn hello_world_stdout_return_0_runs_on_supported_aarch64_unix_hosts() -> Result<(), String> {
+    assert_fixture_runs_like_expected(
+        "hello_world_stdout_return_0",
+        include_str!("../../../tests/cases/hello_world_stdout_return_0.json"),
+        include_str!("../../../tests/expected/hello_world_stdout_return_0.json"),
+    )
+}
+
 fn assert_fixture_emits_arm64(
     case_name: &str,
     test_case_json: &str,
@@ -270,7 +326,7 @@ fn assert_native_run_matches_expected(
     let result = match test_case.abi() {
         TestCaseAbi::NoArgsU64 => run_no_args_u64_with_host_traps(
             emitted.code().bytes(),
-            runtime_host_trap_plan(test_case.host_trap_plan())?,
+            runtime_host_trap_plan(test_case.host_trap_plan(), emitted.host_trap_requests())?,
         ),
         TestCaseAbi::OneU64ArgReturnsU64 { argument } => run_one_u64(
             emitted.code().bytes(),
@@ -305,7 +361,12 @@ fn assert_native_run_matches_expected(
 
 fn runtime_host_trap_plan(
     plan: &bara_oracle::TestCaseHostTrapPlan,
+    requests: &EmittedHostTrapRequests,
 ) -> Result<HostTrapPlan, String> {
+    if !requests.stdout_requested() {
+        return Ok(HostTrapPlan::none());
+    }
+
     let Some(stdout) = plan.stdout_trap() else {
         return Ok(HostTrapPlan::none());
     };

@@ -1,5 +1,6 @@
 use bara_ir::{
-    BasicBlock, BasicBlockError, BlockId, IrOp, Operand, Program, ProgramError, Terminator, X86Reg,
+    BasicBlock, BasicBlockError, BlockId, HostTrapKind, IrOp, Operand, Program, ProgramError,
+    Terminator, X86Reg,
 };
 
 use crate::{DecodeError, DecodedFunction, DecodedInstructionKind};
@@ -68,6 +69,11 @@ pub fn lift_decoded_function(decoded: &DecodedFunction) -> Result<Program, LiftE
                     src: Operand::ImmU64(0),
                 });
             }
+            DecodedInstructionKind::BaraHostTrapSentinel => {
+                ops.push(IrOp::HostTrap {
+                    kind: HostTrapKind::Stdout,
+                });
+            }
             DecodedInstructionKind::Ret => {
                 terminator = Some(Terminator::Return);
                 break;
@@ -90,7 +96,9 @@ pub fn lift_decoded_function(decoded: &DecodedFunction) -> Result<Program, LiftE
 
 #[cfg(test)]
 mod tests {
-    use bara_ir::{BlockId, IrOp, Operand, Terminator, UnsupportedReason, X86Reg, X86Va};
+    use bara_ir::{
+        BlockId, HostTrapKind, IrOp, Operand, Terminator, UnsupportedReason, X86Reg, X86Va,
+    };
 
     use crate::{
         lift_decoded_function, DecodedFunction, DecodedInstruction, DecodedInstructionKind,
@@ -180,6 +188,44 @@ mod tests {
                 dst: Operand::Reg(X86Reg::Rax),
                 src: Operand::Mem8 { base: X86Reg::Rdi }
             }]
+        );
+        assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_bara_host_trap_sentinel_to_stdout_host_trap() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(2),
+                    DecodedInstructionKind::BaraHostTrapSentinel,
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(2),
+                    X86Va::new(4),
+                    DecodedInstructionKind::XorEaxEax,
+                ),
+                DecodedInstruction::new(X86Va::new(4), X86Va::new(5), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded trap function lifts");
+        let block = &program.blocks()[0];
+
+        assert_eq!(
+            block.ops(),
+            &[
+                IrOp::HostTrap {
+                    kind: HostTrapKind::Stdout
+                },
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(0)
+                }
+            ]
         );
         assert_eq!(block.terminator(), &Terminator::Return);
     }

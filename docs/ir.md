@@ -57,11 +57,21 @@ pub enum IrOp {
     Mov { dst: Operand, src: Operand },
     Add { dst: Operand, src: Operand },
     Sub { dst: Operand, src: Operand },
+    HostTrap { kind: HostTrapKind },
     Cmp { lhs: Operand, rhs: Operand },
     Test { lhs: Operand, rhs: Operand },
     Push { src: Operand },
     Pop { dst: Operand },
     Unsupported { reason: UnsupportedReason },
+}
+```
+
+`HostTrap` は OS syscall ではなく、Bara 専用 sentinel/helper sequence を
+runtime 境界へ伝えるための明示的な外部効果要求として扱う。
+
+```rust
+pub enum HostTrapKind {
+    Stdout,
 }
 ```
 
@@ -102,11 +112,12 @@ pub enum Terminator {
 pub enum Operand {
     Reg(X86Reg),
     ImmU64(u64),
+    Mem8 { base: X86Reg },
     Mem(MemRef),
 }
 ```
 
-M1 では `Reg` と `ImmU64` だけを使う。
+現在の初期 corpus では `Reg`、`ImmU64`、`Mem8 { base: Rdi }` を使う。
 
 ## Flags
 
@@ -161,4 +172,3 @@ pub enum Fixup {
 - [ ] block range が重ならない。
 - [ ] unsupported op は明示的に残る。
 - [ ] PC map が source PC を失っていない。
-

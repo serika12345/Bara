@@ -4,7 +4,7 @@ use std::{
     process::ExitCode,
 };
 
-use bara_arm64::emit_program;
+use bara_arm64::{emit_program, EmittedHostTrapRequests};
 use bara_isa_x86::{decode_function, lift_decoded_function};
 use bara_oracle::{
     compare_observed_results, corpus_report_to_json, observed_result_from_json,
@@ -181,7 +181,7 @@ fn observe_test_case(test_case: &TestCase) -> Result<ObservedResult, CliError> {
     let result = match test_case.abi() {
         TestCaseAbi::NoArgsU64 => run_no_args_u64_with_host_traps(
             emitted.code().bytes(),
-            runtime_host_trap_plan(test_case.host_trap_plan())?,
+            runtime_host_trap_plan(test_case.host_trap_plan(), emitted.host_trap_requests())?,
         ),
         TestCaseAbi::OneU64ArgReturnsU64 { argument } => run_one_u64(
             emitted.code().bytes(),
@@ -207,7 +207,12 @@ fn observe_test_case(test_case: &TestCase) -> Result<ObservedResult, CliError> {
 
 fn runtime_host_trap_plan(
     plan: &bara_oracle::TestCaseHostTrapPlan,
+    requests: &EmittedHostTrapRequests,
 ) -> Result<HostTrapPlan, CliError> {
+    if !requests.stdout_requested() {
+        return Ok(HostTrapPlan::none());
+    }
+
     let Some(stdout) = plan.stdout_trap() else {
         return Ok(HostTrapPlan::none());
     };
