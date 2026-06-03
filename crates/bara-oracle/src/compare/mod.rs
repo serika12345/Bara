@@ -109,4 +109,50 @@ mod tests {
             }]
         );
     }
+
+    #[test]
+    fn all_m1_observation_fields_are_compared() {
+        let expected = ObservedResult::new(
+            CaseId::new("expected").expect("test case id is non-empty"),
+            0,
+            42,
+            "stdout".to_owned(),
+            "stderr".to_owned(),
+        );
+        let actual = ObservedResult::new(
+            CaseId::new("actual").expect("test case id is non-empty"),
+            1,
+            41,
+            "different stdout".to_owned(),
+            "different stderr".to_owned(),
+        );
+
+        let report = compare_observed_results(&expected, &actual);
+
+        assert_eq!(
+            report.issues(),
+            &[
+                ComparisonIssue::CaseIdMismatch {
+                    expected: CaseId::new("expected").expect("test case id is non-empty"),
+                    actual: CaseId::new("actual").expect("test case id is non-empty")
+                },
+                ComparisonIssue::ExitStatusMismatch {
+                    expected: 0,
+                    actual: 1
+                },
+                ComparisonIssue::ReturnValueMismatch {
+                    expected: 42,
+                    actual: 41
+                },
+                ComparisonIssue::StdoutMismatch {
+                    expected: "stdout".to_owned(),
+                    actual: "different stdout".to_owned()
+                },
+                ComparisonIssue::StderrMismatch {
+                    expected: "stderr".to_owned(),
+                    actual: "different stderr".to_owned()
+                }
+            ]
+        );
+    }
 }

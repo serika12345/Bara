@@ -4,6 +4,8 @@
 
 実装は、関数型プログラミングの考え方に寄せ、シグネチャから仕様と境界が読める形を優先する。
 
+開発は TDD を前提にする。新しい振る舞いを追加するときは、先に最小の意味あるテストを書き、可能な範囲で意図した理由で失敗することを確認してから実装する。既存の振る舞いを変更する場合も、直接のテストがなければ先に回帰テストを追加する。
+
 基本アーキテクチャでは I/O とロジックを分離する。I/O 境界の外にある decode、lift、IR 変換、emit、metadata 生成、比較、検証は、外部から見て純粋関数として振る舞うようにする。
 
 設計判断では、DRY より単一責任を優先する。重複して見えるコードでも、責務、変更理由、検証観点が違うなら早すぎる共通化をしない。
@@ -82,6 +84,33 @@ pub fn validate_program(program: &Program);
 ```
 
 この形では、入力ファイル、出力先、環境、ログ、実行順序がシグネチャに現れず、検証や property test が難しくなる。`validate_program` のようなロジック関数が `()` を返す場合も、何を検証し、何が失敗し、呼び出し後に何が変わったのかがシグネチャから読めない。
+
+## TDD
+
+新規実装は red / green / refactor の順で進める。最初のテストは広すぎる integration test ではなく、変更する責務の境界に近い最小テストを優先する。
+
+優先すること:
+
+- decode、lift、IR validation、emit、oracle 比較は pure な単体テストで先に仕様を書く。
+- runtime や CLI のような I/O 境界は、可能な範囲で小さな境界テストを追加する。
+- バグ修正では、先に失敗を再現する regression test を追加する。
+- 未対応命令や未対応形状は panic ではなく、分類された error / unsupported reason をテストする。
+- Rosetta oracle 由来の期待値を使う場合も、比較対象は外部観測 JSON に限定する。
+
+避けること:
+
+- テストなしで命令対応、IR 形状、emit 結果、比較項目を増やす。
+- 実装の都合に合わせてテストだけを弱める。
+- Rosetta や既存変換レイヤーの内部構造をテスト期待値の根拠にする。
+
+例:
+
+```text
+add failing decode/lift/emit/oracle test
+  -> implement smallest production change
+  -> run Nix dev-shell test command
+  -> refactor while tests stay green
+```
 
 ## 責務と合成
 
@@ -251,6 +280,7 @@ impl ExecutableBuffer {
 - ルート直下に実装ファイルを増やしていないか。
 - I/O が専用ディレクトリに集約され、ドメインロジックへ散っていないか。
 - 開発手順が Nix dev shell 前提になっているか。
+- 新規または変更された振る舞いに、先に書かれたテストがあるか。
 - EditorConfig と formatter の責務が分かれているか。
 - 内部 mutation が外部から見た純粋性を壊していないか。
 - `unsafe` が core logic に漏れていないか。

@@ -41,3 +41,26 @@ fn call_no_args_u64(executable: &ExecutableMemory) -> Result<RunResult, RunError
     let _ = executable;
     Err(RunError::UnsupportedHost)
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::RunResult;
+
+    #[test]
+    fn run_result_exposes_return_value() {
+        assert_eq!(RunResult::new(42).return_value(), 42);
+    }
+
+    #[test]
+    #[cfg(not(all(unix, target_arch = "aarch64")))]
+    fn run_reports_unsupported_host_on_other_hosts() {
+        use crate::{run_no_args_u64, ExecutableMemoryError, RunError};
+
+        assert_eq!(
+            run_no_args_u64(&[0]),
+            Err(RunError::ExecutableMemory(
+                ExecutableMemoryError::UnsupportedHost
+            ))
+        );
+    }
+}

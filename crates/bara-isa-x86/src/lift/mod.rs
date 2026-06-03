@@ -45,3 +45,70 @@ pub fn lift_decoded_function(decoded: &DecodedFunction) -> Result<Program, LiftE
 
     Program::new(decoded.entry(), vec![block]).map_err(LiftError::Program)
 }
+
+#[cfg(test)]
+mod tests {
+    use bara_ir::{BlockId, IrOp, Operand, Terminator, UnsupportedReason, X86Reg, X86Va};
+
+    use crate::{
+        lift_decoded_function, DecodedFunction, DecodedInstruction, DecodedInstructionKind,
+    };
+
+    #[test]
+    fn lifts_mov_eax_imm32_and_ret_to_single_block_program() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(5),
+                    DecodedInstructionKind::MovEaxImm32 { imm: 42 },
+                ),
+                DecodedInstruction::new(X86Va::new(5), X86Va::new(6), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded M1 function lifts");
+        let block = &program.blocks()[0];
+
+        assert_eq!(program.entry(), X86Va::new(0));
+        assert_eq!(block.id(), BlockId::new(0));
+        assert_eq!(block.start(), X86Va::new(0));
+        assert_eq!(block.end(), X86Va::new(6));
+        assert_eq!(
+            block.ops(),
+            &[IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(42)
+            }]
+        );
+        assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_unsupported_instruction_to_unsupported_terminator() {
+        let reason = UnsupportedReason::DecodeUnsupportedOpcode {
+            opcode: 0x90,
+            at: X86Va::new(0),
+        };
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![DecodedInstruction::new(
+                X86Va::new(0),
+                X86Va::new(1),
+                DecodedInstructionKind::Unsupported {
+                    reason: reason.clone(),
+                },
+            )],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("unsupported decode lifts to IR");
+
+        assert_eq!(
+            program.blocks()[0].terminator(),
+            &Terminator::Unsupported { reason }
+        );
+    }
+}

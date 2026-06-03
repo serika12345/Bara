@@ -60,3 +60,82 @@ pub fn validate_program(program: &Program) -> ValidationReport {
 
     ValidationReport::new(issues)
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        validate_program, BasicBlock, BlockId, Program, Terminator, UnsupportedReason,
+        ValidationIssue, ValidationReport, X86Va,
+    };
+
+    fn block(id: u32, start: u64, end: u64, terminator: Terminator) -> BasicBlock {
+        BasicBlock::new(
+            BlockId::new(id),
+            X86Va::new(start),
+            X86Va::new(end),
+            Vec::new(),
+            terminator,
+        )
+        .expect("test block range is valid")
+    }
+
+    #[test]
+    fn validation_report_is_valid_when_it_has_no_issues() {
+        let report = ValidationReport::new(Vec::new());
+
+        assert!(report.is_valid());
+        assert!(report.issues().is_empty());
+    }
+
+    #[test]
+    fn valid_program_has_no_issues() {
+        let program = Program::new(X86Va::new(0), vec![block(0, 0, 1, Terminator::Return)])
+            .expect("program has entry block");
+
+        assert!(validate_program(&program).is_valid());
+    }
+
+    #[test]
+    fn overlapping_block_ranges_are_reported() {
+        let program = Program::new(
+            X86Va::new(0),
+            vec![
+                block(0, 0, 4, Terminator::Return),
+                block(1, 3, 6, Terminator::Return),
+            ],
+        )
+        .expect("program has entry block and unique block ids");
+
+        assert_eq!(
+            validate_program(&program).issues(),
+            &[ValidationIssue::BlockRangeOverlap {
+                first_start: X86Va::new(0),
+                first_end: X86Va::new(4),
+                second_start: X86Va::new(3),
+                second_end: X86Va::new(6)
+            }]
+        );
+    }
+
+    #[test]
+    fn unsupported_terminator_is_reported() {
+        let reason = UnsupportedReason::MissingReturnTerminator { at: X86Va::new(1) };
+        let program = Program::new(
+            X86Va::new(0),
+            vec![block(
+                0,
+                0,
+                1,
+                Terminator::Unsupported {
+                    reason: reason.clone(),
+                },
+            )],
+        )
+        .expect("program has entry block");
+
+        assert_eq!(
+            validate_program(&program).issues(),
+            &[ValidationIssue::UnsupportedTerminator { at: X86Va::new(1) }]
+        );
+    }
+}

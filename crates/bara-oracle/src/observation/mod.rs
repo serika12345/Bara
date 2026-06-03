@@ -71,3 +71,37 @@ impl ObservedResult {
         &self.stderr
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{CaseId, CaseIdError, ObservedResult};
+
+    #[test]
+    fn case_id_rejects_empty_value() {
+        assert_eq!(CaseId::new(""), Err(CaseIdError::Empty));
+    }
+
+    #[test]
+    fn case_id_exposes_string_value() {
+        let case_id = CaseId::new("return_42").expect("case id is non-empty");
+
+        assert_eq!(case_id.as_str(), "return_42");
+    }
+
+    #[test]
+    fn observed_result_exposes_fields() {
+        let result = ObservedResult::new(
+            CaseId::new("return_42").expect("case id is non-empty"),
+            0,
+            42,
+            "out".to_owned(),
+            "err".to_owned(),
+        );
+
+        assert_eq!(result.case_id().as_str(), "return_42");
+        assert_eq!(result.exit_status(), 0);
+        assert_eq!(result.return_value(), 42);
+        assert_eq!(result.stdout(), "out");
+        assert_eq!(result.stderr(), "err");
+    }
+}

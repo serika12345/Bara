@@ -98,3 +98,69 @@ pub enum UnsupportedReason {
     MissingReturnTerminator { at: X86Va },
     EmitUnsupportedIr,
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{BasicBlock, BasicBlockError, BlockId, IrOp, Operand, Terminator, X86Reg, X86Va};
+
+    #[test]
+    fn block_id_exposes_value() {
+        assert_eq!(BlockId::new(9).value(), 9);
+    }
+
+    #[test]
+    fn basic_block_rejects_empty_range() {
+        assert_eq!(
+            BasicBlock::new(
+                BlockId::new(0),
+                X86Va::new(4),
+                X86Va::new(4),
+                Vec::new(),
+                Terminator::Return
+            ),
+            Err(BasicBlockError::EmptyOrReversedRange {
+                start: X86Va::new(4),
+                end: X86Va::new(4)
+            })
+        );
+    }
+
+    #[test]
+    fn basic_block_rejects_reversed_range() {
+        assert_eq!(
+            BasicBlock::new(
+                BlockId::new(0),
+                X86Va::new(5),
+                X86Va::new(4),
+                Vec::new(),
+                Terminator::Return
+            ),
+            Err(BasicBlockError::EmptyOrReversedRange {
+                start: X86Va::new(5),
+                end: X86Va::new(4)
+            })
+        );
+    }
+
+    #[test]
+    fn basic_block_exposes_fields() {
+        let op = IrOp::Mov {
+            dst: Operand::Reg(X86Reg::Rax),
+            src: Operand::ImmU64(42),
+        };
+        let block = BasicBlock::new(
+            BlockId::new(1),
+            X86Va::new(0),
+            X86Va::new(6),
+            vec![op.clone()],
+            Terminator::Return,
+        )
+        .expect("test block range is valid");
+
+        assert_eq!(block.id(), BlockId::new(1));
+        assert_eq!(block.start(), X86Va::new(0));
+        assert_eq!(block.end(), X86Va::new(6));
+        assert_eq!(block.ops(), &[op]);
+        assert_eq!(block.terminator(), &Terminator::Return);
+    }
+}

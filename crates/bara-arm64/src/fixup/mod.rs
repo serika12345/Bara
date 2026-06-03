@@ -32,3 +32,23 @@ impl PcMapEntry {
         self.target
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use bara_ir::X86Va;
+
+    use crate::{ArmPc, PcMapEntry};
+
+    #[test]
+    fn arm_pc_exposes_value() {
+        assert_eq!(ArmPc::new(12).value(), 12);
+    }
+
+    #[test]
+    fn pc_map_entry_exposes_source_and_target() {
+        let entry = PcMapEntry::new(X86Va::new(0x1000), ArmPc::new(8));
+
+        assert_eq!(entry.source(), X86Va::new(0x1000));
+        assert_eq!(entry.target(), ArmPc::new(8));
+    }
+}

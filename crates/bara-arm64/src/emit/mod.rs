@@ -125,3 +125,86 @@ fn emit_u32_le(code: &mut Vec<u8>, instruction: u32) -> usize {
     code.extend_from_slice(&instruction.to_le_bytes());
     code.len()
 }
+
+#[cfg(test)]
+mod tests {
+    use bara_ir::{
+        BasicBlock, BlockId, IrOp, Operand, Program, Terminator, UnsupportedReason, X86Reg, X86Va,
+    };
+
+    use crate::{emit_program, Arm64MachineCode, ArmPc, EmitError};
+
+    fn program_with_ops(ops: Vec<IrOp>, terminator: Terminator) -> Program {
+        let block = BasicBlock::new(
+            BlockId::new(0),
+            X86Va::new(0),
+            X86Va::new(1),
+            ops,
+            terminator,
+        )
+        .expect("test block range is valid");
+        Program::new(X86Va::new(0), vec![block]).expect("program has entry block")
+    }
+
+    #[test]
+    fn machine_code_rejects_empty_bytes() {
+        assert_eq!(Arm64MachineCode::new(Vec::new()), Err(EmitError::EmptyCode));
+    }
+
+    #[test]
+    fn emits_mov_x0_imm_and_ret_for_rax_immediate_return() {
+        let program = program_with_ops(
+            vec![IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(42),
+            }],
+            Terminator::Return,
+        );
+
+        let emitted = emit_program(&program).expect("M1 IR emits");
+
+        assert_eq!(
+            emitted.code().bytes(),
+            &[0x40, 0x05, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]
+        );
+        assert_eq!(emitted.pc_map()[0].source(), X86Va::new(0));
+        assert_eq!(emitted.pc_map()[0].target(), ArmPc::new(0));
+    }
+
+    #[test]
+    fn emits_mov_x0_with_multiple_u16_chunks() {
+        let program = program_with_ops(
+            vec![IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(0x0001_0000_0000_0002),
+            }],
+            Terminator::Return,
+        );
+
+        let emitted = emit_program(&program).expect("multi-chunk immediate emits");
+
+        assert_eq!(
+            emitted.code().bytes(),
+            &[0x40, 0x00, 0x80, 0xd2, 0x20, 0x00, 0xe0, 0xf2, 0xc0, 0x03, 0x5f, 0xd6]
+        );
+    }
+
+    #[test]
+    fn return_without_rax_immediate_is_unsupported_shape() {
+        let program = program_with_ops(Vec::new(), Terminator::Return);
+
+        assert_eq!(emit_program(&program), Err(EmitError::UnsupportedShape));
+    }
+
+    #[test]
+    fn unsupported_terminator_is_invalid_program() {
+        let program = program_with_ops(
+            Vec::new(),
+            Terminator::Unsupported {
+                reason: UnsupportedReason::MissingReturnTerminator { at: X86Va::new(1) },
+            },
+        );
+
+        assert_eq!(emit_program(&program), Err(EmitError::InvalidProgram));
+    }
+}

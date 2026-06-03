@@ -239,6 +239,18 @@ Rules:
 
 ## Testing and Verification
 
+Development is test-driven by default.
+
+For new behavior, write or update the smallest meaningful test first, confirm
+that it fails for the intended reason when practical, then implement the
+production change and keep the test as a regression case. Refactors must keep
+the relevant tests passing before and after the change.
+
+When changing existing behavior that lacks direct coverage, add the missing
+test before changing the implementation. Do not extend decode, lift, IR, emit,
+runtime, oracle comparison, or CLI behavior without a corresponding test unless
+the change is documentation-only or purely mechanical formatting.
+
 Initial verification is expected/actual comparison:
 
 ```text
@@ -293,6 +305,7 @@ Before completing a change, check:
 - Are implementation files kept out of the repository root?
 - Is I/O isolated in dedicated directories?
 - Were commands run through the Nix dev shell?
+- Was new or changed behavior driven by a test first?
 - Are EditorConfig and language formatter responsibilities respected?
 - Does internal mutation preserve external purity?
 - Is `unsafe` absent from core logic and documented at runtime boundaries?

@@ -84,3 +84,35 @@ pub enum ExecutableMemoryError {
     ProtectFailed,
     UnsupportedHost,
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{ExecutableMemory, ExecutableMemoryError};
+
+    #[test]
+    #[cfg(all(unix, target_arch = "aarch64"))]
+    fn allocate_rejects_empty_code_on_supported_hosts() {
+        assert_eq!(
+            ExecutableMemory::allocate(&[]).map(|_| ()),
+            Err(ExecutableMemoryError::EmptyCode)
+        );
+    }
+
+    #[test]
+    #[cfg(all(unix, target_arch = "aarch64"))]
+    fn allocate_exposes_pointer_and_length_on_supported_hosts() {
+        let memory = ExecutableMemory::allocate(&[0xc0, 0x03, 0x5f, 0xd6])
+            .expect("ret instruction can be copied into executable memory");
+
+        assert_eq!(memory.len().get(), 4);
+    }
+
+    #[test]
+    #[cfg(not(all(unix, target_arch = "aarch64")))]
+    fn allocate_reports_unsupported_host_on_other_hosts() {
+        assert_eq!(
+            ExecutableMemory::allocate(&[0]).map(|_| ()),
+            Err(ExecutableMemoryError::UnsupportedHost)
+        );
+    }
+}

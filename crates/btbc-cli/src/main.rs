@@ -87,3 +87,21 @@ impl std::fmt::Display for CliError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{run_cli, CliError};
+
+    #[test]
+    fn unknown_command_reports_usage() {
+        assert!(matches!(
+            run_cli(vec!["unknown".to_owned()]),
+            Err(CliError::Usage)
+        ));
+    }
+
+    #[test]
+    fn no_command_reports_usage() {
+        assert!(matches!(run_cli(Vec::new()), Err(CliError::Usage)));
+    }
+}

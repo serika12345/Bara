@@ -62,3 +62,64 @@ pub enum ProgramError {
     MissingEntryBlock { entry: X86Va },
     DuplicateBlockId { id: BlockId },
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{BasicBlock, BlockId, Program, ProgramError, Terminator, X86Va};
+
+    fn block(id: u32, start: u64, end: u64) -> BasicBlock {
+        BasicBlock::new(
+            BlockId::new(id),
+            X86Va::new(start),
+            X86Va::new(end),
+            Vec::new(),
+            Terminator::Return,
+        )
+        .expect("test block range is valid")
+    }
+
+    #[test]
+    fn x86_va_checked_add_returns_typed_address() {
+        assert_eq!(X86Va::new(0x1000).checked_add(5), Ok(X86Va::new(0x1005)));
+    }
+
+    #[test]
+    fn x86_va_checked_add_reports_overflow() {
+        assert_eq!(
+            X86Va::new(u64::MAX).checked_add(1),
+            Err(ProgramError::AddressOverflow {
+                start: X86Va::new(u64::MAX),
+                byte_len: 1
+            })
+        );
+    }
+
+    #[test]
+    fn program_requires_entry_block() {
+        assert_eq!(
+            Program::new(X86Va::new(0), vec![block(0, 1, 2)]),
+            Err(ProgramError::MissingEntryBlock {
+                entry: X86Va::new(0)
+            })
+        );
+    }
+
+    #[test]
+    fn program_rejects_duplicate_block_id() {
+        assert_eq!(
+            Program::new(X86Va::new(0), vec![block(0, 0, 1), block(0, 1, 2)]),
+            Err(ProgramError::DuplicateBlockId {
+                id: BlockId::new(0)
+            })
+        );
+    }
+
+    #[test]
+    fn program_exposes_entry_and_blocks() {
+        let program = Program::new(X86Va::new(0), vec![block(7, 0, 1)])
+            .expect("program has entry block and unique block id");
+
+        assert_eq!(program.entry(), X86Va::new(0));
+        assert_eq!(program.blocks()[0].id(), BlockId::new(7));
+    }
+}
