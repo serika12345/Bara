@@ -18,6 +18,62 @@
 
 曖昧な `u64`、`usize`、`Vec<u8>` をそのまま横断的に渡さない。意味のある型、newtype、enum、Result を使い、呼び出し側が誤用しにくい API にする。
 
+## ドメイン型の強制
+
+Bara では、ドメイン駆動設計と関数型プログラミングを融合した設計を標準とする。primitive obsession は設計上の欠陥として扱い、公開 API へプリミティブ型を出すことは例外にする。
+
+原則:
+
+- domain crate の公開 API は、プリミティブ型ではなくドメイン型で表す。
+- `u8`、`u16`、`u32`、`u64`、`usize`、`i32`、`String`、`Vec<u8>`、`&[u8]` を、意味を持つ値としてそのまま境界越しに渡さない。
+- address、offset、length、opcode、immediate、register、return value、exit status、stdout/stderr、machine code bytes、testcase bytes は、それぞれ専用の型を持つ。
+- 型 alias ではなく newtype / enum / value object を優先する。型 alias は表記短縮であり、型安全性を増やさない。
+- constructor、parser、validator で invariant を作る。無効値を作れる型を core logic に入れない。
+- 値が存在しない状態は sentinel 値、空文字列、空 Vec ではなく、`Option`、enum、または分類された error で表す。
+
+許容されるプリミティブ使用:
+
+- private implementation detail
+- test / fixture
+- runtime / FFI / OS API 境界
+- JSON や CLI などの serialization 境界
+- ドメイン型の `new` / `try_new` / parser / validator / accessor
+
+公開 API にプリミティブ型を残す場合は、意図的な例外として `docs/domain-primitive-baseline.txt` に記録する。新しい公開プリミティブ露出は `scripts/check-domain-types` で検出し、baseline を更新しない限り通さない。baseline 更新は「境界上必要」「既存負債を分離中」など、ドメイン上の理由をレビューで説明できる場合だけ許可する。
+
+優先する Rust 表現:
+
+```rust
+pub struct X86Va(u64);
+pub struct X86ByteLen(u64);
+pub struct X86Opcode(u8);
+pub struct X86Imm32(u32);
+pub struct ReturnValue(u64);
+
+pub enum ObservedStream {
+    Empty,
+    Utf8(String),
+}
+```
+
+避ける Rust 表現:
+
+```rust
+pub fn decode(bytes: Vec<u8>, entry: u64) -> Result<Vec<Instruction>, Error>;
+
+pub struct ObservedResult {
+    pub exit_status: i32,
+    pub return_value: u64,
+    pub stdout: String,
+}
+```
+
+設計判断:
+
+- 「今は小さいから」は primitive 露出の理由にしない。
+- 「後で型にする」は原則禁止。TDD で最初のテストを書く時点で、期待するドメイン型も一緒に定義する。
+- 低レベル実装でプリミティブ演算が必要な場合も、境界の内側に閉じる。公開 signature はドメイン語彙で保つ。
+
 優先すること:
 
 - source PC と target PC を型で分ける。
@@ -281,6 +337,7 @@ impl ExecutableBuffer {
 - I/O が専用ディレクトリに集約され、ドメインロジックへ散っていないか。
 - 開発手順が Nix dev shell 前提になっているか。
 - 新規または変更された振る舞いに、先に書かれたテストがあるか。
+- `scripts/check-domain-types` が通り、baseline 更新がある場合は例外理由を説明できるか。
 - EditorConfig と formatter の責務が分かれているか。
 - 内部 mutation が外部から見た純粋性を壊していないか。
 - `unsafe` が core logic に漏れていないか。

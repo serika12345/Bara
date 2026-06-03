@@ -27,6 +27,7 @@
               cargo-deny
               cargo-nextest
               clippy
+              ripgrep
               rust-analyzer
               rustc
               rustfmt

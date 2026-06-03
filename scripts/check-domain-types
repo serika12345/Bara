@@ -1,0 +1,25 @@
+#!/usr/bin/env sh
+set -eu
+
+cd "$(dirname "$0")/.."
+
+baseline="docs/domain-primitive-baseline.txt"
+actual="$(mktemp "${TMPDIR:-/tmp}/bara-domain-types.XXXXXX")"
+trap 'rm -f "$actual"' EXIT
+
+rg -n "pub .*\b(u8|u16|u32|u64|usize|i32|String|Vec<|&\[u8\])\b" crates -g '*.rs' \
+  | sed -E 's/^([^:]+):[0-9]+:/\1:/' \
+  | sort -u > "$actual"
+
+if ! diff -u "$baseline" "$actual"; then
+  cat >&2 <<'MESSAGE'
+
+Public primitive exposure changed.
+
+Bara public APIs must use domain types by default. If this is a deliberate
+boundary/newtype exception, update docs/domain-primitive-baseline.txt in the
+same change and explain the domain reason in review. Otherwise introduce a
+newtype, enum, or validated domain value.
+MESSAGE
+  exit 1
+fi

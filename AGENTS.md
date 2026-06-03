@@ -127,6 +127,35 @@ Prefer APIs like:
 pub fn validate_program(program: &Program) -> ValidationReport;
 ```
 
+## Domain Type Rules
+
+Bara uses a domain-driven, functional style. Primitive obsession is a design
+defect, not a neutral default.
+
+Public APIs in domain crates must use domain types by default. Do not expose
+bare `u8`, `u16`, `u32`, `u64`, `usize`, `i32`, `String`, `Vec<u8>`, or
+`&[u8]` across module or crate boundaries when the value has domain meaning.
+Define a named newtype, enum, value object, or validated collection instead.
+
+Primitive values are allowed only in these places:
+
+- private implementation details
+- tests and fixtures
+- low-level runtime/FFI boundaries
+- serialization/deserialization boundaries
+- constructors, parsers, validators, or accessors that explicitly convert
+  between untrusted primitive input and trusted domain values
+
+When a primitive must remain in a public API, it must be deliberate and
+accounted for in `docs/domain-primitive-baseline.txt`. New public primitive
+exposures are blocked by `scripts/check-domain-types` unless the baseline is
+updated in the same change with a clear reason in the review.
+
+Prefer domain types that encode invariants at construction time. Use
+`new`/`try_new`, parsers, or validators to reject invalid values before they
+enter core logic. Do not smuggle invalid states through default empty strings,
+sentinel integers, or loosely typed byte buffers.
+
 ## Signatures as Specifications
 
 Design APIs so signatures explain the boundary and behavior.
@@ -295,6 +324,8 @@ Before completing a change, check:
   space?
 - Are raw `u64`, `usize`, or `Vec<u8>` values crossing boundaries without
   domain meaning?
+- Did `scripts/check-domain-types` pass, and did any baseline update have a
+  domain-level justification?
 - Are fallible operations represented with classified errors?
 - Did I/O, time, randomness, global state, or process execution leak into core
   logic?

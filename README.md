@@ -119,6 +119,7 @@ nix develop
 ```sh
 nix develop -c cargo --version
 nix develop -c cargo fmt --all -- --check
+nix develop -c ./scripts/check-domain-types
 nix develop -c cargo check --workspace --all-targets
 nix develop -c cargo test --workspace
 nix develop -c cargo run -p btbc-cli -- check-m1
