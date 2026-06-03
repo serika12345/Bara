@@ -1,125 +1,14 @@
-use bara_ir::{UnsupportedReason, X86Va};
+mod bytes;
+mod error;
+mod immediate;
+mod instruction;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct X86Bytes {
-    entry: X86Va,
-    bytes: Vec<u8>,
-}
+use bara_ir::UnsupportedReason;
 
-impl X86Bytes {
-    pub fn new(entry: X86Va, bytes: Vec<u8>) -> Result<Self, DecodeError> {
-        if bytes.is_empty() {
-            return Err(DecodeError::EmptyFunction { entry });
-        }
-
-        Ok(Self { entry, bytes })
-    }
-
-    pub const fn entry(&self) -> X86Va {
-        self.entry
-    }
-
-    pub fn bytes(&self) -> &[u8] {
-        &self.bytes
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DecodedFunction {
-    entry: X86Va,
-    instructions: Vec<DecodedInstruction>,
-}
-
-impl DecodedFunction {
-    pub fn new(entry: X86Va, instructions: Vec<DecodedInstruction>) -> Result<Self, DecodeError> {
-        if instructions.is_empty() {
-            return Err(DecodeError::EmptyFunction { entry });
-        }
-
-        Ok(Self {
-            entry,
-            instructions,
-        })
-    }
-
-    pub const fn entry(&self) -> X86Va {
-        self.entry
-    }
-
-    pub fn instructions(&self) -> &[DecodedInstruction] {
-        &self.instructions
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DecodedInstruction {
-    start: X86Va,
-    end: X86Va,
-    kind: DecodedInstructionKind,
-}
-
-impl DecodedInstruction {
-    pub const fn new(start: X86Va, end: X86Va, kind: DecodedInstructionKind) -> Self {
-        Self { start, end, kind }
-    }
-
-    pub const fn start(&self) -> X86Va {
-        self.start
-    }
-
-    pub const fn end(&self) -> X86Va {
-        self.end
-    }
-
-    pub const fn kind(&self) -> &DecodedInstructionKind {
-        &self.kind
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DecodedInstructionKind {
-    MovEaxImm32 { imm: u32 },
-    AddEaxImm32 { imm: X86Imm32 },
-    AddEaxImm8 { imm: X86Imm8 },
-    SubEaxImm8 { imm: X86Imm8 },
-    Ret,
-    Unsupported { reason: UnsupportedReason },
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct X86Imm32 {
-    value: i32,
-}
-
-impl X86Imm32 {
-    pub(crate) const fn new(value: i32) -> Self {
-        Self { value }
-    }
-
-    pub(crate) fn as_i64(self) -> i64 {
-        i64::from(self.value)
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct X86Imm8(i8);
-
-impl X86Imm8 {
-    pub const fn new(value: i8) -> Self {
-        Self(value)
-    }
-
-    pub(crate) fn as_i64(self) -> i64 {
-        i64::from(self.0)
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DecodeError {
-    EmptyFunction { entry: X86Va },
-    AddressOverflow { at: X86Va, byte_len: u64 },
-    TruncatedInstruction { at: X86Va, opcode: u8 },
-}
+pub use bytes::X86Bytes;
+pub use error::DecodeError;
+pub use immediate::{X86Imm32, X86Imm8};
+pub use instruction::{DecodedFunction, DecodedInstruction, DecodedInstructionKind};
 
 pub fn decode_function(input: &X86Bytes) -> Result<DecodedFunction, DecodeError> {
     let mut offset = 0usize;

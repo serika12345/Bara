@@ -13,9 +13,9 @@ crates/bara-ir/src/program/mod.rs:    pub fn checked_add(self, byte_len: u64) ->
 crates/bara-ir/src/program/mod.rs:    pub fn new(entry: X86Va, blocks: Vec<BasicBlock>) -> Result<Self, ProgramError> {
 crates/bara-ir/src/program/mod.rs:pub struct X86Va(u64);
 crates/bara-ir/src/validate/mod.rs:    pub fn new(issues: Vec<ValidationIssue>) -> Self {
-crates/bara-isa-x86/src/decode/mod.rs:    pub fn bytes(&self) -> &[u8] {
-crates/bara-isa-x86/src/decode/mod.rs:    pub fn new(entry: X86Va, bytes: Vec<u8>) -> Result<Self, DecodeError> {
-crates/bara-isa-x86/src/decode/mod.rs:    pub fn new(entry: X86Va, instructions: Vec<DecodedInstruction>) -> Result<Self, DecodeError> {
+crates/bara-isa-x86/src/decode/bytes.rs:    pub fn bytes(&self) -> &[u8] {
+crates/bara-isa-x86/src/decode/bytes.rs:    pub fn new(entry: X86Va, bytes: Vec<u8>) -> Result<Self, DecodeError> {
+crates/bara-isa-x86/src/decode/instruction.rs:    pub fn new(entry: X86Va, instructions: Vec<DecodedInstruction>) -> Result<Self, DecodeError> {
 crates/bara-oracle/src/compare/mod.rs:    pub fn new(issues: Vec<ComparisonIssue>) -> Self {
 crates/bara-oracle/src/json/mod.rs:pub fn corpus_report_to_json(report: &CorpusReport) -> Result<String, JsonError> {
 crates/bara-oracle/src/json/mod.rs:pub fn observed_result_to_json(result: &ObservedResult) -> Result<String, JsonError> {
