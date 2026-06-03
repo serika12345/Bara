@@ -124,6 +124,10 @@ btbc-cli check-corpus tests/cases tests/expected
 ./scripts/verify-blackbox
 ```
 
+`check-corpus` は全 testcase を走査し、成功時は case 単位の JSON report
+を出す。失敗がある場合も最後まで走査し、同じ JSON report を出して非ゼロ終了
+する。
+
 将来の分割案:
 
 ```text
@@ -147,7 +151,14 @@ btbc-compare expected.json actual.json
 ## failure classification
 
 ```text
+InvalidTestCase
+MissingExpected
+InvalidExpected
 DecodeError
+LiftError
+EmitError
+RunError
+ComparisonMismatch
 UnsupportedInstruction
 WrongReturnValue
 WrongRegisterValue

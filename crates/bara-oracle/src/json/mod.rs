@@ -1,4 +1,4 @@
-use crate::ObservedResult;
+use crate::{CorpusReport, ObservedResult};
 
 #[derive(Debug)]
 pub struct JsonError {
@@ -31,9 +31,16 @@ pub fn observed_result_from_json(input: &str) -> Result<ObservedResult, JsonErro
     serde_json::from_str(input).map_err(JsonError::new)
 }
 
+pub fn corpus_report_to_json(report: &CorpusReport) -> Result<String, JsonError> {
+    serde_json::to_string(report).map_err(JsonError::new)
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{observed_result_from_json, observed_result_to_json, CaseId, ObservedResult};
+    use crate::{
+        corpus_report_to_json, observed_result_from_json, observed_result_to_json, CaseId,
+        CorpusReport, FailureKind, FailureMessage, FixtureOutcome, FixtureReport, ObservedResult,
+    };
 
     #[test]
     fn observed_result_serializes_as_m1_json() {
@@ -67,6 +74,30 @@ mod tests {
                 String::new(),
                 String::new()
             )
+        );
+    }
+
+    #[test]
+    fn corpus_report_serializes_as_stable_json() {
+        let report = vec![
+            FixtureReport::new(
+                CaseId::new("return_42").expect("case id is non-empty"),
+                FixtureOutcome::Passed,
+            ),
+            FixtureReport::new(
+                CaseId::new("bad_case").expect("case id is non-empty"),
+                FixtureOutcome::failed(
+                    FailureKind::DecodeError,
+                    FailureMessage::from("decode failed"),
+                ),
+            ),
+        ]
+        .into_iter()
+        .collect::<CorpusReport>();
+
+        assert_eq!(
+            corpus_report_to_json(&report).expect("report serializes"),
+            "{\"fixtures\":[{\"case_id\":\"return_42\",\"outcome\":\"passed\"},{\"case_id\":\"bad_case\",\"outcome\":{\"failed\":{\"kind\":\"decode_error\",\"message\":\"decode failed\"}}}]}"
         );
     }
 }

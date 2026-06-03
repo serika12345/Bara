@@ -7,8 +7,10 @@ use std::{
 use bara_arm64::emit_program;
 use bara_isa_x86::{decode_function, lift_decoded_function};
 use bara_oracle::{
-    compare_observed_results, observed_result_from_json, observed_result_to_json,
-    test_case_from_json, ComparisonReport, ExpectedResult, ObservedResult, TestCase,
+    compare_observed_results, corpus_report_to_json, observed_result_from_json,
+    observed_result_to_json, test_case_from_json, CaseId, ComparisonReport, CorpusReport,
+    ExpectedResult, FailureKind, FailureMessage, FixtureOutcome, FixtureReport, ObservedResult,
+    TestCase,
 };
 use bara_runtime::run_no_args_u64;
 
@@ -66,20 +68,60 @@ fn run_check_corpus(cases_dir: &Path, expected_dir: &Path) -> Result<String, Cli
         });
     }
 
-    let mut checked_case_ids = Vec::new();
+    let mut reports = Vec::new();
     for case_path in case_paths {
-        let case_json = read_text_file(&case_path)?;
-        let test_case = test_case_from_json(&case_json).map_err(CliError::TestCase)?;
-        let expected_path = expected_dir.join(format!("{}.json", test_case.case_id().as_str()));
-        let expected_json = read_text_file(&expected_path)?;
-        let expected = observed_result_from_json(&expected_json).map_err(CliError::ExpectedJson)?;
-        let case_id = test_case.case_id().as_str().to_owned();
-
-        run_test_case(test_case, expected)?;
-        checked_case_ids.push(case_id);
+        reports.push(run_corpus_fixture(&case_path, expected_dir));
     }
 
-    Ok(format_corpus_success(&checked_case_ids))
+    let report = reports.into_iter().collect::<CorpusReport>();
+    if !report.is_success() {
+        return Err(CliError::CorpusFailures(report));
+    }
+
+    corpus_report_to_json(&report).map_err(CliError::Json)
+}
+
+fn run_corpus_fixture(case_path: &Path, expected_dir: &Path) -> FixtureReport {
+    let fallback_case_id = case_id_from_path(case_path);
+    let case_json = match read_text_file(case_path) {
+        Ok(case_json) => case_json,
+        Err(error) => {
+            return failed_fixture_report(
+                fallback_case_id,
+                FailureKind::InvalidTestCase,
+                error.to_string(),
+            );
+        }
+    };
+    let test_case = match test_case_from_json(&case_json) {
+        Ok(test_case) => test_case,
+        Err(error) => {
+            return failed_fixture_report(
+                fallback_case_id,
+                FailureKind::InvalidTestCase,
+                error.to_string(),
+            );
+        }
+    };
+    let case_id = test_case.case_id().clone();
+    let expected_path = expected_dir.join(format!("{}.json", case_id.as_str()));
+    let expected_json = match read_text_file(&expected_path) {
+        Ok(expected_json) => expected_json,
+        Err(error) => {
+            return failed_fixture_report(case_id, FailureKind::MissingExpected, error.to_string());
+        }
+    };
+    let expected = match observed_result_from_json(&expected_json) {
+        Ok(expected) => expected,
+        Err(error) => {
+            return failed_fixture_report(case_id, FailureKind::InvalidExpected, error.to_string());
+        }
+    };
+
+    match run_test_case(test_case, expected) {
+        Ok(_) => FixtureReport::new(case_id, FixtureOutcome::Passed),
+        Err(error) => failed_fixture_report(case_id, error.failure_kind(), error.to_string()),
+    }
 }
 
 fn run_test_case(test_case: TestCase, expected: ExpectedResult) -> Result<String, CliError> {
@@ -102,6 +144,13 @@ fn run_test_case(test_case: TestCase, expected: ExpectedResult) -> Result<String
     }
 
     observed_result_to_json(&actual).map_err(CliError::Json)
+}
+
+fn failed_fixture_report(case_id: CaseId, kind: FailureKind, message: String) -> FixtureReport {
+    FixtureReport::new(
+        case_id,
+        FixtureOutcome::failed(kind, FailureMessage::from(message)),
+    )
 }
 
 fn read_text_file(path: &Path) -> Result<String, CliError> {
@@ -136,13 +185,11 @@ fn sorted_case_paths(cases_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
     Ok(paths)
 }
 
-fn format_corpus_success(case_ids: &[String]) -> String {
-    let mut lines = case_ids
-        .iter()
-        .map(|case_id| format!("{case_id}: ok"))
-        .collect::<Vec<_>>();
-    lines.push(format!("checked {} fixture(s)", case_ids.len()));
-    lines.join("\n")
+fn case_id_from_path(path: &Path) -> CaseId {
+    path.file_stem()
+        .and_then(|stem| stem.to_str())
+        .and_then(|stem| CaseId::new(stem).ok())
+        .unwrap_or_else(|| CaseId::new("unknown").expect("fallback case id is non-empty"))
 }
 
 #[derive(Debug)]
@@ -160,6 +207,28 @@ enum CliError {
     Run(bara_runtime::RunError),
     Comparison(ComparisonReport),
     Json(bara_oracle::JsonError),
+    CorpusFailures(CorpusReport),
+}
+
+impl CliError {
+    fn failure_kind(&self) -> FailureKind {
+        match self {
+            Self::TestCase(_) => FailureKind::InvalidTestCase,
+            Self::ExpectedJson(_) => FailureKind::InvalidExpected,
+            Self::Decode(_) => FailureKind::DecodeError,
+            Self::Lift(_) => FailureKind::LiftError,
+            Self::Emit(_) => FailureKind::EmitError,
+            Self::Run(_) => FailureKind::RunError,
+            Self::Comparison(_) => FailureKind::ComparisonMismatch,
+            Self::ReadFile { .. } => FailureKind::InvalidTestCase,
+            Self::ReadDir { .. }
+            | Self::ReadDirEntry { .. }
+            | Self::EmptyCorpus { .. }
+            | Self::Usage
+            | Self::Json(_)
+            | Self::CorpusFailures(_) => FailureKind::InvalidTestCase,
+        }
+    }
 }
 
 impl std::fmt::Display for CliError {
@@ -201,6 +270,10 @@ impl std::fmt::Display for CliError {
             Self::Run(error) => write!(formatter, "run error: {error:?}"),
             Self::Comparison(report) => write!(formatter, "comparison failed: {report:?}"),
             Self::Json(error) => write!(formatter, "{error}"),
+            Self::CorpusFailures(report) => match corpus_report_to_json(report) {
+                Ok(json) => write!(formatter, "{json}"),
+                Err(error) => write!(formatter, "failed to serialize corpus report: {error}"),
+            },
         }
     }
 }
@@ -213,9 +286,12 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
-    use bara_oracle::{observed_result_from_json, observed_result_to_json};
+    use bara_oracle::{
+        observed_result_from_json, observed_result_to_json, FailureKind, FailureMessage,
+        FixtureOutcome,
+    };
 
-    use super::{format_corpus_success, run_cli, run_m1_check_from_fixtures, CliError};
+    use super::{run_cli, run_m1_check_from_fixtures, CliError};
 
     #[test]
     fn unknown_command_reports_usage() {
@@ -272,7 +348,7 @@ mod tests {
     }
 
     #[test]
-    fn check_corpus_reads_all_case_json_files_in_order() {
+    fn check_corpus_reports_all_case_json_files_in_order() {
         let temp_dir = TestTempDir::new("check_corpus_reads_all_case_json_files_in_order");
         let cases_dir = temp_dir.create_dir("cases");
         let expected_dir = temp_dir.create_dir("expected");
@@ -292,15 +368,56 @@ mod tests {
         ])
         .expect("corpus check succeeds on supported host");
 
-        assert_eq!(output, "return_42: ok\nchecked 1 fixture(s)");
+        assert_eq!(
+            output,
+            "{\"fixtures\":[{\"case_id\":\"return_42\",\"outcome\":\"passed\"}]}"
+        );
     }
 
     #[test]
-    fn format_corpus_success_reports_each_case_and_total() {
-        assert_eq!(
-            format_corpus_success(&[String::from("a"), String::from("b")]),
-            "a: ok\nb: ok\nchecked 2 fixture(s)"
+    fn check_corpus_continues_after_failed_case() -> Result<(), String> {
+        let temp_dir = TestTempDir::new("check_corpus_continues_after_failed_case");
+        let cases_dir = temp_dir.create_dir("cases");
+        let expected_dir = temp_dir.create_dir("expected");
+        write_file(
+            &cases_dir.join("bad_hex.json"),
+            r#"{"case_id":"bad_hex","entry":0,"bytes":"cg","abi":{"args":[],"return":"u64"}}"#,
         );
+        write_file(
+            &cases_dir.join("return_42.json"),
+            include_str!("../../../tests/cases/return_42.json"),
+        );
+        write_file(
+            &expected_dir.join("return_42.json"),
+            include_str!("../../../tests/expected/return_42.json"),
+        );
+
+        let error = run_cli(vec![
+            String::from("check-corpus"),
+            cases_dir.to_string_lossy().into_owned(),
+            expected_dir.to_string_lossy().into_owned(),
+        ])
+        .expect_err("corpus check reports failures after scanning every case");
+
+        let report = match error {
+            CliError::CorpusFailures(report) => report,
+            other => return Err(format!("unexpected error: {other:?}")),
+        };
+
+        assert!(!report.is_success());
+        assert_eq!(report.fixtures().len(), 2);
+        assert_eq!(report.fixtures()[0].case_id().as_str(), "bad_hex");
+        assert_eq!(
+            report.fixtures()[0].outcome(),
+            &FixtureOutcome::failed(
+                FailureKind::InvalidTestCase,
+                FailureMessage::from("invalid hex digit at index 1")
+            )
+        );
+        assert_eq!(report.fixtures()[1].case_id().as_str(), "return_42");
+        assert_eq!(report.fixtures()[1].outcome(), &FixtureOutcome::Passed);
+
+        Ok(())
     }
 
     struct TestTempDir {

@@ -1,6 +1,8 @@
+use serde::Serialize;
+
 use crate::{CaseId, ObservedResult};
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ComparisonReport {
     issues: Vec<ComparisonIssue>,
 }
@@ -19,7 +21,8 @@ impl ComparisonReport {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ComparisonIssue {
     CaseIdMismatch { expected: CaseId, actual: CaseId },
     ExitStatusMismatch { expected: i32, actual: i32 },
