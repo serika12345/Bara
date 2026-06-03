@@ -232,7 +232,7 @@ impl ExecutableBuffer {
 - `bara-ir`: IR、invariant、validation、metadata model。I/O と `unsafe` なし。
 - `bara-arm64`: ARM64 emit 計画、fixup、machine code bytes の構築。OS I/O と `unsafe` なし。
 - `bara-oracle`: oracle 比較と Rosetta 連携境界。I/O は `io` directory に集約する。
-- `btbc-runtime`: executable memory、generated code 呼び出し、OS/ABI 境界。`unsafe` をここへ集約する。
+- `bara-runtime`: executable memory、generated code 呼び出し、OS/ABI 境界。`unsafe` をここへ集約する。
 - `btbc-cli`: 入出力、JSON、コマンド実行。仕様境界は各ドメイン crate と runtime の型に委譲する。
 - `spec/`: Haskell 仕様モデル、property test、検証器。
 

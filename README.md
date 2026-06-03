@@ -81,6 +81,29 @@ result:
 
 これを Rust 実装で decode、IR 化、ARM64 emit、実行し、Rosetta oracle の結果と比較できる状態を作ります。
 
+## Rust workspace
+
+初期 workspace は M1 の関心ごとに分けています。
+
+```text
+crates/
+  bara-isa-x86/   x86_64 raw bytes の decode / lift
+  bara-ir/        typed IR と invariant validation
+  bara-arm64/     ARM64 emit と PC map
+  bara-runtime/   executable memory と generated function runner
+  btbc-cli/       開発用の実行チェック入口
+```
+
+現在の最小テストは `b8 2a 00 00 00 c3` を decode、IR 化、ARM64 machine code 化し、対応 host では no-args `u64` 関数として実行します。
+
+M1 の実行チェックだけを行う場合:
+
+```sh
+./scripts/check-m1
+```
+
+成功すると `actual.json` 相当の最小 JSON を標準出力へ出します。
+
 ## 開発メモ
 
 必要なツールは Nix 経由で使い、グローバルインストールを前提にしません。
@@ -95,6 +118,10 @@ nix develop
 
 ```sh
 nix develop -c cargo --version
+nix develop -c cargo fmt --all -- --check
+nix develop -c cargo check --workspace --all-targets
+nix develop -c cargo test --workspace
+nix develop -c cargo run -p btbc-cli -- check-m1
 ```
 
 direnv を使う場合は `.envrc` の `use flake` を有効にします。

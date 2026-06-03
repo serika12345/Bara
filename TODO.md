@@ -116,15 +116,15 @@ Output / Runner
 
 ## Rust 側の構成 TODO
 
-- [ ] Rust workspace を作る。
-- [ ] package / crate は技術駆動ではなく、関心ごとのドメイン駆動で切る。
-- [ ] I/O は専用ディレクトリに集約し、decode / IR / emit などのロジックへ散らさない。
-- [ ] `bara-isa-x86` crate を作る。
-- [ ] `bara-ir` crate を作る。
-- [ ] `bara-arm64` crate を作る。
+- [x] Rust workspace を作る。
+- [x] package / crate は技術駆動ではなく、関心ごとのドメイン駆動で切る。
+- [x] I/O は専用ディレクトリに集約し、decode / IR / emit などのロジックへ散らさない。
+- [x] `bara-isa-x86` crate を作る。
+- [x] `bara-ir` crate を作る。
+- [x] `bara-arm64` crate を作る。
 - [ ] `bara-oracle` crate を作る。
-- [ ] `btbc-runtime` crate を作る。
-- [ ] `btbc-cli` crate を作る。
+- [x] `bara-runtime` crate を作る。
+- [x] `btbc-cli` crate を作る。
 - [ ] `btbc-tests` または integration test 用 crate を作る。
 - [ ] 後で Haskell verifier を追加できるディレクトリ構成にする。
 
@@ -151,7 +151,7 @@ btbc/
         io/
         rosetta/
         compare/
-    btbc-runtime/
+    bara-runtime/
       src/
         io/
         executable_memory/
@@ -170,11 +170,11 @@ btbc/
 
 ## 型モデル TODO
 
-- [ ] `X86Va` を newtype として定義する。
+- [x] `X86Va` を newtype として定義する。
 - [ ] `X86Rva` を newtype として定義する。
-- [ ] `ArmPc` を newtype として定義する。
+- [x] `ArmPc` を newtype として定義する。
 - [ ] `ImageBase` を newtype として定義する。
-- [ ] `BlockId` を定義する。
+- [x] `BlockId` を定義する。
 - [ ] `SymbolId` を定義する。
 - [ ] `HelperId` を定義する。
 - [ ] `CpuState` を定義する。
@@ -205,14 +205,14 @@ enum BlockTerminator {
 最初は関数単位の小さな命令列だけを対象にする。
 
 - [ ] `iced-x86` の採用を検討する。
-- [ ] raw x86_64 bytes を decode する。
+- [x] raw x86_64 bytes を decode する。
 - [ ] basic block に分割する。
-- [ ] typed IR に lift する。
-- [ ] unsupported instruction を明示的に表現する。
+- [x] typed IR に lift する。
+- [x] unsupported instruction を明示的に表現する。
 
 初期対応命令:
 
-- [ ] `mov reg, imm`
+- [x] `mov reg, imm`
 - [ ] `mov reg, reg`
 - [ ] `add`
 - [ ] `sub`
@@ -252,10 +252,11 @@ enum BlockTerminator {
 
 ## ARM64 emitter TODO
 
-- [ ] ARM64 machine code emitter を作る。
-- [ ] executable buffer へ書き込めるようにする。
-- [ ] `mmap` / `mprotect` など executable memory 管理を runtime 側へ分離する。
-- [ ] `mov/add/sub/cmp/ret` の最小 emission を実装する。
+- [x] ARM64 machine code emitter を作る。
+- [x] executable buffer へ書き込めるようにする。
+- [x] `mmap` / `mprotect` など executable memory 管理を runtime 側へ分離する。
+- [x] `mov` / `ret` の最小 emission を実装する。
+- [ ] `add/sub/cmp` の最小 emission を実装する。
 - [ ] conditional branch の fixup を実装する。
 - [ ] direct call / return の最小実装を追加する。
 - [ ] helper call ABI を定義して emitter から呼べるようにする。
@@ -543,12 +544,13 @@ nightly:
 
 すぐ着手するなら以下。
 
-- [ ] Rust workspace を作る。
-- [ ] `bara-ir` に型モデルを作る。
-- [ ] raw x86_64 bytes 入力を受ける CLI を作る。
-- [ ] `mov eax, imm; ret` だけ decode/lift する。
-- [ ] ARM64 emitter で即値 return を出す。
-- [ ] executable buffer で実行する。
-- [ ] `return_value` を JSON で出す。
+- [x] Rust workspace を作る。
+- [x] `bara-ir` に型モデルを作る。
+- [x] M1 実行チェック用 CLI を作る。
+- [ ] raw x86_64 bytes 入力を受ける汎用 CLI を作る。
+- [x] `mov eax, imm; ret` だけ decode/lift する。
+- [x] ARM64 emitter で即値 return を出す。
+- [x] executable buffer で実行する。
+- [x] `return_value` を JSON で出す。
 - [ ] 同じケースを x86_64 Mach-O としてビルドし、Rosetta oracle で JSON を出す。
 - [ ] expected/actual を比較する。

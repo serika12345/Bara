@@ -1,0 +1,15 @@
+[package]
+name = "btbc-cli"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bara-arm64 = { path = "../bara-arm64" }
+bara-ir = { path = "../bara-ir" }
+bara-isa-x86 = { path = "../bara-isa-x86" }
+bara-runtime = { path = "../bara-runtime" }
+
+[lints]
+workspace = true
