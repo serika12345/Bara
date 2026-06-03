@@ -13,8 +13,8 @@ use bara_oracle::{
     TestCase, TestCaseAbi,
 };
 use bara_runtime::{
-    run_no_args_u64, run_one_input_memory_ptr, run_one_u64, InputMemory, InputMemoryError,
-    RunArgumentU64,
+    run_no_args_u64_with_host_traps, run_one_input_memory_ptr, run_one_u64, HostTrapPlan,
+    InputMemory, InputMemoryError, RunArgumentU64, RunStdoutError,
 };
 
 fn main() -> ExitCode {
@@ -179,7 +179,10 @@ fn observe_test_case(test_case: &TestCase) -> Result<ObservedResult, CliError> {
     let program = lift_decoded_function(&decoded).map_err(CliError::Lift)?;
     let emitted = emit_program(&program).map_err(CliError::Emit)?;
     let result = match test_case.abi() {
-        TestCaseAbi::NoArgsU64 => run_no_args_u64(emitted.code().bytes()),
+        TestCaseAbi::NoArgsU64 => run_no_args_u64_with_host_traps(
+            emitted.code().bytes(),
+            runtime_host_trap_plan(test_case.host_trap_plan())?,
+        ),
         TestCaseAbi::OneU64ArgReturnsU64 { argument } => run_one_u64(
             emitted.code().bytes(),
             RunArgumentU64::new(argument.value()),
@@ -196,10 +199,21 @@ fn observe_test_case(test_case: &TestCase) -> Result<ObservedResult, CliError> {
         test_case.case_id().clone(),
         0,
         result.return_value(),
-        String::new(),
+        result.stdout().to_owned(),
         String::new(),
     );
     Ok(actual)
+}
+
+fn runtime_host_trap_plan(
+    plan: &bara_oracle::TestCaseHostTrapPlan,
+) -> Result<HostTrapPlan, CliError> {
+    let Some(stdout) = plan.stdout_trap() else {
+        return Ok(HostTrapPlan::none());
+    };
+    let stdout = bara_runtime::RunStdout::from_text(stdout.text().to_owned())
+        .map_err(CliError::StdoutTrap)?;
+    Ok(HostTrapPlan::stdout(stdout))
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -339,6 +353,7 @@ enum CliError {
     Lift(bara_isa_x86::LiftError),
     Emit(bara_arm64::EmitError),
     InputMemory(InputMemoryError),
+    StdoutTrap(RunStdoutError),
     Run(bara_runtime::RunError),
     Comparison(ComparisonReport),
     Json(bara_oracle::JsonError),
@@ -354,6 +369,7 @@ impl CliError {
             Self::Lift(_) => FailureKind::LiftError,
             Self::Emit(_) => FailureKind::EmitError,
             Self::InputMemory(_) => FailureKind::RunError,
+            Self::StdoutTrap(_) => FailureKind::RunError,
             Self::Run(_) => FailureKind::RunError,
             Self::Comparison(_) => FailureKind::ComparisonMismatch,
             Self::ReadFile { .. } | Self::WriteFile { .. } | Self::CreateDir { .. } => {
@@ -420,6 +436,7 @@ impl std::fmt::Display for CliError {
             Self::Lift(error) => write!(formatter, "lift error: {error:?}"),
             Self::Emit(error) => write!(formatter, "emit error: {error:?}"),
             Self::InputMemory(error) => write!(formatter, "input memory error: {error:?}"),
+            Self::StdoutTrap(error) => write!(formatter, "stdout trap error: {error:?}"),
             Self::Run(error) => write!(formatter, "run error: {error:?}"),
             Self::Comparison(report) => write!(formatter, "comparison failed: {report:?}"),
             Self::Json(error) => write!(formatter, "{error}"),

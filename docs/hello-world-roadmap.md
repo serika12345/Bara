@@ -19,6 +19,7 @@ raw function fixture が runtime 境界を通じて stdout に
 - 引数なし
 - `u64` 引数 1 個
 - pointer 引数 1 個と read-only input memory
+- Bara 専用 stdout host trap
 - `rax` return value
 - `mov rax, rdi`
 - `movzx eax, byte ptr [rdi]`
@@ -29,6 +30,7 @@ raw function fixture が runtime 境界を通じて stdout に
 - `ret`
 - ARM64 native runner による `u64` 戻り値比較
 - file-based corpus fixture と `actual.json` / `report.json` 出力
+- stdout / stderr / return_value の expected / actual 比較
 
 ## マイルストーン
 
@@ -109,20 +111,25 @@ ret
 
 目的:
 
-- translated function から runtime 境界へ明示的に出力要求を渡し、stdout を
+- runtime 境界で clean-room な stdout trap plan を扱い、stdout を
   `actual.json` に保存できるようにする。
 
 方針:
 
 - OS syscall を直接再現しない。
 - 最初は clean-room な Bara 専用 helper/trap ABI を定義する。
-- x86 側命令列は helper call か sentinel instruction sequence によって
-  runtime に `write_stdout(ptr, len)` 相当を要求する。
+- この段階では testcase の `host_traps` metadata で stdout 出力を宣言する。
+- x86 側命令列からの helper call / sentinel instruction sequence 連携は、
+  HW4 の raw function hello world で最小対応する。
 
 成功条件:
 
 - fixture が stdout に任意の短い ASCII 文字列を出せる。
 - stdout / stderr / return_value の比較が通る。
+
+状態:
+
+- 完了。
 
 ### HW4: raw function hello world
 
@@ -134,6 +141,7 @@ ret
 
 - HW2 の memory read または fixture data pointer。
 - HW3 の stdout host trap。
+- x86 側命令列から host trap を要求する helper call または sentinel sequence。
 - stdout を含む expected / actual comparison。
 
 成功条件:

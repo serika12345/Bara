@@ -6,19 +6,34 @@ use serde::Deserialize;
 
 use crate::{CaseId, CaseIdError};
 
+mod host_trap;
+
+pub use host_trap::{TestCaseHostTrapPlan, TestCaseStdoutTrap, TestCaseStdoutTrapError};
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TestCase {
     case_id: CaseId,
     x86_bytes: X86Bytes,
     abi: TestCaseAbi,
+    host_trap_plan: TestCaseHostTrapPlan,
 }
 
 impl TestCase {
     pub const fn new(case_id: CaseId, x86_bytes: X86Bytes, abi: TestCaseAbi) -> Self {
+        Self::with_host_traps(case_id, x86_bytes, abi, TestCaseHostTrapPlan::none())
+    }
+
+    pub const fn with_host_traps(
+        case_id: CaseId,
+        x86_bytes: X86Bytes,
+        abi: TestCaseAbi,
+        host_trap_plan: TestCaseHostTrapPlan,
+    ) -> Self {
         Self {
             case_id,
             x86_bytes,
             abi,
+            host_trap_plan,
         }
     }
 
@@ -32,6 +47,10 @@ impl TestCase {
 
     pub const fn abi(&self) -> &TestCaseAbi {
         &self.abi
+    }
+
+    pub const fn host_trap_plan(&self) -> &TestCaseHostTrapPlan {
+        &self.host_trap_plan
     }
 }
 
@@ -93,6 +112,8 @@ pub enum TestCaseJsonError {
     },
     MissingInputMemory,
     EmptyInputMemory,
+    DuplicateStdoutTrap,
+    StdoutTrap(TestCaseStdoutTrapError),
     OddHexLength {
         hex_len: usize,
     },
@@ -124,6 +145,8 @@ impl fmt::Display for TestCaseJsonError {
             }
             Self::MissingInputMemory => write!(formatter, "missing testcase input memory"),
             Self::EmptyInputMemory => write!(formatter, "testcase input memory is empty"),
+            Self::DuplicateStdoutTrap => write!(formatter, "duplicate testcase stdout trap"),
+            Self::StdoutTrap(error) => write!(formatter, "invalid testcase stdout trap: {error:?}"),
             Self::OddHexLength { hex_len } => {
                 write!(formatter, "hex byte string has odd length: {hex_len}")
             }
@@ -140,11 +163,17 @@ pub fn test_case_from_json(input: &str) -> Result<TestCase, TestCaseJsonError> {
         serde_json::from_str(input).map_err(|error| TestCaseJsonError::Json(error.to_string()))?;
     let case_id = CaseId::new(dto.case_id).map_err(TestCaseJsonError::CaseId)?;
     let abi = TestCaseAbi::try_from_parts(dto.abi, dto.arguments, dto.memory)?;
+    let host_trap_plan = host_trap::host_trap_plan_from_dtos(dto.host_traps)?;
     let bytes = decode_hex_bytes(&dto.bytes)?;
     let x86_bytes =
         X86Bytes::new(X86Va::new(dto.entry), bytes).map_err(TestCaseJsonError::DecodeInput)?;
 
-    Ok(TestCase::new(case_id, x86_bytes, abi))
+    Ok(TestCase::with_host_traps(
+        case_id,
+        x86_bytes,
+        abi,
+        host_trap_plan,
+    ))
 }
 
 #[derive(Deserialize)]
@@ -156,6 +185,8 @@ struct TestCaseDto {
     #[serde(default)]
     arguments: Vec<u64>,
     memory: Option<TestCaseMemoryDto>,
+    #[serde(default)]
+    host_traps: Vec<host_trap::TestCaseHostTrapDto>,
 }
 
 #[derive(Deserialize)]
@@ -265,7 +296,7 @@ mod tests {
     use bara_ir::X86Va;
     use bara_isa_x86::X86Bytes;
 
-    use super::{TestCaseInputMemory, TestCaseU64};
+    use super::{TestCaseInputMemory, TestCaseStdoutTrap, TestCaseU64};
     use crate::{test_case_from_json, CaseId, TestCase, TestCaseAbi, TestCaseJsonError};
 
     #[test]
@@ -338,6 +369,28 @@ mod tests {
                     memory: TestCaseInputMemory::from_bytes(vec![0x48])
                         .expect("input memory is non-empty")
                 }
+            )
+        );
+    }
+
+    #[test]
+    fn parses_stdout_trap_test_case() {
+        let test_case = test_case_from_json(include_str!(
+            "../../../../tests/cases/stdout_trap_return_0.json"
+        ))
+        .expect("fixture parses");
+
+        assert_eq!(
+            test_case,
+            TestCase::with_host_traps(
+                CaseId::new("stdout_trap_return_0").expect("case id is non-empty"),
+                X86Bytes::new(X86Va::new(0), vec![0x31, 0xc0, 0xc3])
+                    .expect("fixture bytes are non-empty"),
+                TestCaseAbi::NoArgsU64,
+                super::TestCaseHostTrapPlan::stdout(
+                    TestCaseStdoutTrap::from_text(String::from("hello trap\n"))
+                        .expect("stdout trap text is valid")
+                )
             )
         );
     }

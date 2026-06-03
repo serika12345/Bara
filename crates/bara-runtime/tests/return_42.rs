@@ -6,7 +6,8 @@ use bara_oracle::{
     ObservedResult, TestCase, TestCaseAbi,
 };
 use bara_runtime::{
-    run_no_args_u64, run_one_input_memory_ptr, run_one_u64, InputMemory, RunArgumentU64, RunError,
+    run_no_args_u64_with_host_traps, run_one_input_memory_ptr, run_one_u64, HostTrapPlan,
+    InputMemory, RunArgumentU64, RunError, RunStdout,
 };
 
 #[test]
@@ -203,6 +204,15 @@ fn load_u8_from_rdi_return_72_runs_on_supported_aarch64_unix_hosts() -> Result<(
     )
 }
 
+#[test]
+fn stdout_trap_return_0_runs_on_supported_aarch64_unix_hosts() -> Result<(), String> {
+    assert_fixture_runs_like_expected(
+        "stdout_trap_return_0",
+        include_str!("../../../tests/cases/stdout_trap_return_0.json"),
+        include_str!("../../../tests/expected/stdout_trap_return_0.json"),
+    )
+}
+
 fn assert_fixture_emits_arm64(
     case_name: &str,
     test_case_json: &str,
@@ -258,7 +268,10 @@ fn assert_native_run_matches_expected(
     emitted: &EmittedFunction,
 ) -> Result<(), String> {
     let result = match test_case.abi() {
-        TestCaseAbi::NoArgsU64 => run_no_args_u64(emitted.code().bytes()),
+        TestCaseAbi::NoArgsU64 => run_no_args_u64_with_host_traps(
+            emitted.code().bytes(),
+            runtime_host_trap_plan(test_case.host_trap_plan())?,
+        ),
         TestCaseAbi::OneU64ArgReturnsU64 { argument } => run_one_u64(
             emitted.code().bytes(),
             RunArgumentU64::new(argument.value()),
@@ -276,7 +289,7 @@ fn assert_native_run_matches_expected(
                 test_case.case_id().clone(),
                 0,
                 result.return_value(),
-                String::new(),
+                result.stdout().to_owned(),
                 String::new(),
             );
             assert!(compare_observed_results(expected, &actual).is_match());
@@ -288,4 +301,16 @@ fn assert_native_run_matches_expected(
     }
 
     Ok(())
+}
+
+fn runtime_host_trap_plan(
+    plan: &bara_oracle::TestCaseHostTrapPlan,
+) -> Result<HostTrapPlan, String> {
+    let Some(stdout) = plan.stdout_trap() else {
+        return Ok(HostTrapPlan::none());
+    };
+
+    let stdout = RunStdout::from_text(stdout.text().to_owned())
+        .map_err(|error| format!("testcase stdout trap converts: {error:?}"))?;
+    Ok(HostTrapPlan::stdout(stdout))
 }

@@ -1,0 +1,7 @@
+{
+  "case_id": "stdout_trap_return_0",
+  "exit_status": 0,
+  "return_value": 0,
+  "stdout": "hello trap\n",
+  "stderr": ""
+}

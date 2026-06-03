@@ -1,0 +1,15 @@
+{
+  "case_id": "stdout_trap_return_0",
+  "entry": 0,
+  "bytes": "31c0c3",
+  "abi": {
+    "args": [],
+    "return": "u64"
+  },
+  "host_traps": [
+    {
+      "kind": "stdout",
+      "text": "hello trap\n"
+    }
+  ]
+}

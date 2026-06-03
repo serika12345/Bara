@@ -1,8 +1,9 @@
-use crate::{ExecutableMemory, ExecutableMemoryError};
+use crate::{ExecutableMemory, ExecutableMemoryError, HostTrapPlan, RunStdout};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RunResult {
     return_value: u64,
+    stdout: RunStdout,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -40,11 +41,25 @@ pub enum InputMemoryError {
 
 impl RunResult {
     pub const fn new(return_value: u64) -> Self {
-        Self { return_value }
+        Self {
+            return_value,
+            stdout: RunStdout::empty(),
+        }
+    }
+
+    const fn with_stdout(return_value: u64, stdout: RunStdout) -> Self {
+        Self {
+            return_value,
+            stdout,
+        }
     }
 
     pub const fn return_value(&self) -> u64 {
         self.return_value
+    }
+
+    pub fn stdout(&self) -> &str {
+        self.stdout.as_str()
     }
 }
 
@@ -55,8 +70,19 @@ pub enum RunError {
 }
 
 pub fn run_no_args_u64(code: &[u8]) -> Result<RunResult, RunError> {
+    run_no_args_u64_with_host_traps(code, HostTrapPlan::none())
+}
+
+pub fn run_no_args_u64_with_host_traps(
+    code: &[u8],
+    host_traps: HostTrapPlan,
+) -> Result<RunResult, RunError> {
     let executable = ExecutableMemory::allocate(code).map_err(RunError::ExecutableMemory)?;
-    call_no_args_u64(&executable)
+    let result = call_no_args_u64(&executable)?;
+    Ok(RunResult::with_stdout(
+        result.return_value(),
+        host_traps.stdout_output().clone(),
+    ))
 }
 
 pub fn run_one_u64(code: &[u8], argument: RunArgumentU64) -> Result<RunResult, RunError> {
@@ -134,11 +160,21 @@ fn call_one_input_memory_ptr(
 
 #[cfg(test)]
 mod tests {
-    use crate::{InputMemory, InputMemoryError, RunArgumentU64, RunResult};
+    use crate::{InputMemory, InputMemoryError, RunArgumentU64, RunResult, RunStdout};
 
     #[test]
     fn run_result_exposes_return_value() {
         assert_eq!(RunResult::new(42).return_value(), 42);
+    }
+
+    #[test]
+    fn run_result_exposes_stdout() {
+        let result = RunResult::with_stdout(
+            0,
+            RunStdout::from_text(String::from("hello trap\n")).expect("stdout trap text is ascii"),
+        );
+
+        assert_eq!(result.stdout(), "hello trap\n");
     }
 
     #[test]
@@ -166,11 +202,17 @@ mod tests {
     fn run_reports_unsupported_host_on_other_hosts() {
         use crate::{
             run_no_args_u64, run_one_input_memory_ptr, run_one_u64, ExecutableMemoryError,
-            InputMemory, RunArgumentU64, RunError,
+            HostTrapPlan, InputMemory, RunArgumentU64, RunError,
         };
 
         assert_eq!(
             run_no_args_u64(&[0]),
+            Err(RunError::ExecutableMemory(
+                ExecutableMemoryError::UnsupportedHost
+            ))
+        );
+        assert_eq!(
+            crate::run_no_args_u64_with_host_traps(&[0], HostTrapPlan::none()),
             Err(RunError::ExecutableMemory(
                 ExecutableMemoryError::UnsupportedHost
             ))
