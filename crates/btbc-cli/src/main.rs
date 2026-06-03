@@ -36,6 +36,15 @@ fn run_cli(args: Vec<String>) -> Result<String, CliError> {
         [command, cases_dir, expected_dir] if command == "check-corpus" => {
             run_check_corpus(Path::new(cases_dir), Path::new(expected_dir))
         }
+        [command, cases_dir, expected_dir, output_flag, output_dir]
+            if command == "check-corpus" && output_flag == "--out" =>
+        {
+            run_check_corpus_with_output(
+                Path::new(cases_dir),
+                Path::new(expected_dir),
+                Some(Path::new(output_dir)),
+            )
+        }
         _ => Err(CliError::Usage),
     }
 }
@@ -61,6 +70,14 @@ fn run_check_fixture(case_path: &Path, expected_path: &Path) -> Result<String, C
 }
 
 fn run_check_corpus(cases_dir: &Path, expected_dir: &Path) -> Result<String, CliError> {
+    run_check_corpus_with_output(cases_dir, expected_dir, None)
+}
+
+fn run_check_corpus_with_output(
+    cases_dir: &Path,
+    expected_dir: &Path,
+    output_dir: Option<&Path>,
+) -> Result<String, CliError> {
     let case_paths = sorted_case_paths(cases_dir)?;
     if case_paths.is_empty() {
         return Err(CliError::EmptyCorpus {
@@ -68,12 +85,18 @@ fn run_check_corpus(cases_dir: &Path, expected_dir: &Path) -> Result<String, Cli
         });
     }
 
-    let mut reports = Vec::new();
+    let mut fixture_runs = Vec::new();
     for case_path in case_paths {
-        reports.push(run_corpus_fixture(&case_path, expected_dir));
+        fixture_runs.push(run_corpus_fixture(&case_path, expected_dir));
     }
 
-    let report = reports.into_iter().collect::<CorpusReport>();
+    let report = fixture_runs
+        .iter()
+        .map(|run| run.report.clone())
+        .collect::<CorpusReport>();
+    if let Some(output_dir) = output_dir {
+        write_corpus_outputs(output_dir, &report, &fixture_runs)?;
+    }
     if !report.is_success() {
         return Err(CliError::CorpusFailures(report));
     }
@@ -81,12 +104,12 @@ fn run_check_corpus(cases_dir: &Path, expected_dir: &Path) -> Result<String, Cli
     corpus_report_to_json(&report).map_err(CliError::Json)
 }
 
-fn run_corpus_fixture(case_path: &Path, expected_dir: &Path) -> FixtureReport {
+fn run_corpus_fixture(case_path: &Path, expected_dir: &Path) -> FixtureRun {
     let fallback_case_id = case_id_from_path(case_path);
     let case_json = match read_text_file(case_path) {
         Ok(case_json) => case_json,
         Err(error) => {
-            return failed_fixture_report(
+            return FixtureRun::failed(
                 fallback_case_id,
                 FailureKind::InvalidTestCase,
                 error.to_string(),
@@ -96,7 +119,7 @@ fn run_corpus_fixture(case_path: &Path, expected_dir: &Path) -> FixtureReport {
     let test_case = match test_case_from_json(&case_json) {
         Ok(test_case) => test_case,
         Err(error) => {
-            return failed_fixture_report(
+            return FixtureRun::failed(
                 fallback_case_id,
                 FailureKind::InvalidTestCase,
                 error.to_string(),
@@ -108,23 +131,46 @@ fn run_corpus_fixture(case_path: &Path, expected_dir: &Path) -> FixtureReport {
     let expected_json = match read_text_file(&expected_path) {
         Ok(expected_json) => expected_json,
         Err(error) => {
-            return failed_fixture_report(case_id, FailureKind::MissingExpected, error.to_string());
+            return FixtureRun::failed(case_id, FailureKind::MissingExpected, error.to_string());
         }
     };
     let expected = match observed_result_from_json(&expected_json) {
         Ok(expected) => expected,
         Err(error) => {
-            return failed_fixture_report(case_id, FailureKind::InvalidExpected, error.to_string());
+            return FixtureRun::failed(case_id, FailureKind::InvalidExpected, error.to_string());
         }
     };
 
-    match run_test_case(test_case, expected) {
-        Ok(_) => FixtureReport::new(case_id, FixtureOutcome::Passed),
-        Err(error) => failed_fixture_report(case_id, error.failure_kind(), error.to_string()),
+    let actual = match observe_test_case(&test_case) {
+        Ok(actual) => actual,
+        Err(error) => {
+            return FixtureRun::failed(case_id, error.failure_kind(), error.to_string());
+        }
+    };
+    let comparison = compare_observed_results(&expected, &actual);
+    if !comparison.is_match() {
+        return FixtureRun::failed_with_actual(
+            case_id,
+            FailureKind::ComparisonMismatch,
+            format!("comparison failed: {comparison:?}"),
+            actual,
+        );
     }
+
+    FixtureRun::passed(case_id, actual)
 }
 
 fn run_test_case(test_case: TestCase, expected: ExpectedResult) -> Result<String, CliError> {
+    let actual = observe_test_case(&test_case)?;
+    let comparison = compare_observed_results(&expected, &actual);
+    if !comparison.is_match() {
+        return Err(CliError::Comparison(comparison));
+    }
+
+    observed_result_to_json(&actual).map_err(CliError::Json)
+}
+
+fn observe_test_case(test_case: &TestCase) -> Result<ObservedResult, CliError> {
     let input = test_case.x86_bytes().clone();
     let decoded = decode_function(&input).map_err(CliError::Decode)?;
     let program = lift_decoded_function(&decoded).map_err(CliError::Lift)?;
@@ -138,12 +184,41 @@ fn run_test_case(test_case: TestCase, expected: ExpectedResult) -> Result<String
         String::new(),
         String::new(),
     );
-    let comparison = compare_observed_results(&expected, &actual);
-    if !comparison.is_match() {
-        return Err(CliError::Comparison(comparison));
+    Ok(actual)
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct FixtureRun {
+    report: FixtureReport,
+    actual: Option<ObservedResult>,
+}
+
+impl FixtureRun {
+    fn passed(case_id: CaseId, actual: ObservedResult) -> Self {
+        Self {
+            report: FixtureReport::new(case_id, FixtureOutcome::Passed),
+            actual: Some(actual),
+        }
     }
 
-    observed_result_to_json(&actual).map_err(CliError::Json)
+    fn failed(case_id: CaseId, kind: FailureKind, message: String) -> Self {
+        Self {
+            report: failed_fixture_report(case_id, kind, message),
+            actual: None,
+        }
+    }
+
+    fn failed_with_actual(
+        case_id: CaseId,
+        kind: FailureKind,
+        message: String,
+        actual: ObservedResult,
+    ) -> Self {
+        Self {
+            report: failed_fixture_report(case_id, kind, message),
+            actual: Some(actual),
+        }
+    }
 }
 
 fn failed_fixture_report(case_id: CaseId, kind: FailureKind, message: String) -> FixtureReport {
@@ -153,8 +228,50 @@ fn failed_fixture_report(case_id: CaseId, kind: FailureKind, message: String) ->
     )
 }
 
+fn write_corpus_outputs(
+    output_dir: &Path,
+    report: &CorpusReport,
+    fixture_runs: &[FixtureRun],
+) -> Result<(), CliError> {
+    create_dir(output_dir)?;
+    let actual_dir = output_dir.join("actual");
+    create_dir(&actual_dir)?;
+    create_dir(&output_dir.join("compiled"))?;
+    create_dir(&output_dir.join("ir"))?;
+    create_dir(&output_dir.join("pcmap"))?;
+
+    let report_json = corpus_report_to_json(report).map_err(CliError::Json)?;
+    write_text_file(&output_dir.join("report.json"), &report_json)?;
+
+    for run in fixture_runs {
+        if let Some(actual) = &run.actual {
+            let actual_json = observed_result_to_json(actual).map_err(CliError::Json)?;
+            write_text_file(
+                &actual_dir.join(format!("{}.json", actual.case_id().as_str())),
+                &actual_json,
+            )?;
+        }
+    }
+
+    Ok(())
+}
+
+fn create_dir(path: &Path) -> Result<(), CliError> {
+    fs::create_dir_all(path).map_err(|source| CliError::CreateDir {
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
 fn read_text_file(path: &Path) -> Result<String, CliError> {
     fs::read_to_string(path).map_err(|source| CliError::ReadFile {
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
+fn write_text_file(path: &Path, contents: &str) -> Result<(), CliError> {
+    fs::write(path, contents).map_err(|source| CliError::WriteFile {
         path: path.to_path_buf(),
         source,
     })
@@ -196,6 +313,8 @@ fn case_id_from_path(path: &Path) -> CaseId {
 enum CliError {
     Usage,
     ReadFile { path: PathBuf, source: io::Error },
+    WriteFile { path: PathBuf, source: io::Error },
+    CreateDir { path: PathBuf, source: io::Error },
     ReadDir { path: PathBuf, source: io::Error },
     ReadDirEntry { path: PathBuf, source: io::Error },
     EmptyCorpus { cases_dir: PathBuf },
@@ -220,7 +339,9 @@ impl CliError {
             Self::Emit(_) => FailureKind::EmitError,
             Self::Run(_) => FailureKind::RunError,
             Self::Comparison(_) => FailureKind::ComparisonMismatch,
-            Self::ReadFile { .. } => FailureKind::InvalidTestCase,
+            Self::ReadFile { .. } | Self::WriteFile { .. } | Self::CreateDir { .. } => {
+                FailureKind::InvalidTestCase
+            }
             Self::ReadDir { .. }
             | Self::ReadDirEntry { .. }
             | Self::EmptyCorpus { .. }
@@ -236,10 +357,24 @@ impl std::fmt::Display for CliError {
         match self {
             Self::Usage => write!(
                 formatter,
-                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-corpus <cases-dir> <expected-dir>"
+                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>]"
             ),
             Self::ReadFile { path, source } => {
                 write!(formatter, "failed to read file {}: {source}", path.display())
+            }
+            Self::WriteFile { path, source } => {
+                write!(
+                    formatter,
+                    "failed to write file {}: {source}",
+                    path.display()
+                )
+            }
+            Self::CreateDir { path, source } => {
+                write!(
+                    formatter,
+                    "failed to create directory {}: {source}",
+                    path.display()
+                )
             }
             Self::ReadDir { path, source } => {
                 write!(
@@ -375,6 +510,47 @@ mod tests {
     }
 
     #[test]
+    fn check_corpus_writes_report_and_actual_outputs() {
+        let temp_dir = TestTempDir::new("check_corpus_writes_report_and_actual_outputs");
+        let cases_dir = temp_dir.create_dir("cases");
+        let expected_dir = temp_dir.create_dir("expected");
+        let output_dir = temp_dir.create_dir("out");
+        write_file(
+            &cases_dir.join("return_42.json"),
+            include_str!("../../../tests/cases/return_42.json"),
+        );
+        write_file(
+            &expected_dir.join("return_42.json"),
+            include_str!("../../../tests/expected/return_42.json"),
+        );
+
+        let output = run_cli(vec![
+            String::from("check-corpus"),
+            cases_dir.to_string_lossy().into_owned(),
+            expected_dir.to_string_lossy().into_owned(),
+            String::from("--out"),
+            output_dir.to_string_lossy().into_owned(),
+        ])
+        .expect("corpus check succeeds on supported host");
+
+        assert_eq!(
+            output,
+            "{\"fixtures\":[{\"case_id\":\"return_42\",\"outcome\":\"passed\"}]}"
+        );
+        assert_eq!(
+            read_file(&output_dir.join("report.json")),
+            "{\"fixtures\":[{\"case_id\":\"return_42\",\"outcome\":\"passed\"}]}"
+        );
+        assert_eq!(
+            read_file(&output_dir.join("actual").join("return_42.json")),
+            "{\"case_id\":\"return_42\",\"exit_status\":0,\"return_value\":42,\"stdout\":\"\",\"stderr\":\"\"}"
+        );
+        assert!(output_dir.join("compiled").is_dir());
+        assert!(output_dir.join("ir").is_dir());
+        assert!(output_dir.join("pcmap").is_dir());
+    }
+
+    #[test]
     fn check_corpus_continues_after_failed_case() -> Result<(), String> {
         let temp_dir = TestTempDir::new("check_corpus_continues_after_failed_case");
         let cases_dir = temp_dir.create_dir("cases");
@@ -456,5 +632,9 @@ mod tests {
 
     fn write_file(path: &Path, contents: &str) {
         fs::write(path, contents).expect("test fixture file is written");
+    }
+
+    fn read_file(path: &Path) -> String {
+        fs::read_to_string(path).expect("test fixture file is read")
     }
 }

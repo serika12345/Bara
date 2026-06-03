@@ -3,4 +3,4 @@ set -eu
 
 cd "$(dirname "$0")/.."
 
-cargo run -p btbc-cli -- check-corpus tests/cases tests/expected
+cargo run -p btbc-cli -- check-corpus tests/cases tests/expected --out target/bara-blackbox

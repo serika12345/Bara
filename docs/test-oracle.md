@@ -120,13 +120,24 @@ M1 では以下だけを比較する。
 
 ```text
 btbc-cli check-fixture tests/cases/return_42.json tests/expected/return_42.json
-btbc-cli check-corpus tests/cases tests/expected
+btbc-cli check-corpus tests/cases tests/expected --out target/bara-blackbox
 ./scripts/verify-blackbox
 ```
 
 `check-corpus` は全 testcase を走査し、成功時は case 単位の JSON report
 を出す。失敗がある場合も最後まで走査し、同じ JSON report を出して非ゼロ終了
 する。
+
+`--out` を指定すると、エージェントが後続ターンで読める成果物を保存する。
+
+```text
+target/bara-blackbox/
+  report.json
+  actual/<case_id>.json
+  compiled/
+  ir/
+  pcmap/
+```
 
 将来の分割案:
 
