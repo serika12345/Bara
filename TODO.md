@@ -130,6 +130,10 @@ Output / Runner
 - [x] Rust supply-chain 検証を追加する。
 - [x] 不可視文字 / Unicode 制御文字検査を追加する。
 - [x] ローカル一括検証 script を追加する。
+- [x] pre-commit hook installer を追加する。
+- [x] CVE baseline 運用を追加する。
+- [x] Nix build / package 検証を追加する。
+- [x] VS Code Rust エディタ設定を追加する。
 - [ ] 機能が揃ってきたら CI workflow を追加する。
 
 候補構成:

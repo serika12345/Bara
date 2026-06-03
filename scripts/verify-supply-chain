@@ -4,5 +4,5 @@ set -eu
 cd "$(dirname "$0")/.."
 
 cargo metadata --locked --format-version 1 >/dev/null
-cargo audit
+./scripts/verify-cves
 cargo deny check

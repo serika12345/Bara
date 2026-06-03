@@ -1,0 +1,21 @@
+#!/usr/bin/env sh
+set -eu
+
+cd "$(dirname "$0")/.."
+
+hook=".git/hooks/pre-commit"
+if [ ! -d ".git/hooks" ]; then
+  echo "install-pre-commit-hook: .git/hooks not found" >&2
+  exit 1
+fi
+
+cat > "$hook" <<'HOOK'
+#!/usr/bin/env sh
+set -eu
+
+nix develop -c ./scripts/check-no-invisible-chars
+nix develop -c ./scripts/check-domain-types
+HOOK
+
+chmod +x "$hook"
+echo "Installed $hook"

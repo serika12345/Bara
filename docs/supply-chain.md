@@ -26,7 +26,7 @@ nix develop -c ./scripts/verify-supply-chain
 This verifies:
 
 - `cargo metadata --locked --format-version 1`
-- `cargo audit`
+- `scripts/verify-cves`
 - `cargo deny check`
 
 ## Dependency Changes
@@ -41,6 +41,32 @@ For dependency additions or updates:
 
 Dependency changes are incomplete unless both the behavioral tests and the
 supply-chain checks pass.
+
+## CVE Baseline
+
+Known RustSec advisories are tracked in
+`scripts/cve-audit-baseline.json`. The baseline must stay narrow:
+
+- New advisories fail `scripts/verify-cves`.
+- Stale baseline entries fail `scripts/verify-cves`.
+- Baseline additions require a reason in review and should be removed as soon
+  as dependencies can be updated.
+
+Run:
+
+```sh
+nix develop -c ./scripts/verify-cves
+```
+
+## Nix Package Verification
+
+Bara exposes a default Nix package. Package verification runs:
+
+```sh
+nix develop -c ./scripts/verify-nix-package
+```
+
+This checks the flake and builds `.#default`, using `Cargo.lock` through Nix.
 
 ## Hidden Text Attacks
 

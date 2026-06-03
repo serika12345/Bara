@@ -124,6 +124,7 @@ nix develop -c ./scripts/check-no-invisible-chars
 nix develop -c ./scripts/check-domain-types
 nix develop -c ./scripts/verify-security
 nix develop -c ./scripts/verify-supply-chain
+nix develop -c ./scripts/verify-nix-package
 nix develop -c cargo check --workspace --all-targets
 nix develop -c cargo test --workspace
 nix develop -c cargo run -p btbc-cli -- check-m1
@@ -136,6 +137,12 @@ nix develop -c cargo run -p btbc-cli -- check-m1
 `./scripts/verify-supply-chain` を必ず実行します。詳細は
 [Supply Chain Policy](docs/supply-chain.md) を参照してください。
 セキュリティ関連の変更では `./scripts/verify-security` も実行します。
+
+任意で pre-commit hook を入れる場合:
+
+```sh
+nix develop -c ./scripts/install-pre-commit-hook
+```
 
 direnv を使う場合は `.envrc` の `use flake` を有効にします。
 

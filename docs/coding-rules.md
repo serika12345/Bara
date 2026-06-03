@@ -265,6 +265,14 @@ nix develop -c ./scripts/verify-supply-chain
 
 依存追加は、テストで必要性が示され、ドメイン上の理由を説明できる場合だけ許可する。未知の registry、Git dependency、未審査 license、既知 advisory、duplicate crate version は、明示的な狭い例外なしに受け入れない。
 
+既知 advisory は `scripts/cve-audit-baseline.json` で管理する。baseline にない advisory、または現在検出されない stale baseline entry は失敗として扱う。
+
+Nix/package 変更では `scripts/verify-nix-package` を通す。
+
+```sh
+nix develop -c ./scripts/verify-nix-package
+```
+
 不可視文字、Unicode format character、BiDi override、通常のテキストに不要な制御文字は、悪意あるコードを隠す手段として扱う。Git 管理下のファイルは `scripts/check-no-invisible-chars` で検査し、検出された場合は削除する。例外が必要なファイルは、境界を分離して理由を説明できる状態にする。
 
 ```sh
@@ -275,6 +283,7 @@ nix develop -c ./scripts/verify-security
 優先すること:
 
 - coding agent は作業完了前に `scripts/verify` を通し、通せない場合は理由と残リスクを報告する。
+- 人間向けエディタ設定は `.vscode/` に置き、Rust Analyzer は clippy / all targets 前提にする。
 - Rust、formatter、linter、test runner、assembler/linker などは Nix dev shell から使う。
 - Haskell など追加の toolchain は、必要になった時点で Nix dev shell に定義してから使う。
 - 日常コマンドは `nix develop -c ...` または direnv 経由の dev shell 内で実行する前提にする。

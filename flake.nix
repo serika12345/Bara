@@ -8,6 +8,7 @@
 
   outputs =
     {
+      self,
       nixpkgs,
       flake-utils,
       ...
@@ -19,6 +20,22 @@
         lib = pkgs.lib;
       in
       {
+        packages.default = pkgs.rustPlatform.buildRustPackage {
+          pname = "bara";
+          version = "0.1.0";
+          src = lib.cleanSource ./.;
+          cargoLock.lockFile = ./Cargo.lock;
+          cargoBuildFlags = [
+            "--workspace"
+            "--all-targets"
+          ];
+          cargoTestFlags = [
+            "--workspace"
+          ];
+        };
+
+        checks.package = self.packages.${system}.default;
+
         devShells.default = pkgs.mkShell {
           packages =
             (with pkgs; [
@@ -27,6 +44,8 @@
               cargo-deny
               cargo-nextest
               clippy
+              jq
+              python3
               ripgrep
               rust-analyzer
               rustc

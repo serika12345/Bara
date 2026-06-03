@@ -112,6 +112,15 @@ For security-relevant changes, run the aggregate check:
 nix develop -c ./scripts/verify-security
 ```
 
+Install the local pre-commit hook when working in a clone:
+
+```sh
+nix develop -c ./scripts/install-pre-commit-hook
+```
+
+The hook runs the fast repository integrity checks before commit. It does not
+replace `nix develop -c ./scripts/verify`.
+
 Use `.editorconfig` for baseline text formatting:
 
 - UTF-8
@@ -354,6 +363,12 @@ For ordinary code, script, policy, or configuration changes, run:
 
 ```sh
 nix develop -c ./scripts/verify
+```
+
+For Nix/package changes, the local gate includes:
+
+```sh
+nix develop -c ./scripts/verify-nix-package
 ```
 
 For dependency, lockfile, `deny.toml`, or `flake.nix` changes, also run:

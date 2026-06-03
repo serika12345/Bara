@@ -1,0 +1,71 @@
+#!/usr/bin/env sh
+set -eu
+
+cd "$(dirname "$0")/.."
+
+baseline="scripts/cve-audit-baseline.json"
+audit_json="$(mktemp "${TMPDIR:-/tmp}/bara-cargo-audit.XXXXXX")"
+trap 'rm -f "$audit_json"' EXIT
+
+set +e
+cargo audit --json > "$audit_json"
+audit_status="$?"
+set -e
+
+python3 - "$baseline" "$audit_json" "$audit_status" <<'PY'
+import json
+import sys
+
+baseline_path, audit_path, audit_status_text = sys.argv[1], sys.argv[2], sys.argv[3]
+audit_status = int(audit_status_text)
+
+with open(baseline_path, "r", encoding="utf-8") as handle:
+    baseline = json.load(handle)
+
+with open(audit_path, "r", encoding="utf-8") as handle:
+    audit = json.load(handle)
+
+allowed = sorted(set(baseline.get("cargo", {}).get("rustSecIds", [])))
+if not isinstance(baseline.get("cargo", {}).get("rustSecIds", []), list):
+    print(f"{baseline_path} must define cargo.rustSecIds as an array.", file=sys.stderr)
+    sys.exit(2)
+
+vulnerabilities = audit.get("vulnerabilities", {})
+if isinstance(vulnerabilities, dict):
+    entries = vulnerabilities.get("list", [])
+elif isinstance(vulnerabilities, list):
+    entries = vulnerabilities
+else:
+    entries = []
+
+current = sorted(
+    {
+        entry.get("advisory", {}).get("id")
+        for entry in entries
+        if isinstance(entry, dict) and entry.get("advisory", {}).get("id")
+    }
+)
+
+unexpected = [item for item in current if item not in allowed]
+stale = [item for item in allowed if item not in current]
+
+if unexpected:
+    print("Unexpected RustSec advisories:", file=sys.stderr)
+    for item in unexpected:
+        print(f"  {item}", file=sys.stderr)
+    print(f"Update dependencies or add a justified baseline entry to {baseline_path}.", file=sys.stderr)
+    sys.exit(1)
+
+if stale:
+    print("Stale RustSec baseline entries:", file=sys.stderr)
+    for item in stale:
+        print(f"  {item}", file=sys.stderr)
+    print(f"Remove stale entries from {baseline_path}.", file=sys.stderr)
+    sys.exit(1)
+
+if audit_status not in (0, 1):
+    print(f"cargo audit failed with status {audit_status}.", file=sys.stderr)
+    sys.exit(audit_status)
+
+print(f"verify-cves: OK ({len(current)} RustSec advisories tracked by baseline)")
+PY
