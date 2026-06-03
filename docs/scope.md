@@ -66,6 +66,9 @@ x86_64 bytes
 5. direct `call`
 6. helper call
 
+`hello world` 相当の外部観測までの段階的な計画は
+`docs/hello-world-roadmap.md` に置く。
+
 ## 初期 CpuState
 
 初期実装では `CpuState` を明示し、検証しやすさを優先する。
@@ -128,4 +131,3 @@ M1 は以下を満たしたら完了とする。
 - executable buffer で実行できる。
 - `actual.json` に `return_value: 42` を出せる。
 - Rosetta oracle で得た `expected.json` と比較できる。
-
