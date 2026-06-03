@@ -1,0 +1,7 @@
+{
+  "case_id": "add_sub_eax_imm_return_40",
+  "exit_status": 0,
+  "return_value": 40,
+  "stdout": "",
+  "stderr": ""
+}
