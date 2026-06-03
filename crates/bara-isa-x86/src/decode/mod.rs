@@ -47,6 +47,27 @@ pub fn decode_function(input: &X86Bytes) -> Result<DecodedFunction, DecodeError>
                 ));
                 offset = end_offset;
             }
+            0x2d => {
+                let end_offset = offset + 5;
+                let imm_bytes = input
+                    .bytes()
+                    .get((offset + 1)..end_offset)
+                    .ok_or(DecodeError::TruncatedInstruction { at, opcode })?;
+                let imm =
+                    i32::from_le_bytes([imm_bytes[0], imm_bytes[1], imm_bytes[2], imm_bytes[3]]);
+                let end = input
+                    .entry()
+                    .checked_add(end_offset as u64)
+                    .map_err(|_| DecodeError::AddressOverflow { at, byte_len: 5 })?;
+                instructions.push(DecodedInstruction::new(
+                    at,
+                    end,
+                    DecodedInstructionKind::SubEaxImm32 {
+                        imm: X86Imm32::new(imm),
+                    },
+                ));
+                offset = end_offset;
+            }
             0xb8 => {
                 let end_offset = offset + 5;
                 let imm_bytes = input
@@ -335,6 +356,40 @@ mod tests {
                     }
                 ),
                 DecodedInstruction::new(X86Va::new(8), X86Va::new(9), DecodedInstructionKind::Ret)
+            ]
+        );
+    }
+
+    #[test]
+    fn decodes_sub_eax_imm32_between_mov_and_ret() {
+        let input = X86Bytes::new(
+            X86Va::new(0),
+            vec![0xb8, 0x2a, 0, 0, 0, 0x2d, 0x03, 0, 0, 0, 0xc3],
+        )
+        .expect("test bytes are non-empty");
+
+        let decoded = decode_function(&input).expect("test bytes decode");
+
+        assert_eq!(
+            decoded.instructions(),
+            &[
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(5),
+                    DecodedInstructionKind::MovEaxImm32 { imm: 42 }
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(5),
+                    X86Va::new(10),
+                    DecodedInstructionKind::SubEaxImm32 {
+                        imm: crate::decode::X86Imm32::new(3)
+                    }
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(10),
+                    X86Va::new(11),
+                    DecodedInstructionKind::Ret
+                )
             ]
         );
     }

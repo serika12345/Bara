@@ -1,0 +1,9 @@
+{
+  "case_id": "sub_eax_imm32_return_39",
+  "entry": 0,
+  "bytes": "b82a0000002d03000000c3",
+  "abi": {
+    "args": [],
+    "return": "u64"
+  }
+}

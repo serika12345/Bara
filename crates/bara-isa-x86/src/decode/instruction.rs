@@ -59,6 +59,7 @@ pub enum DecodedInstructionKind {
     MovEaxImm32 { imm: u32 },
     AddEaxImm32 { imm: X86Imm32 },
     AddEaxImm8 { imm: X86Imm8 },
+    SubEaxImm32 { imm: X86Imm32 },
     SubEaxImm8 { imm: X86Imm8 },
     Ret,
     Unsupported { reason: UnsupportedReason },
