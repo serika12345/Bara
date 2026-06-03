@@ -40,6 +40,7 @@ raw function fixture が runtime 境界を通じて stdout に
 - Mach-O 64-bit little-endian magic の recognized-but-unsupported 分類
 - `probe-binary <path>` CLI による public binary probe
 - `probe-binary <path>` の安定 JSON report 出力
+- Mach-O 64-bit little-endian header の typed `filetype` metadata
 
 ## マイルストーン
 
@@ -369,6 +370,30 @@ manifest
   `{"format":"mach_o_64_little_endian","status":"recognized_but_unsupported"}`
   を返す。
 - probe report serializer の単体テストで JSON field と enum 名が固定される。
+
+状態:
+
+- 完了。
+
+### HW6c: Mach-O header metadata の最小 typed field
+
+目的:
+
+- magic だけでなく、公開 Mach-O header の最小 metadata を typed value として
+  probe report に含める。
+
+方針:
+
+- 実行や loader 変換はしない。
+- まず Mach-O 64-bit little-endian header の `filetype` だけを扱う。
+- `filetype` の primitive 値は parser 境界で enum / classified unsupported に変換する。
+- header bytes の不足は magic 不足とは別の分類 error とする。
+
+成功条件:
+
+- Mach-O 64-bit little-endian executable header を probe すると、report JSON に
+  file type metadata が含まれる。
+- 未対応 filetype は分類 error または unsupported metadata として扱い、panic しない。
 
 状態:
 

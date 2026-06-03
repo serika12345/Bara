@@ -23,6 +23,18 @@ impl BinaryInput {
     pub(crate) fn starts_with_magic(&self, magic: BinaryMagic) -> bool {
         self.bytes.starts_with(magic.bytes())
     }
+
+    pub(crate) fn has_len_at_least(&self, len: usize) -> bool {
+        self.bytes.len() >= len
+    }
+
+    pub(crate) fn read_little_endian_u32_at(&self, offset: usize) -> Option<u32> {
+        let end = offset.checked_add(4)?;
+        let bytes = self.bytes.get(offset..end)?;
+        Some(u32::from_le_bytes(
+            bytes.try_into().expect("slice len is 4"),
+        ))
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

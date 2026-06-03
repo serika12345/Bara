@@ -1,4 +1,7 @@
-use super::input::{BinaryInput, BinaryMagic};
+use super::{
+    input::{BinaryInput, BinaryMagic},
+    mach_o::{parse_mach_o_64_little_endian_metadata, MachOMetadata},
+};
 
 use serde::Serialize;
 
@@ -19,11 +22,20 @@ pub enum BinaryFormatProbeStatus {
 pub struct BinaryFormatProbeReport {
     format: BinaryFormat,
     status: BinaryFormatProbeStatus,
+    metadata: BinaryFormatProbeMetadata,
 }
 
 impl BinaryFormatProbeReport {
-    pub const fn new(format: BinaryFormat, status: BinaryFormatProbeStatus) -> Self {
-        Self { format, status }
+    pub const fn new(
+        format: BinaryFormat,
+        status: BinaryFormatProbeStatus,
+        metadata: BinaryFormatProbeMetadata,
+    ) -> Self {
+        Self {
+            format,
+            status,
+            metadata,
+        }
     }
 
     pub const fn format(self) -> BinaryFormat {
@@ -33,12 +45,33 @@ impl BinaryFormatProbeReport {
     pub const fn status(self) -> BinaryFormatProbeStatus {
         self.status
     }
+
+    pub const fn metadata(self) -> BinaryFormatProbeMetadata {
+        self.metadata
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+pub struct BinaryFormatProbeMetadata {
+    mach_o: MachOMetadata,
+}
+
+impl BinaryFormatProbeMetadata {
+    pub const fn mach_o(mach_o: MachOMetadata) -> Self {
+        Self { mach_o }
+    }
+
+    pub const fn mach_o_metadata(self) -> MachOMetadata {
+        self.mach_o
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BinaryFormatProbeError {
     InputTooShort,
+    HeaderTooShort,
     UnknownMagic,
+    UnsupportedMachOFileType,
 }
 
 pub fn probe_public_binary_format(
@@ -49,9 +82,12 @@ pub fn probe_public_binary_format(
     }
 
     if input.starts_with_magic(BinaryMagic::MachO64LittleEndian) {
+        let metadata = parse_mach_o_64_little_endian_metadata(input)?;
+
         return Ok(BinaryFormatProbeReport::new(
             BinaryFormat::MachO64LittleEndian,
             BinaryFormatProbeStatus::RecognizedButUnsupported,
+            BinaryFormatProbeMetadata::mach_o(metadata),
         ));
     }
 

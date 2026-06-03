@@ -555,7 +555,14 @@ mod tests {
     #[test]
     fn probe_binary_reads_file_and_reports_unsupported_mach_o() {
         let temp_dir = TestTempDir::new("probe_binary_reads_file_and_reports_unsupported_mach_o");
-        let binary_path = temp_dir.write_binary_file("fixture.bin", &[0xcf, 0xfa, 0xed, 0xfe]);
+        let binary_path = temp_dir.write_binary_file(
+            "fixture.bin",
+            &[
+                0xcf, 0xfa, 0xed, 0xfe, 0x07, 0x00, 0x00, 0x01, 0x03, 0x00, 0x00, 0x00, 0x02, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00,
+            ],
+        );
 
         let output = run_cli(vec![
             String::from("probe-binary"),
@@ -565,7 +572,7 @@ mod tests {
 
         assert_eq!(
             output,
-            "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\"}"
+            "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\",\"metadata\":{\"mach_o\":{\"file_type\":\"executable\"}}}"
         );
     }
 

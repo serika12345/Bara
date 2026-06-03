@@ -45,9 +45,9 @@ pub fn binary_format_probe_report_to_json(
 mod tests {
     use crate::{
         binary_format_probe_report_to_json, corpus_report_to_json, observed_result_from_json,
-        observed_result_to_json, BinaryFormat, BinaryFormatProbeReport, BinaryFormatProbeStatus,
-        CaseId, CorpusReport, FailureKind, FailureMessage, FixtureOutcome, FixtureReport,
-        ObservedResult,
+        observed_result_to_json, BinaryFormat, BinaryFormatProbeMetadata, BinaryFormatProbeReport,
+        BinaryFormatProbeStatus, CaseId, CorpusReport, FailureKind, FailureMessage, FixtureOutcome,
+        FixtureReport, MachOFileType, MachOMetadata, ObservedResult,
     };
 
     #[test]
@@ -114,11 +114,12 @@ mod tests {
         let report = BinaryFormatProbeReport::new(
             BinaryFormat::MachO64LittleEndian,
             BinaryFormatProbeStatus::RecognizedButUnsupported,
+            BinaryFormatProbeMetadata::mach_o(MachOMetadata::new(MachOFileType::Executable)),
         );
 
         assert_eq!(
             binary_format_probe_report_to_json(&report).expect("probe report serializes"),
-            "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\"}"
+            "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\",\"metadata\":{\"mach_o\":{\"file_type\":\"executable\"}}}"
         );
     }
 }
