@@ -1,6 +1,6 @@
 use bara_ir::{
     BasicBlock, BasicBlockError, BlockId, HostTrapKind, IrOp, Operand, Program, ProgramError,
-    Terminator, X86Reg,
+    Terminator, UnsupportedReason, X86Reg,
 };
 
 use crate::{DecodeError, DecodedFunction, DecodedInstructionKind};
@@ -73,6 +73,15 @@ pub fn lift_decoded_function(decoded: &DecodedFunction) -> Result<Program, LiftE
                 ops.push(IrOp::HostTrap {
                     kind: HostTrapKind::Stdout,
                 });
+            }
+            DecodedInstructionKind::CallRel32 { target, return_to } => {
+                terminator = Some(Terminator::Unsupported {
+                    reason: UnsupportedReason::DirectCallUnsupported {
+                        target: *target,
+                        return_to: *return_to,
+                    },
+                });
+                break;
             }
             DecodedInstructionKind::Ret => {
                 terminator = Some(Terminator::Return);
@@ -436,6 +445,31 @@ mod tests {
         assert_eq!(
             program.blocks()[0].terminator(),
             &Terminator::Unsupported { reason }
+        );
+    }
+
+    #[test]
+    fn lifts_direct_call_to_unsupported_terminator() {
+        let target = X86Va::new(0x1015);
+        let return_to = X86Va::new(0x1005);
+        let decoded = DecodedFunction::new(
+            X86Va::new(0x1000),
+            vec![DecodedInstruction::new(
+                X86Va::new(0x1000),
+                return_to,
+                DecodedInstructionKind::CallRel32 { target, return_to },
+            )],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("direct call lifts to unsupported IR");
+
+        assert_eq!(program.blocks()[0].ops(), &[]);
+        assert_eq!(
+            program.blocks()[0].terminator(),
+            &Terminator::Unsupported {
+                reason: UnsupportedReason::DirectCallUnsupported { target, return_to }
+            }
         );
     }
 }

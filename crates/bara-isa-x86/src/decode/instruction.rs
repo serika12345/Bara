@@ -64,6 +64,7 @@ pub enum DecodedInstructionKind {
     SubEaxImm32 { imm: X86Imm32 },
     SubEaxImm8 { imm: X86Imm8 },
     XorEaxEax,
+    CallRel32 { target: X86Va, return_to: X86Va },
     BaraHostTrapSentinel,
     Ret,
     Unsupported { reason: UnsupportedReason },

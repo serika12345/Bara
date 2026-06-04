@@ -166,6 +166,18 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                     }
                 }
             }
+            0xe8 => {
+                let end_offset = offset + 5;
+                let displacement = read_i32(input, offset, end_offset, at, opcode)?;
+                let return_to = instruction_end(input, at, end_offset, 5)?;
+                let target = relative_target(return_to, displacement, at)?;
+                instructions.push(DecodedInstruction::new(
+                    at,
+                    return_to,
+                    DecodedInstructionKind::CallRel32 { target, return_to },
+                ));
+                return DecodedFunction::new(input.entry(), instructions);
+            }
             0xc3 => {
                 let end = instruction_end(input, at, offset + 1, 1)?;
                 instructions.push(DecodedInstruction::new(
@@ -265,6 +277,18 @@ fn read_u32(
         imm_bytes[2],
         imm_bytes[3],
     ]))
+}
+
+fn relative_target(return_to: X86Va, displacement: i32, at: X86Va) -> Result<X86Va, DecodeError> {
+    let target = i128::from(return_to.value()) + i128::from(displacement);
+    if target < 0 || target > i128::from(u64::MAX) {
+        return Err(DecodeError::AddressOverflow {
+            at,
+            byte_len: u64::from(displacement.unsigned_abs()),
+        });
+    }
+
+    Ok(X86Va::new(target as u64))
 }
 
 fn unsupported_instruction(at: X86Va, end: X86Va, opcode: u8) -> DecodedInstruction {

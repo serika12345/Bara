@@ -106,6 +106,7 @@ pub enum HostTrapKind {
 pub enum UnsupportedReason {
     DecodeUnsupportedOpcode { opcode: u8, at: X86Va },
     MissingReturnTerminator { at: X86Va },
+    DirectCallUnsupported { target: X86Va, return_to: X86Va },
     EmitUnsupportedIr,
 }
 

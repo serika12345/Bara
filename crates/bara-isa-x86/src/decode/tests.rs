@@ -291,6 +291,46 @@ fn decodes_xor_eax_eax_then_ret() {
 }
 
 #[test]
+fn decodes_call_rel32_with_positive_target() {
+    let input = X86Bytes::new(X86Va::new(0x1000), vec![0xe8, 0x10, 0, 0, 0])
+        .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[DecodedInstruction::new(
+            X86Va::new(0x1000),
+            X86Va::new(0x1005),
+            DecodedInstructionKind::CallRel32 {
+                target: X86Va::new(0x1015),
+                return_to: X86Va::new(0x1005)
+            }
+        )]
+    );
+}
+
+#[test]
+fn decodes_call_rel32_with_negative_target() {
+    let input = X86Bytes::new(X86Va::new(0x1000), vec![0xe8, 0xf0, 0xff, 0xff, 0xff])
+        .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[DecodedInstruction::new(
+            X86Va::new(0x1000),
+            X86Va::new(0x1005),
+            DecodedInstructionKind::CallRel32 {
+                target: X86Va::new(0x0ff5),
+                return_to: X86Va::new(0x1005)
+            }
+        )]
+    );
+}
+
+#[test]
 fn truncated_mov_eax_imm32_is_reported() {
     let input = X86Bytes::new(X86Va::new(7), vec![0xb8, 0x2a]).expect("test bytes are non-empty");
 
