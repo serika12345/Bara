@@ -50,6 +50,56 @@ impl Default for HostHelperImportTable {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HostHelperResolutionPlan {
+    write_stdout: Option<ResolvedHostHelperImport>,
+}
+
+impl HostHelperResolutionPlan {
+    pub const fn empty() -> Self {
+        Self { write_stdout: None }
+    }
+
+    pub const fn write_stdout(&self) -> Option<&ResolvedHostHelperImport> {
+        self.write_stdout.as_ref()
+    }
+
+    const fn with_write_stdout(write_stdout: ResolvedHostHelperImport) -> Self {
+        Self {
+            write_stdout: Some(write_stdout),
+        }
+    }
+}
+
+impl Default for HostHelperResolutionPlan {
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResolvedHostHelperImport {
+    import: HostHelperImport,
+}
+
+impl ResolvedHostHelperImport {
+    const fn new(import: HostHelperImport) -> Self {
+        Self { import }
+    }
+
+    pub const fn import(self) -> HostHelperImport {
+        self.import
+    }
+
+    pub const fn name(self) -> HostHelperName {
+        self.import.name()
+    }
+
+    pub const fn signature(self) -> HostHelperSignature {
+        self.import.signature()
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct HostHelperImport {
     name: HostHelperName,
@@ -126,17 +176,23 @@ pub(crate) fn host_helper_import_table_from_dtos(
     )
 }
 
-pub(crate) fn validate_host_trap_imports(
+pub(crate) fn resolve_host_trap_imports(
     host_trap_plan: &TestCaseHostTrapPlan,
     import_table: &HostHelperImportTable,
-) -> Result<(), HostHelperImportTableError> {
-    if host_trap_plan.stdout_trap().is_some() && import_table.write_stdout().is_none() {
-        return Err(HostHelperImportTableError::MissingRequiredImport {
-            helper: HostHelperName::WriteStdout,
-        });
+) -> Result<HostHelperResolutionPlan, HostHelperImportTableError> {
+    if host_trap_plan.stdout_trap().is_some() {
+        let write_stdout = import_table.write_stdout().ok_or(
+            HostHelperImportTableError::MissingRequiredImport {
+                helper: HostHelperName::WriteStdout,
+            },
+        )?;
+
+        return Ok(HostHelperResolutionPlan::with_write_stdout(
+            ResolvedHostHelperImport::new(*write_stdout),
+        ));
     }
 
-    Ok(())
+    Ok(HostHelperResolutionPlan::empty())
 }
 
 impl From<ExecutableImportDto> for HostHelperImport {

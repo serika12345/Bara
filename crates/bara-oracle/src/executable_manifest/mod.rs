@@ -11,7 +11,7 @@ mod image;
 
 pub use host_helper::{
     HostHelperImport, HostHelperImportTable, HostHelperImportTableError, HostHelperName,
-    HostHelperSignature,
+    HostHelperResolutionPlan, HostHelperSignature, ResolvedHostHelperImport,
 };
 pub use image::{CodeSegment, ExecutableEntry, ExecutableImage, ExecutableImageError};
 
@@ -21,6 +21,7 @@ pub struct ExecutableManifest {
     image: ExecutableImage,
     abi: TestCaseAbi,
     host_helper_imports: HostHelperImportTable,
+    host_helper_resolution_plan: HostHelperResolutionPlan,
     host_trap_plan: TestCaseHostTrapPlan,
 }
 
@@ -30,6 +31,7 @@ impl ExecutableManifest {
         image: ExecutableImage,
         abi: TestCaseAbi,
         host_helper_imports: HostHelperImportTable,
+        host_helper_resolution_plan: HostHelperResolutionPlan,
         host_trap_plan: TestCaseHostTrapPlan,
     ) -> Self {
         Self {
@@ -37,6 +39,7 @@ impl ExecutableManifest {
             image,
             abi,
             host_helper_imports,
+            host_helper_resolution_plan,
             host_trap_plan,
         }
     }
@@ -51,6 +54,10 @@ impl ExecutableManifest {
 
     pub const fn host_helper_imports(&self) -> &HostHelperImportTable {
         &self.host_helper_imports
+    }
+
+    pub const fn host_helper_resolution_plan(&self) -> &HostHelperResolutionPlan {
+        &self.host_helper_resolution_plan
     }
 
     pub fn entry_function(&self) -> Result<TestCase, ExecutableManifestJsonError> {
@@ -124,8 +131,9 @@ pub fn executable_manifest_from_json(
         .map_err(ExecutableManifestJsonError::EntryFunction)?;
     let host_helper_imports = host_helper::host_helper_import_table_from_dtos(dto.imports)
         .map_err(ExecutableManifestJsonError::HostHelperImports)?;
-    host_helper::validate_host_trap_imports(&host_trap_plan, &host_helper_imports)
-        .map_err(ExecutableManifestJsonError::HostHelperImports)?;
+    let host_helper_resolution_plan =
+        host_helper::resolve_host_trap_imports(&host_trap_plan, &host_helper_imports)
+            .map_err(ExecutableManifestJsonError::HostHelperImports)?;
     let bytes = crate::testcase::decode_hex_bytes(&dto.code)
         .map_err(ExecutableManifestJsonError::EntryFunction)?;
     let code_segment = CodeSegment::from_x86_bytes(
@@ -142,6 +150,7 @@ pub fn executable_manifest_from_json(
         image,
         abi,
         host_helper_imports,
+        host_helper_resolution_plan,
         host_trap_plan,
     ))
 }
@@ -203,6 +212,15 @@ mod tests {
             .expect("write_stdout import exists");
         assert_eq!(write_stdout.name(), HostHelperName::WriteStdout);
         assert_eq!(write_stdout.signature(), HostHelperSignature::PtrLenToUnit);
+        let resolved_write_stdout = manifest
+            .host_helper_resolution_plan()
+            .write_stdout()
+            .expect("write_stdout import is resolved");
+        assert_eq!(resolved_write_stdout.name(), HostHelperName::WriteStdout);
+        assert_eq!(
+            resolved_write_stdout.signature(),
+            HostHelperSignature::PtrLenToUnit
+        );
     }
 
     #[test]
@@ -304,6 +322,66 @@ mod tests {
             result,
             Err(ExecutableManifestJsonError::HostHelperImports(
                 HostHelperImportTableError::MissingRequiredImport {
+                    helper: HostHelperName::WriteStdout
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn does_not_resolve_unused_write_stdout_import() {
+        let manifest = executable_manifest_from_json(
+            r#"{
+  "executable_id": "unused_stdout_import",
+  "format": "bara-executable-v0",
+  "entry": 0,
+  "code": "31c0c3",
+  "abi": { "args": [], "return": "u64" },
+  "imports": [
+    {
+      "kind": "host_helper",
+      "name": "write_stdout",
+      "signature": "ptr_len_to_unit"
+    }
+  ]
+}"#,
+        )
+        .expect("manifest with unused import parses");
+
+        assert!(manifest
+            .host_helper_resolution_plan()
+            .write_stdout()
+            .is_none());
+    }
+
+    #[test]
+    fn rejects_duplicate_write_stdout_import() {
+        let result = executable_manifest_from_json(
+            r#"{
+  "executable_id": "duplicate_stdout_import",
+  "format": "bara-executable-v0",
+  "entry": 0,
+  "code": "31c0c3",
+  "abi": { "args": [], "return": "u64" },
+  "imports": [
+    {
+      "kind": "host_helper",
+      "name": "write_stdout",
+      "signature": "ptr_len_to_unit"
+    },
+    {
+      "kind": "host_helper",
+      "name": "write_stdout",
+      "signature": "ptr_len_to_unit"
+    }
+  ]
+}"#,
+        );
+
+        assert_eq!(
+            result,
+            Err(ExecutableManifestJsonError::HostHelperImports(
+                HostHelperImportTableError::DuplicateImport {
                     helper: HostHelperName::WriteStdout
                 }
             ))

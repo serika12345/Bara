@@ -1392,6 +1392,51 @@ HW14 全体の状態:
 - 完了。`syscall` は decode / lift 境界で classified unsupported として扱われ、
   runtime execution には入らない。
 
+HW15 全体の状態:
+
+- 完了。syscall は OS / libc / runtime 実行へ進まず、public ISA decode と lift 境界の
+  classified unsupported value として固定された。
+
+### HW16: Host helper import resolution plan
+
+目的:
+
+- manifest の host helper import declaration / validation を、runtime 実行前に確認できる
+  pure な resolution plan へ進める。
+
+成功条件:
+
+- stdout host trap を持つ manifest は、`write_stdout` / `ptr_len_to_unit` import が
+  resolved された domain value を公開する。
+- missing import / duplicate / signature mismatch の既存 validation error を維持する。
+- runtime、ARM64 emit、CLI、binary format は変更しない。
+
+#### HW16a: Minimal host helper resolution value
+
+目的:
+
+- 既存 manifest host helper import validation を壊さず、`write_stdout` の解決結果を
+  `ExecutableManifest` から確認できる pure domain value として保持する。
+
+方針:
+
+- `crates/bara-oracle/src/executable_manifest/host_helper.rs` に小さな resolution plan
+  type を置き、host helper の責務を同ファイル内に閉じる。
+- stdout host trap がある場合だけ `write_stdout` import を resolved にする。
+- entry function 実行挙動は変えない。
+
+成功条件:
+
+- stdout host trap manifest は `write_stdout` / `ptr_len_to_unit` の resolved import を
+  domain value として返す。
+- stdout host trap がない manifest では、unused import を resolution plan に入れない。
+- duplicate / missing import の既存エラーを保つ。
+
+状態:
+
+- 完了。`HostHelperResolutionPlan` / `ResolvedHostHelperImport` を追加し、
+  `ExecutableManifest` が import table と別に resolution plan を保持・公開する。
+
 ## 判断基準
 
 - 先に raw function で外部観測を増やす。

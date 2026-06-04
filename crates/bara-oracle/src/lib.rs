@@ -26,7 +26,8 @@ pub use compare::{compare_observed_results, ComparisonIssue, ComparisonReport};
 pub use executable_manifest::{
     executable_manifest_from_json, CodeSegment, ExecutableEntry, ExecutableImage,
     ExecutableImageError, ExecutableManifest, ExecutableManifestJsonError, HostHelperImport,
-    HostHelperImportTable, HostHelperImportTableError, HostHelperName, HostHelperSignature,
+    HostHelperImportTable, HostHelperImportTableError, HostHelperName, HostHelperResolutionPlan,
+    HostHelperSignature, ResolvedHostHelperImport,
 };
 pub use json::{
     binary_format_probe_report_from_json, binary_format_probe_report_to_json,
