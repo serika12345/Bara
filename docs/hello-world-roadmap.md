@@ -59,6 +59,7 @@ raw function fixture が runtime 境界を通じて stdout に
 - Mach-O `LC_MAIN.stacksize` から testcase stack metadata への pure conversion
 - public ABI / import / host helper / syscall 相当境界の clean-room 計画文書
 - x86 `syscall` の typed decode と classified unsupported lift
+- raw testcase から ARM64 machine code artifact への実行なし変換境界
 
 ## マイルストーン
 
@@ -1491,6 +1492,61 @@ HW17 全体の状態:
 - 完了。resolved host helper plan は `run_executable_manifest` の実行前境界で
   preflight value として消費される。runtime host-call execution、unsafe runtime
   boundary、helper ABI 拡張はまだ扱わない。
+
+### HW18: Translated ARM64 artifact boundary
+
+目的:
+
+- 既存の in-memory runtime 実行から、変換成果物をファイルとして扱う段階へ進む。
+- `x86 function bytes -> decode -> lift -> ARM64 emit` の結果を、実行せずに
+  明示的な artifact として取り出せるようにする。
+
+方針:
+
+- まだ OS 実行可能ファイル形式は生成しない。
+- `bara-runtime` には入れず、JIT 実行境界と artifact 出力境界を分ける。
+- `bara-arm64` は machine code bytes 生成に集中させ、ファイル I/O を持たせない。
+- stdout host trap を実 OS stdout と見なさない。standalone 実行可能化は次段階で扱う。
+
+成功条件:
+
+- raw testcase を ARM64 machine code bytes に変換し、CLI からファイルへ保存できる。
+- 変換だけの経路は runtime unsafe / executable memory allocation / generated function call
+  を行わない。
+- host trap を要求する testcase は、standalone artifact としての未対応理由を分類する。
+
+#### HW18a: Raw testcase ARM64 code export
+
+目的:
+
+- `TestCase` から `EmittedFunction` までを、実行なしで返す小さな境界を作る。
+- CLI で raw testcase JSON から ARM64 code bytes を出力できるようにする。
+
+方針:
+
+- 既存の `run_test_case_function` は挙動を変えず、共通の compile-only helper に委譲する。
+- CLI の filesystem I/O は `btbc-cli` に閉じる。
+- 出力は raw ARM64 bytes とし、Mach-O / ELF / PE writer はまだ作らない。
+
+成功条件:
+
+- `emit-fixture-arm64 <case.json> <out.bin>` が、host trap を含まない fixture を
+  ARM64 machine code bytes として保存する。
+- stdout host trap fixture は、standalone artifact unsupported として分類 error になる。
+- 既存 `check-*` / blackbox の外部観測結果は変えない。
+
+状態:
+
+- 完了。`emit-fixture-arm64 <case.json> <out.bin>` で raw testcase を
+  実行せずに ARM64 machine code bytes へ変換し、CLI I/O 境界で保存できる。
+  stdout host trap を要求する testcase は standalone artifact unsupported として
+  分類 error になる。
+
+HW18 全体の状態:
+
+- 完了。変換成果物を raw ARM64 machine code artifact としてファイル出力できる
+  境界ができた。OS 実行可能ファイル形式、実 OS stdout、process spawn による
+  成果物実行は次の大項目で扱う。
 
 ## 判断基準
 

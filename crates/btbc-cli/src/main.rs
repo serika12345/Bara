@@ -21,7 +21,9 @@ mod function_run;
 
 use blackbox_run::run_check_blackbox;
 use executable_run::{run_executable_manifest, ExecutableRunError};
-use function_run::{run_test_case_function, FunctionRunError};
+use function_run::{
+    compile_test_case_function_standalone_artifact, run_test_case_function, FunctionRunError,
+};
 
 fn main() -> ExitCode {
     match run_cli(env::args().skip(1).collect()) {
@@ -63,6 +65,9 @@ fn run_cli(args: Vec<String>) -> Result<String, CliError> {
         [command, binary_path, expected_path] if command == "check-binary-probe" => {
             run_check_binary_probe(Path::new(binary_path), Path::new(expected_path))
         }
+        [command, case_path, output_path] if command == "emit-fixture-arm64" => {
+            run_emit_fixture_arm64(Path::new(case_path), Path::new(output_path))
+        }
         [command] if command == "check-blackbox" => run_check_blackbox(None),
         [command, output_flag, output_dir]
             if command == "check-blackbox" && output_flag == "--out" =>
@@ -103,6 +108,20 @@ fn run_check_fixture(case_path: &Path, expected_path: &Path) -> Result<String, C
     let expected_json = read_text_file(expected_path)?;
 
     run_m1_check_from_fixtures(&case_json, &expected_json)
+}
+
+fn run_emit_fixture_arm64(case_path: &Path, output_path: &Path) -> Result<String, CliError> {
+    let case_json = read_text_file(case_path)?;
+    let test_case = test_case_from_json(&case_json).map_err(CliError::TestCase)?;
+    let compiled = compile_test_case_function_standalone_artifact(&test_case)
+        .map_err(CliError::FunctionRun)?;
+    write_binary_file(output_path, compiled.arm64_bytes().as_slice())?;
+
+    Ok(format!(
+        "wrote ARM64 machine code for {} to {}",
+        test_case.case_id().as_str(),
+        output_path.display()
+    ))
 }
 
 fn run_check_executable(manifest_path: &Path, expected_path: &Path) -> Result<String, CliError> {
@@ -412,6 +431,13 @@ fn write_text_file(path: &Path, contents: &str) -> Result<(), CliError> {
     })
 }
 
+fn write_binary_file(path: &Path, contents: &[u8]) -> Result<(), CliError> {
+    fs::write(path, contents).map_err(|source| CliError::WriteFile {
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
 fn sorted_case_paths(cases_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
     let mut paths = Vec::new();
     let entries = fs::read_dir(cases_dir).map_err(|source| CliError::ReadDir {
@@ -520,7 +546,7 @@ impl std::fmt::Display for CliError {
         match self {
             Self::Usage => write!(
                 formatter,
-                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | check-blackbox [--out <dir>]"
+                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | check-blackbox [--out <dir>]"
             ),
             Self::ReadFile { path, source } => {
                 write!(formatter, "failed to read file {}: {source}", path.display())
@@ -681,6 +707,53 @@ mod tests {
                 .expect("expected fixture normalizes to output json");
 
         assert_eq!(output, expected);
+    }
+
+    #[test]
+    fn emit_fixture_arm64_writes_return_42_machine_code_file() {
+        let temp_dir = TestTempDir::new("emit_fixture_arm64_writes_return_42_machine_code_file");
+        let case_path = temp_dir.write_file(
+            "case.json",
+            include_str!("../../../tests/cases/return_42.json"),
+        );
+        let output_path = temp_dir.path.join("return_42.arm64.bin");
+
+        let output = run_cli(vec![
+            String::from("emit-fixture-arm64"),
+            case_path.to_string_lossy().into_owned(),
+            output_path.to_string_lossy().into_owned(),
+        ])
+        .expect("return_42 fixture emits standalone ARM64 machine code");
+
+        assert_eq!(
+            read_binary_file(&output_path),
+            vec![0x40, 0x05, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]
+        );
+        assert!(output.contains("wrote ARM64 machine code for return_42"));
+    }
+
+    #[test]
+    fn emit_fixture_arm64_rejects_stdout_host_trap_fixture() {
+        let temp_dir = TestTempDir::new("emit_fixture_arm64_rejects_stdout_host_trap_fixture");
+        let case_path = temp_dir.write_file(
+            "case.json",
+            include_str!("../../../tests/cases/stdout_trap_return_0.json"),
+        );
+        let output_path = temp_dir.path.join("stdout_trap.arm64.bin");
+
+        let error = run_cli(vec![
+            String::from("emit-fixture-arm64"),
+            case_path.to_string_lossy().into_owned(),
+            output_path.to_string_lossy().into_owned(),
+        ])
+        .expect_err("stdout host trap fixture is rejected for standalone ARM64 output");
+
+        assert!(matches!(
+            error,
+            CliError::FunctionRun(super::function_run::FunctionRunError::StandaloneArtifact(_))
+        ));
+        assert_eq!(error.failure_kind(), FailureKind::EmitError);
+        assert!(!output_path.exists());
     }
 
     #[test]
@@ -894,6 +967,9 @@ mod tests {
         assert!(error
             .to_string()
             .contains("check-binary-probe <binary> <expected.json>"));
+        assert!(error
+            .to_string()
+            .contains("emit-fixture-arm64 <case.json> <out.bin>"));
         assert!(error.to_string().contains("check-blackbox [--out <dir>]"));
     }
 
@@ -1132,6 +1208,10 @@ mod tests {
 
     fn read_file(path: &Path) -> String {
         fs::read_to_string(path).expect("test fixture file is read")
+    }
+
+    fn read_binary_file(path: &Path) -> Vec<u8> {
+        fs::read(path).expect("test fixture binary file is read")
     }
 
     fn expected_blackbox_report_json() -> &'static str {
