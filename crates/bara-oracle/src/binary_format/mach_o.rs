@@ -17,11 +17,8 @@ pub struct MachOMetadata {
 }
 
 impl MachOMetadata {
-    pub const fn new(file_type: MachOFileType, load_commands: MachOLoadCommands) -> Self {
-        let executable_image_conversion = MachOExecutableImageConversion::not_convertible(
-            MachOExecutableImageConversionBlocker::MissingEntryPoint,
-        );
-
+    pub fn new(file_type: MachOFileType, load_commands: MachOLoadCommands) -> Self {
+        let executable_image_conversion = classify_executable_image_conversion(&load_commands);
         Self {
             file_type,
             load_commands,
@@ -81,6 +78,7 @@ pub enum MachOExecutableImageConversionStatus {
 #[serde(rename_all = "snake_case")]
 pub enum MachOExecutableImageConversionBlocker {
     MissingEntryPoint,
+    UnsupportedImageMapping,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -158,6 +156,18 @@ impl MachOFileType {
             _ => None,
         }
     }
+}
+
+fn classify_executable_image_conversion(
+    load_commands: &MachOLoadCommands,
+) -> MachOExecutableImageConversion {
+    let blocker = if load_commands.summary().recognized_entry_points().is_empty() {
+        MachOExecutableImageConversionBlocker::MissingEntryPoint
+    } else {
+        MachOExecutableImageConversionBlocker::UnsupportedImageMapping
+    };
+
+    MachOExecutableImageConversion::not_convertible(blocker)
 }
 
 fn validate_load_command_table_bounds(

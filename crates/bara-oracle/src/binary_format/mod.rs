@@ -1,5 +1,6 @@
 mod input;
 mod mach_o;
+mod mach_o_entry_point_command;
 mod mach_o_load_command;
 mod mach_o_segment_command;
 mod probe;
@@ -9,9 +10,12 @@ pub use mach_o::{
     MachOExecutableImageConversion, MachOExecutableImageConversionBlocker,
     MachOExecutableImageConversionStatus, MachOFileType, MachOLoadCommands, MachOMetadata,
 };
+pub use mach_o_entry_point_command::{
+    MachOEntryPointCommandMetadata, MachOEntryPointFileOffset, MachOEntryPointStackSize,
+};
 pub use mach_o_load_command::{
     MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommandSummary, MachOLoadCommandType,
-    RecognizedMachOSegmentCommand, UnsupportedMachOLoadCommand,
+    RecognizedMachOEntryPointCommand, RecognizedMachOSegmentCommand, UnsupportedMachOLoadCommand,
 };
 pub use mach_o_segment_command::{
     MachOSegmentCommandHeaderMetadata, MachOSegmentFileOffset, MachOSegmentFileSize,
@@ -155,6 +159,7 @@ mod tests {
                         "load_commands": {
                             "count": 1,
                             "byte_size": 72,
+                            "recognized_entry_points": [],
                             "recognized_segments": [
                                 {
                                     "byte_size": 72,
@@ -203,6 +208,7 @@ mod tests {
                         "load_commands": {
                             "count": 1,
                             "byte_size": 72,
+                            "recognized_entry_points": [],
                             "recognized_segments": [
                                 {
                                     "byte_size": 72,
@@ -221,6 +227,91 @@ mod tests {
                     }
                 }
             })
+        );
+    }
+
+    #[test]
+    fn recognizes_mach_o_entry_point_load_command_metadata() {
+        let input = BinaryInput::from_hex(concat!(
+            "cffaedfe07000001030000000200000001000000180000000000000000000000",
+            "2800008018000000",
+            "3412000000000000",
+            "0020000000000000",
+        ))
+        .expect("hex fixture is valid");
+
+        let report = probe_public_binary_format(&input).expect("probe succeeds");
+
+        assert_eq!(
+            serde_json::to_value(report).expect("probe report serializes"),
+            serde_json::json!({
+                "format": "mach_o_64_little_endian",
+                "status": "recognized_but_unsupported",
+                "metadata": {
+                    "mach_o": {
+                        "file_type": "executable",
+                        "load_commands": {
+                            "count": 1,
+                            "byte_size": 24,
+                            "recognized_entry_points": [
+                                {
+                                    "byte_size": 24,
+                                    "entryoff": 4660,
+                                    "stacksize": 8192
+                                }
+                            ],
+                            "recognized_segments": [],
+                            "unsupported_commands": []
+                        },
+                        "executable_image_conversion": {
+                            "status": "not_convertible",
+                            "blocker": "unsupported_image_mapping"
+                        }
+                    }
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn reports_mach_o_with_entry_point_as_not_convertible_until_image_mapping_exists() {
+        let input = BinaryInput::from_hex(concat!(
+            "cffaedfe07000001030000000200000001000000180000000000000000000000",
+            "2800008018000000",
+            "3412000000000000",
+            "0020000000000000",
+        ))
+        .expect("hex fixture is valid");
+
+        let report = probe_public_binary_format(&input).expect("probe succeeds");
+        let conversion = report
+            .metadata()
+            .mach_o_metadata()
+            .executable_image_conversion();
+
+        assert_eq!(
+            conversion.status(),
+            MachOExecutableImageConversionStatus::NotConvertible
+        );
+        assert_eq!(
+            conversion.blocker(),
+            MachOExecutableImageConversionBlocker::UnsupportedImageMapping
+        );
+    }
+
+    #[test]
+    fn rejects_mach_o_entry_point_command_smaller_than_public_command() {
+        let input = BinaryInput::from_hex(concat!(
+            "cffaedfe07000001030000000200000001000000170000000000000000000000",
+            "2800008017000000",
+            "3412000000000000",
+            "00200000000000",
+        ))
+        .expect("hex fixture is valid");
+
+        assert_eq!(
+            probe_public_binary_format(&input),
+            Err(BinaryFormatProbeError::LoadCommandTooSmall)
         );
     }
 

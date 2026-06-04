@@ -1,5 +1,9 @@
 use super::{
     input::BinaryInput,
+    mach_o_entry_point_command::{
+        parse_entry_point_command_metadata, validate_entry_point_command_byte_size,
+        MachOEntryPointCommandMetadata,
+    },
     mach_o_segment_command::{
         parse_segment_64_header_metadata, validate_segment_64_command_byte_size,
         MachOSegmentCommandHeaderMetadata,
@@ -48,10 +52,15 @@ pub struct MachOLoadCommandType {
 }
 
 impl MachOLoadCommandType {
+    const LC_MAIN: Self = Self { value: 0x80000028 };
     const LC_SEGMENT_64: Self = Self { value: 0x19 };
 
     pub(crate) const fn from_public_command_value(value: u32) -> Self {
         Self { value }
+    }
+
+    const fn is_entry_point(self) -> bool {
+        self.value == Self::LC_MAIN.value
     }
 
     const fn is_segment_64(self) -> bool {
@@ -62,6 +71,8 @@ impl MachOLoadCommandType {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct MachOLoadCommandSummary {
     #[serde(default)]
+    recognized_entry_points: Vec<RecognizedMachOEntryPointCommand>,
+    #[serde(default)]
     recognized_segments: Vec<RecognizedMachOSegmentCommand>,
     unsupported_commands: Vec<UnsupportedMachOLoadCommand>,
 }
@@ -69,17 +80,24 @@ pub struct MachOLoadCommandSummary {
 impl MachOLoadCommandSummary {
     pub fn empty() -> Self {
         Self {
+            recognized_entry_points: Vec::new(),
             recognized_segments: Vec::new(),
             unsupported_commands: Vec::new(),
         }
     }
 
-    pub(crate) fn new<R, U>(recognized_segments: R, unsupported_commands: U) -> Self
+    pub(crate) fn new<E, R, U>(
+        recognized_entry_points: E,
+        recognized_segments: R,
+        unsupported_commands: U,
+    ) -> Self
     where
+        E: Into<Vec<RecognizedMachOEntryPointCommand>>,
         R: Into<Vec<RecognizedMachOSegmentCommand>>,
         U: Into<Vec<UnsupportedMachOLoadCommand>>,
     {
         Self {
+            recognized_entry_points: recognized_entry_points.into(),
             recognized_segments: recognized_segments.into(),
             unsupported_commands: unsupported_commands.into(),
         }
@@ -90,7 +108,11 @@ impl MachOLoadCommandSummary {
     where
         T: Into<Vec<UnsupportedMachOLoadCommand>>,
     {
-        Self::new(Vec::new(), commands)
+        Self::new(Vec::new(), Vec::new(), commands)
+    }
+
+    pub fn recognized_entry_points(&self) -> &[RecognizedMachOEntryPointCommand] {
+        &self.recognized_entry_points
     }
 
     pub fn recognized_segments(&self) -> &[RecognizedMachOSegmentCommand] {
@@ -99,6 +121,33 @@ impl MachOLoadCommandSummary {
 
     pub fn unsupported_commands(&self) -> &[UnsupportedMachOLoadCommand] {
         &self.unsupported_commands
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct RecognizedMachOEntryPointCommand {
+    byte_size: MachOLoadCommandByteSize,
+    #[serde(flatten)]
+    metadata: MachOEntryPointCommandMetadata,
+}
+
+impl RecognizedMachOEntryPointCommand {
+    pub const fn new(
+        byte_size: MachOLoadCommandByteSize,
+        metadata: MachOEntryPointCommandMetadata,
+    ) -> Self {
+        Self {
+            byte_size,
+            metadata,
+        }
+    }
+
+    pub const fn byte_size(self) -> MachOLoadCommandByteSize {
+        self.byte_size
+    }
+
+    pub const fn metadata(self) -> MachOEntryPointCommandMetadata {
+        self.metadata
     }
 }
 
@@ -167,6 +216,7 @@ pub(crate) fn parse_mach_o_load_command_summary(
         return Ok(MachOLoadCommandSummary::empty());
     }
 
+    let mut recognized_entry_points = Vec::new();
     let mut recognized_segments = Vec::new();
     let mut unsupported_commands = Vec::new();
     let mut command_offset = table_range.start;
@@ -199,7 +249,13 @@ pub(crate) fn parse_mach_o_load_command_summary(
             return Err(BinaryFormatProbeError::LoadCommandsOutOfBounds);
         }
 
-        if command.is_segment_64() {
+        if command.is_entry_point() {
+            validate_entry_point_command_byte_size(byte_size.as_usize())?;
+            recognized_entry_points.push(RecognizedMachOEntryPointCommand::new(
+                byte_size,
+                parse_entry_point_command_metadata(input, command_offset)?,
+            ));
+        } else if command.is_segment_64() {
             validate_segment_64_command_byte_size(byte_size.as_usize())?;
             recognized_segments.push(RecognizedMachOSegmentCommand::new(
                 byte_size,
@@ -212,6 +268,7 @@ pub(crate) fn parse_mach_o_load_command_summary(
     }
 
     Ok(MachOLoadCommandSummary::new(
+        recognized_entry_points,
         recognized_segments,
         unsupported_commands,
     ))

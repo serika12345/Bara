@@ -53,11 +53,13 @@ mod tests {
         binary_format_probe_report_from_json, binary_format_probe_report_to_json,
         corpus_report_to_json, observed_result_from_json, observed_result_to_json, BinaryFormat,
         BinaryFormatProbeMetadata, BinaryFormatProbeReport, BinaryFormatProbeStatus, CaseId,
-        CorpusReport, FailureKind, FailureMessage, FixtureOutcome, FixtureReport, MachOFileType,
-        MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommandSummary,
+        CorpusReport, FailureKind, FailureMessage, FixtureOutcome, FixtureReport,
+        MachOEntryPointCommandMetadata, MachOEntryPointFileOffset, MachOEntryPointStackSize,
+        MachOFileType, MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommandSummary,
         MachOLoadCommandType, MachOLoadCommands, MachOMetadata, MachOSegmentCommandHeaderMetadata,
         MachOSegmentFileOffset, MachOSegmentFileSize, MachOSegmentName, MachOSegmentVmAddr,
-        ObservedResult, RecognizedMachOSegmentCommand, UnsupportedMachOLoadCommand,
+        ObservedResult, RecognizedMachOEntryPointCommand, RecognizedMachOSegmentCommand,
+        UnsupportedMachOLoadCommand,
     };
 
     fn empty_load_commands() -> MachOLoadCommands {
@@ -140,7 +142,7 @@ mod tests {
 
         assert_eq!(
             binary_format_probe_report_to_json(&report).expect("probe report serializes"),
-            "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\",\"metadata\":{\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":0,\"byte_size\":0,\"recognized_segments\":[],\"unsupported_commands\":[]},\"executable_image_conversion\":{\"status\":\"not_convertible\",\"blocker\":\"missing_entry_point\"}}}}"
+            "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\",\"metadata\":{\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":0,\"byte_size\":0,\"recognized_entry_points\":[],\"recognized_segments\":[],\"unsupported_commands\":[]},\"executable_image_conversion\":{\"status\":\"not_convertible\",\"blocker\":\"missing_entry_point\"}}}}"
         );
     }
 
@@ -166,7 +168,38 @@ mod tests {
 
         assert_eq!(
             binary_format_probe_report_to_json(&report).expect("probe report serializes"),
-            "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\",\"metadata\":{\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":1,\"byte_size\":8,\"recognized_segments\":[],\"unsupported_commands\":[{\"command\":1,\"byte_size\":8}]},\"executable_image_conversion\":{\"status\":\"not_convertible\",\"blocker\":\"missing_entry_point\"}}}}"
+            "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\",\"metadata\":{\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":1,\"byte_size\":8,\"recognized_entry_points\":[],\"recognized_segments\":[],\"unsupported_commands\":[{\"command\":1,\"byte_size\":8}]},\"executable_image_conversion\":{\"status\":\"not_convertible\",\"blocker\":\"missing_entry_point\"}}}}"
+        );
+    }
+
+    #[test]
+    fn binary_format_probe_report_serializes_recognized_mach_o_entry_points_as_stable_json() {
+        let report = BinaryFormatProbeReport::new(
+            BinaryFormat::MachO64LittleEndian,
+            BinaryFormatProbeStatus::RecognizedButUnsupported,
+            BinaryFormatProbeMetadata::mach_o(MachOMetadata::new(
+                MachOFileType::Executable,
+                MachOLoadCommands::new(
+                    MachOLoadCommandCount::from_public_header_value(1),
+                    MachOLoadCommandByteSize::from_public_header_value(24),
+                    MachOLoadCommandSummary::new(
+                        vec![RecognizedMachOEntryPointCommand::new(
+                            MachOLoadCommandByteSize::from_public_header_value(24),
+                            MachOEntryPointCommandMetadata::new(
+                                MachOEntryPointFileOffset::from_public_entry_point_value(0x1234),
+                                MachOEntryPointStackSize::from_public_entry_point_value(0x2000),
+                            ),
+                        )],
+                        Vec::<RecognizedMachOSegmentCommand>::new(),
+                        Vec::<UnsupportedMachOLoadCommand>::new(),
+                    ),
+                ),
+            )),
+        );
+
+        assert_eq!(
+            binary_format_probe_report_to_json(&report).expect("probe report serializes"),
+            "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\",\"metadata\":{\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":1,\"byte_size\":24,\"recognized_entry_points\":[{\"byte_size\":24,\"entryoff\":4660,\"stacksize\":8192}],\"recognized_segments\":[],\"unsupported_commands\":[]},\"executable_image_conversion\":{\"status\":\"not_convertible\",\"blocker\":\"unsupported_image_mapping\"}}}}"
         );
     }
 
@@ -181,6 +214,7 @@ mod tests {
                     MachOLoadCommandCount::from_public_header_value(1),
                     MachOLoadCommandByteSize::from_public_header_value(72),
                     MachOLoadCommandSummary::new(
+                        Vec::<RecognizedMachOEntryPointCommand>::new(),
                         vec![RecognizedMachOSegmentCommand::new(
                             MachOLoadCommandByteSize::from_public_header_value(72),
                             MachOSegmentCommandHeaderMetadata::new(
@@ -201,14 +235,14 @@ mod tests {
 
         assert_eq!(
             binary_format_probe_report_to_json(&report).expect("probe report serializes"),
-            "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\",\"metadata\":{\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":1,\"byte_size\":72,\"recognized_segments\":[{\"byte_size\":72,\"name\":\"__TEXT\",\"vmaddr\":4294967296,\"fileoff\":0,\"filesize\":4660}],\"unsupported_commands\":[]},\"executable_image_conversion\":{\"status\":\"not_convertible\",\"blocker\":\"missing_entry_point\"}}}}"
+            "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\",\"metadata\":{\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":1,\"byte_size\":72,\"recognized_entry_points\":[],\"recognized_segments\":[{\"byte_size\":72,\"name\":\"__TEXT\",\"vmaddr\":4294967296,\"fileoff\":0,\"filesize\":4660}],\"unsupported_commands\":[]},\"executable_image_conversion\":{\"status\":\"not_convertible\",\"blocker\":\"missing_entry_point\"}}}}"
         );
     }
 
     #[test]
     fn binary_format_probe_report_parses_from_expected_json() {
         let report = binary_format_probe_report_from_json(
-            "{\n  \"format\": \"mach_o_64_little_endian\",\n  \"status\": \"recognized_but_unsupported\",\n  \"metadata\": {\n    \"mach_o\": {\n      \"file_type\": \"executable\",\n      \"load_commands\": {\n        \"count\": 0,\n        \"byte_size\": 0,\n        \"recognized_segments\": [],\n        \"unsupported_commands\": []\n      },\n      \"executable_image_conversion\": {\n        \"status\": \"not_convertible\",\n        \"blocker\": \"missing_entry_point\"\n      }\n    }\n  }\n}\n",
+            "{\n  \"format\": \"mach_o_64_little_endian\",\n  \"status\": \"recognized_but_unsupported\",\n  \"metadata\": {\n    \"mach_o\": {\n      \"file_type\": \"executable\",\n      \"load_commands\": {\n        \"count\": 0,\n        \"byte_size\": 0,\n        \"recognized_entry_points\": [],\n        \"recognized_segments\": [],\n        \"unsupported_commands\": []\n      },\n      \"executable_image_conversion\": {\n        \"status\": \"not_convertible\",\n        \"blocker\": \"missing_entry_point\"\n      }\n    }\n  }\n}\n",
         )
         .expect("probe report json parses");
 

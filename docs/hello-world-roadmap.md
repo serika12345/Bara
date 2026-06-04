@@ -601,6 +601,35 @@ manifest
 - 完了。entry point metadata 未対応の Mach-O probe は
   `not_convertible` / `missing_entry_point` として stable JSON report に含める。
 
+### HW8d: Mach-O entry point command metadata
+
+目的:
+
+- 公開 Mach-O `LC_MAIN` load command を unsupported command ではなく、
+  executable entry point metadata として probe report に含める。
+
+方針:
+
+- `entry_point_command` の公開 layout に基づき、`entryoff` と `stacksize` のみを
+  typed metadata として読む。
+- 実際の executable image 変換、VM mapping、section parsing、loader execution、
+  syscall、import はまだ扱わない。
+- `cmdsize` が公開 `entry_point_command` の 24 bytes 未満なら
+  `LoadCommandTooSmall` として reject する。
+
+成功条件:
+
+- `LC_MAIN` を含む Mach-O fixture を probe すると、
+  `recognized_entry_points` に `entryoff` と `stacksize` が出る。
+- `LC_MAIN` は `unsupported_commands` には分類されない。
+- entry point がある Mach-O probe は、次に足りない capability として
+  `not_convertible` / `unsupported_image_mapping` を報告する。
+
+状態:
+
+- 完了。`LC_MAIN` の `entryoff` / `stacksize` metadata を typed value として読み、
+  stable JSON report に含め、変換可否 blocker を entry point 有無から分類する。
+
 ## 判断基準
 
 - 先に raw function で外部観測を増やす。
