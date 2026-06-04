@@ -1444,6 +1444,54 @@ HW16 全体の状態:
   domain value として公開できる。既存の missing / duplicate / signature mismatch
   validation error と entry function 実行挙動は維持されている。
 
+### HW17: Runtime preflight for resolved host helpers
+
+目的:
+
+- executable manifest の resolved host helper plan を、実行前境界で明示的に消費する。
+
+成功条件:
+
+- `check-executable` / `run_executable_manifest` 経路は、stdout host trap 実行前に
+  manifest の resolved `write_stdout` helper を確認する。
+- runtime unsafe、real host call、helper ABI 拡張、ARM64 emit、binary format、
+  oracle manifest parser は変更しない。
+- 正常 fixture の外部観測結果は変えない。
+
+#### HW17a: Minimal executable host helper preflight
+
+目的:
+
+- `ExecutableManifest::host_helper_resolution_plan()` を CLI execution 境界で読み、
+  stdout host trap がある場合に resolved `write_stdout` import を小さな preflight
+  value として確認する。
+
+方針:
+
+- execution preflight は `crates/btbc-cli/src/executable_run.rs` に閉じる。
+- preflight logic は `()` ではなく、将来 runtime host-call execution へ渡せる
+  report value または classified error を返す。
+- 既存 manifest parser validation と整合させ、正常 fixture の behavior は変えない。
+
+成功条件:
+
+- stdout host trap manifest は、function 実行前に `write_stdout` /
+  `ptr_len_to_unit` の resolved helper を preflight で確認する。
+- `check-executable` の既存 executable manifest fixture は preflight を通って実行される。
+- missing resolved helper は execution preflight error として分類される。
+
+状態:
+
+- 完了。`run_executable_manifest` が entry function 実行前に
+  `host_helper_resolution_plan()` を明示的に消費し、stdout host trap に対して
+  resolved `write_stdout` / `ptr_len_to_unit` helper を確認する。
+
+HW17 全体の状態:
+
+- 完了。resolved host helper plan は `run_executable_manifest` の実行前境界で
+  preflight value として消費される。runtime host-call execution、unsafe runtime
+  boundary、helper ABI 拡張はまだ扱わない。
+
 ## 判断基準
 
 - 先に raw function で外部観測を増やす。
