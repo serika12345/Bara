@@ -46,6 +46,9 @@ raw function fixture が runtime 境界を通じて stdout に
 - Mach-O 64-bit little-endian unsupported load command summary
 - Mach-O probe fixture / expected JSON と `check-binary-probe`
 - Mach-O probe report 上の executable image 変換可否 metadata
+- Mach-O 64-bit little-endian `LC_SEGMENT_64` metadata
+- Mach-O 64-bit little-endian `LC_MAIN` entry point metadata
+- Mach-O executable image conversion blocker classification
 
 ## マイルストーン
 
@@ -836,6 +839,92 @@ manifest
 
 - 完了。Mach-O executable image conversion metadata と blocker classification を
   専用 module に分離し、既存の JSON behavior と public re-export を維持する。
+
+## 次の大マイルストーン
+
+ここから先は、細かい command metadata の追加ではなく、Mach-O を既存の
+raw function / executable manifest pipeline に段階的に接続する。
+
+### HW9: Mach-O executable image materialization
+
+目的:
+
+- recognized `LC_SEGMENT_64` / `LC_MAIN` metadata から、Bara の
+  `ExecutableImage` / `ExecutableManifest` 相当へ変換できる最小経路を作る。
+
+成功条件:
+
+- 単一 entry point と単一 containing segment を持つ Mach-O fixture から、
+  typed executable image が作れる。
+- 変換不能な Mach-O は既存の blocker classification と classified error で止まる。
+- section parsing、dynamic loader、imports、syscall、libc はまだ扱わない。
+
+### HW10: Mach-O backed raw function execution
+
+目的:
+
+- Mach-O から取り出した code segment と entry point を、既存の raw function
+  decode / lift / emit / runtime pipeline へ渡して実行する。
+
+成功条件:
+
+- Mach-O fixture 内の最小 x86 function が `return_value` として比較できる。
+- 既存の `check-executable` と同等の expected / actual JSON 比較が Mach-O 入力でも
+  できる。
+- VM address と file offset の対応は domain type で表現され、primitive boundary が
+  増えすぎない。
+
+### HW11: Mach-O hello world via Bara host trap
+
+目的:
+
+- Mach-O fixture 内の x86 function から、Bara 専用 stdout host trap を通じて
+  `hello world\n` を外部観測する。
+
+成功条件:
+
+- Mach-O backed execution の `stdout` / `stderr` / `return_value` が stable JSON で
+  比較できる。
+- host helper import declaration / validation は既存 manifest model と矛盾しない。
+- 実 OS syscall や libc call にはまだ踏み込まない。
+
+### HW12: Minimal stack / call boundary
+
+目的:
+
+- loader 付き hello world に必要な範囲で、stack と call / return の境界を最小対応する。
+
+成功条件:
+
+- function-level execution の責務を壊さず、必要な stack state を typed input として
+  表現できる。
+- call target が未対応の場合は classified unsupported として止まる。
+- decode / lift / emit / runtime の各責務が混ざらない。
+
+### HW13: Public ABI / import boundary planning
+
+目的:
+
+- Wine-style compatibility layer との接続を見据え、public ABI、imports、host helper、
+  syscall 相当の境界を clean-room に設計する。
+
+成功条件:
+
+- Rosetta や既存 translation layer の内部構造に依存しない boundary document がある。
+- imports / syscalls / host helpers の責務が、runtime と oracle に混ざらず分かれている。
+- 実装前に、許可された public spec と externally observable behavior の範囲が明記される。
+
+### HW14: Corpus expansion and regression gate
+
+目的:
+
+- Mach-O backed execution で増えた fixture を、長期的に壊れにくい corpus として管理する。
+
+成功条件:
+
+- raw function、manifest、Mach-O の fixture が同じ report model で比較できる。
+- expected / actual JSON の stable schema が維持される。
+- `scripts/verify` が新しい regression gate を含む。
 
 ## 判断基準
 
