@@ -988,6 +988,12 @@ raw function / executable manifest pipeline に段階的に接続する。
 - VM address と file offset の対応は domain type で表現され、primitive boundary が
   増えすぎない。
 
+状態:
+
+- 完了。`check-mach-o <binary> <expected.json>` で Mach-O fixture 内の raw
+  x86 function を既存 decode / lift / emit / runtime pipeline へ渡し、stable
+  expected / actual JSON で比較できる。
+
 #### HW10a: Mach-O executable image entry function testcase
 
 目的:
