@@ -1,17 +1,19 @@
 mod input;
 mod mach_o;
 mod mach_o_entry_point_command;
+mod mach_o_executable_image_conversion;
 mod mach_o_load_command;
 mod mach_o_segment_command;
 mod probe;
 
 pub use input::{BinaryFileBytes, BinaryInput, BinaryInputError};
-pub use mach_o::{
-    MachOExecutableImageConversion, MachOExecutableImageConversionBlocker,
-    MachOExecutableImageConversionStatus, MachOFileType, MachOLoadCommands, MachOMetadata,
-};
+pub use mach_o::{MachOFileType, MachOLoadCommands, MachOMetadata};
 pub use mach_o_entry_point_command::{
     MachOEntryPointCommandMetadata, MachOEntryPointFileOffset, MachOEntryPointStackSize,
+};
+pub use mach_o_executable_image_conversion::{
+    MachOExecutableImageConversion, MachOExecutableImageConversionBlocker,
+    MachOExecutableImageConversionStatus,
 };
 pub use mach_o_load_command::{
     MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommandSummary, MachOLoadCommandType,

@@ -809,6 +809,34 @@ manifest
 - 完了。Mach-O executable image conversion blocker は単一 entry point と複数
   containing segment の組み合わせを ambiguous entry segment として分類する。
 
+### HW8k: Mach-O executable image conversion responsibility split
+
+目的:
+
+- Mach-O header parsing / load command metadata assembly と executable image conversion
+  blocker classification の責務を分け、次の loader/image conversion 検討前に
+  module boundary を明確にする。
+
+方針:
+
+- parsing logic は `mach_o.rs` に残す。
+- executable image conversion metadata type と blocker classification は専用 module に
+  移す。
+- serialized JSON 名、既存の blocker 分類、public re-export は変えない。
+- 実際の executable image 変換、VM mapping、section parsing、loader execution、
+  syscall、import はまだ扱わない。
+
+成功条件:
+
+- `MachOMetadata::new` は parsed load command metadata から pure classifier を呼び、
+  既存の stable JSON と blocker tests が変わらず通る。
+- `mach_o.rs` は Mach-O header parsing と metadata assembly に集中する。
+
+状態:
+
+- 完了。Mach-O executable image conversion metadata と blocker classification を
+  専用 module に分離し、既存の JSON behavior と public re-export を維持する。
+
 ## 判断基準
 
 - 先に raw function で外部観測を増やす。
