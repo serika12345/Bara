@@ -79,6 +79,7 @@ pub enum MachOExecutableImageConversionStatus {
 pub enum MachOExecutableImageConversionBlocker {
     MissingEntryPoint,
     MissingSegment,
+    EntryPointOutsideSegment,
     UnsupportedImageMapping,
 }
 
@@ -162,15 +163,28 @@ impl MachOFileType {
 fn classify_executable_image_conversion(
     load_commands: &MachOLoadCommands,
 ) -> MachOExecutableImageConversion {
-    let blocker = if load_commands.summary().recognized_entry_points().is_empty() {
+    let summary = load_commands.summary();
+    let blocker = if summary.recognized_entry_points().is_empty() {
         MachOExecutableImageConversionBlocker::MissingEntryPoint
-    } else if load_commands.summary().recognized_segments().is_empty() {
+    } else if summary.recognized_segments().is_empty() {
         MachOExecutableImageConversionBlocker::MissingSegment
+    } else if !has_entry_point_inside_recognized_segment(summary) {
+        MachOExecutableImageConversionBlocker::EntryPointOutsideSegment
     } else {
         MachOExecutableImageConversionBlocker::UnsupportedImageMapping
     };
 
     MachOExecutableImageConversion::not_convertible(blocker)
+}
+
+fn has_entry_point_inside_recognized_segment(summary: &MachOLoadCommandSummary) -> bool {
+    summary.recognized_entry_points().iter().any(|entry_point| {
+        summary.recognized_segments().iter().any(|segment| {
+            segment
+                .header()
+                .contains_entry_point_file_offset(entry_point.metadata().entryoff())
+        })
+    })
 }
 
 fn validate_load_command_table_bounds(

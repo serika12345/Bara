@@ -714,6 +714,39 @@ manifest
 - 完了。`LC_MAIN.entryoff` は metadata assembly 時に入力 byte を指す file offset として
   検証され、segment 対応付けや executable image conversion には進まない。
 
+### HW8h: Mach-O entry point segment file range blocker
+
+目的:
+
+- recognized `LC_MAIN.entryoff` が recognized `LC_SEGMENT_64` file range に含まれるかを、
+  executable image conversion metadata として分類する。
+
+方針:
+
+- entry point がなく recognized segment があるかどうかに関係なく、既存通り
+  `missing_entry_point` を報告する。
+- entry point があり recognized segment がない場合は、既存通り `missing_segment` を
+  報告する。
+- entry point と recognized segment があり、entry file offset がどの segment file
+  range にも含まれない場合は `entry_point_outside_segment` を報告する。
+- entry file offset が recognized segment file range に含まれる場合だけ、次の未実装
+  capability として `unsupported_image_mapping` を報告する。
+- zero-size segment は entry byte を含まないものとして扱う。
+- VM address mapping、section parsing、code extraction、executable image creation、
+  loader execution、syscall、import はまだ扱わない。
+
+成功条件:
+
+- entry point outside recognized segment は probe parse error ではなく
+  `not_convertible` / `entry_point_outside_segment` として stable JSON に出る。
+- entry point inside recognized segment は引き続き
+  `not_convertible` / `unsupported_image_mapping` として分類される。
+
+状態:
+
+- 完了。Mach-O executable image conversion blocker は recognized entry point の
+  file offset が recognized segment file range に含まれるかを分類する。
+
 ## 判断基準
 
 - 先に raw function で外部観測を増やす。

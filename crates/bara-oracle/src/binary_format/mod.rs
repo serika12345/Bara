@@ -472,7 +472,51 @@ mod tests {
     }
 
     #[test]
-    fn reports_mach_o_with_entry_point_and_segment_as_not_convertible_until_image_mapping_exists() {
+    fn reports_mach_o_with_entry_point_outside_segment_as_not_convertible() {
+        let metadata = MachOMetadata::new(
+            MachOFileType::Executable,
+            MachOLoadCommands::new(
+                MachOLoadCommandCount::from_public_header_value(2),
+                MachOLoadCommandByteSize::from_public_header_value(96),
+                MachOLoadCommandSummary::new(
+                    vec![RecognizedMachOEntryPointCommand::new(
+                        MachOLoadCommandByteSize::from_public_header_value(24),
+                        MachOEntryPointCommandMetadata::new(
+                            MachOEntryPointFileOffset::from_public_entry_point_value(0x1234),
+                            MachOEntryPointStackSize::from_public_entry_point_value(0x2000),
+                        ),
+                    )],
+                    vec![RecognizedMachOSegmentCommand::new(
+                        MachOLoadCommandByteSize::from_public_header_value(72),
+                        MachOSegmentCommandHeaderMetadata::new(
+                            MachOSegmentName::from_public_fixed_field(
+                                b"__TEXT\0\0\0\0\0\0\0\0\0\0",
+                            )
+                            .expect("test segment name is valid"),
+                            MachOSegmentVmAddr::from_public_segment_value(0x1_0000_0000),
+                            MachOSegmentFileOffset::from_public_segment_value(0x1234),
+                            MachOSegmentFileSize::from_public_segment_value(0),
+                        ),
+                    )],
+                    Vec::<UnsupportedMachOLoadCommand>::new(),
+                ),
+            ),
+        );
+        let conversion = metadata.executable_image_conversion();
+
+        assert_eq!(
+            conversion.status(),
+            MachOExecutableImageConversionStatus::NotConvertible
+        );
+        assert_eq!(
+            conversion.blocker(),
+            MachOExecutableImageConversionBlocker::EntryPointOutsideSegment
+        );
+    }
+
+    #[test]
+    fn reports_mach_o_with_entry_point_inside_segment_as_not_convertible_until_image_mapping_exists(
+    ) {
         let metadata = MachOMetadata::new(
             MachOFileType::Executable,
             MachOLoadCommands::new(
@@ -495,7 +539,7 @@ mod tests {
                             .expect("test segment name is valid"),
                             MachOSegmentVmAddr::from_public_segment_value(0x1_0000_0000),
                             MachOSegmentFileOffset::from_public_segment_value(0),
-                            MachOSegmentFileSize::from_public_segment_value(0x1234),
+                            MachOSegmentFileSize::from_public_segment_value(0x1235),
                         ),
                     )],
                     Vec::<UnsupportedMachOLoadCommand>::new(),

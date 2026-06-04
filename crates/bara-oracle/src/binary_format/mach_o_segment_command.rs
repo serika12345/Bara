@@ -1,4 +1,7 @@
-use super::{input::BinaryInput, probe::BinaryFormatProbeError};
+use super::{
+    input::BinaryInput, mach_o_entry_point_command::MachOEntryPointFileOffset,
+    probe::BinaryFormatProbeError,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -39,6 +42,17 @@ impl MachOSegmentCommandHeaderMetadata {
 
     pub const fn filesize(&self) -> MachOSegmentFileSize {
         self.filesize
+    }
+
+    pub(crate) fn contains_entry_point_file_offset(
+        &self,
+        entryoff: MachOEntryPointFileOffset,
+    ) -> bool {
+        let Some(file_end) = self.fileoff.as_u64().checked_add(self.filesize.as_u64()) else {
+            return false;
+        };
+
+        self.fileoff.as_u64() <= entryoff.as_u64() && entryoff.as_u64() < file_end
     }
 }
 
