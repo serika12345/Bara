@@ -472,6 +472,55 @@ mod tests {
     }
 
     #[test]
+    fn reports_mach_o_with_multiple_entry_points_as_ambiguous_not_convertible() {
+        let input = BinaryInput::from_hex(concat!(
+            "cffaedfe07000001030000000200000002000000300000000000000000000000",
+            "2800008018000000",
+            "2000000000000000",
+            "0020000000000000",
+            "2800008018000000",
+            "2100000000000000",
+            "0030000000000000",
+        ))
+        .expect("hex fixture is valid");
+
+        let report = probe_public_binary_format(&input).expect("probe succeeds");
+        let load_commands = report.metadata().mach_o_metadata().load_commands();
+        let conversion = report
+            .metadata()
+            .mach_o_metadata()
+            .executable_image_conversion();
+
+        assert_eq!(
+            load_commands.summary().recognized_entry_points(),
+            &[
+                RecognizedMachOEntryPointCommand::new(
+                    MachOLoadCommandByteSize::from_public_header_value(24),
+                    MachOEntryPointCommandMetadata::new(
+                        MachOEntryPointFileOffset::from_public_entry_point_value(32),
+                        MachOEntryPointStackSize::from_public_entry_point_value(0x2000),
+                    ),
+                ),
+                RecognizedMachOEntryPointCommand::new(
+                    MachOLoadCommandByteSize::from_public_header_value(24),
+                    MachOEntryPointCommandMetadata::new(
+                        MachOEntryPointFileOffset::from_public_entry_point_value(33),
+                        MachOEntryPointStackSize::from_public_entry_point_value(0x3000),
+                    ),
+                ),
+            ]
+        );
+        assert_eq!(
+            conversion.status(),
+            MachOExecutableImageConversionStatus::NotConvertible
+        );
+        assert_eq!(
+            conversion.blocker(),
+            MachOExecutableImageConversionBlocker::AmbiguousEntryPoint
+        );
+    }
+
+    #[test]
     fn reports_mach_o_with_entry_point_outside_segment_as_not_convertible() {
         let metadata = MachOMetadata::new(
             MachOFileType::Executable,

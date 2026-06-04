@@ -204,6 +204,50 @@ mod tests {
     }
 
     #[test]
+    fn binary_format_probe_report_serializes_ambiguous_mach_o_entry_point_blocker_as_stable_json() {
+        let report = BinaryFormatProbeReport::new(
+            BinaryFormat::MachO64LittleEndian,
+            BinaryFormatProbeStatus::RecognizedButUnsupported,
+            BinaryFormatProbeMetadata::mach_o(MachOMetadata::new(
+                MachOFileType::Executable,
+                MachOLoadCommands::new(
+                    MachOLoadCommandCount::from_public_header_value(2),
+                    MachOLoadCommandByteSize::from_public_header_value(48),
+                    MachOLoadCommandSummary::new(
+                        vec![
+                            RecognizedMachOEntryPointCommand::new(
+                                MachOLoadCommandByteSize::from_public_header_value(24),
+                                MachOEntryPointCommandMetadata::new(
+                                    MachOEntryPointFileOffset::from_public_entry_point_value(
+                                        0x1234,
+                                    ),
+                                    MachOEntryPointStackSize::from_public_entry_point_value(0x2000),
+                                ),
+                            ),
+                            RecognizedMachOEntryPointCommand::new(
+                                MachOLoadCommandByteSize::from_public_header_value(24),
+                                MachOEntryPointCommandMetadata::new(
+                                    MachOEntryPointFileOffset::from_public_entry_point_value(
+                                        0x1235,
+                                    ),
+                                    MachOEntryPointStackSize::from_public_entry_point_value(0x3000),
+                                ),
+                            ),
+                        ],
+                        Vec::<RecognizedMachOSegmentCommand>::new(),
+                        Vec::<UnsupportedMachOLoadCommand>::new(),
+                    ),
+                ),
+            )),
+        );
+
+        assert_eq!(
+            binary_format_probe_report_to_json(&report).expect("probe report serializes"),
+            "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\",\"metadata\":{\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":2,\"byte_size\":48,\"recognized_entry_points\":[{\"byte_size\":24,\"entryoff\":4660,\"stacksize\":8192},{\"byte_size\":24,\"entryoff\":4661,\"stacksize\":12288}],\"recognized_segments\":[],\"unsupported_commands\":[]},\"executable_image_conversion\":{\"status\":\"not_convertible\",\"blocker\":\"ambiguous_entry_point\"}}}}"
+        );
+    }
+
+    #[test]
     fn binary_format_probe_report_serializes_mach_o_entry_point_and_segment_as_stable_json() {
         let report = BinaryFormatProbeReport::new(
             BinaryFormat::MachO64LittleEndian,

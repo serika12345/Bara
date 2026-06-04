@@ -747,6 +747,33 @@ manifest
 - 完了。Mach-O executable image conversion blocker は recognized entry point の
   file offset が recognized segment file range に含まれるかを分類する。
 
+### HW8i: Mach-O ambiguous entry point blocker
+
+目的:
+
+- 複数の recognized `LC_MAIN` がある Mach-O executable を parse error ではなく、
+  executable image conversion metadata の ambiguity として分類する。
+
+方針:
+
+- recognized entry point が 0 個なら既存通り `missing_entry_point` を報告する。
+- recognized entry point が複数なら `ambiguous_entry_point` を報告する。
+- recognized entry point が 1 個だけの場合に限り、recognized segment の有無、
+  segment file range との対応、image mapping capability を既存順で分類する。
+- 実際の executable image 変換、VM mapping、section parsing、loader execution、
+  syscall、import はまだ扱わない。
+
+成功条件:
+
+- 複数の recognized `LC_MAIN` は probe parse error ではなく
+  `not_convertible` / `ambiguous_entry_point` として stable JSON に出る。
+- recognized entry point が 1 個だけの既存 blocker 分類は変わらない。
+
+状態:
+
+- 完了。Mach-O executable image conversion blocker は複数の recognized `LC_MAIN` を
+  ambiguous entry point として分類する。
+
 ## 判断基準
 
 - 先に raw function で外部観測を増やす。
