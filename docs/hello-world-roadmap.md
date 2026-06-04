@@ -912,6 +912,31 @@ raw function / executable manifest pipeline に段階的に接続する。
 - 完了。Mach-O executable image materialization に必要な最小 plan を
   conversion metadata から pure に作れる。
 
+#### HW9c: binary format test responsibility split
+
+目的:
+
+- 次の executable image materialization 実装前に、`binary_format` の巨大な
+  inline tests を責務別 test module に分ける。
+
+方針:
+
+- production behavior、public API、JSON shape は変えない。
+- probe、conversion、plan の tests を `binary_format/mod.rs` から外す。
+- probe tests は header/input、load command、segment、entry point に分ける。
+
+成功条件:
+
+- `binary_format/mod.rs` は module declarations / public re-export /
+  test module declaration に戻る。
+- 既存 test names と assertions は維持される。
+- 次の HW9 materialization 実装で、責務に合う test file を選びやすい。
+
+状態:
+
+- 完了。Mach-O probe / conversion / plan tests を責務別 module に分割し、
+  HW9 materialization に進む前の test surface を整理する。
+
 ### HW10: Mach-O backed raw function execution
 
 目的:
