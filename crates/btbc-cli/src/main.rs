@@ -18,12 +18,14 @@ use bara_oracle::{
 mod blackbox_run;
 mod executable_run;
 mod function_run;
+mod native_artifact;
 
 use blackbox_run::run_check_blackbox;
 use executable_run::{run_executable_manifest, ExecutableRunError};
 use function_run::{
     compile_test_case_function_standalone_artifact, run_test_case_function, FunctionRunError,
 };
+use native_artifact::{link_arm64_main_executable, NativeArtifactError};
 
 fn main() -> ExitCode {
     match run_cli(env::args().skip(1).collect()) {
@@ -67,6 +69,9 @@ fn run_cli(args: Vec<String>) -> Result<String, CliError> {
         }
         [command, case_path, output_path] if command == "emit-fixture-arm64" => {
             run_emit_fixture_arm64(Path::new(case_path), Path::new(output_path))
+        }
+        [command, case_path, output_path] if command == "link-fixture-arm64-main" => {
+            run_link_fixture_arm64_main(Path::new(case_path), Path::new(output_path))
         }
         [command] if command == "check-blackbox" => run_check_blackbox(None),
         [command, output_flag, output_dir]
@@ -119,6 +124,21 @@ fn run_emit_fixture_arm64(case_path: &Path, output_path: &Path) -> Result<String
 
     Ok(format!(
         "wrote ARM64 machine code for {} to {}",
+        test_case.case_id().as_str(),
+        output_path.display()
+    ))
+}
+
+fn run_link_fixture_arm64_main(case_path: &Path, output_path: &Path) -> Result<String, CliError> {
+    let case_json = read_text_file(case_path)?;
+    let test_case = test_case_from_json(&case_json).map_err(CliError::TestCase)?;
+    let compiled = compile_test_case_function_standalone_artifact(&test_case)
+        .map_err(CliError::FunctionRun)?;
+    link_arm64_main_executable(compiled.arm64_bytes(), output_path)
+        .map_err(CliError::NativeArtifact)?;
+
+    Ok(format!(
+        "linked ARM64 main executable for {} to {}",
         test_case.case_id().as_str(),
         output_path.display()
     ))
@@ -508,6 +528,7 @@ enum CliError {
         actual: Box<BinaryFormatProbeReport>,
     },
     FunctionRun(FunctionRunError),
+    NativeArtifact(NativeArtifactError),
     ExecutableRun(ExecutableRunError),
     Comparison(ComparisonReport),
     Json(bara_oracle::JsonError),
@@ -526,6 +547,7 @@ impl CliError {
             Self::MachOEntryFunctionTestCase(_) => FailureKind::InvalidTestCase,
             Self::BinaryProbeComparisonMismatch { .. } => FailureKind::ComparisonMismatch,
             Self::FunctionRun(error) => error.failure_kind(),
+            Self::NativeArtifact(error) => error.failure_kind(),
             Self::ExecutableRun(error) => error.failure_kind(),
             Self::Comparison(_) => FailureKind::ComparisonMismatch,
             Self::ReadFile { .. } | Self::WriteFile { .. } | Self::CreateDir { .. } => {
@@ -546,7 +568,7 @@ impl std::fmt::Display for CliError {
         match self {
             Self::Usage => write!(
                 formatter,
-                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | check-blackbox [--out <dir>]"
+                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | link-fixture-arm64-main <case.json> <out-exe> | check-blackbox [--out <dir>]"
             ),
             Self::ReadFile { path, source } => {
                 write!(formatter, "failed to read file {}: {source}", path.display())
@@ -608,6 +630,7 @@ impl std::fmt::Display for CliError {
                 )
             }
             Self::FunctionRun(error) => write!(formatter, "function run error: {error}"),
+            Self::NativeArtifact(error) => write!(formatter, "native artifact error: {error}"),
             Self::ExecutableRun(error) => write!(formatter, "executable run error: {error}"),
             Self::Comparison(report) => write!(formatter, "comparison failed: {report:?}"),
             Self::Json(error) => write!(formatter, "{error}"),
@@ -624,6 +647,7 @@ mod tests {
     use std::{
         fs,
         path::{Path, PathBuf},
+        process::Command,
         time::{SystemTime, UNIX_EPOCH},
     };
 
@@ -747,6 +771,82 @@ mod tests {
             output_path.to_string_lossy().into_owned(),
         ])
         .expect_err("stdout host trap fixture is rejected for standalone ARM64 output");
+
+        assert!(matches!(
+            error,
+            CliError::FunctionRun(super::function_run::FunctionRunError::StandaloneArtifact(_))
+        ));
+        assert_eq!(error.failure_kind(), FailureKind::EmitError);
+        assert!(!output_path.exists());
+    }
+
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    #[test]
+    fn link_fixture_arm64_main_writes_return_42_executable() {
+        let temp_dir = TestTempDir::new("link_fixture_arm64_main_writes_return_42_executable");
+        let case_path = temp_dir.write_file(
+            "case.json",
+            include_str!("../../../tests/cases/return_42.json"),
+        );
+        let output_path = temp_dir.path.join("return_42");
+
+        let output = run_cli(vec![
+            String::from("link-fixture-arm64-main"),
+            case_path.to_string_lossy().into_owned(),
+            output_path.to_string_lossy().into_owned(),
+        ])
+        .expect("return_42 fixture links as an ARM64 main executable");
+
+        assert!(output_path.exists());
+        assert!(output.contains("linked ARM64 main executable for return_42"));
+        let status = Command::new(&output_path)
+            .status()
+            .expect("linked executable runs");
+        assert_eq!(status.code(), Some(42));
+    }
+
+    #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
+    #[test]
+    fn link_fixture_arm64_main_reports_unsupported_host() {
+        let temp_dir = TestTempDir::new("link_fixture_arm64_main_reports_unsupported_host");
+        let case_path = temp_dir.write_file(
+            "case.json",
+            include_str!("../../../tests/cases/return_42.json"),
+        );
+        let output_path = temp_dir.path.join("return_42");
+
+        let error = run_cli(vec![
+            String::from("link-fixture-arm64-main"),
+            case_path.to_string_lossy().into_owned(),
+            output_path.to_string_lossy().into_owned(),
+        ])
+        .expect_err("non-macOS ARM64 host is unsupported");
+
+        assert!(matches!(
+            error,
+            CliError::NativeArtifact(
+                super::native_artifact::NativeArtifactError::UnsupportedHost { .. }
+            )
+        ));
+        assert_eq!(error.failure_kind(), FailureKind::EmitError);
+        assert!(!output_path.exists());
+    }
+
+    #[test]
+    fn link_fixture_arm64_main_rejects_stdout_host_trap_fixture() {
+        let temp_dir = TestTempDir::new("link_fixture_arm64_main_rejects_stdout_host_trap_fixture");
+        let case_path = temp_dir.write_file(
+            "case.json",
+            include_str!("../../../tests/cases/stdout_trap_return_0.json"),
+        );
+        let output_path = temp_dir.path.join("stdout_trap");
+
+        let error = run_cli(vec![
+            String::from("link-fixture-arm64-main"),
+            case_path.to_string_lossy().into_owned(),
+            output_path.to_string_lossy().into_owned(),
+        ])
+        .expect_err("stdout host trap fixture is rejected before native linking");
 
         assert!(matches!(
             error,
@@ -970,6 +1070,9 @@ mod tests {
         assert!(error
             .to_string()
             .contains("emit-fixture-arm64 <case.json> <out.bin>"));
+        assert!(error
+            .to_string()
+            .contains("link-fixture-arm64-main <case.json> <out-exe>"));
         assert!(error.to_string().contains("check-blackbox [--out <dir>]"));
     }
 

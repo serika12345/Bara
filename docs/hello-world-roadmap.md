@@ -60,6 +60,7 @@ raw function fixture が runtime 境界を通じて stdout に
 - public ABI / import / host helper / syscall 相当境界の clean-room 計画文書
 - x86 `syscall` の typed decode と classified unsupported lift
 - raw testcase から ARM64 machine code artifact への実行なし変換境界
+- raw testcase から macOS ARM64 executable artifact への toolchain packaging 境界
 
 ## マイルストーン
 
@@ -1547,6 +1548,66 @@ HW18 全体の状態:
 - 完了。変換成果物を raw ARM64 machine code artifact としてファイル出力できる
   境界ができた。OS 実行可能ファイル形式、実 OS stdout、process spawn による
   成果物実行は次の大項目で扱う。
+
+### HW19: macOS ARM64 executable packaging smoke
+
+目的:
+
+- HW18 の raw ARM64 machine code artifact を、OS が起動できる成果物へ近づける。
+- まずは host trap を含まない no-args `u64` return fixture を、macOS ARM64 の
+  `_main` としてリンクし、実プロセスの exit status として観測する。
+
+方針:
+
+- 最初は汎用 Mach-O writer を作らない。
+- Nix dev shell 上の public toolchain (`clang`) を CLI I/O 境界から呼び出す。
+- `bara-arm64` / `bara-runtime` / input Mach-O probe parser へ toolchain orchestration を
+  混ぜない。
+- stdout host trap や実 OS stdout はまだ扱わない。`hello world` standalone 実行は
+  次段階で、明示的な native stdout emission として切る。
+
+成功条件:
+
+- raw testcase から生成した ARM64 bytes を `_main` body としてリンクした executable
+  artifact を作れる。
+- 生成 artifact を実プロセスとして起動し、`return_42` が exit status 42 として
+  観測できる。
+- host trap を要求する testcase は standalone executable packaging unsupported として
+  分類 error になる。
+
+#### HW19a: Link host-trap-free fixture as ARM64 main
+
+目的:
+
+- `emit-fixture-arm64` の compile-only 境界を再利用し、host trap を含まない fixture を
+  `_main` の機械語 body としてリンクする。
+
+方針:
+
+- CLI filesystem / process spawn boundary に閉じる。
+- temporary assembly source は CLI が生成し、core crates へ I/O を入れない。
+- raw bytes は `.byte` directive として書き出し、assembler / linker に渡す。
+- macOS ARM64 host 以外では classified unsupported として扱う。
+
+成功条件:
+
+- `link-fixture-arm64-main <case.json> <out-exe>` が executable artifact を作る。
+- 生成 artifact を起動すると `return_42` fixture が exit status 42 になる。
+- stdout host trap fixture は executable packaging unsupported として reject される。
+
+状態:
+
+- 完了。`link-fixture-arm64-main <case.json> <out-exe>` で host trap を含まない
+  raw testcase を ARM64 `_main` body として `clang` でリンクし、macOS ARM64 上で
+  executable artifact を作れる。`return_42` fixture は生成 artifact の実行時
+  exit status 42 として観測できる。stdout host trap fixture は standalone artifact
+  unsupported として reject される。
+
+HW19 全体の状態:
+
+- 完了。変換済み ARM64 bytes を OS が起動できる macOS ARM64 executable artifact に
+  package し、実プロセスとして exit status を観測する smoke 経路ができた。
+  standalone `hello world` stdout emission は次の大項目で扱う。
 
 ## 判断基準
 
