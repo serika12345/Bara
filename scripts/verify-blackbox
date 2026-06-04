@@ -4,7 +4,20 @@ set -eu
 cd "$(dirname "$0")/.."
 
 output_dir="target/bara-blackbox"
+expected_report="tests/expected-reports/blackbox.json"
+actual_report="$output_dir/report.json"
+expected_normalized="$output_dir/expected-report.normalized.json"
+actual_normalized="$output_dir/actual-report.normalized.json"
 
 rm -rf "$output_dir"
 
 cargo run -p btbc-cli -- check-blackbox --out "$output_dir"
+
+jq -S . "$expected_report" > "$expected_normalized"
+jq -S . "$actual_report" > "$actual_normalized"
+
+if ! cmp -s "$expected_normalized" "$actual_normalized"; then
+  echo "blackbox CorpusReport JSON does not match $expected_report" >&2
+  diff -u "$expected_normalized" "$actual_normalized" >&2
+  exit 1
+fi

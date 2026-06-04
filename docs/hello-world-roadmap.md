@@ -1261,6 +1261,8 @@ raw function / executable manifest pipeline に段階的に接続する。
 - raw function、manifest、Mach-O の fixture が同じ report model で比較できる。
 - expected / actual JSON の stable schema が維持される。
 - `scripts/verify` が新しい regression gate を含む。
+- `check-blackbox` の `CorpusReport` JSON が expected report fixture として固定され、
+  `scripts/verify-blackbox` で構造的に比較される。
 
 #### HW14a: Existing fixture regression gate
 
@@ -1317,6 +1319,39 @@ raw function / executable manifest pipeline に段階的に接続する。
 - 完了。`check-blackbox` は raw corpus、manifest 2 件、Mach-O execution 2 件、
   probe 1 件を `CorpusReport` に集約し、actual output は observed/probe の
   schema を分けたまま保存する。
+
+#### HW14c: Stable blackbox report fixture
+
+目的:
+
+- `check-blackbox` の `CorpusReport` JSON を expected fixture として固定し、
+  expected / actual JSON schema の回帰を通常 gate で検出できるようにする。
+
+方針:
+
+- `btbc-cli` には追加機能を足さず、既存の
+  `check-blackbox --out target/bara-blackbox` が書く `report.json` を使う。
+- expected fixture は `tests/expected-reports/blackbox.json` に置く。
+- 比較は `scripts/verify-blackbox` の I/O 境界に閉じ、`jq -S` で JSON を
+  正規化してから比較する。
+
+成功条件:
+
+- `scripts/verify-blackbox` が `target/bara-blackbox/report.json` と
+  `tests/expected-reports/blackbox.json` を比較する。
+- report の fixture case id、outcome、schema が変わった場合に通常 gate が失敗する。
+
+状態:
+
+- 完了。`tests/expected-reports/blackbox.json` を expected report fixture として
+  固定し、`scripts/verify-blackbox` が `jq -S` 正規化後の構造的比較で
+  `CorpusReport` JSON の安定 schema を検証する。
+
+HW14 全体の状態:
+
+- 完了。raw function、manifest、Mach-O execution、Mach-O probe fixture は
+  `check-blackbox` の共通 `CorpusReport` に集約され、actual JSON と report JSON の
+  regression gate が `scripts/verify` から実行される。
 
 ## 判断基準
 
