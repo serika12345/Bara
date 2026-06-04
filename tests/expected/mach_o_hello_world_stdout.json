@@ -1,0 +1,7 @@
+{
+  "case_id": "mach_o_hello_world_stdout",
+  "exit_status": 0,
+  "return_value": 0,
+  "stdout": "hello world\n",
+  "stderr": ""
+}

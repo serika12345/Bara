@@ -8,7 +8,9 @@ use crate::{CaseId, CaseIdError};
 
 pub(crate) mod host_trap;
 
-pub use host_trap::{TestCaseHostTrapPlan, TestCaseStdoutTrap, TestCaseStdoutTrapError};
+pub use host_trap::{
+    host_trap_plan_from_json, TestCaseHostTrapPlan, TestCaseStdoutTrap, TestCaseStdoutTrapError,
+};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TestCase {

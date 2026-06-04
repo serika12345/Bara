@@ -90,3 +90,68 @@ pub(crate) fn host_trap_plan_from_dtos(
         None => TestCaseHostTrapPlan::none(),
     })
 }
+
+pub fn host_trap_plan_from_json(input: &str) -> Result<TestCaseHostTrapPlan, TestCaseJsonError> {
+    let dto: TestCaseHostTrapPlanDto =
+        serde_json::from_str(input).map_err(|error| TestCaseJsonError::Json(error.to_string()))?;
+
+    host_trap_plan_from_dtos(dto.host_traps)
+}
+
+#[derive(Deserialize)]
+struct TestCaseHostTrapPlanDto {
+    #[serde(default)]
+    host_traps: Vec<TestCaseHostTrapDto>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        host_trap_plan_from_json, TestCaseHostTrapPlan, TestCaseJsonError, TestCaseStdoutTrap,
+        TestCaseStdoutTrapError,
+    };
+
+    #[test]
+    fn parses_stdout_host_trap_plan_json() {
+        let plan = host_trap_plan_from_json(
+            r#"{"host_traps":[{"kind":"stdout","text":"hello world\n"}]}"#,
+        )
+        .expect("host trap plan json parses");
+
+        assert_eq!(
+            plan,
+            TestCaseHostTrapPlan::stdout(
+                TestCaseStdoutTrap::from_text(String::from("hello world\n"))
+                    .expect("stdout trap text is valid")
+            )
+        );
+    }
+
+    #[test]
+    fn parses_missing_host_traps_as_empty_plan() {
+        let plan = host_trap_plan_from_json("{}").expect("empty plan parses");
+
+        assert_eq!(plan, TestCaseHostTrapPlan::none());
+    }
+
+    #[test]
+    fn rejects_duplicate_stdout_host_trap_plan_json() {
+        let result = host_trap_plan_from_json(
+            r#"{"host_traps":[{"kind":"stdout","text":"hello\n"},{"kind":"stdout","text":"again\n"}]}"#,
+        );
+
+        assert_eq!(result, Err(TestCaseJsonError::DuplicateStdoutTrap));
+    }
+
+    #[test]
+    fn rejects_empty_stdout_host_trap_plan_json() {
+        let result = host_trap_plan_from_json(r#"{"host_traps":[{"kind":"stdout","text":""}]}"#);
+
+        assert_eq!(
+            result,
+            Err(TestCaseJsonError::StdoutTrap(
+                TestCaseStdoutTrapError::Empty
+            ))
+        );
+    }
+}

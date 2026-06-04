@@ -1,0 +1,8 @@
+{
+  "host_traps": [
+    {
+      "kind": "stdout",
+      "text": "hello world\n"
+    }
+  ]
+}

@@ -7,11 +7,12 @@ use std::{
 use bara_oracle::{
     binary_format_probe_report_from_json, binary_format_probe_report_to_json,
     compare_observed_results, corpus_report_to_json, executable_manifest_from_json,
-    mach_o_entry_function_test_case, observed_result_from_json, observed_result_to_json,
-    probe_public_binary_format, test_case_from_json, BinaryFileBytes, BinaryFormatProbeError,
-    BinaryFormatProbeReport, BinaryInput, CaseId, ComparisonReport, CorpusReport,
-    ExecutableManifest, ExpectedResult, FailureKind, FailureMessage, FixtureOutcome, FixtureReport,
-    MachOEntryFunctionTestCaseError, ObservedResult, TestCase,
+    host_trap_plan_from_json, mach_o_entry_function_test_case,
+    mach_o_entry_function_test_case_with_host_traps, observed_result_from_json,
+    observed_result_to_json, probe_public_binary_format, test_case_from_json, BinaryFileBytes,
+    BinaryFormatProbeError, BinaryFormatProbeReport, BinaryInput, CaseId, ComparisonReport,
+    CorpusReport, ExecutableManifest, ExpectedResult, FailureKind, FailureMessage, FixtureOutcome,
+    FixtureReport, MachOEntryFunctionTestCaseError, ObservedResult, TestCase,
 };
 
 mod executable_run;
@@ -44,6 +45,15 @@ fn run_cli(args: Vec<String>) -> Result<String, CliError> {
         }
         [command, binary_path, expected_path] if command == "check-mach-o" => {
             run_check_mach_o(Path::new(binary_path), Path::new(expected_path))
+        }
+        [command, binary_path, host_traps_path, expected_path]
+            if command == "check-mach-o-host-traps" =>
+        {
+            run_check_mach_o_host_traps(
+                Path::new(binary_path),
+                Path::new(host_traps_path),
+                Path::new(expected_path),
+            )
         }
         [command, binary_path] if command == "probe-binary" => {
             run_probe_binary(Path::new(binary_path))
@@ -104,6 +114,28 @@ fn run_check_mach_o(binary_path: &Path, expected_path: &Path) -> Result<String, 
     let input = BinaryInput::from_file_bytes(BinaryFileBytes::from_untrusted_file_contents(bytes));
     let test_case = mach_o_entry_function_test_case(case_id_from_path(binary_path), &input)
         .map_err(CliError::MachOEntryFunctionTestCase)?;
+
+    run_test_case(test_case, expected)
+}
+
+fn run_check_mach_o_host_traps(
+    binary_path: &Path,
+    host_traps_path: &Path,
+    expected_path: &Path,
+) -> Result<String, CliError> {
+    let bytes = read_binary_file(binary_path)?;
+    let host_traps_json = read_text_file(host_traps_path)?;
+    let expected_json = read_text_file(expected_path)?;
+    let host_trap_plan =
+        host_trap_plan_from_json(&host_traps_json).map_err(CliError::HostTrapPlan)?;
+    let expected = observed_result_from_json(&expected_json).map_err(CliError::ExpectedJson)?;
+    let input = BinaryInput::from_file_bytes(BinaryFileBytes::from_untrusted_file_contents(bytes));
+    let test_case = mach_o_entry_function_test_case_with_host_traps(
+        case_id_from_path(binary_path),
+        &input,
+        host_trap_plan,
+    )
+    .map_err(CliError::MachOEntryFunctionTestCase)?;
 
     run_test_case(test_case, expected)
 }
@@ -413,6 +445,7 @@ enum CliError {
     },
     ExecutableManifest(bara_oracle::ExecutableManifestJsonError),
     TestCase(bara_oracle::TestCaseJsonError),
+    HostTrapPlan(bara_oracle::TestCaseJsonError),
     ExpectedJson(bara_oracle::JsonError),
     ExpectedProbeJson(bara_oracle::JsonError),
     BinaryFormatProbe(BinaryFormatProbeError),
@@ -432,6 +465,7 @@ impl CliError {
     fn failure_kind(&self) -> FailureKind {
         match self {
             Self::TestCase(_) => FailureKind::InvalidTestCase,
+            Self::HostTrapPlan(_) => FailureKind::InvalidTestCase,
             Self::ExecutableManifest(_) => FailureKind::InvalidTestCase,
             Self::ExpectedJson(_) => FailureKind::InvalidExpected,
             Self::ExpectedProbeJson(_) => FailureKind::InvalidExpected,
@@ -459,7 +493,7 @@ impl std::fmt::Display for CliError {
         match self {
             Self::Usage => write!(
                 formatter,
-                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json>"
+                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json>"
             ),
             Self::ReadFile { path, source } => {
                 write!(formatter, "failed to read file {}: {source}", path.display())
@@ -503,6 +537,7 @@ impl std::fmt::Display for CliError {
                 write!(formatter, "executable manifest error: {error}")
             }
             Self::TestCase(error) => write!(formatter, "testcase error: {error}"),
+            Self::HostTrapPlan(error) => write!(formatter, "host trap plan error: {error}"),
             Self::ExpectedJson(error) => write!(formatter, "expected json error: {error}"),
             Self::ExpectedProbeJson(error) => {
                 write!(formatter, "expected probe json error: {error}")
@@ -545,6 +580,26 @@ mod tests {
     };
 
     use super::{run_cli, run_m1_check_from_fixtures, CliError};
+
+    const MACH_O_HELLO_WORLD_STDOUT_HOST_TRAPS_JSON: &str = concat!(
+        "{\n",
+        "  \"host_traps\": [\n",
+        "    {\n",
+        "      \"kind\": \"stdout\",\n",
+        "      \"text\": \"hello world\\n\"\n",
+        "    }\n",
+        "  ]\n",
+        "}\n",
+    );
+    const MACH_O_HELLO_WORLD_STDOUT_EXPECTED_JSON: &str = concat!(
+        "{\n",
+        "  \"case_id\": \"mach_o_hello_world_stdout\",\n",
+        "  \"exit_status\": 0,\n",
+        "  \"return_value\": 0,\n",
+        "  \"stdout\": \"hello world\\n\",\n",
+        "  \"stderr\": \"\"\n",
+        "}\n",
+    );
 
     #[test]
     fn unknown_command_reports_usage() {
@@ -655,6 +710,56 @@ mod tests {
     }
 
     #[test]
+    fn check_mach_o_host_traps_reads_binary_plan_and_expected_files() {
+        let temp_dir =
+            TestTempDir::new("check_mach_o_host_traps_reads_binary_plan_and_expected_files");
+        let binary_path = temp_dir.write_binary_file(
+            "mach_o_hello_world_stdout.bin",
+            include_bytes!("../../../tests/binaries/mach_o_hello_world_stdout.bin"),
+        );
+        let host_traps_path =
+            temp_dir.write_file("host-traps.json", MACH_O_HELLO_WORLD_STDOUT_HOST_TRAPS_JSON);
+        let expected_path =
+            temp_dir.write_file("expected.json", MACH_O_HELLO_WORLD_STDOUT_EXPECTED_JSON);
+
+        let output = run_cli(vec![
+            String::from("check-mach-o-host-traps"),
+            binary_path.to_string_lossy().into_owned(),
+            host_traps_path.to_string_lossy().into_owned(),
+            expected_path.to_string_lossy().into_owned(),
+        ])
+        .expect("mach-o host trap fixture check succeeds on supported host");
+        let expected = observed_result_from_json(MACH_O_HELLO_WORLD_STDOUT_EXPECTED_JSON)
+            .and_then(|result| observed_result_to_json(&result))
+            .expect("expected mach-o host trap fixture normalizes to output json");
+
+        assert_eq!(output, expected);
+    }
+
+    #[test]
+    fn check_mach_o_host_traps_does_not_derive_plan_from_expected_json() {
+        let temp_dir =
+            TestTempDir::new("check_mach_o_host_traps_does_not_derive_plan_from_expected_json");
+        let binary_path = temp_dir.write_binary_file(
+            "mach_o_hello_world_stdout.bin",
+            include_bytes!("../../../tests/binaries/mach_o_hello_world_stdout.bin"),
+        );
+        let host_traps_path = temp_dir.write_file("host-traps.json", "{}");
+        let expected_path =
+            temp_dir.write_file("expected.json", MACH_O_HELLO_WORLD_STDOUT_EXPECTED_JSON);
+
+        let error = run_cli(vec![
+            String::from("check-mach-o-host-traps"),
+            binary_path.to_string_lossy().into_owned(),
+            host_traps_path.to_string_lossy().into_owned(),
+            expected_path.to_string_lossy().into_owned(),
+        ])
+        .expect_err("missing explicit host trap plan fails comparison");
+
+        assert!(matches!(error, CliError::Comparison(_)));
+    }
+
+    #[test]
     fn probe_binary_reads_file_and_reports_unsupported_mach_o() {
         let temp_dir = TestTempDir::new("probe_binary_reads_file_and_reports_unsupported_mach_o");
         let binary_path = temp_dir.write_binary_file(
@@ -754,6 +859,9 @@ mod tests {
         assert!(error
             .to_string()
             .contains("check-mach-o <binary> <expected.json>"));
+        assert!(error
+            .to_string()
+            .contains("check-mach-o-host-traps <binary> <host-traps.json> <expected.json>"));
         assert!(error.to_string().contains("probe-binary <path>"));
         assert!(error
             .to_string()
