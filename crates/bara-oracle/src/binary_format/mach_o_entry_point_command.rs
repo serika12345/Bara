@@ -54,6 +54,10 @@ impl MachOEntryPointStackSize {
     pub(crate) const fn from_public_entry_point_value(value: u64) -> Self {
         Self { value }
     }
+
+    pub(crate) const fn as_u64(self) -> u64 {
+        self.value
+    }
 }
 
 pub(crate) fn validate_entry_point_command_byte_size(

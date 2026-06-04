@@ -36,6 +36,7 @@ pub use observation::{CaseId, CaseIdError, ExpectedResult, ObservedResult};
 pub use report::{CorpusReport, FailureKind, FailureMessage, FixtureOutcome, FixtureReport};
 pub use testcase::{
     host_trap_plan_from_json, test_case_from_json, TestCase, TestCaseAbi, TestCaseHostTrapPlan,
-    TestCaseInputMemory, TestCaseInputMemoryError, TestCaseJsonError, TestCaseStdoutTrap,
-    TestCaseStdoutTrapError, TestCaseU64,
+    TestCaseInputMemory, TestCaseInputMemoryError, TestCaseJsonError, TestCaseStackSize,
+    TestCaseStackSizeError, TestCaseStackState, TestCaseStdoutTrap, TestCaseStdoutTrapError,
+    TestCaseU64,
 };

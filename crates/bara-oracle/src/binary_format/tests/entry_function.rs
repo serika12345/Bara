@@ -34,6 +34,7 @@ fn converts_mach_o_executable_image_entry_to_no_args_u64_testcase() {
         &[0xb8, 0x2a, 0x00, 0x00, 0x00, 0xc3]
     );
     assert!(testcase.host_trap_plan().is_empty());
+    assert!(testcase.stack_state().is_empty());
 }
 
 #[test]

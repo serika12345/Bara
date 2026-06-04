@@ -1,6 +1,6 @@
 use crate::{
     mach_o_entry_function_test_case_with_host_traps, CaseId, TestCaseAbi, TestCaseHostTrapPlan,
-    TestCaseStdoutTrap,
+    TestCaseStackSize, TestCaseStdoutTrap,
 };
 
 use super::*;
@@ -34,6 +34,10 @@ fn builds_no_args_u64_testcase_from_mach_o_binary_input() {
         &[0xb8, 0x2a, 0x00, 0x00, 0x00, 0xc3]
     );
     assert!(testcase.host_trap_plan().is_empty());
+    assert_eq!(
+        testcase.stack_state().size(),
+        Some(TestCaseStackSize::from_trusted_nonzero_byte_count(0x2000))
+    );
 }
 
 #[test]

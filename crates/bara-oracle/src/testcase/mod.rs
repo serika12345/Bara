@@ -7,10 +7,12 @@ use serde::Deserialize;
 use crate::{CaseId, CaseIdError};
 
 pub(crate) mod host_trap;
+mod stack;
 
 pub use host_trap::{
     host_trap_plan_from_json, TestCaseHostTrapPlan, TestCaseStdoutTrap, TestCaseStdoutTrapError,
 };
+pub use stack::{TestCaseStackSize, TestCaseStackSizeError, TestCaseStackState};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TestCase {
@@ -18,6 +20,7 @@ pub struct TestCase {
     x86_bytes: X86Bytes,
     abi: TestCaseAbi,
     host_trap_plan: TestCaseHostTrapPlan,
+    stack_state: TestCaseStackState,
 }
 
 impl TestCase {
@@ -31,11 +34,28 @@ impl TestCase {
         abi: TestCaseAbi,
         host_trap_plan: TestCaseHostTrapPlan,
     ) -> Self {
+        Self::with_host_traps_and_stack_state(
+            case_id,
+            x86_bytes,
+            abi,
+            host_trap_plan,
+            TestCaseStackState::none(),
+        )
+    }
+
+    pub const fn with_host_traps_and_stack_state(
+        case_id: CaseId,
+        x86_bytes: X86Bytes,
+        abi: TestCaseAbi,
+        host_trap_plan: TestCaseHostTrapPlan,
+        stack_state: TestCaseStackState,
+    ) -> Self {
         Self {
             case_id,
             x86_bytes,
             abi,
             host_trap_plan,
+            stack_state,
         }
     }
 
@@ -53,6 +73,10 @@ impl TestCase {
 
     pub const fn host_trap_plan(&self) -> &TestCaseHostTrapPlan {
         &self.host_trap_plan
+    }
+
+    pub const fn stack_state(&self) -> &TestCaseStackState {
+        &self.stack_state
     }
 }
 
@@ -116,6 +140,7 @@ pub enum TestCaseJsonError {
     EmptyInputMemory,
     DuplicateStdoutTrap,
     StdoutTrap(TestCaseStdoutTrapError),
+    StackSize(TestCaseStackSizeError),
     OddHexLength {
         hex_len: usize,
     },
@@ -149,6 +174,7 @@ impl fmt::Display for TestCaseJsonError {
             Self::EmptyInputMemory => write!(formatter, "testcase input memory is empty"),
             Self::DuplicateStdoutTrap => write!(formatter, "duplicate testcase stdout trap"),
             Self::StdoutTrap(error) => write!(formatter, "invalid testcase stdout trap: {error:?}"),
+            Self::StackSize(error) => write!(formatter, "invalid testcase stack size: {error:?}"),
             Self::OddHexLength { hex_len } => {
                 write!(formatter, "hex byte string has odd length: {hex_len}")
             }
@@ -166,15 +192,17 @@ pub fn test_case_from_json(input: &str) -> Result<TestCase, TestCaseJsonError> {
     let case_id = CaseId::new(dto.case_id).map_err(TestCaseJsonError::CaseId)?;
     let abi = TestCaseAbi::try_from_parts(dto.abi, dto.arguments, dto.memory)?;
     let host_trap_plan = host_trap::host_trap_plan_from_dtos(dto.host_traps)?;
+    let stack_state = stack::stack_state_from_optional_dto(dto.stack)?;
     let bytes = decode_hex_bytes(&dto.bytes)?;
     let x86_bytes =
         X86Bytes::new(X86Va::new(dto.entry), bytes).map_err(TestCaseJsonError::DecodeInput)?;
 
-    Ok(TestCase::with_host_traps(
+    Ok(TestCase::with_host_traps_and_stack_state(
         case_id,
         x86_bytes,
         abi,
         host_trap_plan,
+        stack_state,
     ))
 }
 
@@ -189,6 +217,7 @@ struct TestCaseDto {
     memory: Option<TestCaseMemoryDto>,
     #[serde(default)]
     host_traps: Vec<host_trap::TestCaseHostTrapDto>,
+    stack: Option<stack::TestCaseStackDto>,
 }
 
 #[derive(Deserialize)]
@@ -298,8 +327,23 @@ mod tests {
     use bara_ir::X86Va;
     use bara_isa_x86::X86Bytes;
 
-    use super::{TestCaseInputMemory, TestCaseStdoutTrap, TestCaseU64};
+    use super::{
+        TestCaseInputMemory, TestCaseStackSize, TestCaseStackSizeError, TestCaseStackState,
+        TestCaseStdoutTrap, TestCaseU64,
+    };
     use crate::{test_case_from_json, CaseId, TestCase, TestCaseAbi, TestCaseJsonError};
+
+    #[test]
+    fn new_test_case_has_empty_stack_state() {
+        let test_case = TestCase::new(
+            CaseId::new("return_42").expect("case id is non-empty"),
+            X86Bytes::new(X86Va::new(0), vec![0xb8, 0x2a, 0, 0, 0, 0xc3])
+                .expect("fixture bytes are non-empty"),
+            TestCaseAbi::NoArgsU64,
+        );
+
+        assert_eq!(test_case.stack_state(), &TestCaseStackState::none());
+    }
 
     #[test]
     fn parses_return_42_test_case() {
@@ -314,6 +358,32 @@ mod tests {
                     .expect("fixture bytes are non-empty"),
                 TestCaseAbi::NoArgsU64
             )
+        );
+        assert!(test_case.stack_state().is_empty());
+    }
+
+    #[test]
+    fn parses_stack_size_metadata() {
+        let test_case = test_case_from_json(
+            r#"{"case_id":"stacked","entry":0,"bytes":"c3","abi":{"args":[],"return":"u64"},"stack":{"size":8192}}"#,
+        )
+        .expect("stack metadata parses");
+
+        assert_eq!(
+            test_case.stack_state().size(),
+            Some(TestCaseStackSize::from_trusted_nonzero_byte_count(8192))
+        );
+    }
+
+    #[test]
+    fn rejects_zero_stack_size_metadata() {
+        let result = test_case_from_json(
+            r#"{"case_id":"bad_stack","entry":0,"bytes":"c3","abi":{"args":[],"return":"u64"},"stack":{"size":0}}"#,
+        );
+
+        assert_eq!(
+            result,
+            Err(TestCaseJsonError::StackSize(TestCaseStackSizeError::Zero))
         );
     }
 
