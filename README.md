@@ -1,5 +1,9 @@
 # Bara
 
+<p align="center">
+  <img src="logo.png" alt="Bara logo" width="160">
+</p>
+
 Bara は、x86_64 などの既存バイナリを ARM64 などへ変換する binary-to-binary compiler の研究プロジェクトです。
 
 Rosetta の再実装ではなく、変換コア、runtime、検証系、OS/ABI/ローダー固有部分を分離し、Wine のような互換レイヤーへ接続しやすい構成を探ることを目的とします。
