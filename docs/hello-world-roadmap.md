@@ -1437,6 +1437,13 @@ HW15 全体の状態:
 - 完了。`HostHelperResolutionPlan` / `ResolvedHostHelperImport` を追加し、
   `ExecutableManifest` が import table と別に resolution plan を保持・公開する。
 
+HW16 全体の状態:
+
+- 完了。stdout host trap を持つ manifest は、runtime 実行前に
+  `write_stdout` / `ptr_len_to_unit` の resolved host helper import を pure な
+  domain value として公開できる。既存の missing / duplicate / signature mismatch
+  validation error と entry function 実行挙動は維持されている。
+
 ## 判断基準
 
 - 先に raw function で外部観測を増やす。
