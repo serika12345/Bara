@@ -1,5 +1,6 @@
 mod input;
 mod mach_o;
+mod mach_o_entry_function_pipeline;
 mod mach_o_entry_point_command;
 mod mach_o_executable_image_conversion;
 mod mach_o_executable_image_entry_function;
@@ -11,6 +12,9 @@ mod probe;
 
 pub use input::{BinaryFileBytes, BinaryInput, BinaryInputError};
 pub use mach_o::{MachOFileType, MachOLoadCommands, MachOMetadata};
+pub use mach_o_entry_function_pipeline::{
+    mach_o_entry_function_test_case, MachOEntryFunctionTestCaseError,
+};
 pub use mach_o_entry_point_command::{
     MachOEntryPointCommandMetadata, MachOEntryPointFileOffset, MachOEntryPointStackSize,
 };

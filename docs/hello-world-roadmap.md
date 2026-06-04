@@ -1014,6 +1014,34 @@ raw function / executable manifest pipeline に段階的に接続する。
 - 完了。materialized Mach-O executable image を no-args u64 raw function
   `TestCase` へ pure に変換できる。
 
+#### HW10b: Mach-O binary input entry function testcase pipeline
+
+目的:
+
+- Mach-O `BinaryInput` から no-args u64 raw function `TestCase` までを、pure な
+  pipeline API で作れるようにする。
+
+方針:
+
+- `probe_public_binary_format`、executable image conversion、plan、
+  materialization、entry function 変換を pipeline 専用 module で orchestration する。
+- probe / Mach-O parser / materialization module には orchestration を戻さない。
+- file I/O、CLI、expected comparison、runtime 実行はまだ行わない。
+- pipeline 専用 classified error で Probe / Plan / Materialization /
+  EntryFunction を区別する。
+
+成功条件:
+
+- Mach-O-like `BinaryInput` から、case id、ABI、entry 以降の x86 bytes が期待通りの
+  `TestCase` を作れる。
+- not-convertible な Mach-O は pipeline 専用 error の Plan 分類で止まる。
+- `binary_format/mod.rs` を肥大化させず、pipeline test は責務別 file に置く。
+
+状態:
+
+- 完了。Mach-O `BinaryInput` から no-args u64 raw function `TestCase` までを pure に
+  生成できる。
+
 ### HW11: Mach-O hello world via Bara host trap
 
 目的:
