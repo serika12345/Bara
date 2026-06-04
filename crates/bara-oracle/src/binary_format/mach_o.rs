@@ -78,6 +78,7 @@ pub enum MachOExecutableImageConversionStatus {
 #[serde(rename_all = "snake_case")]
 pub enum MachOExecutableImageConversionBlocker {
     MissingEntryPoint,
+    MissingSegment,
     UnsupportedImageMapping,
 }
 
@@ -163,6 +164,8 @@ fn classify_executable_image_conversion(
 ) -> MachOExecutableImageConversion {
     let blocker = if load_commands.summary().recognized_entry_points().is_empty() {
         MachOExecutableImageConversionBlocker::MissingEntryPoint
+    } else if load_commands.summary().recognized_segments().is_empty() {
+        MachOExecutableImageConversionBlocker::MissingSegment
     } else {
         MachOExecutableImageConversionBlocker::UnsupportedImageMapping
     };

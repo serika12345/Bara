@@ -622,13 +622,44 @@ manifest
 - `LC_MAIN` を含む Mach-O fixture を probe すると、
   `recognized_entry_points` に `entryoff` と `stacksize` が出る。
 - `LC_MAIN` は `unsupported_commands` には分類されない。
-- entry point がある Mach-O probe は、次に足りない capability として
-  `not_convertible` / `unsupported_image_mapping` を報告する。
+- entry point がある Mach-O probe は、entry point がない場合とは別の
+  conversion blocker として分類できる。
 
 状態:
 
 - 完了。`LC_MAIN` の `entryoff` / `stacksize` metadata を typed value として読み、
   stable JSON report に含め、変換可否 blocker を entry point 有無から分類する。
+  segment 有無による blocker の細分化は HW8e で扱う。
+
+### HW8e: Mach-O conversion blocker for missing segment metadata
+
+目的:
+
+- Mach-O executable image conversion の blocker を、entry point 有無だけでなく
+  recognized `LC_SEGMENT_64` metadata 有無でも分類する。
+
+方針:
+
+- 実際の executable image 変換、file range validation、`entryoff` と segment の
+  対応付け、VM mapping、section parsing、loader execution、syscall、import は
+  まだ扱わない。
+- `LC_MAIN` があり、recognized `LC_SEGMENT_64` がない場合は
+  `not_convertible` / `missing_segment` として報告する。
+- `LC_MAIN` と recognized `LC_SEGMENT_64` が両方ある場合は、次に足りない
+  capability として `not_convertible` / `unsupported_image_mapping` を報告する。
+
+成功条件:
+
+- entry point がない Mach-O probe は `missing_entry_point` のまま分類される。
+- entry point があり recognized segment がない Mach-O probe は `missing_segment`
+  として分類される。
+- entry point と recognized segment がある Mach-O probe は
+  `unsupported_image_mapping` として分類される。
+
+状態:
+
+- 完了。Mach-O executable image conversion blocker は entry point、recognized segment、
+  image mapping capability の順に typed metadata として分類する。
 
 ## 判断基準
 

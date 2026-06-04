@@ -31,9 +31,13 @@ mod tests {
     use super::{
         probe_public_binary_format, BinaryFileBytes, BinaryFormat, BinaryFormatProbeError,
         BinaryFormatProbeMetadata, BinaryFormatProbeReport, BinaryFormatProbeStatus, BinaryInput,
+        MachOEntryPointCommandMetadata, MachOEntryPointFileOffset, MachOEntryPointStackSize,
         MachOExecutableImageConversionBlocker, MachOExecutableImageConversionStatus, MachOFileType,
         MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommandSummary,
-        MachOLoadCommandType, MachOLoadCommands, MachOMetadata, UnsupportedMachOLoadCommand,
+        MachOLoadCommandType, MachOLoadCommands, MachOMetadata, MachOSegmentCommandHeaderMetadata,
+        MachOSegmentFileOffset, MachOSegmentFileSize, MachOSegmentName, MachOSegmentVmAddr,
+        RecognizedMachOEntryPointCommand, RecognizedMachOSegmentCommand,
+        UnsupportedMachOLoadCommand,
     };
 
     fn empty_load_commands() -> MachOLoadCommands {
@@ -265,7 +269,7 @@ mod tests {
                         },
                         "executable_image_conversion": {
                             "status": "not_convertible",
-                            "blocker": "unsupported_image_mapping"
+                            "blocker": "missing_segment"
                         }
                     }
                 }
@@ -274,7 +278,7 @@ mod tests {
     }
 
     #[test]
-    fn reports_mach_o_with_entry_point_as_not_convertible_until_image_mapping_exists() {
+    fn reports_mach_o_with_entry_point_but_no_segment_as_not_convertible() {
         let input = BinaryInput::from_hex(concat!(
             "cffaedfe07000001030000000200000001000000180000000000000000000000",
             "2800008018000000",
@@ -288,6 +292,49 @@ mod tests {
             .metadata()
             .mach_o_metadata()
             .executable_image_conversion();
+
+        assert_eq!(
+            conversion.status(),
+            MachOExecutableImageConversionStatus::NotConvertible
+        );
+        assert_eq!(
+            conversion.blocker(),
+            MachOExecutableImageConversionBlocker::MissingSegment
+        );
+    }
+
+    #[test]
+    fn reports_mach_o_with_entry_point_and_segment_as_not_convertible_until_image_mapping_exists() {
+        let metadata = MachOMetadata::new(
+            MachOFileType::Executable,
+            MachOLoadCommands::new(
+                MachOLoadCommandCount::from_public_header_value(2),
+                MachOLoadCommandByteSize::from_public_header_value(96),
+                MachOLoadCommandSummary::new(
+                    vec![RecognizedMachOEntryPointCommand::new(
+                        MachOLoadCommandByteSize::from_public_header_value(24),
+                        MachOEntryPointCommandMetadata::new(
+                            MachOEntryPointFileOffset::from_public_entry_point_value(0x1234),
+                            MachOEntryPointStackSize::from_public_entry_point_value(0x2000),
+                        ),
+                    )],
+                    vec![RecognizedMachOSegmentCommand::new(
+                        MachOLoadCommandByteSize::from_public_header_value(72),
+                        MachOSegmentCommandHeaderMetadata::new(
+                            MachOSegmentName::from_public_fixed_field(
+                                b"__TEXT\0\0\0\0\0\0\0\0\0\0",
+                            )
+                            .expect("test segment name is valid"),
+                            MachOSegmentVmAddr::from_public_segment_value(0x1_0000_0000),
+                            MachOSegmentFileOffset::from_public_segment_value(0),
+                            MachOSegmentFileSize::from_public_segment_value(0x1234),
+                        ),
+                    )],
+                    Vec::<UnsupportedMachOLoadCommand>::new(),
+                ),
+            ),
+        );
+        let conversion = metadata.executable_image_conversion();
 
         assert_eq!(
             conversion.status(),
