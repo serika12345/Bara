@@ -438,6 +438,7 @@ manifest
 - HW7a: `ncmds` / `sizeofcmds` typed metadata
 - HW7b: load command table bounds validation
 - HW7c: unsupported load command summary
+- HW8: Mach-O segment command metadata
 
 ### HW7a: `ncmds` / `sizeofcmds` typed metadata
 
@@ -509,6 +510,43 @@ manifest
 状態:
 
 - 完了。
+
+### HW8: Mach-O segment command metadata
+
+目的:
+
+- unsupported summary だけでなく、公開 Mach-O `LC_SEGMENT_64` command の
+  envelope-level metadata を typed value として読めるようにする。
+
+分割:
+
+- HW8a: `LC_SEGMENT_64` command kind recognition
+- HW8b: segment name / vmaddr / fileoff / filesize metadata
+- HW8c: executable image への変換可否 report
+
+### HW8a: `LC_SEGMENT_64` command kind recognition
+
+目的:
+
+- Mach-O load command の `cmd` が `LC_SEGMENT_64` の場合、unsupported command ではなく
+  recognized segment command として summary に分類する。
+
+方針:
+
+- segment contents、sections、VM mapping、entry point 変換はまだ扱わない。
+- まず command kind と byte size だけを typed summary に含める。
+- `cmd` の primitive 値は parser 境界で enum / newtype に変換する。
+
+成功条件:
+
+- `LC_SEGMENT_64` command を 1 つ含む fixture を probe すると、
+  report JSON に recognized segment command summary が含まれる。
+- unknown command はこれまで通り unsupported summary に残る。
+
+状態:
+
+- 完了。`LC_SEGMENT_64` は command kind と byte size のみを
+  `recognized_segments` summary に分類する。
 
 ## 判断基準
 

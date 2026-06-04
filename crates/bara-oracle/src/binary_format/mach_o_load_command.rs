@@ -41,34 +41,72 @@ pub struct MachOLoadCommandType {
 }
 
 impl MachOLoadCommandType {
+    const LC_SEGMENT_64: Self = Self { value: 0x19 };
+
     pub(crate) const fn from_public_command_value(value: u32) -> Self {
         Self { value }
+    }
+
+    const fn is_segment_64(self) -> bool {
+        self.value == Self::LC_SEGMENT_64.value
     }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct MachOLoadCommandSummary {
+    #[serde(default)]
+    recognized_segments: Vec<RecognizedMachOSegmentCommand>,
     unsupported_commands: Vec<UnsupportedMachOLoadCommand>,
 }
 
 impl MachOLoadCommandSummary {
     pub fn empty() -> Self {
         Self {
+            recognized_segments: Vec::new(),
             unsupported_commands: Vec::new(),
         }
     }
 
+    pub(crate) fn new<R, U>(recognized_segments: R, unsupported_commands: U) -> Self
+    where
+        R: Into<Vec<RecognizedMachOSegmentCommand>>,
+        U: Into<Vec<UnsupportedMachOLoadCommand>>,
+    {
+        Self {
+            recognized_segments: recognized_segments.into(),
+            unsupported_commands: unsupported_commands.into(),
+        }
+    }
+
+    #[cfg(test)]
     pub(crate) fn from_unsupported_commands<T>(commands: T) -> Self
     where
         T: Into<Vec<UnsupportedMachOLoadCommand>>,
     {
-        Self {
-            unsupported_commands: commands.into(),
-        }
+        Self::new(Vec::new(), commands)
+    }
+
+    pub fn recognized_segments(&self) -> &[RecognizedMachOSegmentCommand] {
+        &self.recognized_segments
     }
 
     pub fn unsupported_commands(&self) -> &[UnsupportedMachOLoadCommand] {
         &self.unsupported_commands
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct RecognizedMachOSegmentCommand {
+    byte_size: MachOLoadCommandByteSize,
+}
+
+impl RecognizedMachOSegmentCommand {
+    pub const fn new(byte_size: MachOLoadCommandByteSize) -> Self {
+        Self { byte_size }
+    }
+
+    pub const fn byte_size(self) -> MachOLoadCommandByteSize {
+        self.byte_size
     }
 }
 
@@ -113,6 +151,7 @@ pub(crate) fn parse_mach_o_load_command_summary(
         return Ok(MachOLoadCommandSummary::empty());
     }
 
+    let mut recognized_segments = Vec::new();
     let mut unsupported_commands = Vec::new();
     let mut command_offset = table_range.start;
 
@@ -144,11 +183,16 @@ pub(crate) fn parse_mach_o_load_command_summary(
             return Err(BinaryFormatProbeError::LoadCommandsOutOfBounds);
         }
 
-        unsupported_commands.push(UnsupportedMachOLoadCommand::new(command, byte_size));
+        if command.is_segment_64() {
+            recognized_segments.push(RecognizedMachOSegmentCommand::new(byte_size));
+        } else {
+            unsupported_commands.push(UnsupportedMachOLoadCommand::new(command, byte_size));
+        }
         command_offset = command_end;
     }
 
-    Ok(MachOLoadCommandSummary::from_unsupported_commands(
+    Ok(MachOLoadCommandSummary::new(
+        recognized_segments,
         unsupported_commands,
     ))
 }

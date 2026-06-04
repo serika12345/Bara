@@ -7,7 +7,7 @@ pub use input::{BinaryFileBytes, BinaryInput, BinaryInputError};
 pub use mach_o::{MachOFileType, MachOLoadCommands, MachOMetadata};
 pub use mach_o_load_command::{
     MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommandSummary, MachOLoadCommandType,
-    UnsupportedMachOLoadCommand,
+    RecognizedMachOSegmentCommand, UnsupportedMachOLoadCommand,
 };
 pub use probe::{
     probe_public_binary_format, BinaryFormat, BinaryFormatProbeError, BinaryFormatProbeMetadata,
@@ -118,6 +118,44 @@ mod tests {
                     )
                 ))
             ))
+        );
+    }
+
+    #[test]
+    fn recognizes_mach_o_segment_64_load_command_kind() {
+        let input = BinaryInput::from_hex(concat!(
+            "cffaedfe07000001030000000200000001000000480000000000000000000000",
+            "1900000048000000",
+            "00000000000000000000000000000000",
+            "00000000000000000000000000000000",
+            "00000000000000000000000000000000",
+            "00000000000000000000000000000000",
+        ))
+        .expect("hex fixture is valid");
+
+        let report = probe_public_binary_format(&input).expect("probe succeeds");
+
+        assert_eq!(
+            serde_json::to_value(report).expect("probe report serializes"),
+            serde_json::json!({
+                "format": "mach_o_64_little_endian",
+                "status": "recognized_but_unsupported",
+                "metadata": {
+                    "mach_o": {
+                        "file_type": "executable",
+                        "load_commands": {
+                            "count": 1,
+                            "byte_size": 72,
+                            "recognized_segments": [
+                                {
+                                    "byte_size": 72
+                                }
+                            ],
+                            "unsupported_commands": []
+                        }
+                    }
+                }
+            })
         );
     }
 

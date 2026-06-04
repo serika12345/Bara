@@ -11,7 +11,7 @@ pub use binary_format::{
     BinaryFormatProbeMetadata, BinaryFormatProbeReport, BinaryFormatProbeStatus, BinaryInput,
     BinaryInputError, MachOFileType, MachOLoadCommandByteSize, MachOLoadCommandCount,
     MachOLoadCommandSummary, MachOLoadCommandType, MachOLoadCommands, MachOMetadata,
-    UnsupportedMachOLoadCommand,
+    RecognizedMachOSegmentCommand, UnsupportedMachOLoadCommand,
 };
 pub use compare::{compare_observed_results, ComparisonIssue, ComparisonReport};
 pub use executable_manifest::{
