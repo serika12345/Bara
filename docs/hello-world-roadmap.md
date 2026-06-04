@@ -1262,6 +1262,32 @@ raw function / executable manifest pipeline に段階的に接続する。
 - expected / actual JSON の stable schema が維持される。
 - `scripts/verify` が新しい regression gate を含む。
 
+#### HW14a: Existing fixture regression gate
+
+目的:
+
+- 既存の raw function corpus、executable manifest fixture、Mach-O backed execution
+  fixture、Mach-O probe fixture を、通常の repository verification gate に載せる。
+
+方針:
+
+- CLI に新しい実行 orchestration を足さず、既存の `check-corpus`、
+  `check-executable`、`check-mach-o`、`check-mach-o-host-traps`、
+  `check-binary-probe` を script 境界で組み合わせる。
+- regression output は `target/bara-blackbox` に閉じ、actual JSON を安定した場所に
+  書き出す。
+- loader、syscall、libc、Rosetta 内部観測は扱わない。
+
+成功条件:
+
+- `scripts/verify-blackbox` が既存 fixture をまとめて検証する。
+- `scripts/verify` が `scripts/verify-blackbox` を含む。
+
+状態:
+
+- 完了。`scripts/verify-blackbox` は出力先を初期化してから既存 fixture を実行し、
+  `scripts/verify` の通常 gate から呼ばれる。
+
 ## 判断基準
 
 - 先に raw function で外部観測を増やす。
