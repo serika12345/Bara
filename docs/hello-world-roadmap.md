@@ -859,6 +859,11 @@ raw function / executable manifest pipeline に段階的に接続する。
 - 変換不能な Mach-O は既存の blocker classification と classified error で止まる。
 - section parsing、dynamic loader、imports、syscall、libc はまだ扱わない。
 
+状態:
+
+- 完了。Mach-O conversion metadata から materialization plan を作り、
+  `BinaryInput` の segment bytes から既存 `ExecutableImage` を pure に作れる。
+
 #### HW9a: Mach-O convertible image candidate
 
 目的:
