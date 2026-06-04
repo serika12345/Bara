@@ -18,6 +18,16 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                 let opcode2 = read_u8(input, offset + 1, at, opcode)?;
 
                 match opcode2 {
+                    0x05 => {
+                        let end_offset = offset + 2;
+                        let end = instruction_end(input, at, end_offset, 2)?;
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::Syscall,
+                        ));
+                        return DecodedFunction::new(input.entry(), instructions);
+                    }
                     0x0b => {
                         let end_offset = offset + 2;
                         let end = instruction_end(input, at, end_offset, 2)?;

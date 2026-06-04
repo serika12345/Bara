@@ -331,6 +331,23 @@ fn decodes_call_rel32_with_negative_target() {
 }
 
 #[test]
+fn decodes_syscall_boundary() {
+    let input =
+        X86Bytes::new(X86Va::new(0x1000), vec![0x0f, 0x05]).expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[DecodedInstruction::new(
+            X86Va::new(0x1000),
+            X86Va::new(0x1002),
+            DecodedInstructionKind::Syscall
+        )]
+    );
+}
+
+#[test]
 fn truncated_mov_eax_imm32_is_reported() {
     let input = X86Bytes::new(X86Va::new(7), vec![0xb8, 0x2a]).expect("test bytes are non-empty");
 

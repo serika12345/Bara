@@ -58,6 +58,7 @@ raw function fixture が runtime 境界を通じて stdout に
 - `TestCase` 上の typed stack state metadata
 - Mach-O `LC_MAIN.stacksize` から testcase stack metadata への pure conversion
 - public ABI / import / host helper / syscall 相当境界の clean-room 計画文書
+- x86 `syscall` の typed decode と classified unsupported lift
 
 ## マイルストーン
 
@@ -1352,6 +1353,44 @@ HW14 全体の状態:
 - 完了。raw function、manifest、Mach-O execution、Mach-O probe fixture は
   `check-blackbox` の共通 `CorpusReport` に集約され、actual JSON と report JSON の
   regression gate が `scripts/verify` から実行される。
+
+### HW15: Unsupported syscall boundary classification
+
+目的:
+
+- x86_64 `syscall` 命令を public ISA に基づいて decode し、OS syscall 実行へ進まず
+  lift 境界で classified unsupported として扱う。
+
+成功条件:
+
+- `0f 05` は typed decoded instruction として表現される。
+- lift は syscall を `Terminator::Unsupported` に変換し、命令 address と
+  next-instruction address を stable reason に保持する。
+- OS syscall 番号、libc、loader、runtime 実行、ARM64 emit には踏み込まない。
+
+#### HW15a: Minimal syscall unsupported boundary
+
+目的:
+
+- x86_64 `syscall` (`0f 05`) を decode / lift 境界だけで classified unsupported に
+  止める。
+
+方針:
+
+- decoded instruction は syscall の typed variant として保持する。
+- lift は `SyscallUnsupported { at, return_to }` に分類する。
+- runtime、ARM64 emit、oracle、CLI は変更しない。
+
+成功条件:
+
+- `0f 05` が typed instruction として decode される。
+- syscall は `SyscallUnsupported { at, return_to }` として lift される。
+- syscall は実行経路に入らない。
+
+状態:
+
+- 完了。`syscall` は decode / lift 境界で classified unsupported として扱われ、
+  runtime execution には入らない。
 
 ## 判断基準
 

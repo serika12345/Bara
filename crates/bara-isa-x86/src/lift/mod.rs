@@ -83,6 +83,15 @@ pub fn lift_decoded_function(decoded: &DecodedFunction) -> Result<Program, LiftE
                 });
                 break;
             }
+            DecodedInstructionKind::Syscall => {
+                terminator = Some(Terminator::Unsupported {
+                    reason: UnsupportedReason::SyscallUnsupported {
+                        at: instruction.start(),
+                        return_to: instruction.end(),
+                    },
+                });
+                break;
+            }
             DecodedInstructionKind::Ret => {
                 terminator = Some(Terminator::Return);
                 break;
@@ -469,6 +478,32 @@ mod tests {
             program.blocks()[0].terminator(),
             &Terminator::Unsupported {
                 reason: UnsupportedReason::DirectCallUnsupported { target, return_to }
+            }
+        );
+    }
+
+    #[test]
+    fn lifts_syscall_to_unsupported_terminator() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0x1000),
+            vec![DecodedInstruction::new(
+                X86Va::new(0x1000),
+                X86Va::new(0x1002),
+                DecodedInstructionKind::Syscall,
+            )],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("syscall lifts to unsupported IR");
+
+        assert_eq!(program.blocks()[0].ops(), &[]);
+        assert_eq!(
+            program.blocks()[0].terminator(),
+            &Terminator::Unsupported {
+                reason: UnsupportedReason::SyscallUnsupported {
+                    at: X86Va::new(0x1000),
+                    return_to: X86Va::new(0x1002)
+                }
             }
         );
     }
