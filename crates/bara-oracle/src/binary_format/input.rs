@@ -28,6 +28,10 @@ impl BinaryInput {
         self.bytes.len() >= len
     }
 
+    pub(crate) fn byte_len(&self) -> usize {
+        self.bytes.len()
+    }
+
     pub(crate) fn read_little_endian_u32_at(&self, offset: usize) -> Option<u32> {
         let end = offset.checked_add(4)?;
         let bytes = self.bytes.get(offset..end)?;

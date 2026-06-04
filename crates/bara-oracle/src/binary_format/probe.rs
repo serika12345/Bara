@@ -73,6 +73,7 @@ pub enum BinaryFormatProbeError {
     InvalidMachOSegmentName,
     LoadCommandTooSmall,
     LoadCommandsOutOfBounds,
+    SegmentFileRangeOutOfBounds,
     UnknownMagic,
     UnsupportedMachOFileType,
 }

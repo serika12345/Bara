@@ -89,6 +89,10 @@ impl MachOSegmentFileOffset {
     pub(crate) const fn from_public_segment_value(value: u64) -> Self {
         Self { value }
     }
+
+    const fn as_u64(self) -> u64 {
+        self.value
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -100,6 +104,10 @@ pub struct MachOSegmentFileSize {
 impl MachOSegmentFileSize {
     pub(crate) const fn from_public_segment_value(value: u64) -> Self {
         Self { value }
+    }
+
+    const fn as_u64(self) -> u64 {
+        self.value
     }
 }
 
@@ -147,9 +155,27 @@ pub(crate) fn parse_segment_64_header_metadata(
         .map(MachOSegmentFileSize::from_public_segment_value)
         .ok_or(BinaryFormatProbeError::LoadCommandsOutOfBounds)?;
 
-    Ok(MachOSegmentCommandHeaderMetadata::new(
-        name, vmaddr, fileoff, filesize,
-    ))
+    let header = MachOSegmentCommandHeaderMetadata::new(name, vmaddr, fileoff, filesize);
+    validate_segment_file_range(input, &header)?;
+
+    Ok(header)
+}
+
+fn validate_segment_file_range(
+    input: &BinaryInput,
+    header: &MachOSegmentCommandHeaderMetadata,
+) -> Result<(), BinaryFormatProbeError> {
+    let file_end = header
+        .fileoff()
+        .as_u64()
+        .checked_add(header.filesize().as_u64())
+        .ok_or(BinaryFormatProbeError::SegmentFileRangeOutOfBounds)?;
+
+    if file_end <= input.byte_len() as u64 {
+        Ok(())
+    } else {
+        Err(BinaryFormatProbeError::SegmentFileRangeOutOfBounds)
+    }
 }
 
 const MACH_O_SEGMENT_64_COMMAND_HEADER_WIDTH: usize = 72;

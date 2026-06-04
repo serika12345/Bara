@@ -661,6 +661,34 @@ manifest
 - 完了。Mach-O executable image conversion blocker は entry point、recognized segment、
   image mapping capability の順に typed metadata として分類する。
 
+### HW8f: Mach-O segment file range validation
+
+目的:
+
+- recognized `LC_SEGMENT_64` metadata の `fileoff` / `filesize` が、入力 binary の
+  file byte range として成立することを検証する。
+
+方針:
+
+- `fileoff + filesize` の overflow と input length 超過を classified probe error として
+  reject する。
+- `filesize == 0` は empty file range として扱い、`fileoff` が input length 以下なら
+  valid とする。
+- VM range、protection、sections、`entryoff` と segment の対応付け、executable image
+  変換はまだ扱わない。
+
+成功条件:
+
+- zero-size range at EOF は valid として recognized segment metadata に残る。
+- nonzero range が input 内に収まる場合は valid として recognized segment metadata に残る。
+- overflow または input 外の segment file range は
+  `SegmentFileRangeOutOfBounds` として reject する。
+
+状態:
+
+- 完了。recognized `LC_SEGMENT_64` の file range は metadata assembly 時に検証され、
+  executable image conversion や VM mapping には進まない。
+
 ## 判断基準
 
 - 先に raw function で外部観測を増やす。
