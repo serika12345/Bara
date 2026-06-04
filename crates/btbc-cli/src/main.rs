@@ -15,9 +15,11 @@ use bara_oracle::{
     FixtureReport, MachOEntryFunctionTestCaseError, ObservedResult, TestCase,
 };
 
+mod blackbox_run;
 mod executable_run;
 mod function_run;
 
+use blackbox_run::run_check_blackbox;
 use executable_run::{run_executable_manifest, ExecutableRunError};
 use function_run::{run_test_case_function, FunctionRunError};
 
@@ -60,6 +62,12 @@ fn run_cli(args: Vec<String>) -> Result<String, CliError> {
         }
         [command, binary_path, expected_path] if command == "check-binary-probe" => {
             run_check_binary_probe(Path::new(binary_path), Path::new(expected_path))
+        }
+        [command] if command == "check-blackbox" => run_check_blackbox(None),
+        [command, output_flag, output_dir]
+            if command == "check-blackbox" && output_flag == "--out" =>
+        {
+            run_check_blackbox(Some(Path::new(output_dir)))
         }
         [command, cases_dir, expected_dir] if command == "check-corpus" => {
             run_check_corpus(Path::new(cases_dir), Path::new(expected_dir))
@@ -254,7 +262,7 @@ fn run_corpus_fixture(case_path: &Path, expected_dir: &Path) -> FixtureRun {
         );
     }
 
-    FixtureRun::passed(case_id, actual)
+    FixtureRun::passed_observed(case_id, actual)
 }
 
 fn run_test_case(test_case: TestCase, expected: ExpectedResult) -> Result<String, CliError> {
@@ -291,21 +299,34 @@ fn run_executable(
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct FixtureRun {
     report: FixtureReport,
-    actual: Option<ObservedResult>,
+    output: Option<FixtureOutput>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum FixtureOutput {
+    Observed(ObservedResult),
+    Probe(BinaryFormatProbeReport),
 }
 
 impl FixtureRun {
-    fn passed(case_id: CaseId, actual: ObservedResult) -> Self {
+    fn passed_observed(case_id: CaseId, actual: ObservedResult) -> Self {
         Self {
             report: FixtureReport::new(case_id, FixtureOutcome::Passed),
-            actual: Some(actual),
+            output: Some(FixtureOutput::Observed(actual)),
+        }
+    }
+
+    fn passed_probe(case_id: CaseId, actual: BinaryFormatProbeReport) -> Self {
+        Self {
+            report: FixtureReport::new(case_id, FixtureOutcome::Passed),
+            output: Some(FixtureOutput::Probe(actual)),
         }
     }
 
     fn failed(case_id: CaseId, kind: FailureKind, message: String) -> Self {
         Self {
             report: failed_fixture_report(case_id, kind, message),
-            actual: None,
+            output: None,
         }
     }
 
@@ -317,7 +338,7 @@ impl FixtureRun {
     ) -> Self {
         Self {
             report: failed_fixture_report(case_id, kind, message),
-            actual: Some(actual),
+            output: Some(FixtureOutput::Observed(actual)),
         }
     }
 }
@@ -345,12 +366,18 @@ fn write_corpus_outputs(
     write_text_file(&output_dir.join("report.json"), &report_json)?;
 
     for run in fixture_runs {
-        if let Some(actual) = &run.actual {
-            let actual_json = observed_result_to_json(actual).map_err(CliError::Json)?;
-            write_text_file(
-                &actual_dir.join(format!("{}.json", actual.case_id().as_str())),
-                &actual_json,
-            )?;
+        if let Some(output) = &run.output {
+            let (case_id, actual_json) = match output {
+                FixtureOutput::Observed(actual) => (
+                    actual.case_id().as_str(),
+                    observed_result_to_json(actual).map_err(CliError::Json)?,
+                ),
+                FixtureOutput::Probe(actual) => (
+                    run.report.case_id().as_str(),
+                    binary_format_probe_report_to_json(actual).map_err(CliError::Json)?,
+                ),
+            };
+            write_text_file(&actual_dir.join(format!("{case_id}.json")), &actual_json)?;
         }
     }
 
@@ -493,7 +520,7 @@ impl std::fmt::Display for CliError {
         match self {
             Self::Usage => write!(
                 formatter,
-                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json>"
+                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | check-blackbox [--out <dir>]"
             ),
             Self::ReadFile { path, source } => {
                 write!(formatter, "failed to read file {}: {source}", path.display())
@@ -575,6 +602,7 @@ mod tests {
     };
 
     use bara_oracle::{
+        binary_format_probe_report_from_json, binary_format_probe_report_to_json,
         observed_result_from_json, observed_result_to_json, FailureKind, FailureMessage,
         FixtureOutcome,
     };
@@ -866,6 +894,7 @@ mod tests {
         assert!(error
             .to_string()
             .contains("check-binary-probe <binary> <expected.json>"));
+        assert!(error.to_string().contains("check-blackbox [--out <dir>]"));
     }
 
     #[test]
@@ -952,6 +981,63 @@ mod tests {
         assert!(output_dir.join("compiled").is_dir());
         assert!(output_dir.join("ir").is_dir());
         assert!(output_dir.join("pcmap").is_dir());
+    }
+
+    #[test]
+    fn check_blackbox_reports_raw_manifest_mach_o_and_probe_fixtures() {
+        let output = run_cli(vec![String::from("check-blackbox")])
+            .expect("blackbox check succeeds on supported host");
+
+        assert_eq!(output, expected_blackbox_report_json());
+    }
+
+    #[test]
+    fn check_blackbox_writes_report_and_schema_specific_actual_outputs() {
+        let temp_dir =
+            TestTempDir::new("check_blackbox_writes_report_and_schema_specific_actual_outputs");
+        let output_dir = temp_dir.create_dir("out");
+
+        let output = run_cli(vec![
+            String::from("check-blackbox"),
+            String::from("--out"),
+            output_dir.to_string_lossy().into_owned(),
+        ])
+        .expect("blackbox check succeeds on supported host");
+
+        assert_eq!(output, expected_blackbox_report_json());
+        assert_eq!(
+            read_file(&output_dir.join("report.json")),
+            expected_blackbox_report_json()
+        );
+        assert_eq!(
+            read_file(
+                &output_dir
+                    .join("actual")
+                    .join("hello_world_executable_manifest.json")
+            ),
+            "{\"case_id\":\"hello_world_executable_manifest\",\"exit_status\":0,\"return_value\":0,\"stdout\":\"hello world\\n\",\"stderr\":\"\"}"
+        );
+        assert_eq!(
+            read_file(
+                &output_dir
+                    .join("actual")
+                    .join("mach_o_hello_world_stdout.json")
+            ),
+            "{\"case_id\":\"mach_o_hello_world_stdout\",\"exit_status\":0,\"return_value\":0,\"stdout\":\"hello world\\n\",\"stderr\":\"\"}"
+        );
+        let expected_probe = binary_format_probe_report_from_json(include_str!(
+            "../../../tests/expected-probes/mach_o_execute_header.json"
+        ))
+        .and_then(|report| binary_format_probe_report_to_json(&report))
+        .expect("expected probe report normalizes to output json");
+        assert_eq!(
+            read_file(
+                &output_dir
+                    .join("actual")
+                    .join("mach_o_execute_header_probe.json")
+            ),
+            expected_probe
+        );
     }
 
     #[test]
@@ -1046,5 +1132,9 @@ mod tests {
 
     fn read_file(path: &Path) -> String {
         fs::read_to_string(path).expect("test fixture file is read")
+    }
+
+    fn expected_blackbox_report_json() -> &'static str {
+        "{\"fixtures\":[{\"case_id\":\"add_eax_imm32_return_45\",\"outcome\":\"passed\"},{\"case_id\":\"add_eax_imm_return_45\",\"outcome\":\"passed\"},{\"case_id\":\"add_sub_eax_imm_return_40\",\"outcome\":\"passed\"},{\"case_id\":\"hello_world_stdout_return_0\",\"outcome\":\"passed\"},{\"case_id\":\"identity_u64\",\"outcome\":\"passed\"},{\"case_id\":\"load_u8_from_rdi_return_72\",\"outcome\":\"passed\"},{\"case_id\":\"return_42\",\"outcome\":\"passed\"},{\"case_id\":\"stdout_trap_return_0\",\"outcome\":\"passed\"},{\"case_id\":\"sub_eax_imm32_return_39\",\"outcome\":\"passed\"},{\"case_id\":\"sub_eax_imm_return_39\",\"outcome\":\"passed\"},{\"case_id\":\"xor_eax_eax_return_0\",\"outcome\":\"passed\"},{\"case_id\":\"xor_then_add_eax_return_7\",\"outcome\":\"passed\"},{\"case_id\":\"hello_world_executable_manifest\",\"outcome\":\"passed\"},{\"case_id\":\"entry_offset_return_42_manifest\",\"outcome\":\"passed\"},{\"case_id\":\"mach_o_return_42\",\"outcome\":\"passed\"},{\"case_id\":\"mach_o_hello_world_stdout\",\"outcome\":\"passed\"},{\"case_id\":\"mach_o_execute_header_probe\",\"outcome\":\"passed\"}]}"
     }
 }

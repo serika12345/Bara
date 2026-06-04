@@ -1288,6 +1288,36 @@ raw function / executable manifest pipeline に段階的に接続する。
 - 完了。`scripts/verify-blackbox` は出力先を初期化してから既存 fixture を実行し、
   `scripts/verify` の通常 gate から呼ばれる。
 
+#### HW14b: Unified blackbox fixture report
+
+目的:
+
+- 既存の raw function corpus、executable manifest、Mach-O backed execution、
+  Mach-O probe fixture を、同じ `CorpusReport` / `FixtureReport` outcome model で
+  まとめて比較できるようにする。
+
+方針:
+
+- `btbc-cli check-blackbox [--out <dir>]` を追加し、既存の
+  `check-corpus`、`check-executable`、`check-mach-o`、
+  `check-mach-o-host-traps`、`check-binary-probe` の責務を維持したまま
+  orchestration だけを担当させる。
+- observed result と probe report は異なる actual JSON schema のまま保存し、
+  同一化する対象は fixture の pass/fail outcome report に限定する。
+- regression output は引き続き `target/bara-blackbox` 配下に閉じる。
+
+成功条件:
+
+- `check-blackbox` が既存 fixture 全体の `CorpusReport` JSON を返す。
+- `scripts/verify-blackbox` が `check-blackbox --out target/bara-blackbox` を使う。
+- CLI tests が stable report JSON と schema 別 actual output を検証する。
+
+状態:
+
+- 完了。`check-blackbox` は raw corpus、manifest 2 件、Mach-O execution 2 件、
+  probe 1 件を `CorpusReport` に集約し、actual output は observed/probe の
+  schema を分けたまま保存する。
+
 ## 判断基準
 
 - 先に raw function で外部観測を増やす。

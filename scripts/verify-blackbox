@@ -4,30 +4,7 @@ set -eu
 cd "$(dirname "$0")/.."
 
 output_dir="target/bara-blackbox"
-actual_dir="$output_dir/actual"
 
 rm -rf "$output_dir"
-mkdir -p "$actual_dir"
 
-cargo run -p btbc-cli -- check-corpus tests/cases tests/expected --out "$output_dir"
-cargo run -p btbc-cli -- check-executable \
-  tests/executables/hello_world_executable_manifest.json \
-  tests/expected/hello_world_executable_manifest.json \
-  > "$actual_dir/hello_world_executable_manifest.json"
-cargo run -p btbc-cli -- check-executable \
-  tests/executables/entry_offset_return_42_manifest.json \
-  tests/expected/entry_offset_return_42_manifest.json \
-  > "$actual_dir/entry_offset_return_42_manifest.json"
-cargo run -p btbc-cli -- check-mach-o \
-  tests/binaries/mach_o_return_42.bin \
-  tests/expected/mach_o_return_42.json \
-  > "$actual_dir/mach_o_return_42.json"
-cargo run -p btbc-cli -- check-mach-o-host-traps \
-  tests/binaries/mach_o_hello_world_stdout.bin \
-  tests/host-traps/mach_o_hello_world_stdout.json \
-  tests/expected/mach_o_hello_world_stdout.json \
-  > "$actual_dir/mach_o_hello_world_stdout.json"
-cargo run -p btbc-cli -- check-binary-probe \
-  tests/binaries/mach_o_execute_header.bin \
-  tests/expected-probes/mach_o_execute_header.json \
-  > "$actual_dir/mach_o_execute_header_probe.json"
+cargo run -p btbc-cli -- check-blackbox --out "$output_dir"
