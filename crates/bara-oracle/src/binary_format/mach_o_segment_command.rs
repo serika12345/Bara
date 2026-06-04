@@ -104,7 +104,7 @@ impl MachOSegmentFileOffset {
         Self { value }
     }
 
-    const fn as_u64(self) -> u64 {
+    pub(crate) const fn as_u64(self) -> u64 {
         self.value
     }
 }
@@ -120,7 +120,7 @@ impl MachOSegmentFileSize {
         Self { value }
     }
 
-    const fn as_u64(self) -> u64 {
+    pub(crate) const fn as_u64(self) -> u64 {
         self.value
     }
 }

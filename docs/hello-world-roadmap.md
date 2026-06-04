@@ -884,6 +884,34 @@ raw function / executable manifest pipeline に段階的に接続する。
 - 完了。Mach-O executable image conversion metadata が、単一 entry point と
   単一 containing segment を変換可能候補として表現できる。
 
+#### HW9b: Mach-O executable image materialization plan
+
+目的:
+
+- 変換可能候補から、raw bytes extraction と executable manifest 生成に必要な
+  typed materialization plan を pure に作る。
+
+方針:
+
+- plan は selected segment の file range と、entry point の segment-relative
+  offset だけを保持する。
+- raw bytes extraction、`ExecutableImage` / `ExecutableManifest` 生成、
+  runtime 実行、CLI 追加はまだ行わない。
+- 変換不能な候補から plan を要求した場合は、blocker とは別の plan 専用
+  classified error で止める。
+
+成功条件:
+
+- convertible metadata から、segment file range と entry point relative offset を
+  domain type で確認できる。
+- not-convertible metadata から plan を作ろうとすると classified error になる。
+- 既存 blocker tests と stable JSON tests が通る。
+
+状態:
+
+- 完了。Mach-O executable image materialization に必要な最小 plan を
+  conversion metadata から pure に作れる。
+
 ### HW10: Mach-O backed raw function execution
 
 目的:

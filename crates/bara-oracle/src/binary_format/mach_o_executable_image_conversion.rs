@@ -12,7 +12,7 @@ impl MachOExecutableImageConversion {
         Self(MachOExecutableImageConversionState::NotConvertible { blocker })
     }
 
-    pub fn convertible(
+    pub(crate) fn convertible(
         entry_point: RecognizedMachOEntryPointCommand,
         segment: RecognizedMachOSegmentCommand,
     ) -> Self {
@@ -53,6 +53,24 @@ impl MachOExecutableImageConversion {
         match &self.0 {
             MachOExecutableImageConversionState::Convertible { segment, .. } => Some(segment),
             MachOExecutableImageConversionState::NotConvertible { .. } => None,
+        }
+    }
+
+    pub(crate) const fn selected_candidate(
+        &self,
+    ) -> Result<
+        (
+            RecognizedMachOEntryPointCommand,
+            &RecognizedMachOSegmentCommand,
+        ),
+        MachOExecutableImageConversionBlocker,
+    > {
+        match &self.0 {
+            MachOExecutableImageConversionState::Convertible {
+                entry_point,
+                segment,
+            } => Ok((*entry_point, segment)),
+            MachOExecutableImageConversionState::NotConvertible { blocker } => Err(*blocker),
         }
     }
 }
