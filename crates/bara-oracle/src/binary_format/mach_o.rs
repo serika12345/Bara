@@ -81,6 +81,7 @@ pub enum MachOExecutableImageConversionBlocker {
     AmbiguousEntryPoint,
     MissingSegment,
     EntryPointOutsideSegment,
+    AmbiguousEntrySegment,
     UnsupportedImageMapping,
 }
 
@@ -171,23 +172,30 @@ fn classify_executable_image_conversion(
         [_] if summary.recognized_segments().is_empty() => {
             MachOExecutableImageConversionBlocker::MissingSegment
         }
-        [_] if !has_entry_point_inside_recognized_segment(summary) => {
-            MachOExecutableImageConversionBlocker::EntryPointOutsideSegment
-        }
-        [_] => MachOExecutableImageConversionBlocker::UnsupportedImageMapping,
+        [_] => match recognized_segments_containing_entry_point(summary) {
+            0 => MachOExecutableImageConversionBlocker::EntryPointOutsideSegment,
+            1 => MachOExecutableImageConversionBlocker::UnsupportedImageMapping,
+            _ => MachOExecutableImageConversionBlocker::AmbiguousEntrySegment,
+        },
     };
 
     MachOExecutableImageConversion::not_convertible(blocker)
 }
 
-fn has_entry_point_inside_recognized_segment(summary: &MachOLoadCommandSummary) -> bool {
-    summary.recognized_entry_points().iter().any(|entry_point| {
-        summary.recognized_segments().iter().any(|segment| {
+fn recognized_segments_containing_entry_point(summary: &MachOLoadCommandSummary) -> usize {
+    let Some(entry_point) = summary.recognized_entry_points().first() else {
+        return 0;
+    };
+
+    summary
+        .recognized_segments()
+        .iter()
+        .filter(|segment| {
             segment
                 .header()
                 .contains_entry_point_file_offset(entry_point.metadata().entryoff())
         })
-    })
+        .count()
 }
 
 fn validate_load_command_table_bounds(

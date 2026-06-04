@@ -332,6 +332,63 @@ mod tests {
     }
 
     #[test]
+    fn binary_format_probe_report_serializes_ambiguous_mach_o_entry_segment_blocker_as_stable_json()
+    {
+        let report = BinaryFormatProbeReport::new(
+            BinaryFormat::MachO64LittleEndian,
+            BinaryFormatProbeStatus::RecognizedButUnsupported,
+            BinaryFormatProbeMetadata::mach_o(MachOMetadata::new(
+                MachOFileType::Executable,
+                MachOLoadCommands::new(
+                    MachOLoadCommandCount::from_public_header_value(3),
+                    MachOLoadCommandByteSize::from_public_header_value(168),
+                    MachOLoadCommandSummary::new(
+                        vec![RecognizedMachOEntryPointCommand::new(
+                            MachOLoadCommandByteSize::from_public_header_value(24),
+                            MachOEntryPointCommandMetadata::new(
+                                MachOEntryPointFileOffset::from_public_entry_point_value(0x1234),
+                                MachOEntryPointStackSize::from_public_entry_point_value(0x2000),
+                            ),
+                        )],
+                        vec![
+                            RecognizedMachOSegmentCommand::new(
+                                MachOLoadCommandByteSize::from_public_header_value(72),
+                                MachOSegmentCommandHeaderMetadata::new(
+                                    MachOSegmentName::from_public_fixed_field(
+                                        b"__TEXT\0\0\0\0\0\0\0\0\0\0",
+                                    )
+                                    .expect("test segment name is valid"),
+                                    MachOSegmentVmAddr::from_public_segment_value(0x1_0000_0000),
+                                    MachOSegmentFileOffset::from_public_segment_value(0),
+                                    MachOSegmentFileSize::from_public_segment_value(0x2000),
+                                ),
+                            ),
+                            RecognizedMachOSegmentCommand::new(
+                                MachOLoadCommandByteSize::from_public_header_value(72),
+                                MachOSegmentCommandHeaderMetadata::new(
+                                    MachOSegmentName::from_public_fixed_field(
+                                        b"__DATA\0\0\0\0\0\0\0\0\0\0",
+                                    )
+                                    .expect("test segment name is valid"),
+                                    MachOSegmentVmAddr::from_public_segment_value(0x1_0000_1000),
+                                    MachOSegmentFileOffset::from_public_segment_value(0x1000),
+                                    MachOSegmentFileSize::from_public_segment_value(0x1000),
+                                ),
+                            ),
+                        ],
+                        Vec::<UnsupportedMachOLoadCommand>::new(),
+                    ),
+                ),
+            )),
+        );
+
+        assert_eq!(
+            binary_format_probe_report_to_json(&report).expect("probe report serializes"),
+            "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\",\"metadata\":{\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":3,\"byte_size\":168,\"recognized_entry_points\":[{\"byte_size\":24,\"entryoff\":4660,\"stacksize\":8192}],\"recognized_segments\":[{\"byte_size\":72,\"name\":\"__TEXT\",\"vmaddr\":4294967296,\"fileoff\":0,\"filesize\":8192},{\"byte_size\":72,\"name\":\"__DATA\",\"vmaddr\":4294971392,\"fileoff\":4096,\"filesize\":4096}],\"unsupported_commands\":[]},\"executable_image_conversion\":{\"status\":\"not_convertible\",\"blocker\":\"ambiguous_entry_segment\"}}}}"
+        );
+    }
+
+    #[test]
     fn binary_format_probe_report_serializes_recognized_mach_o_segments_as_stable_json() {
         let report = BinaryFormatProbeReport::new(
             BinaryFormat::MachO64LittleEndian,
