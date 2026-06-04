@@ -7,17 +7,18 @@ pub mod report;
 pub mod testcase;
 
 pub use binary_format::{
-    plan_mach_o_executable_image, probe_public_binary_format, BinaryFileBytes, BinaryFormat,
-    BinaryFormatProbeError, BinaryFormatProbeMetadata, BinaryFormatProbeReport,
-    BinaryFormatProbeStatus, BinaryInput, BinaryInputError, MachOEntryPointCommandMetadata,
-    MachOEntryPointFileOffset, MachOEntryPointSegmentOffset, MachOEntryPointStackSize,
-    MachOExecutableImageConversion, MachOExecutableImageConversionBlocker,
-    MachOExecutableImageConversionStatus, MachOExecutableImagePlan, MachOExecutableImagePlanError,
-    MachOFileType, MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommandSummary,
-    MachOLoadCommandType, MachOLoadCommands, MachOMetadata, MachOSegmentCommandHeaderMetadata,
-    MachOSegmentFileOffset, MachOSegmentFileRange, MachOSegmentFileSize, MachOSegmentName,
-    MachOSegmentVmAddr, RecognizedMachOEntryPointCommand, RecognizedMachOSegmentCommand,
-    UnsupportedMachOLoadCommand,
+    materialize_mach_o_executable_image, plan_mach_o_executable_image, probe_public_binary_format,
+    BinaryFileBytes, BinaryFormat, BinaryFormatProbeError, BinaryFormatProbeMetadata,
+    BinaryFormatProbeReport, BinaryFormatProbeStatus, BinaryInput, BinaryInputError,
+    MachOEntryPointCommandMetadata, MachOEntryPointFileOffset, MachOEntryPointSegmentOffset,
+    MachOEntryPointStackSize, MachOExecutableImageConversion,
+    MachOExecutableImageConversionBlocker, MachOExecutableImageConversionStatus,
+    MachOExecutableImageMaterializationError, MachOExecutableImagePlan,
+    MachOExecutableImagePlanError, MachOFileType, MachOLoadCommandByteSize, MachOLoadCommandCount,
+    MachOLoadCommandSummary, MachOLoadCommandType, MachOLoadCommands, MachOMetadata,
+    MachOSegmentCommandHeaderMetadata, MachOSegmentFileOffset, MachOSegmentFileRange,
+    MachOSegmentFileSize, MachOSegmentName, MachOSegmentVmAddr, RecognizedMachOEntryPointCommand,
+    RecognizedMachOSegmentCommand, UnsupportedMachOLoadCommand,
 };
 pub use compare::{compare_observed_results, ComparisonIssue, ComparisonReport};
 pub use executable_manifest::{

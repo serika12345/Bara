@@ -2,6 +2,7 @@ mod input;
 mod mach_o;
 mod mach_o_entry_point_command;
 mod mach_o_executable_image_conversion;
+mod mach_o_executable_image_materialization;
 mod mach_o_executable_image_plan;
 mod mach_o_load_command;
 mod mach_o_segment_command;
@@ -15,6 +16,9 @@ pub use mach_o_entry_point_command::{
 pub use mach_o_executable_image_conversion::{
     MachOExecutableImageConversion, MachOExecutableImageConversionBlocker,
     MachOExecutableImageConversionStatus,
+};
+pub use mach_o_executable_image_materialization::{
+    materialize_mach_o_executable_image, MachOExecutableImageMaterializationError,
 };
 pub use mach_o_executable_image_plan::{
     plan_mach_o_executable_image, MachOEntryPointSegmentOffset, MachOExecutableImagePlan,

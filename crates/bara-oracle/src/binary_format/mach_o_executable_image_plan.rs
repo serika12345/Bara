@@ -62,6 +62,10 @@ impl MachOEntryPointSegmentOffset {
         Self { value }
     }
 
+    pub(crate) const fn as_u64(self) -> u64 {
+        self.value
+    }
+
     fn from_file_offsets(
         entry_point_file_offset: MachOEntryPointFileOffset,
         segment_file_offset: MachOSegmentFileOffset,

@@ -1,13 +1,14 @@
 use super::{
-    plan_mach_o_executable_image, probe_public_binary_format, BinaryFileBytes, BinaryFormat,
-    BinaryFormatProbeError, BinaryFormatProbeMetadata, BinaryFormatProbeReport,
-    BinaryFormatProbeStatus, BinaryInput, MachOEntryPointCommandMetadata,
+    materialize_mach_o_executable_image, plan_mach_o_executable_image, probe_public_binary_format,
+    BinaryFileBytes, BinaryFormat, BinaryFormatProbeError, BinaryFormatProbeMetadata,
+    BinaryFormatProbeReport, BinaryFormatProbeStatus, BinaryInput, MachOEntryPointCommandMetadata,
     MachOEntryPointFileOffset, MachOEntryPointSegmentOffset, MachOEntryPointStackSize,
     MachOExecutableImageConversionBlocker, MachOExecutableImageConversionStatus,
+    MachOExecutableImageMaterializationError, MachOExecutableImagePlan,
     MachOExecutableImagePlanError, MachOFileType, MachOLoadCommandByteSize, MachOLoadCommandCount,
     MachOLoadCommandSummary, MachOLoadCommandType, MachOLoadCommands, MachOMetadata,
-    MachOSegmentCommandHeaderMetadata, MachOSegmentFileOffset, MachOSegmentFileSize,
-    MachOSegmentName, MachOSegmentVmAddr, RecognizedMachOEntryPointCommand,
+    MachOSegmentCommandHeaderMetadata, MachOSegmentFileOffset, MachOSegmentFileRange,
+    MachOSegmentFileSize, MachOSegmentName, MachOSegmentVmAddr, RecognizedMachOEntryPointCommand,
     RecognizedMachOSegmentCommand, UnsupportedMachOLoadCommand,
 };
 
@@ -20,6 +21,7 @@ fn empty_load_commands() -> MachOLoadCommands {
 }
 
 mod conversion;
+mod materialization;
 mod plan;
 mod probe_entry_point;
 mod probe_header;

@@ -937,6 +937,34 @@ raw function / executable manifest pipeline に段階的に接続する。
 - 完了。Mach-O probe / conversion / plan tests を責務別 module に分割し、
   HW9 materialization に進む前の test surface を整理する。
 
+#### HW9d: Mach-O executable image materialization
+
+目的:
+
+- `BinaryInput` と `MachOExecutableImagePlan` から、既存の
+  `ExecutableImage` を pure に作る。
+
+方針:
+
+- plan の segment file range で input bytes を切り出し、`CodeSegment` /
+  `ExecutableEntry` / `ExecutableImage` に変換する。
+- code segment base は既存 manifest と同じ `X86Va::new(0)` とし、entry は
+  plan の segment-relative offset を使う。
+- CLI、file I/O、runtime 実行、manifest JSON 生成、loader/import/syscall はまだ
+  行わない。
+
+成功条件:
+
+- segment bytes containing `mov eax, 42; ret` から `ExecutableImage` を作り、
+  entry 以降の function bytes を取り出せる。
+- plan の file range が input 外なら materialization 専用 classified error で止まる。
+- `binary_format/mod.rs` を肥大化させず、materialization tests は責務別 file に置く。
+
+状態:
+
+- 完了。Mach-O executable image plan から、既存 `ExecutableImage` を pure に
+  materialize できる。
+
 ### HW10: Mach-O backed raw function execution
 
 目的:
