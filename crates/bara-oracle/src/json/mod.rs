@@ -290,7 +290,8 @@ mod tests {
     }
 
     #[test]
-    fn binary_format_probe_report_serializes_mach_o_entry_point_inside_segment_as_stable_json() {
+    fn binary_format_probe_report_serializes_convertible_mach_o_entry_point_inside_segment_as_stable_json(
+    ) {
         let report = BinaryFormatProbeReport::new(
             BinaryFormat::MachO64LittleEndian,
             BinaryFormatProbeStatus::RecognizedButUnsupported,
@@ -327,7 +328,7 @@ mod tests {
 
         assert_eq!(
             binary_format_probe_report_to_json(&report).expect("probe report serializes"),
-            "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\",\"metadata\":{\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":2,\"byte_size\":96,\"recognized_entry_points\":[{\"byte_size\":24,\"entryoff\":4660,\"stacksize\":8192}],\"recognized_segments\":[{\"byte_size\":72,\"name\":\"__TEXT\",\"vmaddr\":4294967296,\"fileoff\":0,\"filesize\":4661}],\"unsupported_commands\":[]},\"executable_image_conversion\":{\"status\":\"not_convertible\",\"blocker\":\"unsupported_image_mapping\"}}}}"
+            "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\",\"metadata\":{\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":2,\"byte_size\":96,\"recognized_entry_points\":[{\"byte_size\":24,\"entryoff\":4660,\"stacksize\":8192}],\"recognized_segments\":[{\"byte_size\":72,\"name\":\"__TEXT\",\"vmaddr\":4294967296,\"fileoff\":0,\"filesize\":4661}],\"unsupported_commands\":[]},\"executable_image_conversion\":{\"status\":\"convertible\",\"entry_point\":{\"byte_size\":24,\"entryoff\":4660,\"stacksize\":8192},\"segment\":{\"byte_size\":72,\"name\":\"__TEXT\",\"vmaddr\":4294967296,\"fileoff\":0,\"filesize\":4661}}}}}"
         );
     }
 

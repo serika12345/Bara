@@ -469,7 +469,7 @@ mod tests {
         );
         assert_eq!(
             conversion.blocker(),
-            MachOExecutableImageConversionBlocker::MissingSegment
+            Some(MachOExecutableImageConversionBlocker::MissingSegment)
         );
     }
 
@@ -518,7 +518,7 @@ mod tests {
         );
         assert_eq!(
             conversion.blocker(),
-            MachOExecutableImageConversionBlocker::AmbiguousEntryPoint
+            Some(MachOExecutableImageConversionBlocker::AmbiguousEntryPoint)
         );
     }
 
@@ -561,38 +561,37 @@ mod tests {
         );
         assert_eq!(
             conversion.blocker(),
-            MachOExecutableImageConversionBlocker::EntryPointOutsideSegment
+            Some(MachOExecutableImageConversionBlocker::EntryPointOutsideSegment)
         );
     }
 
     #[test]
-    fn reports_mach_o_with_entry_point_inside_segment_as_not_convertible_until_image_mapping_exists(
-    ) {
+    fn reports_mach_o_with_entry_point_inside_single_segment_as_convertible_candidate() {
+        let entry_point = RecognizedMachOEntryPointCommand::new(
+            MachOLoadCommandByteSize::from_public_header_value(24),
+            MachOEntryPointCommandMetadata::new(
+                MachOEntryPointFileOffset::from_public_entry_point_value(0x1234),
+                MachOEntryPointStackSize::from_public_entry_point_value(0x2000),
+            ),
+        );
+        let segment = RecognizedMachOSegmentCommand::new(
+            MachOLoadCommandByteSize::from_public_header_value(72),
+            MachOSegmentCommandHeaderMetadata::new(
+                MachOSegmentName::from_public_fixed_field(b"__TEXT\0\0\0\0\0\0\0\0\0\0")
+                    .expect("test segment name is valid"),
+                MachOSegmentVmAddr::from_public_segment_value(0x1_0000_0000),
+                MachOSegmentFileOffset::from_public_segment_value(0),
+                MachOSegmentFileSize::from_public_segment_value(0x1235),
+            ),
+        );
         let metadata = MachOMetadata::new(
             MachOFileType::Executable,
             MachOLoadCommands::new(
                 MachOLoadCommandCount::from_public_header_value(2),
                 MachOLoadCommandByteSize::from_public_header_value(96),
                 MachOLoadCommandSummary::new(
-                    vec![RecognizedMachOEntryPointCommand::new(
-                        MachOLoadCommandByteSize::from_public_header_value(24),
-                        MachOEntryPointCommandMetadata::new(
-                            MachOEntryPointFileOffset::from_public_entry_point_value(0x1234),
-                            MachOEntryPointStackSize::from_public_entry_point_value(0x2000),
-                        ),
-                    )],
-                    vec![RecognizedMachOSegmentCommand::new(
-                        MachOLoadCommandByteSize::from_public_header_value(72),
-                        MachOSegmentCommandHeaderMetadata::new(
-                            MachOSegmentName::from_public_fixed_field(
-                                b"__TEXT\0\0\0\0\0\0\0\0\0\0",
-                            )
-                            .expect("test segment name is valid"),
-                            MachOSegmentVmAddr::from_public_segment_value(0x1_0000_0000),
-                            MachOSegmentFileOffset::from_public_segment_value(0),
-                            MachOSegmentFileSize::from_public_segment_value(0x1235),
-                        ),
-                    )],
+                    vec![entry_point],
+                    vec![segment.clone()],
                     Vec::<UnsupportedMachOLoadCommand>::new(),
                 ),
             ),
@@ -601,12 +600,11 @@ mod tests {
 
         assert_eq!(
             conversion.status(),
-            MachOExecutableImageConversionStatus::NotConvertible
+            MachOExecutableImageConversionStatus::Convertible
         );
-        assert_eq!(
-            conversion.blocker(),
-            MachOExecutableImageConversionBlocker::UnsupportedImageMapping
-        );
+        assert_eq!(conversion.blocker(), None);
+        assert_eq!(conversion.entry_point(), Some(entry_point));
+        assert_eq!(conversion.segment(), Some(&segment));
     }
 
     #[test]
@@ -662,7 +660,7 @@ mod tests {
         );
         assert_eq!(
             conversion.blocker(),
-            MachOExecutableImageConversionBlocker::AmbiguousEntrySegment
+            Some(MachOExecutableImageConversionBlocker::AmbiguousEntrySegment)
         );
     }
 
@@ -701,7 +699,7 @@ mod tests {
         );
         assert_eq!(
             conversion.blocker(),
-            MachOExecutableImageConversionBlocker::MissingEntryPoint
+            Some(MachOExecutableImageConversionBlocker::MissingEntryPoint)
         );
     }
 

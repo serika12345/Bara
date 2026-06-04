@@ -859,6 +859,31 @@ raw function / executable manifest pipeline に段階的に接続する。
 - 変換不能な Mach-O は既存の blocker classification と classified error で止まる。
 - section parsing、dynamic loader、imports、syscall、libc はまだ扱わない。
 
+#### HW9a: Mach-O convertible image candidate
+
+目的:
+
+- 単一 `LC_MAIN` と、その entry point file offset を含む単一 `LC_SEGMENT_64` を、
+  executable image materialization の変換可能候補として typed metadata に残す。
+
+方針:
+
+- classifier は pure のままにし、I/O、raw bytes extraction、`ExecutableImage` /
+  `ExecutableManifest` 生成、runtime 実行はまだ行わない。
+- blocker がある case は既存の `not_convertible` JSON を維持する。
+- convertible case は selected entry point / segment を既存 metadata type で保持する。
+
+成功条件:
+
+- 単一 entry point と単一 containing segment は `convertible` status になる。
+- convertible metadata から、選択された entry point と segment を確認できる。
+- 既存 blocker tests と stable JSON tests が通る。
+
+状態:
+
+- 完了。Mach-O executable image conversion metadata が、単一 entry point と
+  単一 containing segment を変換可能候補として表現できる。
+
 ### HW10: Mach-O backed raw function execution
 
 目的:
