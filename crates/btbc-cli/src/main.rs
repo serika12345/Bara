@@ -7,10 +7,11 @@ use std::{
 use bara_oracle::{
     binary_format_probe_report_from_json, binary_format_probe_report_to_json,
     compare_observed_results, corpus_report_to_json, executable_manifest_from_json,
-    observed_result_from_json, observed_result_to_json, probe_public_binary_format,
-    test_case_from_json, BinaryFileBytes, BinaryFormatProbeError, BinaryFormatProbeReport,
-    BinaryInput, CaseId, ComparisonReport, CorpusReport, ExecutableManifest, ExpectedResult,
-    FailureKind, FailureMessage, FixtureOutcome, FixtureReport, ObservedResult, TestCase,
+    mach_o_entry_function_test_case, observed_result_from_json, observed_result_to_json,
+    probe_public_binary_format, test_case_from_json, BinaryFileBytes, BinaryFormatProbeError,
+    BinaryFormatProbeReport, BinaryInput, CaseId, ComparisonReport, CorpusReport,
+    ExecutableManifest, ExpectedResult, FailureKind, FailureMessage, FixtureOutcome, FixtureReport,
+    MachOEntryFunctionTestCaseError, ObservedResult, TestCase,
 };
 
 mod executable_run;
@@ -40,6 +41,9 @@ fn run_cli(args: Vec<String>) -> Result<String, CliError> {
         }
         [command, manifest_path, expected_path] if command == "check-executable" => {
             run_check_executable(Path::new(manifest_path), Path::new(expected_path))
+        }
+        [command, binary_path, expected_path] if command == "check-mach-o" => {
+            run_check_mach_o(Path::new(binary_path), Path::new(expected_path))
         }
         [command, binary_path] if command == "probe-binary" => {
             run_probe_binary(Path::new(binary_path))
@@ -91,6 +95,17 @@ fn run_check_executable(manifest_path: &Path, expected_path: &Path) -> Result<St
     let expected = observed_result_from_json(&expected_json).map_err(CliError::ExpectedJson)?;
 
     run_executable(manifest, expected)
+}
+
+fn run_check_mach_o(binary_path: &Path, expected_path: &Path) -> Result<String, CliError> {
+    let bytes = read_binary_file(binary_path)?;
+    let expected_json = read_text_file(expected_path)?;
+    let expected = observed_result_from_json(&expected_json).map_err(CliError::ExpectedJson)?;
+    let input = BinaryInput::from_file_bytes(BinaryFileBytes::from_untrusted_file_contents(bytes));
+    let test_case = mach_o_entry_function_test_case(case_id_from_path(binary_path), &input)
+        .map_err(CliError::MachOEntryFunctionTestCase)?;
+
+    run_test_case(test_case, expected)
 }
 
 fn run_probe_binary(binary_path: &Path) -> Result<String, CliError> {
@@ -401,6 +416,7 @@ enum CliError {
     ExpectedJson(bara_oracle::JsonError),
     ExpectedProbeJson(bara_oracle::JsonError),
     BinaryFormatProbe(BinaryFormatProbeError),
+    MachOEntryFunctionTestCase(MachOEntryFunctionTestCaseError),
     BinaryProbeComparisonMismatch {
         expected: Box<BinaryFormatProbeReport>,
         actual: Box<BinaryFormatProbeReport>,
@@ -420,6 +436,7 @@ impl CliError {
             Self::ExpectedJson(_) => FailureKind::InvalidExpected,
             Self::ExpectedProbeJson(_) => FailureKind::InvalidExpected,
             Self::BinaryFormatProbe(_) => FailureKind::InvalidTestCase,
+            Self::MachOEntryFunctionTestCase(_) => FailureKind::InvalidTestCase,
             Self::BinaryProbeComparisonMismatch { .. } => FailureKind::ComparisonMismatch,
             Self::FunctionRun(error) => error.failure_kind(),
             Self::ExecutableRun(error) => error.failure_kind(),
@@ -442,7 +459,7 @@ impl std::fmt::Display for CliError {
         match self {
             Self::Usage => write!(
                 formatter,
-                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json>"
+                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json>"
             ),
             Self::ReadFile { path, source } => {
                 write!(formatter, "failed to read file {}: {source}", path.display())
@@ -492,6 +509,9 @@ impl std::fmt::Display for CliError {
             }
             Self::BinaryFormatProbe(error) => {
                 write!(formatter, "binary format probe error: {error:?}")
+            }
+            Self::MachOEntryFunctionTestCase(error) => {
+                write!(formatter, "mach-o entry function testcase error: {error:?}")
             }
             Self::BinaryProbeComparisonMismatch { expected, actual } => {
                 write!(
@@ -608,6 +628,33 @@ mod tests {
     }
 
     #[test]
+    fn check_mach_o_reads_binary_and_expected_files() {
+        let temp_dir = TestTempDir::new("check_mach_o_reads_binary_and_expected_files");
+        let binary_path = temp_dir.write_binary_file(
+            "mach_o_return_42.bin",
+            include_bytes!("../../../tests/binaries/mach_o_return_42.bin"),
+        );
+        let expected_path = temp_dir.write_file(
+            "expected.json",
+            include_str!("../../../tests/expected/mach_o_return_42.json"),
+        );
+
+        let output = run_cli(vec![
+            String::from("check-mach-o"),
+            binary_path.to_string_lossy().into_owned(),
+            expected_path.to_string_lossy().into_owned(),
+        ])
+        .expect("mach-o fixture check succeeds on supported host");
+        let expected = observed_result_from_json(include_str!(
+            "../../../tests/expected/mach_o_return_42.json"
+        ))
+        .and_then(|result| observed_result_to_json(&result))
+        .expect("expected mach-o fixture normalizes to output json");
+
+        assert_eq!(output, expected);
+    }
+
+    #[test]
     fn probe_binary_reads_file_and_reports_unsupported_mach_o() {
         let temp_dir = TestTempDir::new("probe_binary_reads_file_and_reports_unsupported_mach_o");
         let binary_path = temp_dir.write_binary_file(
@@ -704,6 +751,9 @@ mod tests {
     fn usage_includes_probe_binary_command() {
         let error = run_cli(Vec::new()).expect_err("missing command reports usage");
 
+        assert!(error
+            .to_string()
+            .contains("check-mach-o <binary> <expected.json>"));
         assert!(error.to_string().contains("probe-binary <path>"));
         assert!(error
             .to_string()

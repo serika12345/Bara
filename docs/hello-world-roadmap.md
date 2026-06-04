@@ -51,6 +51,7 @@ raw function fixture が runtime 境界を通じて stdout に
 - Mach-O executable image conversion blocker classification
 - Mach-O materialized executable image から no-args u64 raw function testcase への
   pure conversion
+- `check-mach-o <binary> <expected.json>` による Mach-O backed raw function 実行
 
 ## マイルストーン
 
@@ -1041,6 +1042,33 @@ raw function / executable manifest pipeline に段階的に接続する。
 
 - 完了。Mach-O `BinaryInput` から no-args u64 raw function `TestCase` までを pure に
   生成できる。
+
+#### HW10c: Mach-O binary CLI execution
+
+目的:
+
+- Mach-O binary file から no-args u64 raw function `TestCase` を作り、既存 raw
+  function runner と expected / actual JSON 比較へ接続する。
+
+方針:
+
+- CLI 境界で binary file を読み、`BinaryInput` に変換する。
+- case id は binary path stem から `CaseId` を作る。
+- `mach_o_entry_function_test_case` で `TestCase` を作り、既存 `run_test_case` を使う。
+- file I/O、runtime 実行、JSON 比較は `btbc-cli` に留め、`bara-oracle` に戻さない。
+- host trap、imports、syscalls、loader 拡張はまだ行わない。
+
+成功条件:
+
+- `check-mach-o <binary> <expected.json>` で Mach-O fixture 内の
+  `mov eax, 42; ret` が `return_value: 42` として比較できる。
+- blackbox verification に Mach-O backed raw function fixture が含まれる。
+- CLI implementation は小さな command handler と helper に留まる。
+
+状態:
+
+- 完了。Mach-O binary file を既存 raw function runner へ渡し、stable expected /
+  actual JSON で比較できる。
 
 ### HW11: Mach-O hello world via Bara host trap
 
