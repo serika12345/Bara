@@ -52,6 +52,8 @@ raw function fixture が runtime 境界を通じて stdout に
 - Mach-O materialized executable image から no-args u64 raw function testcase への
   pure conversion
 - `check-mach-o <binary> <expected.json>` による Mach-O backed raw function 実行
+- `check-mach-o-host-traps <binary> <host-traps.json> <expected.json>` による
+  Mach-O backed stdout host trap 実行
 
 ## マイルストーン
 
@@ -1089,6 +1091,62 @@ raw function / executable manifest pipeline に段階的に接続する。
   比較できる。
 - host helper import declaration / validation は既存 manifest model と矛盾しない。
 - 実 OS syscall や libc call にはまだ踏み込まない。
+
+状態:
+
+- 完了。Mach-O entry function `TestCase` に明示的な host trap plan を付け、
+  `check-mach-o-host-traps <binary> <host-traps.json> <expected.json>` で
+  Bara 専用 stdout sentinel から `hello world\n` を stable expected / actual JSON で
+  比較できる。
+
+#### HW11a: Mach-O entry host trap plan preservation
+
+目的:
+
+- Mach-O から materialize した entry function `TestCase` が、呼び出し側から渡された
+  `TestCaseHostTrapPlan` を保持できるようにする。
+
+方針:
+
+- 既存の no-trap API は `TestCaseHostTrapPlan::none()` に委譲し、挙動を変えない。
+- `BinaryInput` / `ExecutableImage` から `TestCase` への変換は pure のままにする。
+- CLI、file I/O、runtime 実行、expected comparison はまだ行わない。
+
+成功条件:
+
+- Mach-O entry function `TestCase` に stdout host trap plan を保持できる。
+- 既存の `mach_o_entry_function_test_case` は no-trap のまま維持される。
+
+状態:
+
+- 完了。Mach-O entry function 変換と pipeline に `*_with_host_traps` API を追加し、
+  既存 API は no-trap plan へ委譲している。
+
+#### HW11b: Mach-O host trap CLI execution
+
+目的:
+
+- Mach-O binary、明示的な host trap plan JSON、expected JSON を CLI 境界で読み、
+  既存 raw function runner と comparison へ接続する。
+
+方針:
+
+- stdout plan は expected JSON から逆算せず、別の `host-traps.json` として明示する。
+- `bara-oracle` は host trap plan JSON を pure に `TestCaseHostTrapPlan` へ変換する。
+- `btbc-cli` は file I/O、runtime 実行、JSON 比較の境界に留める。
+- OS syscall、libc call、loader import、relocation は扱わない。
+
+成功条件:
+
+- `check-mach-o-host-traps <binary> <host-traps.json> <expected.json>` で
+  Mach-O fixture 内の `0f 0b; xor eax, eax; ret` が stdout `hello world\n`、
+  `return_value: 0` として比較できる。
+- blackbox verification に Mach-O backed hello world fixture が含まれる。
+
+状態:
+
+- 完了。Mach-O backed hello world fixture が blackbox verification に入り、
+  explicit host trap plan 経由で stdout / stderr / return_value を比較できる。
 
 ### HW12: Minimal stack / call boundary
 
