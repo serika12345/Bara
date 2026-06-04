@@ -54,6 +54,9 @@ raw function fixture が runtime 境界を通じて stdout に
 - `check-mach-o <binary> <expected.json>` による Mach-O backed raw function 実行
 - `check-mach-o-host-traps <binary> <host-traps.json> <expected.json>` による
   Mach-O backed stdout host trap 実行
+- x86 `call rel32` の typed decode と classified unsupported lift
+- `TestCase` 上の typed stack state metadata
+- Mach-O `LC_MAIN.stacksize` から testcase stack metadata への pure conversion
 
 ## マイルストーン
 
@@ -1160,6 +1163,65 @@ raw function / executable manifest pipeline に段階的に接続する。
   表現できる。
 - call target が未対応の場合は classified unsupported として止まる。
 - decode / lift / emit / runtime の各責務が混ざらない。
+
+状態:
+
+- 完了。`call rel32` は typed target / return address を持つ decoded instruction として
+  読み、lift では `DirectCallUnsupported` として classified unsupported に止める。
+  stack state は `TestCase` の typed metadata として保持し、Mach-O `LC_MAIN.stacksize`
+  から pure に変換できる。runtime の stack allocation や call execution はまだ
+  行わない。
+
+#### HW12a: Direct call unsupported boundary
+
+目的:
+
+- x86 `call rel32` を public ISA semantics に基づいて decode し、まだ実行せず
+  classified unsupported として止める。
+
+方針:
+
+- `call rel32` の target は次命令 address と signed displacement から計算する。
+- decoded instruction は `target` と `return_to` を `X86Va` で保持する。
+- lift は direct call を `Terminator::Unsupported` に変換する。
+- emit / runtime / stack mutation は変更しない。
+
+成功条件:
+
+- positive / negative displacement の `call rel32` target が typed address として decode される。
+- direct call は `DirectCallUnsupported { target, return_to }` として lift される。
+- existing raw function 実行経路は変わらない。
+
+状態:
+
+- 完了。direct call は decode / lift 境界で classified unsupported として扱われ、
+  runtime execution には入らない。
+
+#### HW12b: Testcase stack state metadata
+
+目的:
+
+- loader 付き hello world に必要になる stack requirement を、runtime 実行へ混ぜる前に
+  testcase metadata として typed に表現する。
+
+方針:
+
+- general testcase stack 型を `bara-oracle` の testcase 領域に置く。
+- `MachOEntryPointStackSize` は Mach-O 境界専用型のままにし、
+  `TestCaseStackState` へ変換する。
+- `TestCase::new` / `with_host_traps` は empty stack state を既定にし、既存挙動を保つ。
+- runtime は stack metadata をまだ消費しない。
+
+成功条件:
+
+- `TestCase` は empty / explicit stack size を typed metadata として保持できる。
+- explicit zero stack size は validation error として拒否される。
+- Mach-O entry function pipeline は `LC_MAIN.stacksize` を testcase stack state として保持する。
+
+状態:
+
+- 完了。`TestCaseStackState` / `TestCaseStackSize` を追加し、Mach-O backed testcase が
+  `LC_MAIN.stacksize` を保持できる。
 
 ### HW13: Public ABI / import boundary planning
 
