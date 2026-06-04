@@ -9,6 +9,10 @@
         "byte_size": 0,
         "recognized_segments": [],
         "unsupported_commands": []
+      },
+      "executable_image_conversion": {
+        "status": "not_convertible",
+        "blocker": "missing_entry_point"
       }
     }
   }

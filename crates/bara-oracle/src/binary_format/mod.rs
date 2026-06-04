@@ -5,7 +5,10 @@ mod mach_o_segment_command;
 mod probe;
 
 pub use input::{BinaryFileBytes, BinaryInput, BinaryInputError};
-pub use mach_o::{MachOFileType, MachOLoadCommands, MachOMetadata};
+pub use mach_o::{
+    MachOExecutableImageConversion, MachOExecutableImageConversionBlocker,
+    MachOExecutableImageConversionStatus, MachOFileType, MachOLoadCommands, MachOMetadata,
+};
 pub use mach_o_load_command::{
     MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommandSummary, MachOLoadCommandType,
     RecognizedMachOSegmentCommand, UnsupportedMachOLoadCommand,
@@ -24,7 +27,8 @@ mod tests {
     use super::{
         probe_public_binary_format, BinaryFileBytes, BinaryFormat, BinaryFormatProbeError,
         BinaryFormatProbeMetadata, BinaryFormatProbeReport, BinaryFormatProbeStatus, BinaryInput,
-        MachOFileType, MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommandSummary,
+        MachOExecutableImageConversionBlocker, MachOExecutableImageConversionStatus, MachOFileType,
+        MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommandSummary,
         MachOLoadCommandType, MachOLoadCommands, MachOMetadata, UnsupportedMachOLoadCommand,
     };
 
@@ -161,6 +165,10 @@ mod tests {
                                 }
                             ],
                             "unsupported_commands": []
+                        },
+                        "executable_image_conversion": {
+                            "status": "not_convertible",
+                            "blocker": "missing_entry_point"
                         }
                     }
                 }
@@ -205,10 +213,37 @@ mod tests {
                                 }
                             ],
                             "unsupported_commands": []
+                        },
+                        "executable_image_conversion": {
+                            "status": "not_convertible",
+                            "blocker": "missing_entry_point"
                         }
                     }
                 }
             })
+        );
+    }
+
+    #[test]
+    fn reports_mach_o_without_entry_point_as_not_convertible_to_executable_image() {
+        let input = BinaryInput::from_hex(
+            "cffaedfe07000001030000000200000000000000000000000000000000000000",
+        )
+        .expect("hex fixture is valid");
+
+        let report = probe_public_binary_format(&input).expect("probe succeeds");
+        let conversion = report
+            .metadata()
+            .mach_o_metadata()
+            .executable_image_conversion();
+
+        assert_eq!(
+            conversion.status(),
+            MachOExecutableImageConversionStatus::NotConvertible
+        );
+        assert_eq!(
+            conversion.blocker(),
+            MachOExecutableImageConversionBlocker::MissingEntryPoint
         );
     }
 

@@ -45,6 +45,7 @@ raw function fixture が runtime 境界を通じて stdout に
 - Mach-O 64-bit little-endian load command table bounds validation
 - Mach-O 64-bit little-endian unsupported load command summary
 - Mach-O probe fixture / expected JSON と `check-binary-probe`
+- Mach-O probe report 上の executable image 変換可否 metadata
 
 ## マイルストーン
 
@@ -574,6 +575,31 @@ manifest
 
 - 完了。`LC_SEGMENT_64` の command header metadata を typed value として読み、
   stable JSON report に含める。
+
+### HW8c: executable image への変換可否 report
+
+目的:
+
+- Mach-O probe の結果が、Bara の executable image model へ変換可能かどうかを
+  loader 実装前の typed metadata として報告する。
+
+方針:
+
+- 実際の executable image 変換、entry point 抽出、VM mapping はまだ行わない。
+- 現時点では Mach-O entry point load command を扱っていないため、
+  `not_convertible` / `missing_entry_point` として分類する。
+- 変換可否は probe report の metadata に含め、CLI は JSON をそのまま安定出力する。
+
+成功条件:
+
+- Mach-O executable header fixture を probe すると、
+  `executable_image_conversion` に変換不可理由が出る。
+- 判定は domain type と serializer で表現し、ad hoc JSON 文字列生成を増やさない。
+
+状態:
+
+- 完了。entry point metadata 未対応の Mach-O probe は
+  `not_convertible` / `missing_entry_point` として stable JSON report に含める。
 
 ## 判断基準
 

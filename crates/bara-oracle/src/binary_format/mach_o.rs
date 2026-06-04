@@ -13,13 +13,19 @@ use serde::{Deserialize, Serialize};
 pub struct MachOMetadata {
     file_type: MachOFileType,
     load_commands: MachOLoadCommands,
+    executable_image_conversion: MachOExecutableImageConversion,
 }
 
 impl MachOMetadata {
     pub const fn new(file_type: MachOFileType, load_commands: MachOLoadCommands) -> Self {
+        let executable_image_conversion = MachOExecutableImageConversion::not_convertible(
+            MachOExecutableImageConversionBlocker::MissingEntryPoint,
+        );
+
         Self {
             file_type,
             load_commands,
+            executable_image_conversion,
         }
     }
 
@@ -30,12 +36,51 @@ impl MachOMetadata {
     pub const fn load_commands(&self) -> &MachOLoadCommands {
         &self.load_commands
     }
+
+    pub const fn executable_image_conversion(&self) -> &MachOExecutableImageConversion {
+        &self.executable_image_conversion
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MachOFileType {
     Executable,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct MachOExecutableImageConversion {
+    status: MachOExecutableImageConversionStatus,
+    blocker: MachOExecutableImageConversionBlocker,
+}
+
+impl MachOExecutableImageConversion {
+    pub const fn not_convertible(blocker: MachOExecutableImageConversionBlocker) -> Self {
+        Self {
+            status: MachOExecutableImageConversionStatus::NotConvertible,
+            blocker,
+        }
+    }
+
+    pub const fn status(self) -> MachOExecutableImageConversionStatus {
+        self.status
+    }
+
+    pub const fn blocker(self) -> MachOExecutableImageConversionBlocker {
+        self.blocker
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MachOExecutableImageConversionStatus {
+    NotConvertible,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MachOExecutableImageConversionBlocker {
+    MissingEntryPoint,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

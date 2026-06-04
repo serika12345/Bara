@@ -9,9 +9,10 @@ pub mod testcase;
 pub use binary_format::{
     probe_public_binary_format, BinaryFileBytes, BinaryFormat, BinaryFormatProbeError,
     BinaryFormatProbeMetadata, BinaryFormatProbeReport, BinaryFormatProbeStatus, BinaryInput,
-    BinaryInputError, MachOFileType, MachOLoadCommandByteSize, MachOLoadCommandCount,
-    MachOLoadCommandSummary, MachOLoadCommandType, MachOLoadCommands, MachOMetadata,
-    MachOSegmentCommandHeaderMetadata, MachOSegmentFileOffset, MachOSegmentFileSize,
+    BinaryInputError, MachOExecutableImageConversion, MachOExecutableImageConversionBlocker,
+    MachOExecutableImageConversionStatus, MachOFileType, MachOLoadCommandByteSize,
+    MachOLoadCommandCount, MachOLoadCommandSummary, MachOLoadCommandType, MachOLoadCommands,
+    MachOMetadata, MachOSegmentCommandHeaderMetadata, MachOSegmentFileOffset, MachOSegmentFileSize,
     MachOSegmentName, MachOSegmentVmAddr, RecognizedMachOSegmentCommand,
     UnsupportedMachOLoadCommand,
 };
