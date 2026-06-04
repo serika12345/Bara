@@ -35,6 +35,19 @@ impl BinaryInput {
             bytes.try_into().expect("slice len is 4"),
         ))
     }
+
+    pub(crate) fn read_little_endian_u64_at(&self, offset: usize) -> Option<u64> {
+        let end = offset.checked_add(8)?;
+        let bytes = self.bytes.get(offset..end)?;
+        Some(u64::from_le_bytes(
+            bytes.try_into().expect("slice len is 8"),
+        ))
+    }
+
+    pub(crate) fn read_bytes_at(&self, offset: usize, len: usize) -> Option<&[u8]> {
+        let end = offset.checked_add(len)?;
+        self.bytes.get(offset..end)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

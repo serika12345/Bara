@@ -55,8 +55,9 @@ mod tests {
         BinaryFormatProbeMetadata, BinaryFormatProbeReport, BinaryFormatProbeStatus, CaseId,
         CorpusReport, FailureKind, FailureMessage, FixtureOutcome, FixtureReport, MachOFileType,
         MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommandSummary,
-        MachOLoadCommandType, MachOLoadCommands, MachOMetadata, ObservedResult,
-        RecognizedMachOSegmentCommand, UnsupportedMachOLoadCommand,
+        MachOLoadCommandType, MachOLoadCommands, MachOMetadata, MachOSegmentCommandHeaderMetadata,
+        MachOSegmentFileOffset, MachOSegmentFileSize, MachOSegmentName, MachOSegmentVmAddr,
+        ObservedResult, RecognizedMachOSegmentCommand, UnsupportedMachOLoadCommand,
     };
 
     fn empty_load_commands() -> MachOLoadCommands {
@@ -182,6 +183,15 @@ mod tests {
                     MachOLoadCommandSummary::new(
                         vec![RecognizedMachOSegmentCommand::new(
                             MachOLoadCommandByteSize::from_public_header_value(72),
+                            MachOSegmentCommandHeaderMetadata::new(
+                                MachOSegmentName::from_public_fixed_field(
+                                    b"__TEXT\0\0\0\0\0\0\0\0\0\0",
+                                )
+                                .expect("test segment name is valid"),
+                                MachOSegmentVmAddr::from_public_segment_value(0x1_0000_0000),
+                                MachOSegmentFileOffset::from_public_segment_value(0),
+                                MachOSegmentFileSize::from_public_segment_value(0x1234),
+                            ),
                         )],
                         Vec::<UnsupportedMachOLoadCommand>::new(),
                     ),
@@ -191,7 +201,7 @@ mod tests {
 
         assert_eq!(
             binary_format_probe_report_to_json(&report).expect("probe report serializes"),
-            "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\",\"metadata\":{\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":1,\"byte_size\":72,\"recognized_segments\":[{\"byte_size\":72}],\"unsupported_commands\":[]}}}}"
+            "{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\",\"metadata\":{\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":1,\"byte_size\":72,\"recognized_segments\":[{\"byte_size\":72,\"name\":\"__TEXT\",\"vmaddr\":4294967296,\"fileoff\":0,\"filesize\":4660}],\"unsupported_commands\":[]}}}}"
         );
     }
 

@@ -1,4 +1,11 @@
-use super::{input::BinaryInput, probe::BinaryFormatProbeError};
+use super::{
+    input::BinaryInput,
+    mach_o_segment_command::{
+        parse_segment_64_header_metadata, validate_segment_64_command_byte_size,
+        MachOSegmentCommandHeaderMetadata,
+    },
+    probe::BinaryFormatProbeError,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -95,18 +102,27 @@ impl MachOLoadCommandSummary {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct RecognizedMachOSegmentCommand {
     byte_size: MachOLoadCommandByteSize,
+    #[serde(flatten)]
+    header: MachOSegmentCommandHeaderMetadata,
 }
 
 impl RecognizedMachOSegmentCommand {
-    pub const fn new(byte_size: MachOLoadCommandByteSize) -> Self {
-        Self { byte_size }
+    pub fn new(
+        byte_size: MachOLoadCommandByteSize,
+        header: MachOSegmentCommandHeaderMetadata,
+    ) -> Self {
+        Self { byte_size, header }
     }
 
-    pub const fn byte_size(self) -> MachOLoadCommandByteSize {
+    pub const fn byte_size(&self) -> MachOLoadCommandByteSize {
         self.byte_size
+    }
+
+    pub const fn header(&self) -> &MachOSegmentCommandHeaderMetadata {
+        &self.header
     }
 }
 
@@ -184,7 +200,11 @@ pub(crate) fn parse_mach_o_load_command_summary(
         }
 
         if command.is_segment_64() {
-            recognized_segments.push(RecognizedMachOSegmentCommand::new(byte_size));
+            validate_segment_64_command_byte_size(byte_size.as_usize())?;
+            recognized_segments.push(RecognizedMachOSegmentCommand::new(
+                byte_size,
+                parse_segment_64_header_metadata(input, command_offset)?,
+            ));
         } else {
             unsupported_commands.push(UnsupportedMachOLoadCommand::new(command, byte_size));
         }

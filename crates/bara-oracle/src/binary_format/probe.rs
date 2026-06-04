@@ -70,6 +70,7 @@ impl BinaryFormatProbeMetadata {
 pub enum BinaryFormatProbeError {
     InputTooShort,
     HeaderTooShort,
+    InvalidMachOSegmentName,
     LoadCommandTooSmall,
     LoadCommandsOutOfBounds,
     UnknownMagic,

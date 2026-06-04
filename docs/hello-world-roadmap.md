@@ -548,6 +548,33 @@ manifest
 - 完了。`LC_SEGMENT_64` は command kind と byte size のみを
   `recognized_segments` summary に分類する。
 
+### HW8b: segment name / vmaddr / fileoff / filesize metadata
+
+目的:
+
+- 公開 Mach-O `segment_command_64` header から segment name、`vmaddr`、
+  `fileoff`、`filesize` を typed metadata として probe report に含める。
+
+方針:
+
+- sections、protection flags、`nsects`、flags、VM mapping、entry point 変換は
+  まだ扱わない。
+- segment name は 16 byte fixed field として読み、最初の NUL までを UTF-8 として
+  JSON 文字列にする。
+- UTF-8 として不正な segment name は silent replacement せず、分類 error にする。
+
+成功条件:
+
+- `LC_SEGMENT_64` command を 1 つ含む fixture bytes を probe すると、
+  `recognized_segments` に `name`、`vmaddr`、`fileoff`、`filesize` が出る。
+- `LC_SEGMENT_64` の `cmdsize` が public `segment_command_64` header の 72 bytes
+  未満なら `LoadCommandTooSmall` として reject する。
+
+状態:
+
+- 完了。`LC_SEGMENT_64` の command header metadata を typed value として読み、
+  stable JSON report に含める。
+
 ## 判断基準
 
 - 先に raw function で外部観測を増やす。
