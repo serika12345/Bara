@@ -62,6 +62,7 @@ Rosetta から使う情報は、テスト harness が出力する外部挙動だ
 - [コーディングルール](docs/coding-rules.md): シグネチャで仕様を表す方針と `unsafe` 境界
 - [初期 IR 設計](docs/ir.md): 初期 IR、型境界、invariant
 - [Rosetta Oracle 検証ワークフロー](docs/test-oracle.md): expected/actual 比較の流れ
+- [Public ABI / import boundary](docs/public-abi-import-boundary.md): public ABI、imports、host helpers、syscall 相当境界の clean-room 設計
 
 ## 当面のゴール
 

@@ -57,6 +57,7 @@ raw function fixture が runtime 境界を通じて stdout に
 - x86 `call rel32` の typed decode と classified unsupported lift
 - `TestCase` 上の typed stack state metadata
 - Mach-O `LC_MAIN.stacksize` から testcase stack metadata への pure conversion
+- public ABI / import / host helper / syscall 相当境界の clean-room 計画文書
 
 ## マイルストーン
 
@@ -1235,6 +1236,19 @@ raw function / executable manifest pipeline に段階的に接続する。
 - Rosetta や既存 translation layer の内部構造に依存しない boundary document がある。
 - imports / syscalls / host helpers の責務が、runtime と oracle に混ざらず分かれている。
 - 実装前に、許可された public spec と externally observable behavior の範囲が明記される。
+
+分割:
+
+- HW13a: `docs/public-abi-import-boundary.md` に clean-room な public ABI /
+  import boundary planning を置く。
+
+状態:
+
+- 完了。`docs/public-abi-import-boundary.md` に、許可された実装根拠、
+  forbidden sources、crate / layer ごとの責務、domain vocabulary、最初の実装順序、
+  non-goals を明記した。
+- imports / syscalls / host helpers は、runtime 実行前に typed declaration、
+  validation、resolution、unsupported classification として扱う方針にした。
 
 ### HW14: Corpus expansion and regression gate
 
