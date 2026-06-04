@@ -349,7 +349,7 @@ mod tests {
         let input = BinaryInput::from_hex(concat!(
             "cffaedfe07000001030000000200000001000000180000000000000000000000",
             "2800008018000000",
-            "3412000000000000",
+            "2000000000000000",
             "0020000000000000",
         ))
         .expect("hex fixture is valid");
@@ -370,7 +370,7 @@ mod tests {
                             "recognized_entry_points": [
                                 {
                                     "byte_size": 24,
-                                    "entryoff": 4660,
+                                    "entryoff": 32,
                                     "stacksize": 8192
                                 }
                             ],
@@ -388,11 +388,69 @@ mod tests {
     }
 
     #[test]
+    fn accepts_mach_o_entry_point_file_offset_inside_input() {
+        let input = BinaryInput::from_hex(concat!(
+            "cffaedfe07000001030000000200000001000000180000000000000000000000",
+            "2800008018000000",
+            "2000000000000000",
+            "0020000000000000",
+        ))
+        .expect("hex fixture is valid");
+
+        let report = probe_public_binary_format(&input).expect("probe succeeds");
+        let entry_point = report
+            .metadata()
+            .mach_o_metadata()
+            .load_commands()
+            .summary()
+            .recognized_entry_points()
+            .first()
+            .expect("entry point is recognized");
+
+        assert_eq!(
+            entry_point.metadata().entryoff(),
+            MachOEntryPointFileOffset::from_public_entry_point_value(32)
+        );
+    }
+
+    #[test]
+    fn rejects_mach_o_entry_point_file_offset_at_end_of_input() {
+        let input = BinaryInput::from_hex(concat!(
+            "cffaedfe07000001030000000200000001000000180000000000000000000000",
+            "2800008018000000",
+            "3800000000000000",
+            "0020000000000000",
+        ))
+        .expect("hex fixture is valid");
+
+        assert_eq!(
+            probe_public_binary_format(&input),
+            Err(BinaryFormatProbeError::EntryPointFileOffsetOutOfBounds)
+        );
+    }
+
+    #[test]
+    fn rejects_mach_o_entry_point_file_offset_beyond_input() {
+        let input = BinaryInput::from_hex(concat!(
+            "cffaedfe07000001030000000200000001000000180000000000000000000000",
+            "2800008018000000",
+            "3900000000000000",
+            "0020000000000000",
+        ))
+        .expect("hex fixture is valid");
+
+        assert_eq!(
+            probe_public_binary_format(&input),
+            Err(BinaryFormatProbeError::EntryPointFileOffsetOutOfBounds)
+        );
+    }
+
+    #[test]
     fn reports_mach_o_with_entry_point_but_no_segment_as_not_convertible() {
         let input = BinaryInput::from_hex(concat!(
             "cffaedfe07000001030000000200000001000000180000000000000000000000",
             "2800008018000000",
-            "3412000000000000",
+            "2000000000000000",
             "0020000000000000",
         ))
         .expect("hex fixture is valid");

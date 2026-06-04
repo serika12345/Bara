@@ -38,6 +38,10 @@ impl MachOEntryPointFileOffset {
     pub(crate) const fn from_public_entry_point_value(value: u64) -> Self {
         Self { value }
     }
+
+    pub(crate) const fn as_u64(self) -> u64 {
+        self.value
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -82,7 +86,21 @@ pub(crate) fn parse_entry_point_command_metadata(
         .map(MachOEntryPointStackSize::from_public_entry_point_value)
         .ok_or(BinaryFormatProbeError::LoadCommandsOutOfBounds)?;
 
-    Ok(MachOEntryPointCommandMetadata::new(entryoff, stacksize))
+    let metadata = MachOEntryPointCommandMetadata::new(entryoff, stacksize);
+    validate_entry_point_file_offset(input, metadata.entryoff())?;
+
+    Ok(metadata)
+}
+
+fn validate_entry_point_file_offset(
+    input: &BinaryInput,
+    entryoff: MachOEntryPointFileOffset,
+) -> Result<(), BinaryFormatProbeError> {
+    if entryoff.as_u64() < input.byte_len() as u64 {
+        Ok(())
+    } else {
+        Err(BinaryFormatProbeError::EntryPointFileOffsetOutOfBounds)
+    }
 }
 
 const MACH_O_ENTRY_POINT_COMMAND_WIDTH: usize = 24;

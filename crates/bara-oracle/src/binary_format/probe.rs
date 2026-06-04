@@ -68,6 +68,7 @@ impl BinaryFormatProbeMetadata {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BinaryFormatProbeError {
+    EntryPointFileOffsetOutOfBounds,
     InputTooShort,
     HeaderTooShort,
     InvalidMachOSegmentName,

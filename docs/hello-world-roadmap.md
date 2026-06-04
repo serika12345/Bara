@@ -689,6 +689,31 @@ manifest
 - 完了。recognized `LC_SEGMENT_64` の file range は metadata assembly 時に検証され、
   executable image conversion や VM mapping には進まない。
 
+### HW8g: Mach-O LC_MAIN entryoff file offset validation
+
+目的:
+
+- recognized `LC_MAIN` metadata の `entryoff` が、入力 binary 内の byte を指す
+  file offset として成立することを検証する。
+
+方針:
+
+- `entryoff < input length` のみを検証し、`entryoff == input length` と input 外の
+  offset は classified probe error として reject する。
+- `entryoff` と recognized segment の対応付け、VM mapping、section parsing、
+  executable image 変換、loader execution、syscall、import はまだ扱わない。
+
+成功条件:
+
+- input 内の `entryoff` は valid として recognized entry point metadata に残る。
+- EOF または input 外を指す `entryoff` は
+  `EntryPointFileOffsetOutOfBounds` として reject する。
+
+状態:
+
+- 完了。`LC_MAIN.entryoff` は metadata assembly 時に入力 byte を指す file offset として
+  検証され、segment 対応付けや executable image conversion には進まない。
+
 ## 判断基準
 
 - 先に raw function で外部観測を増やす。
