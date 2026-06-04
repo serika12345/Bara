@@ -13,7 +13,8 @@ mod probe;
 pub use input::{BinaryFileBytes, BinaryInput, BinaryInputError};
 pub use mach_o::{MachOFileType, MachOLoadCommands, MachOMetadata};
 pub use mach_o_entry_function_pipeline::{
-    mach_o_entry_function_test_case, MachOEntryFunctionTestCaseError,
+    mach_o_entry_function_test_case, mach_o_entry_function_test_case_with_host_traps,
+    MachOEntryFunctionTestCaseError,
 };
 pub use mach_o_entry_point_command::{
     MachOEntryPointCommandMetadata, MachOEntryPointFileOffset, MachOEntryPointStackSize,
@@ -23,7 +24,8 @@ pub use mach_o_executable_image_conversion::{
     MachOExecutableImageConversionStatus,
 };
 pub use mach_o_executable_image_entry_function::{
-    mach_o_executable_image_entry_function, MachOExecutableImageEntryFunctionError,
+    mach_o_executable_image_entry_function, mach_o_executable_image_entry_function_with_host_traps,
+    MachOExecutableImageEntryFunctionError,
 };
 pub use mach_o_executable_image_materialization::{
     materialize_mach_o_executable_image, MachOExecutableImageMaterializationError,
