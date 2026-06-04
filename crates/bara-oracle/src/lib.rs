@@ -7,12 +7,13 @@ pub mod report;
 pub mod testcase;
 
 pub use binary_format::{
-    materialize_mach_o_executable_image, plan_mach_o_executable_image, probe_public_binary_format,
-    BinaryFileBytes, BinaryFormat, BinaryFormatProbeError, BinaryFormatProbeMetadata,
-    BinaryFormatProbeReport, BinaryFormatProbeStatus, BinaryInput, BinaryInputError,
-    MachOEntryPointCommandMetadata, MachOEntryPointFileOffset, MachOEntryPointSegmentOffset,
-    MachOEntryPointStackSize, MachOExecutableImageConversion,
-    MachOExecutableImageConversionBlocker, MachOExecutableImageConversionStatus,
+    mach_o_executable_image_entry_function, materialize_mach_o_executable_image,
+    plan_mach_o_executable_image, probe_public_binary_format, BinaryFileBytes, BinaryFormat,
+    BinaryFormatProbeError, BinaryFormatProbeMetadata, BinaryFormatProbeReport,
+    BinaryFormatProbeStatus, BinaryInput, BinaryInputError, MachOEntryPointCommandMetadata,
+    MachOEntryPointFileOffset, MachOEntryPointSegmentOffset, MachOEntryPointStackSize,
+    MachOExecutableImageConversion, MachOExecutableImageConversionBlocker,
+    MachOExecutableImageConversionStatus, MachOExecutableImageEntryFunctionError,
     MachOExecutableImageMaterializationError, MachOExecutableImagePlan,
     MachOExecutableImagePlanError, MachOFileType, MachOLoadCommandByteSize, MachOLoadCommandCount,
     MachOLoadCommandSummary, MachOLoadCommandType, MachOLoadCommands, MachOMetadata,

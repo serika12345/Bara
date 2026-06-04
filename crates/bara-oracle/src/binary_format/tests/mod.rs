@@ -1,7 +1,8 @@
 use super::{
-    materialize_mach_o_executable_image, plan_mach_o_executable_image, probe_public_binary_format,
-    BinaryFileBytes, BinaryFormat, BinaryFormatProbeError, BinaryFormatProbeMetadata,
-    BinaryFormatProbeReport, BinaryFormatProbeStatus, BinaryInput, MachOEntryPointCommandMetadata,
+    mach_o_executable_image_entry_function, materialize_mach_o_executable_image,
+    plan_mach_o_executable_image, probe_public_binary_format, BinaryFileBytes, BinaryFormat,
+    BinaryFormatProbeError, BinaryFormatProbeMetadata, BinaryFormatProbeReport,
+    BinaryFormatProbeStatus, BinaryInput, MachOEntryPointCommandMetadata,
     MachOEntryPointFileOffset, MachOEntryPointSegmentOffset, MachOEntryPointStackSize,
     MachOExecutableImageConversionBlocker, MachOExecutableImageConversionStatus,
     MachOExecutableImageMaterializationError, MachOExecutableImagePlan,
@@ -21,6 +22,7 @@ fn empty_load_commands() -> MachOLoadCommands {
 }
 
 mod conversion;
+mod entry_function;
 mod materialization;
 mod plan;
 mod probe_entry_point;

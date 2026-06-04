@@ -49,6 +49,8 @@ raw function fixture が runtime 境界を通じて stdout に
 - Mach-O 64-bit little-endian `LC_SEGMENT_64` metadata
 - Mach-O 64-bit little-endian `LC_MAIN` entry point metadata
 - Mach-O executable image conversion blocker classification
+- Mach-O materialized executable image から no-args u64 raw function testcase への
+  pure conversion
 
 ## マイルストーン
 
@@ -984,6 +986,33 @@ raw function / executable manifest pipeline に段階的に接続する。
   できる。
 - VM address と file offset の対応は domain type で表現され、primitive boundary が
   増えすぎない。
+
+#### HW10a: Mach-O executable image entry function testcase
+
+目的:
+
+- materialized `ExecutableImage` の entry point 以降を、既存 raw function runner 用の
+  no-args u64 `TestCase` に pure に変換する。
+
+方針:
+
+- `ExecutableImage::entry_function_bytes()` を使い、`CaseId` と
+  `TestCaseAbi::NoArgsU64` を持つ `TestCase` を作る。
+- `BinaryInput` slicing、file I/O、CLI、expected comparison、runtime 実行はまだ
+  行わない。
+- image error は Mach-O executable image entry function 専用 classified error に
+  包む。
+
+成功条件:
+
+- entry offset を持つ `ExecutableImage` から、case id、ABI、entry 以降の x86 bytes が
+  期待通りの `TestCase` を作れる。
+- `binary_format/mod.rs` を肥大化させず、entry function 変換 test は責務別 file に置く。
+
+状態:
+
+- 完了。materialized Mach-O executable image を no-args u64 raw function
+  `TestCase` へ pure に変換できる。
 
 ### HW11: Mach-O hello world via Bara host trap
 
