@@ -237,10 +237,52 @@ integration and must audit:
 If the sub-agent result violates these rules, revise it directly or send it
 back as a smaller, clearer task before accepting it.
 
-Committing is not automatic for every change. Commit only when the user asks
-for a commit or when the active user instruction explicitly includes committing
-as part of the cycle. Before committing, verify that the staged diff contains
-only the intended files.
+## Milestone Branch Workflow
+
+When the user asks to advance until a small or large milestone is reached, use
+a dedicated work branch unless the user explicitly says otherwise.
+
+Branch workflow:
+
+1. Start from the current base branch, normally `main`.
+2. Create a task branch before implementation.
+3. Advance TODO-backed small steps on that branch.
+4. Commit autonomously on the task branch after each coherent verified step.
+5. Push the task branch after commits when network access is available.
+6. Continue until the requested small or large milestone is reached, or until a
+   review gate or blocker is reached.
+7. When a large milestone is complete, stop and return a review package with
+   the branch already committed and pushed.
+
+Large milestone completion is a review gate. Do not merge back to `main`
+autonomously. After user review, if the user approves, merge the branch into
+`main`, clean up the branch if appropriate, update progress documentation, and
+continue to the next milestone only when instructed.
+
+On a dedicated task branch, autonomous commits and pushes are allowed when all
+of these are true:
+
+- the work is on a dedicated task branch, not `main`
+- the commit contains one coherent TODO-backed step
+- required verification for that step has passed, or the failure is documented
+- TODO, progress, and design documents match the implementation state
+- the commit does not include unrelated user changes
+
+Do not autonomously commit or push on `main`. For non-milestone tasks, such as
+documentation updates, small policy edits, one-off explanations, or exploratory
+changes, do not create a branch and do not commit unless the user explicitly
+asks. These tasks usually happen on `main`; return the uncommitted diff for
+review unless instructed otherwise.
+
+Review package at a milestone stop:
+
+- branch name and latest commit
+- completed TODO items
+- changed files summary
+- verification commands and results
+- design or refactoring decisions made
+- remaining risks or review points
+- recommended next milestone
 
 ## Architecture Rules
 
