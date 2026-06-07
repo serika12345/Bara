@@ -61,6 +61,7 @@ raw function fixture が runtime 境界を通じて stdout に
 - x86 `syscall` の typed decode と classified unsupported lift
 - raw testcase から ARM64 machine code artifact への実行なし変換境界
 - raw testcase から macOS ARM64 executable artifact への toolchain packaging 境界
+- standalone macOS ARM64 executable artifact による実 OS stdout emission
 
 ## マイルストーン
 
@@ -1608,6 +1609,69 @@ HW19 全体の状態:
 - 完了。変換済み ARM64 bytes を OS が起動できる macOS ARM64 executable artifact に
   package し、実プロセスとして exit status を観測する smoke 経路ができた。
   standalone `hello world` stdout emission は次の大項目で扱う。
+
+### HW20: Standalone executable stdout emission
+
+目的:
+
+- Bara 専用 stdout host trap fixture を、standalone macOS ARM64 executable artifact の
+  実 OS stdout emission として観測できるようにする。
+- 生成した executable を起動すると、コンソールに `hello world\n` が出る状態へ進む。
+
+方針:
+
+- x86 `syscall` や libc / dyld import の汎用変換はまだ扱わない。
+- 既存 runtime の `RunResult.stdout` 合成を実 OS stdout と見なさない。
+- packaging 境界で、明示的な native stdout prologue を生成する。
+- process spawn / temporary assembly / toolchain 呼び出しは `btbc-cli` の
+  `native_artifact` 境界に閉じる。
+- `bara-arm64` は既存どおり ARM64 function body bytes の emit に集中する。
+
+成功条件:
+
+- `hello_world_stdout_return_0` fixture から standalone executable artifact を作れる。
+- 生成 artifact を実プロセスとして起動すると stdout が `hello world\n`、
+  exit status が 0 になる。
+- stdout host trap metadata だけでなく、emitted function が stdout request を持つことを
+  確認してから native stdout prologue を生成する。
+
+#### HW20a: Link stdout host trap fixture with native write prologue
+
+目的:
+
+- stdout host trap を要求する fixture を、native `_write` prologue と既存 ARM64
+  function body bytes で構成される `_main` としてリンクする。
+
+方針:
+
+- `compile_test_case_function` の compile-only 結果を使う。
+- `TestCaseHostTrapPlan` の stdout text と `EmittedHostTrapRequests` の stdout request が
+  揃っている場合だけ native stdout prologue を生成する。
+- prologue は file descriptor 1、text pointer、text length を `_write` に渡す。
+- generated body は既存 emit 結果の bytes をそのまま置き、return value を `_main`
+  の exit status として扱う。
+
+成功条件:
+
+- `link-fixture-arm64-stdout-main <case.json> <out-exe>` が
+  `hello_world_stdout_return_0` fixture から executable artifact を作る。
+- 生成 artifact を起動すると stdout `hello world\n`、exit status 0 が観測できる。
+- stdout request がない fixture は stdout executable packaging unsupported として
+  classified error になる。
+
+状態:
+
+- 完了。`link-fixture-arm64-stdout-main <case.json> <out-exe>` で
+  `hello_world_stdout_return_0` fixture を native `_write` prologue 付きの
+  macOS ARM64 executable artifact としてリンクできる。生成 artifact は実プロセスとして
+  stdout `hello world\n`、exit status 0 を観測できる。stdout request がない fixture は
+  stdout main unsupported として classified error になる。
+
+HW20 全体の状態:
+
+- 完了。Bara 専用 stdout host trap fixture を、runtime の stdout 合成ではなく
+  standalone executable artifact 内の明示的な native stdout emission として観測できる。
+  生成 executable を起動すると実OS stdoutに `hello world\n` が出る。
 
 ## 判断基準
 

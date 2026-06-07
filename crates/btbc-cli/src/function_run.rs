@@ -25,6 +25,10 @@ impl FunctionCompileResult {
     fn emitted(&self) -> &bara_arm64::EmittedFunction {
         &self.emitted
     }
+
+    pub(crate) fn stdout_host_trap_request(&self) -> FunctionStdoutHostTrapRequest {
+        FunctionStdoutHostTrapRequest::new(self.emitted.host_trap_requests().stdout_requested())
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -37,6 +41,21 @@ impl<'a> FunctionArm64Bytes<'a> {
 
     pub(crate) fn as_slice(self) -> &'a [u8] {
         self.0.bytes()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct FunctionStdoutHostTrapRequest {
+    requested: bool,
+}
+
+impl FunctionStdoutHostTrapRequest {
+    const fn new(requested: bool) -> Self {
+        Self { requested }
+    }
+
+    pub(crate) const fn is_requested(self) -> bool {
+        self.requested
     }
 }
 

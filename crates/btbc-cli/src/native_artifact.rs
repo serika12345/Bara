@@ -6,9 +6,9 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use bara_oracle::FailureKind;
+use bara_oracle::{FailureKind, TestCaseHostTrapPlan};
 
-use crate::function_run::FunctionArm64Bytes;
+use crate::function_run::{FunctionArm64Bytes, FunctionStdoutHostTrapRequest};
 
 #[derive(Debug)]
 pub(crate) enum NativeArtifactError {
@@ -33,12 +33,14 @@ pub(crate) enum NativeArtifactError {
     MissingLinkedExecutable {
         path: PathBuf,
     },
+    StdoutMainUnsupported(NativeStdoutMainUnsupported),
 }
 
 impl NativeArtifactError {
     pub(crate) const fn failure_kind(&self) -> FailureKind {
         match self {
             Self::UnsupportedHost { .. } => FailureKind::EmitError,
+            Self::StdoutMainUnsupported(_) => FailureKind::EmitError,
             Self::TempAssemblyPath { .. }
             | Self::WriteAssembly { .. }
             | Self::LinkerSpawn { .. }
@@ -77,11 +79,35 @@ impl fmt::Display for NativeArtifactError {
                 "clang completed but output executable does not exist: {}",
                 path.display()
             ),
+            Self::StdoutMainUnsupported(error) => write!(formatter, "{error}"),
         }
     }
 }
 
 impl Error for NativeArtifactError {}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum NativeStdoutMainUnsupported {
+    MissingStdoutTrapPlan,
+    MissingEmittedStdoutRequest,
+}
+
+impl fmt::Display for NativeStdoutMainUnsupported {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingStdoutTrapPlan => write!(
+                formatter,
+                "stdout main executable requires testcase stdout host trap text"
+            ),
+            Self::MissingEmittedStdoutRequest => write!(
+                formatter,
+                "stdout main executable requires emitted function stdout request"
+            ),
+        }
+    }
+}
+
+impl Error for NativeStdoutMainUnsupported {}
 
 pub(crate) fn link_arm64_main_executable(
     body: FunctionArm64Bytes<'_>,
@@ -89,8 +115,35 @@ pub(crate) fn link_arm64_main_executable(
 ) -> Result<(), NativeArtifactError> {
     ensure_supported_host()?;
 
-    let assembly_path = temporary_assembly_path()?;
     let source = arm64_main_assembly_source(body);
+    link_assembly_source(&source, output_path)
+}
+
+pub(crate) fn link_arm64_stdout_main_executable(
+    body: FunctionArm64Bytes<'_>,
+    host_trap_plan: &TestCaseHostTrapPlan,
+    stdout_request: FunctionStdoutHostTrapRequest,
+    output_path: &Path,
+) -> Result<(), NativeArtifactError> {
+    let Some(stdout) = host_trap_plan.stdout_trap() else {
+        return Err(NativeArtifactError::StdoutMainUnsupported(
+            NativeStdoutMainUnsupported::MissingStdoutTrapPlan,
+        ));
+    };
+    if !stdout_request.is_requested() {
+        return Err(NativeArtifactError::StdoutMainUnsupported(
+            NativeStdoutMainUnsupported::MissingEmittedStdoutRequest,
+        ));
+    }
+
+    ensure_supported_host()?;
+
+    let source = arm64_stdout_main_assembly_source(body, stdout.text());
+    link_assembly_source(&source, output_path)
+}
+
+fn link_assembly_source(source: &str, output_path: &Path) -> Result<(), NativeArtifactError> {
+    let assembly_path = temporary_assembly_path()?;
     fs::write(&assembly_path, source).map_err(|source| NativeArtifactError::WriteAssembly {
         path: assembly_path.clone(),
         source,
@@ -146,6 +199,31 @@ fn arm64_main_assembly_source(body: FunctionArm64Bytes<'_>) -> String {
 
 fn arm64_main_assembly_source_from_bytes(bytes: &[u8]) -> String {
     let mut source = String::from(".text\n.globl _main\n.p2align 2\n_main:\n");
+    push_byte_directives(&mut source, bytes);
+    source
+}
+
+fn arm64_stdout_main_assembly_source(body: FunctionArm64Bytes<'_>, stdout_text: &str) -> String {
+    arm64_stdout_main_assembly_source_from_parts(body.as_slice(), stdout_text.as_bytes())
+}
+
+fn arm64_stdout_main_assembly_source_from_parts(body_bytes: &[u8], stdout_bytes: &[u8]) -> String {
+    let mut source = String::from(".text\n.globl _main\n.p2align 2\n_main:\n");
+    source.push_str("stp x29, x30, [sp, #-16]!\n");
+    source.push_str("mov x29, sp\n");
+    source.push_str("mov x0, #1\n");
+    source.push_str("adrp x1, L_stdout_text@PAGE\n");
+    source.push_str("add x1, x1, L_stdout_text@PAGEOFF\n");
+    source.push_str(&format!("mov x2, #{}\n", stdout_bytes.len()));
+    source.push_str("bl _write\n");
+    source.push_str("ldp x29, x30, [sp], #16\n");
+    push_byte_directives(&mut source, body_bytes);
+    source.push_str(".section __TEXT,__const\n.p2align 2\nL_stdout_text:\n");
+    push_byte_directives(&mut source, stdout_bytes);
+    source
+}
+
+fn push_byte_directives(source: &mut String, bytes: &[u8]) {
     for chunk in bytes.chunks(12) {
         source.push_str(".byte ");
         for (index, byte) in chunk.iter().enumerate() {
@@ -156,12 +234,13 @@ fn arm64_main_assembly_source_from_bytes(bytes: &[u8]) -> String {
         }
         source.push('\n');
     }
-    source
 }
 
 #[cfg(test)]
 mod tests {
-    use super::arm64_main_assembly_source_from_bytes;
+    use super::{
+        arm64_main_assembly_source_from_bytes, arm64_stdout_main_assembly_source_from_parts,
+    };
 
     #[test]
     fn assembly_source_embeds_arm64_main_body_bytes() {
@@ -173,5 +252,24 @@ mod tests {
             source,
             ".text\n.globl _main\n.p2align 2\n_main:\n.byte 0x40, 0x05, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6\n"
         );
+    }
+
+    #[test]
+    fn stdout_main_assembly_source_embeds_write_prologue_and_stdout_bytes() {
+        let source = arm64_stdout_main_assembly_source_from_parts(
+            &[0x00, 0x00, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6],
+            b"hello world\n",
+        );
+
+        assert!(source.contains("stp x29, x30, [sp, #-16]!\n"));
+        assert!(source.contains("mov x0, #1\n"));
+        assert!(source.contains("adrp x1, L_stdout_text@PAGE\n"));
+        assert!(source.contains("add x1, x1, L_stdout_text@PAGEOFF\n"));
+        assert!(source.contains("mov x2, #12\n"));
+        assert!(source.contains("bl _write\n"));
+        assert!(source.contains("ldp x29, x30, [sp], #16\n"));
+        assert!(source.contains(
+            ".byte 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x77, 0x6f, 0x72, 0x6c, 0x64, 0x0a\n"
+        ));
     }
 }
