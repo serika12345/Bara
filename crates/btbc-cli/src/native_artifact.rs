@@ -59,7 +59,7 @@ impl NativeArtifactError {
             | Self::WriteAssembly { .. }
             | Self::LinkerSpawn { .. }
             | Self::LinkerFailed { .. }
-            | Self::MissingLinkedExecutable { .. } => FailureKind::InvalidTestCase,
+            | Self::MissingLinkedExecutable { .. } => FailureKind::EmitError,
         }
     }
 }
@@ -300,9 +300,76 @@ fn push_byte_directives(source: &mut String, bytes: &[u8]) {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        io,
+        path::PathBuf,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    use bara_oracle::FailureKind;
+
     use super::{
         arm64_main_assembly_source_from_bytes, arm64_stdout_main_assembly_source_from_parts,
+        NativeArtifactError, NativeStdoutMainUnsupported,
     };
+
+    #[test]
+    fn packaging_and_toolchain_failures_are_emit_errors() {
+        let temp_path = PathBuf::from("/tmp/bara-native-artifact-test");
+        let time_error = UNIX_EPOCH
+            .duration_since(SystemTime::now())
+            .expect_err("current time is after Unix epoch");
+        let errors = [
+            NativeArtifactError::UnsupportedHost {
+                os: "test-os",
+                arch: "test-arch",
+            },
+            NativeArtifactError::TempAssemblyPath { source: time_error },
+            NativeArtifactError::WriteAssembly {
+                path: temp_path.clone(),
+                source: io::Error::other("write failed"),
+            },
+            NativeArtifactError::LinkerSpawn {
+                source: io::Error::other("spawn failed"),
+            },
+            NativeArtifactError::LinkerFailed {
+                status: "exit status: 1".to_owned(),
+                stderr: "link failed".to_owned(),
+            },
+            NativeArtifactError::MissingLinkedExecutable {
+                path: temp_path.clone(),
+            },
+            NativeArtifactError::StdoutMainUnsupported(
+                NativeStdoutMainUnsupported::MissingStdoutTrapPlan,
+            ),
+        ];
+
+        for error in errors {
+            assert_eq!(error.failure_kind(), FailureKind::EmitError);
+        }
+    }
+
+    #[test]
+    fn native_artifact_execution_failures_are_run_errors() {
+        let temp_path = PathBuf::from("/tmp/bara-native-artifact-test");
+        let errors = [
+            NativeArtifactError::RunArtifact {
+                path: temp_path.clone(),
+                source: io::Error::other("run failed"),
+            },
+            NativeArtifactError::MissingArtifactExitStatus {
+                path: temp_path.clone(),
+            },
+            NativeArtifactError::NegativeArtifactExitStatus {
+                path: temp_path,
+                status: -1,
+            },
+        ];
+
+        for error in errors {
+            assert_eq!(error.failure_kind(), FailureKind::RunError);
+        }
+    }
 
     #[test]
     fn assembly_source_embeds_arm64_main_body_bytes() {

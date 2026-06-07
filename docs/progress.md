@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-07 21:55 JST
+最終更新: 2026-06-07 22:12 JST
 
 状態:
 
@@ -17,11 +17,11 @@
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B1 で Hello World 成果物の安定化を進めている。
 - active_design_focus: planned。現在の設計監査入口は [docs/design-todo.md](design-todo.md) の D1 と D2。
 - active_branch: `task/b1-executable-smoke-blackbox-report`。B1 の小ステップ commit を積み増している。
-- related_todo: B1 `link-fixture-arm64-stdout-main` の出力、stdout、exit status stable JSON report completed。
-- completed_work: `link-fixture-arm64-stdout-main` が stdout executable artifact を生成して実行し、`ObservedResult` JSON として exit status、return value、stdout、stderr を返すようにした。
-- remaining_work: B1 の temporary assembly / toolchain failure classification、native artifact CLI test 分割、hello-world roadmap 整理。
-- next_action: B1 の次項目として temporary assembly / toolchain 呼び出しの失敗分類を整理する。
-- verification: `nix develop -c cargo test -p btbc-cli link_fixture_arm64_stdout_main_writes_hello_world_executable` と `nix develop -c ./scripts/verify` passed at 2026-06-07 21:55 JST。
+- related_todo: B1 temporary assembly / toolchain 呼び出しの失敗分類 completed。
+- completed_work: native artifact packaging の temporary assembly / `clang` / missing linked executable 失敗を `EmitError` として分類し、生成後の executable 実行失敗は `RunError` として分類することをテストで固定した。
+- remaining_work: B1 の native artifact CLI test 分割、hello-world roadmap 整理。
+- next_action: B1 の次項目として native artifact 関連の CLI テストを `main.rs` から責務別 module へ分割する。
+- verification: `nix develop -c cargo test -p btbc-cli native_artifact::tests` と `nix develop -c ./scripts/verify` passed at 2026-06-07 22:12 JST。
 
 直近で完了した作業:
 
@@ -29,6 +29,8 @@
 - 検証: 期待 fixture 更新後に `nix develop -c cargo test -p btbc-cli check_blackbox_reports_raw_manifest_mach_o_and_probe_fixtures` が期待どおり失敗し、実装後に同テスト、`nix develop -c cargo test -p btbc-cli check_blackbox_writes_report_and_schema_specific_actual_outputs`、`nix develop -c ./scripts/verify` が通過した。
 - 2026-06-07 21:54 JST: B1 の 2 つ目の小ステップとして、`link-fixture-arm64-stdout-main` の出力を stable `ObservedResult` JSON report にした。生成 artifact は command 内で実行され、stdout `hello world\n`、exit status 0、stderr 空が JSON に含まれる。
 - 検証: 期待 fixture 更新後に `nix develop -c cargo test -p btbc-cli link_fixture_arm64_stdout_main_writes_hello_world_executable` が期待どおり失敗し、実装後に同テストと `nix develop -c ./scripts/verify` が通過した。
+- 2026-06-07 22:10 JST: B1 の 3 つ目の小ステップとして、native artifact packaging / toolchain / execution の failure classification を整理した。temporary assembly と `clang` 呼び出し、linked executable 欠落は `EmitError`、artifact 実行失敗は `RunError` に分類する。
+- 検証: 期待分類テスト追加後に `nix develop -c cargo test -p btbc-cli packaging_and_toolchain_failures_are_emit_errors` が期待どおり失敗し、実装後に `nix develop -c cargo test -p btbc-cli native_artifact::tests` と `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-07 14:48 JST: Bara の agent action commands を VSCode / Codex IDE から選べるように、repo-scoped skill として `.agents/skills/bara-*` を追加した。
 - 検証: `nix develop -c ./scripts/verify` は `verify-cves` の pipe 処理で停止したため中断。代わりに同等 gate を分解して実行し、`cargo fmt --all -- --check`、`./scripts/check-no-invisible-chars`、`./scripts/check-domain-types`、`cargo metadata --locked --format-version 1`、manual `cargo audit` baseline check、`cargo deny check`、`./scripts/verify-nix-package`、`cargo check --workspace --all-targets`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace`、`./scripts/verify-blackbox` が通過した。
 
