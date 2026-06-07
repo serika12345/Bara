@@ -182,6 +182,17 @@ milestone is completed or the project direction changes, add a concise entry to
 `docs/progress.md` that records the state reached, the verification performed,
 and the next intended direction.
 
+`docs/progress.md` must also describe the current active state without requiring
+conversation context. When starting, pausing, blocking, superseding, or
+completing TODO-backed implementation, refactoring, architecture work,
+milestone branch work, or major documentation/policy work, update the
+timestamped `現在の作業スナップショット` in the same change. Include the
+timestamp in `YYYY-MM-DD HH:MM JST`, state (`planned`, `in_progress`, `paused`,
+`blocked`, `completed`, or `superseded`), related TODO or design TODO, branch
+and latest commit when known, completed work, remaining work, next action, and
+verification performed or deliberately skipped. Do not leave stale
+`in_progress` entries behind.
+
 Do not mix broad feature implementation and unrelated refactoring merely to
 clear TODO entries. If a refactor is required to make the feature safe, keep it
 as a clearly bounded preparatory step and mention the relevant design TODO.
@@ -209,7 +220,8 @@ Default cycle:
    before moving on.
 9. Update `TODO.md`, `docs/design-todo.md`, or focused roadmap docs when the
    change affects roadmap state or design decisions. Update
-   `docs/progress.md` when a milestone or major project state changes.
+   `docs/progress.md` when a milestone, current active state, or major project
+   state changes.
 10. Run the required Nix-based verification gate.
 11. Summarize what changed, what was verified, and what remains.
 
