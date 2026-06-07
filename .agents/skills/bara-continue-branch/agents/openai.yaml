@@ -1,0 +1,8 @@
+interface:
+  display_name: "Bara /continue-branch"
+  short_description: "Continue the current Bara task branch"
+  brand_color: "#2563EB"
+  default_prompt: "Use $bara-continue-branch to continue the current Bara task branch."
+
+policy:
+  allow_implicit_invocation: false

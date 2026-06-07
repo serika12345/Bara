@@ -1,5 +1,6 @@
 {
   "recommendations": [
+    "openai.chatgpt",
     "rust-lang.rust-analyzer",
     "tamasfe.even-better-toml",
     "editorconfig.editorconfig",

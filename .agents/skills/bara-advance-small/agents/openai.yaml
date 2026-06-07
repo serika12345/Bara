@@ -1,0 +1,8 @@
+interface:
+  display_name: "Bara /advance-small"
+  short_description: "Advance one verified Bara TODO step"
+  brand_color: "#2563EB"
+  default_prompt: "Use $bara-advance-small to run Bara's /advance-small workflow."
+
+policy:
+  allow_implicit_invocation: false

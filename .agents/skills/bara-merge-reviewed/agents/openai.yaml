@@ -1,0 +1,8 @@
+interface:
+  display_name: "Bara /merge-reviewed"
+  short_description: "Merge a reviewed Bara branch"
+  brand_color: "#2563EB"
+  default_prompt: "Use $bara-merge-reviewed after approving the reviewed Bara branch merge."
+
+policy:
+  allow_implicit_invocation: false

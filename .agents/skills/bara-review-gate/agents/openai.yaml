@@ -1,0 +1,8 @@
+interface:
+  display_name: "Bara /review-gate"
+  short_description: "Summarize branch state for review"
+  brand_color: "#2563EB"
+  default_prompt: "Use $bara-review-gate to prepare the current Bara review package."
+
+policy:
+  allow_implicit_invocation: false

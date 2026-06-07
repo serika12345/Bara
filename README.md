@@ -170,6 +170,12 @@ direnv を使う場合は `.envrc` の `use flake` を有効にします。
 - `/docs-only`: ドキュメント更新のみを行う。原則 `main` のまま、commit / push はしない。
 - `/status`: 現在の branch、worktree、TODO、次に進むべき候補を確認する。
 
+VSCode の Codex 拡張で UI から選びたい場合は、repo-scoped skill として
+同じ操作を `.agents/skills/bara-*` に置いています。チャット入力で `$` を
+入力し、`Bara /advance-small` や `Bara /status` を選んでください。Codex
+IDE には組み込みの `/status` もあるため、Bara 用の状態確認は
+`$bara-status` から呼び出すのが確実です。
+
 基本方針:
 
 - マイルストーン進行は作業ブランチで行う。

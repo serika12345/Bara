@@ -313,6 +313,13 @@ intended to let the user select an action without typing the full instruction.
   milestone, relevant design TODOs, and recommended next action. Do not modify
   files.
 
+For Codex IDE / VSCode UI selection, repo-scoped skills in `.agents/skills/bara-*`
+mirror these actions. Invoking `$bara-advance-small`, `$bara-advance-large`,
+`$bara-continue-branch`, `$bara-review-gate`, `$bara-merge-reviewed`,
+`$bara-docs-only`, or `$bara-status` is equivalent to the corresponding Bara
+action command. Use `$bara-status` for the repository status workflow because
+the IDE also has a built-in `/status` command.
+
 ## Architecture Rules
 
 Separate I/O from logic. Outside explicit I/O boundaries, behavior should be

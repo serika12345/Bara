@@ -1,0 +1,8 @@
+interface:
+  display_name: "Bara /advance-large"
+  short_description: "Advance a large Bara milestone to review"
+  brand_color: "#2563EB"
+  default_prompt: "Use $bara-advance-large to run Bara's /advance-large milestone workflow."
+
+policy:
+  allow_implicit_invocation: false

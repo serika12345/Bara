@@ -1,0 +1,8 @@
+interface:
+  display_name: "Bara /status"
+  short_description: "Report Bara branch and TODO status"
+  brand_color: "#2563EB"
+  default_prompt: "Use $bara-status to report Bara branch, worktree, and TODO status."
+
+policy:
+  allow_implicit_invocation: false

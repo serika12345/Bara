@@ -1,0 +1,8 @@
+interface:
+  display_name: "Bara /docs-only"
+  short_description: "Run documentation-only Bara edits"
+  brand_color: "#2563EB"
+  default_prompt: "Use $bara-docs-only to make only Bara documentation or policy edits."
+
+policy:
+  allow_implicit_invocation: false
