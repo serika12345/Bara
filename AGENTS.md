@@ -218,6 +218,10 @@ or similar, use this default cycle without asking for process clarification.
 Prefer the earliest unfinished relevant milestone in `TODO.md`, unless the
 user explicitly names a milestone or changes priority.
 
+Agents should also recognize the short action commands documented in
+`README.md`. Treat those commands as explicit user instructions; do not ask the
+user to restate the full workflow when a command is clear.
+
 Large milestones must be split before implementation. Do not attempt to finish
 a broad milestone in one unstructured change. Create or update TODO entries
 when the split itself changes the plan.
@@ -283,6 +287,31 @@ Review package at a milestone stop:
 - design or refactoring decisions made
 - remaining risks or review points
 - recommended next milestone
+
+## Agent Action Commands
+
+These short commands are stable aliases for common agent workflows. They are
+intended to let the user select an action without typing the full instruction.
+
+- `/advance-large`: Create a dedicated work branch and advance the current
+  large milestone to completion. Commit and push coherent verified steps on the
+  work branch. Stop at the large milestone review gate with a review package.
+- `/advance-small`: Create or continue a dedicated work branch and advance the
+  next small TODO-backed step. Commit and push the verified step on the work
+  branch, then stop with a concise review package.
+- `/continue-branch`: Continue work on the current dedicated task branch using
+  the default implementation cycle. Commit and push coherent verified steps.
+- `/review-gate`: Do not implement more work. Summarize the current branch,
+  completed TODOs, changed files, verification results, risks, and recommended
+  next step.
+- `/merge-reviewed`: After user approval, merge the reviewed work branch into
+  `main`, update progress documentation if needed, and clean up the branch when
+  appropriate. Do not use this command without explicit review approval.
+- `/docs-only`: Perform documentation or policy edits only. Usually stay on
+  `main`; do not create a branch, commit, or push unless explicitly requested.
+- `/status`: Report current branch state, worktree status, active TODO
+  milestone, relevant design TODOs, and recommended next action. Do not modify
+  files.
 
 ## Architecture Rules
 
