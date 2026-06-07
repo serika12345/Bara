@@ -1,4 +1,9 @@
-use std::path::{Path, PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use bara_oracle::{
     binary_format_probe_report_from_json, corpus_report_to_json, observed_result_from_json, CaseId,
@@ -7,8 +12,8 @@ use bara_oracle::{
 
 use crate::{
     case_id_from_path, run_check_binary_probe, run_check_executable, run_check_mach_o,
-    run_check_mach_o_host_traps, run_corpus_fixture, sorted_case_paths, write_corpus_outputs,
-    CliError, FixtureRun,
+    run_check_mach_o_host_traps, run_corpus_fixture, run_link_fixture_arm64_main,
+    sorted_case_paths, write_corpus_outputs, CliError, FixtureRun,
 };
 
 pub(crate) fn run_check_blackbox(output_dir: Option<&Path>) -> Result<String, CliError> {
@@ -20,10 +25,11 @@ pub(crate) fn run_check_blackbox(output_dir: Option<&Path>) -> Result<String, Cl
         ));
     }
 
+    let native_artifact_dir = output_dir.map(|path| path.join("native-artifacts"));
     fixture_runs.extend(
         BLACKBOX_FIXTURES
             .iter()
-            .map(BlackboxFixtureSpec::run_fixture),
+            .map(|fixture| fixture.run_fixture(native_artifact_dir.as_deref())),
     );
 
     let report = fixture_runs
@@ -41,6 +47,11 @@ pub(crate) fn run_check_blackbox(output_dir: Option<&Path>) -> Result<String, Cl
 }
 
 const BLACKBOX_FIXTURES: &[BlackboxFixtureSpec] = &[
+    BlackboxFixtureSpec::NativeExecutableSmoke {
+        case: "tests/cases/return_42.json",
+        case_id: "return_42_native_executable_smoke",
+        expected_exit_status: 42,
+    },
     BlackboxFixtureSpec::Executable {
         manifest: "tests/executables/hello_world_executable_manifest.json",
         expected: "tests/expected/hello_world_executable_manifest.json",
@@ -65,6 +76,11 @@ const BLACKBOX_FIXTURES: &[BlackboxFixtureSpec] = &[
 ];
 
 enum BlackboxFixtureSpec {
+    NativeExecutableSmoke {
+        case: &'static str,
+        case_id: &'static str,
+        expected_exit_status: i32,
+    },
     Executable {
         manifest: &'static str,
         expected: &'static str,
@@ -85,8 +101,18 @@ enum BlackboxFixtureSpec {
 }
 
 impl BlackboxFixtureSpec {
-    fn run_fixture(&self) -> FixtureRun {
+    fn run_fixture(&self, native_artifact_dir: Option<&Path>) -> FixtureRun {
         match self {
+            Self::NativeExecutableSmoke {
+                case,
+                case_id,
+                expected_exit_status,
+            } => run_native_executable_smoke(
+                case_id,
+                &repo_fixture_path(case),
+                *expected_exit_status,
+                native_artifact_dir,
+            ),
             Self::Executable { manifest, expected } => {
                 let manifest_path = repo_fixture_path(manifest);
                 let expected_path = repo_fixture_path(expected);
@@ -121,6 +147,105 @@ impl BlackboxFixtureSpec {
                     || run_check_binary_probe(&binary_path, &expected_path),
                 )
             }
+        }
+    }
+}
+
+fn run_native_executable_smoke(
+    case_id: &str,
+    case_path: &Path,
+    expected_exit_status: i32,
+    native_artifact_dir: Option<&Path>,
+) -> FixtureRun {
+    let case_id = CaseId::new(case_id).expect("native smoke case id is non-empty");
+    let artifact = match NativeSmokeArtifact::new(&case_id, native_artifact_dir) {
+        Ok(artifact) => artifact,
+        Err(message) => {
+            return FixtureRun::failed(case_id, FailureKind::InvalidTestCase, message);
+        }
+    };
+
+    if let Err(error) = run_link_fixture_arm64_main(case_path, artifact.path()) {
+        return FixtureRun::failed(case_id, error.failure_kind(), error.to_string());
+    }
+
+    let output = match Command::new(artifact.path()).output() {
+        Ok(output) => output,
+        Err(error) => {
+            return FixtureRun::failed(
+                case_id,
+                FailureKind::RunError,
+                format!(
+                    "failed to run native executable smoke artifact {}: {error}",
+                    artifact.path().display()
+                ),
+            );
+        }
+    };
+
+    if output.status.code() != Some(expected_exit_status)
+        || !output.stdout.is_empty()
+        || !output.stderr.is_empty()
+    {
+        return FixtureRun::failed(
+            case_id,
+            FailureKind::ComparisonMismatch,
+            format!(
+                "native executable smoke mismatch: expected exit status {expected_exit_status}, empty stdout, empty stderr; actual exit status {:?}, stdout {:?}, stderr {:?}",
+                output.status.code(),
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            ),
+        );
+    }
+
+    FixtureRun::passed(case_id)
+}
+
+struct NativeSmokeArtifact {
+    path: PathBuf,
+    remove_on_drop: bool,
+}
+
+impl NativeSmokeArtifact {
+    fn new(case_id: &CaseId, native_artifact_dir: Option<&Path>) -> Result<Self, String> {
+        match native_artifact_dir {
+            Some(dir) => {
+                fs::create_dir_all(dir).map_err(|error| {
+                    format!(
+                        "failed to create native artifact directory {}: {error}",
+                        dir.display()
+                    )
+                })?;
+                Ok(Self {
+                    path: dir.join(case_id.as_str()),
+                    remove_on_drop: false,
+                })
+            }
+            None => {
+                let nanos = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map_err(|error| {
+                        format!("failed to build native smoke temporary artifact path: {error}")
+                    })?
+                    .as_nanos();
+                Ok(Self {
+                    path: std::env::temp_dir().join(format!("bara-{}-{nanos}", case_id.as_str())),
+                    remove_on_drop: true,
+                })
+            }
+        }
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for NativeSmokeArtifact {
+    fn drop(&mut self) {
+        if self.remove_on_drop {
+            let _ = fs::remove_file(&self.path);
         }
     }
 }
