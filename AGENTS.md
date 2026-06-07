@@ -4,7 +4,7 @@ This file is the operational rulebook for coding agents working on Bara.
 Follow it together with the repository documentation, especially
 `docs/coding-rules.md`, `docs/clean-room.md`, `docs/scope.md`,
 `docs/ir.md`, `docs/test-oracle.md`, `TODO.md`, and
-`docs/design-todo.md`.
+`docs/design-todo.md`, and `docs/progress.md`.
 
 ## Project Intent
 
@@ -146,6 +146,9 @@ Use these files for different responsibilities:
 - `TODO.md` tracks implementation milestones and large project goals.
 - `docs/design-todo.md` tracks detailed design decisions, refactoring
   boundaries, decomposition plans, and single-responsibility audit notes.
+- `docs/progress.md` tracks completed milestones, current project state, and
+  major direction changes so project history can be understood without reading
+  git history.
 
 When selecting the next task, prefer the earliest unfinished implementation
 milestone in `TODO.md` unless the user names a different milestone or asks for
@@ -158,12 +161,86 @@ update the appropriate TODO document in the same change:
 
 - implementation progress belongs in `TODO.md`
 - design decisions and decomposition notes belong in `docs/design-todo.md`
+- completed milestone summaries and project-state changes belong in
+  `docs/progress.md`
 - completed historical milestone details may remain in focused roadmap docs,
   such as `docs/hello-world-roadmap.md`
+
+The documentation state must match the implementation state. Do not leave a
+TODO item marked incomplete when the implementation and verification for that
+item are complete. Do not mark a TODO item complete until the implementation,
+tests or fixtures, and required verification have actually been completed.
+
+Do not implement work that is not represented by a current TODO milestone,
+design TODO, or focused roadmap entry. If the work is not already tracked,
+first add or refine the milestone, then split it into the smallest coherent
+implementation step.
+
+Project progress should be understandable from documentation alone. Agents must
+not rely on git history as the only record of what happened or why. When a
+milestone is completed or the project direction changes, add a concise entry to
+`docs/progress.md` that records the state reached, the verification performed,
+and the next intended direction.
 
 Do not mix broad feature implementation and unrelated refactoring merely to
 clear TODO entries. If a refactor is required to make the feature safe, keep it
 as a clearly bounded preparatory step and mention the relevant design TODO.
+
+## Agent Implementation Workflow
+
+Agents should advance Bara by repeating a small, auditable implementation
+cycle. The user should not need to restate this process in every session.
+
+Default cycle:
+
+1. Read the relevant `TODO.md` milestone and `docs/design-todo.md` design
+   notes.
+2. Pick the smallest coherent task that moves the current milestone forward.
+3. Identify whether the task is feature work, refactoring, design-only
+   documentation, or verification.
+4. If design or refactoring is needed before feature work, do it as a bounded
+   preparatory step and keep its diff separate where practical.
+5. Add or update the smallest meaningful test or fixture first, unless the
+   change is documentation-only or purely mechanical.
+6. Implement the production change using the existing crate/module boundaries.
+7. Audit the resulting code for single responsibility, module size, domain
+   type boundaries, I/O isolation, and clean-room compliance.
+8. If the implementation grew too large or mixed responsibilities, split it
+   before moving on.
+9. Update `TODO.md`, `docs/design-todo.md`, or focused roadmap docs when the
+   change affects roadmap state or design decisions. Update
+   `docs/progress.md` when a milestone or major project state changes.
+10. Run the required Nix-based verification gate.
+11. Summarize what changed, what was verified, and what remains.
+
+When the user asks to "continue", "go next", "advance to the next milestone",
+or similar, use this default cycle without asking for process clarification.
+Prefer the earliest unfinished relevant milestone in `TODO.md`, unless the
+user explicitly names a milestone or changes priority.
+
+Large milestones must be split before implementation. Do not attempt to finish
+a broad milestone in one unstructured change. Create or update TODO entries
+when the split itself changes the plan.
+
+When multi-agent tooling is available and the task is non-trivial, the primary
+agent should delegate bounded implementation work to a sub-agent and then
+review the returned code. The primary agent remains responsible for the final
+integration and must audit:
+
+- whether each module has a single reason to change
+- whether any file or function became too large
+- whether a DRY abstraction mixed unrelated responsibilities
+- whether public APIs expose primitives where domain types are required
+- whether I/O, toolchain calls, or process execution leaked into core logic
+- whether tests cover the changed behavior
+
+If the sub-agent result violates these rules, revise it directly or send it
+back as a smaller, clearer task before accepting it.
+
+Committing is not automatic for every change. Commit only when the user asks
+for a commit or when the active user instruction explicitly includes committing
+as part of the cycle. Before committing, verify that the staged diff contains
+only the intended files.
 
 ## Architecture Rules
 
