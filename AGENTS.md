@@ -6,6 +6,15 @@ Follow it together with the repository documentation, especially
 `docs/ir.md`, `docs/test-oracle.md`, `TODO.md`, and
 `docs/design-todo.md`, and `docs/progress.md`.
 
+## Communication and Reporting
+
+Agents should report status, summaries, review packages, blockers, and final
+answers in Japanese by default.
+
+Keep source code, command names, file paths, identifiers, quoted output, and
+documentation edits in the language and format appropriate to the surrounding
+context, unless the user explicitly requests translation.
+
 ## Project Intent
 
 Bara is a research project for a binary-to-binary compiler. The motivating
