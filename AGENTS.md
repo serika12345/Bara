@@ -3,7 +3,8 @@
 This file is the operational rulebook for coding agents working on Bara.
 Follow it together with the repository documentation, especially
 `docs/coding-rules.md`, `docs/clean-room.md`, `docs/scope.md`,
-`docs/ir.md`, and `docs/test-oracle.md`.
+`docs/ir.md`, `docs/test-oracle.md`, `TODO.md`, and
+`docs/design-todo.md`.
 
 ## Project Intent
 
@@ -133,6 +134,36 @@ Use `.editorconfig` for baseline text formatting:
 
 Use language-specific formatters, such as `rustfmt`, for language formatting.
 EditorConfig is only the baseline.
+
+## Roadmap and Design TODO Discipline
+
+Before starting implementation, refactoring, or architecture work, read the
+current `TODO.md` and `docs/design-todo.md` entries that are relevant to the
+requested task.
+
+Use these files for different responsibilities:
+
+- `TODO.md` tracks implementation milestones and large project goals.
+- `docs/design-todo.md` tracks detailed design decisions, refactoring
+  boundaries, decomposition plans, and single-responsibility audit notes.
+
+When selecting the next task, prefer the earliest unfinished implementation
+milestone in `TODO.md` unless the user names a different milestone or asks for
+design/refactoring work. When the task is refactoring, module splitting, API
+boundary cleanup, or architecture review, consult `docs/design-todo.md` first
+and keep those changes separate from feature work where practical.
+
+When a change completes, invalidates, or materially changes a roadmap item,
+update the appropriate TODO document in the same change:
+
+- implementation progress belongs in `TODO.md`
+- design decisions and decomposition notes belong in `docs/design-todo.md`
+- completed historical milestone details may remain in focused roadmap docs,
+  such as `docs/hello-world-roadmap.md`
+
+Do not mix broad feature implementation and unrelated refactoring merely to
+clear TODO entries. If a refactor is required to make the feature safe, keep it
+as a clearly bounded preparatory step and mention the relevant design TODO.
 
 ## Architecture Rules
 
@@ -387,6 +418,8 @@ nix develop -c ./scripts/verify-security
 
 Before completing a change, check:
 
+- Did the relevant `TODO.md` and `docs/design-todo.md` entries guide the work,
+  and were they updated if the change affected them?
 - Does the signature explain inputs, outputs, failure, ownership, and address
   space?
 - Are raw `u64`, `usize`, or `Vec<u8>` values crossing boundaries without
