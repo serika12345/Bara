@@ -27,7 +27,8 @@ use function_run::{
     run_test_case_function, FunctionRunError,
 };
 use native_artifact::{
-    link_arm64_main_executable, link_arm64_stdout_main_executable, NativeArtifactError,
+    link_arm64_main_executable, link_arm64_stdout_main_executable,
+    observe_native_executable_artifact, NativeArtifactError,
 };
 
 fn main() -> ExitCode {
@@ -165,11 +166,9 @@ fn run_link_fixture_arm64_stdout_main(
     )
     .map_err(CliError::NativeArtifact)?;
 
-    Ok(format!(
-        "linked ARM64 stdout main executable for {} to {}",
-        test_case.case_id().as_str(),
-        output_path.display()
-    ))
+    let actual = observe_native_executable_artifact(test_case.case_id().clone(), output_path)
+        .map_err(CliError::NativeArtifact)?;
+    observed_result_to_json(&actual).map_err(CliError::Json)
 }
 
 fn run_check_executable(manifest_path: &Path, expected_path: &Path) -> Result<String, CliError> {
@@ -910,15 +909,12 @@ mod tests {
         .expect("hello_world_stdout fixture links as an ARM64 stdout main executable");
 
         assert!(output_path.exists());
-        assert!(
-            output.contains("linked ARM64 stdout main executable for hello_world_stdout_return_0")
-        );
-        let process_output = Command::new(&output_path)
-            .output()
-            .expect("linked stdout executable runs");
-        assert_eq!(process_output.status.code(), Some(0));
-        assert_eq!(process_output.stdout, b"hello world\n");
-        assert_eq!(process_output.stderr, b"");
+        let expected = observed_result_from_json(include_str!(
+            "../../../tests/expected/hello_world_stdout_return_0.json"
+        ))
+        .and_then(|result| observed_result_to_json(&result))
+        .expect("expected stdout fixture normalizes to output json");
+        assert_eq!(output, expected);
     }
 
     #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]

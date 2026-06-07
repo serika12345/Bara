@@ -6,7 +6,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use bara_oracle::{FailureKind, TestCaseHostTrapPlan};
+use bara_oracle::{CaseId, FailureKind, ObservedResult, TestCaseHostTrapPlan};
 
 use crate::function_run::{FunctionArm64Bytes, FunctionStdoutHostTrapRequest};
 
@@ -33,6 +33,17 @@ pub(crate) enum NativeArtifactError {
     MissingLinkedExecutable {
         path: PathBuf,
     },
+    RunArtifact {
+        path: PathBuf,
+        source: io::Error,
+    },
+    MissingArtifactExitStatus {
+        path: PathBuf,
+    },
+    NegativeArtifactExitStatus {
+        path: PathBuf,
+        status: i32,
+    },
     StdoutMainUnsupported(NativeStdoutMainUnsupported),
 }
 
@@ -41,6 +52,9 @@ impl NativeArtifactError {
         match self {
             Self::UnsupportedHost { .. } => FailureKind::EmitError,
             Self::StdoutMainUnsupported(_) => FailureKind::EmitError,
+            Self::RunArtifact { .. }
+            | Self::MissingArtifactExitStatus { .. }
+            | Self::NegativeArtifactExitStatus { .. } => FailureKind::RunError,
             Self::TempAssemblyPath { .. }
             | Self::WriteAssembly { .. }
             | Self::LinkerSpawn { .. }
@@ -77,6 +91,21 @@ impl fmt::Display for NativeArtifactError {
             Self::MissingLinkedExecutable { path } => write!(
                 formatter,
                 "clang completed but output executable does not exist: {}",
+                path.display()
+            ),
+            Self::RunArtifact { path, source } => write!(
+                formatter,
+                "failed to run native executable artifact {}: {source}",
+                path.display()
+            ),
+            Self::MissingArtifactExitStatus { path } => write!(
+                formatter,
+                "native executable artifact terminated without exit status: {}",
+                path.display()
+            ),
+            Self::NegativeArtifactExitStatus { path, status } => write!(
+                formatter,
+                "native executable artifact {} returned negative exit status {status}",
                 path.display()
             ),
             Self::StdoutMainUnsupported(error) => write!(formatter, "{error}"),
@@ -140,6 +169,39 @@ pub(crate) fn link_arm64_stdout_main_executable(
 
     let source = arm64_stdout_main_assembly_source(body, stdout.text());
     link_assembly_source(&source, output_path)
+}
+
+pub(crate) fn observe_native_executable_artifact(
+    case_id: CaseId,
+    executable_path: &Path,
+) -> Result<ObservedResult, NativeArtifactError> {
+    let output = Command::new(executable_path).output().map_err(|source| {
+        NativeArtifactError::RunArtifact {
+            path: executable_path.to_path_buf(),
+            source,
+        }
+    })?;
+    let exit_status =
+        output
+            .status
+            .code()
+            .ok_or_else(|| NativeArtifactError::MissingArtifactExitStatus {
+                path: executable_path.to_path_buf(),
+            })?;
+    let return_value = u64::try_from(exit_status).map_err(|_| {
+        NativeArtifactError::NegativeArtifactExitStatus {
+            path: executable_path.to_path_buf(),
+            status: exit_status,
+        }
+    })?;
+
+    Ok(ObservedResult::new(
+        case_id,
+        exit_status,
+        return_value,
+        String::from_utf8_lossy(&output.stdout).into_owned(),
+        String::from_utf8_lossy(&output.stderr).into_owned(),
+    ))
 }
 
 fn link_assembly_source(source: &str, output_path: &Path) -> Result<(), NativeArtifactError> {
