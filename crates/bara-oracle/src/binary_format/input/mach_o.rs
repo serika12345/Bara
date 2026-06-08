@@ -1,5 +1,4 @@
 use super::{
-    input::BinaryInput,
     mach_o_executable_image_conversion::{
         classify_mach_o_executable_image_conversion, MachOExecutableImageConversion,
     },
@@ -8,6 +7,7 @@ use super::{
         MachOLoadCommandSummary, MachOLoadCommandTableRange,
     },
     probe::BinaryFormatProbeError,
+    BinaryInput,
 };
 
 use serde::{Deserialize, Serialize};

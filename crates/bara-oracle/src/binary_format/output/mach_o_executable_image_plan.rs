@@ -1,9 +1,6 @@
-use super::{
-    mach_o_entry_point_command::MachOEntryPointFileOffset,
-    mach_o_executable_image_conversion::{
-        MachOExecutableImageConversion, MachOExecutableImageConversionBlocker,
-    },
-    mach_o_segment_command::{MachOSegmentFileOffset, MachOSegmentFileSize},
+use super::super::input::{
+    MachOEntryPointFileOffset, MachOExecutableImageConversion,
+    MachOExecutableImageConversionBlocker, MachOSegmentFileOffset, MachOSegmentFileSize,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]

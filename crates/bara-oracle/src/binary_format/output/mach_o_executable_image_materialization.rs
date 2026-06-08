@@ -5,7 +5,8 @@ use crate::executable_manifest::{
     CodeSegment, ExecutableEntry, ExecutableImage, ExecutableImageError,
 };
 
-use super::{input::BinaryInput, mach_o_executable_image_plan::MachOExecutableImagePlan};
+use super::mach_o_executable_image_plan::MachOExecutableImagePlan;
+use crate::binary_format::input::BinaryInput;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MachOExecutableImageMaterializationError {

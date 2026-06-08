@@ -21,6 +21,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "bara-mach-o"
+version = "0.1.0"
+
+[[package]]
 name = "bara-oracle"
 version = "0.1.0"
 dependencies = [

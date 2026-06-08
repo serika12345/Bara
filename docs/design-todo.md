@@ -81,15 +81,26 @@
 
 ## D7: Binary format input/output の分離
 
-- [ ] Mach-O / PE / ELF の input parser と output writer を別責務にする。
+- [x] Mach-O / PE / ELF の input parser と output writer を別責務にする。
 - [ ] input parser は public format から executable image metadata を作る。
 - [ ] output writer は target artifact を作る pure planning / serialization 境界にする。
-- [ ] writer が育つ場合は oracle crate から独立した crate へ切り出す。
+- [x] writer が育つ場合は oracle crate から独立した crate へ切り出す。
 
 メモ:
 
 - 入力解析と出力生成は同じ Mach-O でも変更理由が違う。
 - `bara-oracle` は比較・fixture・外部観測の責務に留め、artifact writer の置き場にしない。
+- B3 の pure writer planning 境界は `bara-mach-o` crate に置く。`bara-oracle`
+  には fixture / probe / external observation を残し、Mach-O artifact serialization
+  は writer 側で育てる。
+- B3 の初期 model は `__TEXT` segment、mandatory `__text` section、optional
+  `__const` section、`_main` entry、`LC_SEGMENT_64` / `LC_MAIN` 相当の最小
+  load command model に限定する。offset / size / byte serialization は次の
+  serialization 境界で扱う。
+- B3 の `clang` packaging 経路と pure writer 経路の差分検証は、現時点の
+  writer maturity に合わせて `bara-mach-o` の公開仕様ベース model 比較として
+  固定する。実 bytes の layout / serialization parity は output writer の
+  serialization 境界を実装する後続作業で扱う。
 
 ## D8: Clean-room research boundary
 

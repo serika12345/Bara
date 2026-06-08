@@ -9,22 +9,30 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 10:10 JST
+最終更新: 2026-06-08 11:21 JST
 
 状態:
 
-- project_state: completed。B2: 実行可能成果物モデルが完了し、review gate 待ち。
-- active_milestone: completed。[TODO.md](../TODO.md) の B2 は全項目完了。
-- active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の D2: Artifact domain model。
-- active_branch: `task/b2-artifact-domain-types`。B2 完了 branch。
-- related_todo: B2 `macOS ARM64 以外の host では classified unsupported として安定出力する` completed。関連設計 TODO は D2。
-- completed_work: unsupported host を `EmitError` のまま stable JSON report message として出力するようにした。B2 では raw code / assembly source / linked executable の型分離、artifact metadata JSON、request responsibility split、packager trait 境界、unsupported host stable output まで完了した。
-- remaining_work: B2 なし。次フェーズは B3: Mach-O 出力境界。
-- next_action: B2 branch を review gate で確認する。承認後に `/merge-reviewed` で `main` へ取り込み、次に進める場合は B3 の最小 TODO-backed step から始める。
-- verification: unsupported host stable output の未実装 failure を確認後、`nix develop -c cargo test -p btbc-cli native_artifact`、`nix develop -c ./scripts/verify` が通過した。
+- project_state: completed。B3: Mach-O 出力境界は review gate に到達した。
+- active_milestone: completed。[TODO.md](../TODO.md) の B3。
+- active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の D7: Binary format input/output の分離。output writer serialization 境界は後続作業として残る。
+- active_branch: `task/b3-mach-o-output-boundary`。B3 作業 branch。
+- related_todo: B3 の `clang` packaging 経路と pure writer 経路の出力差分検証 completed。関連設計 TODO は D7。
+- completed_work: B2 branch は PR merge 後に local から削除した。B3 では `bara-oracle::binary_format` の Mach-O input parser 群を `input` module、executable image plan/materialization を `output` module へ分離した。続いて `bara-mach-o` crate を追加し、最小 ARM64 Mach-O executable writer の pure planning function、`_main` entry、`__TEXT` / optional `__const`、最小 load command model を定義した。最後に、現時点の writer maturity に合わせ、`clang` packaging model と pure writer model の parity を検証する比較 report を追加した。
+- remaining_work: B3 は完了。D7 の output writer serialization 境界、実 bytes の layout / serialization parity は後続作業として残る。
+- next_action: review gate。B3 branch をレビューし、merge 後に B4: x86 syscall / libc 境界へ進む。
+- verification: `nix develop -c cargo test -p bara-mach-o` は未実装 comparison API の compile error で期待どおり失敗し、実装後に通過した。変更全体の gate として `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-08 11:21 JST: B3 の最後の小ステップとして、`clang` packaging 経路と pure writer 経路の差分検証を `bara-mach-o` の公開仕様ベース model 比較として追加した。`MachOArm64ClangPackagingModel`、comparison report、classified mismatch issue を定義し、`_main` / `__TEXT` / `__text` / optional `__const` / minimal load commands の parity を検証できるようにした。B3 は review gate に到達した。
+- 検証: `nix develop -c cargo test -p bara-mach-o` は未実装 comparison API の compile error で期待どおり失敗し、実装後に通過した。変更全体の `nix develop -c ./scripts/verify` が通過した。
+- 2026-06-08 11:08 JST: B3 の 3 つ目の小ステップとして、`bara-mach-o` の writer plan に public Mach-O model を追加した。`_main` entry、`__TEXT` segment、mandatory `__text` section、const payload がある場合の `__const` section、最小 `LC_SEGMENT_64` / `LC_MAIN` 相当の load command model を domain type として定義した。
+- 検証: `nix develop -c cargo test -p bara-mach-o` は未実装 model API の compile error で期待どおり失敗し、実装後に通過した。変更全体の `nix develop -c ./scripts/verify` が通過した。
+- 2026-06-08 10:46 JST: B3 の 2 つ目の小ステップとして、`bara-mach-o` crate を追加し、ARM64 Mach-O executable writer の pure planning 境界を設計した。`MachOArm64MainCode`、`MachOArm64ConstData`、writer request、payload、plan、target を domain type として定義し、empty payload parts は classified input error にする。
+- 検証: `nix develop -c cargo test -p bara-mach-o` は未実装 API の compile error で期待どおり失敗し、実装後に通過した。変更全体の `nix develop -c ./scripts/verify-supply-chain` と `nix develop -c ./scripts/verify` が通過した。
+- 2026-06-08 10:26 JST: B3 の最初の小ステップとして、Mach-O input parser と output artifact planning / materialization の責務を module 境界で分離した。`binary_format::input` が public format probe / Mach-O metadata / load command parsing を扱い、`binary_format::output` が executable image plan / materialization を扱う。外部公開 API は `binary_format` と crate root の re-export で維持した。
+- 検証: 移動前後で `nix develop -c cargo test -p bara-oracle binary_format::tests` が通過した。変更全体の `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 10:09 JST: B2 の最後の小ステップとして、unsupported host を classified stable output にした。`NativeArtifactError::UnsupportedHost` は `EmitError` の分類を保ちつつ、artifact kind、target triple、host os/arch を含む JSON message を返す。
 - 検証: `nix develop -c cargo test -p btbc-cli unsupported_host_error_serializes_as_stable_json_message` は既存 text message との差分で期待どおり失敗し、実装後に同テスト、`nix develop -c cargo test -p btbc-cli native_artifact`、`nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 10:04 JST: B2 の 4 つ目の小ステップとして、外部 `clang` packaging を `NativeArtifactPackager` trait 境界へ分離した。`ClangNativeArtifactPackager` が現行 process 実行を担当し、test fake packager は同じ request から linked executable metadata を返せる。

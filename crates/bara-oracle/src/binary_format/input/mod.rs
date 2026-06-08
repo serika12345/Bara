@@ -1,3 +1,31 @@
+mod mach_o;
+mod mach_o_entry_point_command;
+mod mach_o_executable_image_conversion;
+mod mach_o_load_command;
+mod mach_o_segment_command;
+mod probe;
+
+pub use mach_o::{MachOFileType, MachOLoadCommands, MachOMetadata};
+pub use mach_o_entry_point_command::{
+    MachOEntryPointCommandMetadata, MachOEntryPointFileOffset, MachOEntryPointStackSize,
+};
+pub use mach_o_executable_image_conversion::{
+    MachOExecutableImageConversion, MachOExecutableImageConversionBlocker,
+    MachOExecutableImageConversionStatus,
+};
+pub use mach_o_load_command::{
+    MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommandSummary, MachOLoadCommandType,
+    RecognizedMachOEntryPointCommand, RecognizedMachOSegmentCommand, UnsupportedMachOLoadCommand,
+};
+pub use mach_o_segment_command::{
+    MachOSegmentCommandHeaderMetadata, MachOSegmentFileOffset, MachOSegmentFileSize,
+    MachOSegmentName, MachOSegmentVmAddr,
+};
+pub use probe::{
+    probe_public_binary_format, BinaryFormat, BinaryFormatProbeError, BinaryFormatProbeMetadata,
+    BinaryFormatProbeReport, BinaryFormatProbeStatus,
+};
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BinaryInput {
     bytes: Box<[u8]>,

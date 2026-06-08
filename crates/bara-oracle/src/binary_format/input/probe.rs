@@ -1,6 +1,6 @@
 use super::{
-    input::{BinaryInput, BinaryMagic},
     mach_o::{parse_mach_o_64_little_endian_metadata, MachOMetadata},
+    BinaryInput, BinaryMagic,
 };
 
 use serde::{Deserialize, Serialize};
