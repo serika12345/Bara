@@ -7,6 +7,9 @@ crates/bara-arm64/src/fixup/mod.rs:pub struct ArmPc(u64);
 crates/bara-ir/src/block/mod.rs:    pub const fn new(value: u32) -> Self {
 crates/bara-ir/src/block/mod.rs:    pub const fn value(self) -> u32 {
 crates/bara-ir/src/block/mod.rs:pub struct BlockId(u32);
+crates/bara-ir/src/boundary/mod.rs:    pub const fn new(value: u32) -> Self {
+crates/bara-ir/src/boundary/mod.rs:    pub const fn value(self) -> u32 {
+crates/bara-ir/src/boundary/mod.rs:pub struct ExternalSymbolId(u32);
 crates/bara-ir/src/program/mod.rs:    pub const fn new(value: u64) -> Self {
 crates/bara-ir/src/program/mod.rs:    pub const fn value(self) -> u64 {
 crates/bara-ir/src/program/mod.rs:    pub fn checked_add(self, byte_len: u64) -> Result<Self, ProgramError> {

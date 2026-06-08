@@ -64,8 +64,9 @@ pub fn validate_program(program: &Program) -> ValidationReport {
 #[cfg(test)]
 mod tests {
     use crate::{
-        validate_program, BasicBlock, BlockId, BoundaryRequest, Program, SyscallAbi,
-        SyscallRequest, Terminator, UnsupportedReason, ValidationIssue, ValidationReport, X86Va,
+        validate_program, BasicBlock, BlockId, BoundaryRequest, ExternalCallRequest,
+        ExternalSymbolId, HelperRequest, Program, SyscallAbi, SyscallRequest, Terminator,
+        UnsupportedReason, ValidationIssue, ValidationReport, X86Va,
     };
 
     fn block(id: u32, start: u64, end: u64, terminator: Terminator) -> BasicBlock {
@@ -151,6 +152,27 @@ mod tests {
                 2,
                 Terminator::BoundaryRequest {
                     request: BoundaryRequest::Syscall(request),
+                },
+            )],
+        )
+        .expect("program has entry block");
+
+        assert!(validate_program(&program).is_valid());
+    }
+
+    #[test]
+    fn external_call_helper_request_terminator_is_structurally_valid() {
+        let request =
+            ExternalCallRequest::new(ExternalSymbolId::new(9), X86Va::new(0), X86Va::new(5))
+                .expect("test external call range is valid");
+        let program = Program::new(
+            X86Va::new(0),
+            vec![block(
+                0,
+                0,
+                5,
+                Terminator::BoundaryRequest {
+                    request: BoundaryRequest::Helper(HelperRequest::CallExternal(request)),
                 },
             )],
         )

@@ -9,39 +9,47 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 12:50 JST
+最終更新: 2026-06-08 13:00 JST
 
 状態:
 
-- project_state: completed。B4 の先頭小ステップとして、x86_64 `syscall` を
-  実行せず typed public ABI request として IR に残す境界を追加した。
+- project_state: completed。B4 の 2 つ目の小ステップとして、external
+  symbol / import call を core logic で直接呼ばず typed helper request として
+  IR に残す境界を追加した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B4:
-  x86 syscall / libc 境界。先頭項目は完了し、次は external symbol / import
-  call を core logic で直接呼ばず helper request へ逃がす小ステップ。
+  x86 syscall / libc 境界。先頭 2 項目は完了し、次は
+  `helper_call_external`、`helper_unimplemented`、`helper_exit` の最小 ABI を
+  定義する小ステップ。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の D4:
-  Bara IR の責務と D5: Host helper / OS boundary に沿って、syscall を
-  `HostTrap` へ混ぜず `BoundaryRequest::Syscall` として分離した。
-- active_branch: `task/b4-syscall-ir-request`。base commit は `33a57f4`
-  (`Reframe roadmap around app launch milestones`)。この小ステップの commit
-  は review package で確認する。
+  Bara IR の責務と D5: Host helper / OS boundary に沿って、syscall と
+  external call helper request を `HostTrap` へ混ぜず `BoundaryRequest` として
+  分離した。
+- active_branch: `task/b4-syscall-ir-request`。base commit は `19eeedb`
+  (`Make roadmap linear without losing milestones`)。latest commit は
+  review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B4 の
-  `x86 syscall を実行せず、まず public ABI 上の request として IR に表現する`。
-- completed_work: `bara-ir` に `BoundaryRequest`、`SyscallRequest`、
-  `SyscallAbi` を追加し、`bara-isa-x86` の lifter が `syscall` を
-  `Terminator::BoundaryRequest` へ変換するようにした。`bara-arm64` はこの
-  request を emit せず `SyscallUnsupported { request }` として返す。
-- remaining_work: B4 の external symbol / import call request、最小 helper ABI、
-  stdout helper 境界、OS ABI 差分、unsupported boundary report schema を
-  順に具体化する。
-- next_action: B4 の次小ステップとして external symbol / import call を typed
-  helper request に逃がす最小 IR 境界を設計、実装する。
+  `external symbol / import call を core logic で直接呼ばず、helper request に逃がす`。
+- completed_work: `bara-ir` に `HelperRequest::CallExternal`、
+  `ExternalCallRequest`、`ExternalSymbolId` を追加した。`bara-arm64` は external
+  call helper request を emit せず `ExternalCallUnsupported { request }` として
+  返す。
+- remaining_work: B4 の最小 helper ABI、stdout helper 境界、OS ABI 差分、
+  unsupported boundary report schema を順に具体化する。
+- next_action: B4 の次小ステップとして `helper_call_external`、
+  `helper_unimplemented`、`helper_exit` の最小 ABI domain type を定義する。
 - verification: `nix develop -c cargo test -p bara-ir`、
-  `nix develop -c cargo test -p bara-isa-x86`、
   `nix develop -c cargo test -p bara-arm64`、`nix develop -c ./scripts/verify`
   が通過した。
 
 直近で完了した作業:
 
+- 2026-06-08 13:00 JST: B4 の 2 つ目の小ステップとして、external
+  symbol / import call を `BoundaryRequest::Helper(HelperRequest::CallExternal(...))`
+  として IR に残す境界を追加した。ARM64 emit は実行コードを出さず
+  `ExternalCallUnsupported { request }` を返す。
+- 検証: `nix develop -c cargo test -p bara-ir`、
+  `nix develop -c cargo test -p bara-arm64`、`nix develop -c ./scripts/verify`
+  が通過した。
 - 2026-06-08 12:50 JST: B4 の先頭小ステップとして、x86_64 `syscall` を
   typed public ABI request として IR に残す境界を追加した。`syscall` は
   `BoundaryRequest::Syscall(SyscallRequest { abi: X86_64, at, return_to })`

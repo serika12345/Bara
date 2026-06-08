@@ -111,12 +111,25 @@ pub enum Terminator {
 
 `BoundaryRequest` は guest 側から public ABI / external boundary へ出ようとする
 意図を IR に残す。runtime や host OS syscall を直接実行する指示ではない。
-現在は x86_64 `syscall` を typed request として保持するだけで、ARM64 emit
-では unsupported boundary として止める。
+現在は x86_64 `syscall` と external symbol/import call を typed request として
+保持するだけで、ARM64 emit では unsupported boundary として止める。
 
 ```rust
 pub enum BoundaryRequest {
+    Helper(HelperRequest),
     Syscall(SyscallRequest),
+}
+
+pub enum HelperRequest {
+    CallExternal(ExternalCallRequest),
+}
+
+pub struct ExternalSymbolId(u32);
+
+pub struct ExternalCallRequest {
+    symbol: ExternalSymbolId,
+    call_site: X86Va,
+    return_to: X86Va,
 }
 
 pub struct SyscallRequest {
