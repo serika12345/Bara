@@ -124,6 +124,29 @@ pub enum HelperRequest {
     CallExternal(ExternalCallRequest),
 }
 
+pub enum RuntimeHelper {
+    CallExternal,
+    Unimplemented,
+    Exit,
+}
+
+pub struct RuntimeHelperAbi {
+    name: RuntimeHelperName,
+    signature: RuntimeHelperSignature,
+}
+
+pub enum RuntimeHelperName {
+    HelperCallExternal,
+    HelperUnimplemented,
+    HelperExit,
+}
+
+pub enum RuntimeHelperSignature {
+    StateExternalSymbolToUnit,
+    StateUnimplementedReasonToUnit,
+    StateExitCodeToNever,
+}
+
 pub struct ExternalSymbolId(u32);
 
 pub struct ExternalCallRequest {

@@ -9,40 +9,43 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 13:00 JST
+最終更新: 2026-06-08 13:13 JST
 
 状態:
 
-- project_state: completed。B4 の 2 つ目の小ステップとして、external
-  symbol / import call を core logic で直接呼ばず typed helper request として
-  IR に残す境界を追加した。
-- active_milestone: in_progress。[TODO.md](../TODO.md) の B4:
-  x86 syscall / libc 境界。先頭 2 項目は完了し、次は
+- project_state: completed。B4 の 3 つ目の小ステップとして、
   `helper_call_external`、`helper_unimplemented`、`helper_exit` の最小 ABI を
-  定義する小ステップ。
+  typed domain value として定義した。
+- active_milestone: in_progress。[TODO.md](../TODO.md) の B4:
+  x86 syscall / libc 境界。先頭 3 項目は完了し、次は `puts` / `write`
+  相当を host helper 経由で stdout に出せるようにする小ステップ。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の D4:
-  Bara IR の責務と D5: Host helper / OS boundary に沿って、syscall と
-  external call helper request を `HostTrap` へ混ぜず `BoundaryRequest` として
-  分離した。
+  Bara IR の責務と D5: Host helper / OS boundary に沿って、runtime helper
+  ABI を OS 固有処理や実行から分離した typed value として固定した。
 - active_branch: `task/b4-syscall-ir-request`。base commit は `19eeedb`
   (`Make roadmap linear without losing milestones`)。latest commit は
   review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B4 の
-  `external symbol / import call を core logic で直接呼ばず、helper request に逃がす`。
-- completed_work: `bara-ir` に `HelperRequest::CallExternal`、
-  `ExternalCallRequest`、`ExternalSymbolId` を追加した。`bara-arm64` は external
-  call helper request を emit せず `ExternalCallUnsupported { request }` として
-  返す。
-- remaining_work: B4 の最小 helper ABI、stdout helper 境界、OS ABI 差分、
-  unsupported boundary report schema を順に具体化する。
-- next_action: B4 の次小ステップとして `helper_call_external`、
-  `helper_unimplemented`、`helper_exit` の最小 ABI domain type を定義する。
-- verification: `nix develop -c cargo test -p bara-ir`、
-  `nix develop -c cargo test -p bara-arm64`、`nix develop -c ./scripts/verify`
-  が通過した。
+  `helper_call_external`、`helper_unimplemented`、`helper_exit` の最小 ABI を定義する。
+- completed_work: `bara-ir` に `RuntimeHelper`、`RuntimeHelperAbi`、
+  `RuntimeHelperName`、`RuntimeHelperSignature` を追加し、B4 の最小 helper
+  ABI set を `helper_call_external(state, symbol_id)`、
+  `helper_unimplemented(state, reason)`、`helper_exit(state, code)` として固定した。
+- remaining_work: B4 の stdout helper 境界、OS ABI 差分、unsupported boundary
+  report schema を順に具体化する。
+- next_action: B4 の次小ステップとして `puts` / `write` 相当を host helper
+  経由で stdout に出せるようにする境界を具体化する。
+- verification: `nix develop -c cargo test -p bara-ir` と
+  `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-08 13:13 JST: B4 の 3 つ目の小ステップとして、
+  `helper_call_external`、`helper_unimplemented`、`helper_exit` の最小 ABI を
+  typed domain value として定義した。helper ABI は名前と signature の pure
+  value であり、runtime 実行や host syscall 呼び出しはまだ行わない。
+- 検証: `nix develop -c cargo test -p bara-ir` と
+  `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 13:00 JST: B4 の 2 つ目の小ステップとして、external
   symbol / import call を `BoundaryRequest::Helper(HelperRequest::CallExternal(...))`
   として IR に残す境界を追加した。ARM64 emit は実行コードを出さず

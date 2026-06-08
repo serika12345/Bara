@@ -11,6 +11,82 @@ pub enum HelperRequest {
     CallExternal(ExternalCallRequest),
 }
 
+impl HelperRequest {
+    pub const fn runtime_helper(self) -> RuntimeHelper {
+        match self {
+            Self::CallExternal(_) => RuntimeHelper::CallExternal,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RuntimeHelper {
+    CallExternal,
+    Unimplemented,
+    Exit,
+}
+
+impl RuntimeHelper {
+    pub const fn abi(self) -> RuntimeHelperAbi {
+        match self {
+            Self::CallExternal => RuntimeHelperAbi::new(
+                RuntimeHelperName::HelperCallExternal,
+                RuntimeHelperSignature::StateExternalSymbolToUnit,
+            ),
+            Self::Unimplemented => RuntimeHelperAbi::new(
+                RuntimeHelperName::HelperUnimplemented,
+                RuntimeHelperSignature::StateUnimplementedReasonToUnit,
+            ),
+            Self::Exit => RuntimeHelperAbi::new(
+                RuntimeHelperName::HelperExit,
+                RuntimeHelperSignature::StateExitCodeToNever,
+            ),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RuntimeHelperAbi {
+    name: RuntimeHelperName,
+    signature: RuntimeHelperSignature,
+}
+
+impl RuntimeHelperAbi {
+    pub const fn new(name: RuntimeHelperName, signature: RuntimeHelperSignature) -> Self {
+        Self { name, signature }
+    }
+
+    pub const fn minimal_b4_set() -> [Self; 3] {
+        [
+            RuntimeHelper::CallExternal.abi(),
+            RuntimeHelper::Unimplemented.abi(),
+            RuntimeHelper::Exit.abi(),
+        ]
+    }
+
+    pub const fn name(self) -> RuntimeHelperName {
+        self.name
+    }
+
+    pub const fn signature(self) -> RuntimeHelperSignature {
+        self.signature
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RuntimeHelperName {
+    HelperCallExternal,
+    HelperUnimplemented,
+    HelperExit,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RuntimeHelperSignature {
+    StateExternalSymbolToUnit,
+    StateUnimplementedReasonToUnit,
+    StateExitCodeToNever,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub struct ExternalSymbolId(u32);
 
@@ -111,8 +187,9 @@ pub enum SyscallRequestError {
 #[cfg(test)]
 mod tests {
     use crate::{
-        ExternalCallRequest, ExternalCallRequestError, ExternalSymbolId, SyscallAbi,
-        SyscallRequest, SyscallRequestError, X86Va,
+        ExternalCallRequest, ExternalCallRequestError, ExternalSymbolId, RuntimeHelper,
+        RuntimeHelperAbi, RuntimeHelperName, RuntimeHelperSignature, SyscallAbi, SyscallRequest,
+        SyscallRequestError, X86Va,
     };
 
     #[test]
@@ -170,6 +247,63 @@ mod tests {
                 call_site: X86Va::new(4),
                 return_to: X86Va::new(4)
             })
+        );
+    }
+
+    #[test]
+    fn call_external_request_maps_to_call_external_runtime_helper() {
+        let request =
+            ExternalCallRequest::new(ExternalSymbolId::new(7), X86Va::new(0), X86Va::new(5))
+                .expect("test external call range is valid");
+
+        assert_eq!(
+            crate::HelperRequest::CallExternal(request).runtime_helper(),
+            RuntimeHelper::CallExternal
+        );
+    }
+
+    #[test]
+    fn runtime_helper_abi_defines_call_external() {
+        assert_eq!(
+            RuntimeHelper::CallExternal.abi(),
+            RuntimeHelperAbi::new(
+                RuntimeHelperName::HelperCallExternal,
+                RuntimeHelperSignature::StateExternalSymbolToUnit,
+            )
+        );
+    }
+
+    #[test]
+    fn runtime_helper_abi_defines_unimplemented() {
+        assert_eq!(
+            RuntimeHelper::Unimplemented.abi(),
+            RuntimeHelperAbi::new(
+                RuntimeHelperName::HelperUnimplemented,
+                RuntimeHelperSignature::StateUnimplementedReasonToUnit,
+            )
+        );
+    }
+
+    #[test]
+    fn runtime_helper_abi_defines_exit() {
+        assert_eq!(
+            RuntimeHelper::Exit.abi(),
+            RuntimeHelperAbi::new(
+                RuntimeHelperName::HelperExit,
+                RuntimeHelperSignature::StateExitCodeToNever,
+            )
+        );
+    }
+
+    #[test]
+    fn runtime_helper_minimal_b4_set_is_stable() {
+        assert_eq!(
+            RuntimeHelperAbi::minimal_b4_set(),
+            [
+                RuntimeHelper::CallExternal.abi(),
+                RuntimeHelper::Unimplemented.abi(),
+                RuntimeHelper::Exit.abi(),
+            ]
         );
     }
 }
