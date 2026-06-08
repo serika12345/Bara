@@ -9,22 +9,24 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 11:08 JST
+最終更新: 2026-06-08 11:21 JST
 
 状態:
 
-- project_state: in_progress。B3: Mach-O 出力境界を開始した。
-- active_milestone: in_progress。[TODO.md](../TODO.md) の B3。
-- active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の D7: Binary format input/output の分離。
+- project_state: completed。B3: Mach-O 出力境界は review gate に到達した。
+- active_milestone: completed。[TODO.md](../TODO.md) の B3。
+- active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の D7: Binary format input/output の分離。output writer serialization 境界は後続作業として残る。
 - active_branch: `task/b3-mach-o-output-boundary`。B3 作業 branch。
-- related_todo: B3 `_main` entry、`__TEXT`、`__const`、最小 load commands の公開仕様ベース model を定義する` completed。関連設計 TODO は D7。
-- completed_work: B2 branch は PR merge 後に local から削除した。B3 では `bara-oracle::binary_format` の Mach-O input parser 群を `input` module、executable image plan/materialization を `output` module へ分離した。続いて `bara-mach-o` crate を追加し、最小 ARM64 Mach-O executable writer の pure planning function、`_main` entry、`__TEXT` / optional `__const`、最小 load command model を定義した。
-- remaining_work: B3 の `clang` packaging 経路と pure writer 経路の出力差分検証、必要時の追加切り出し。
-- next_action: `clang` packaging 経路と pure writer 経路の出力差分を検証するため、writer model から serialization 境界に必要な layout / bytes model を詰める。
-- verification: `nix develop -c cargo test -p bara-mach-o` が未実装 model API の compile error で期待どおり失敗し、実装後に通過した。変更全体の gate として `nix develop -c ./scripts/verify` が通過した。
+- related_todo: B3 の `clang` packaging 経路と pure writer 経路の出力差分検証 completed。関連設計 TODO は D7。
+- completed_work: B2 branch は PR merge 後に local から削除した。B3 では `bara-oracle::binary_format` の Mach-O input parser 群を `input` module、executable image plan/materialization を `output` module へ分離した。続いて `bara-mach-o` crate を追加し、最小 ARM64 Mach-O executable writer の pure planning function、`_main` entry、`__TEXT` / optional `__const`、最小 load command model を定義した。最後に、現時点の writer maturity に合わせ、`clang` packaging model と pure writer model の parity を検証する比較 report を追加した。
+- remaining_work: B3 は完了。D7 の output writer serialization 境界、実 bytes の layout / serialization parity は後続作業として残る。
+- next_action: review gate。B3 branch をレビューし、merge 後に B4: x86 syscall / libc 境界へ進む。
+- verification: `nix develop -c cargo test -p bara-mach-o` は未実装 comparison API の compile error で期待どおり失敗し、実装後に通過した。変更全体の gate として `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-08 11:21 JST: B3 の最後の小ステップとして、`clang` packaging 経路と pure writer 経路の差分検証を `bara-mach-o` の公開仕様ベース model 比較として追加した。`MachOArm64ClangPackagingModel`、comparison report、classified mismatch issue を定義し、`_main` / `__TEXT` / `__text` / optional `__const` / minimal load commands の parity を検証できるようにした。B3 は review gate に到達した。
+- 検証: `nix develop -c cargo test -p bara-mach-o` は未実装 comparison API の compile error で期待どおり失敗し、実装後に通過した。変更全体の `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 11:08 JST: B3 の 3 つ目の小ステップとして、`bara-mach-o` の writer plan に public Mach-O model を追加した。`_main` entry、`__TEXT` segment、mandatory `__text` section、const payload がある場合の `__const` section、最小 `LC_SEGMENT_64` / `LC_MAIN` 相当の load command model を domain type として定義した。
 - 検証: `nix develop -c cargo test -p bara-mach-o` は未実装 model API の compile error で期待どおり失敗し、実装後に通過した。変更全体の `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 10:46 JST: B3 の 2 つ目の小ステップとして、`bara-mach-o` crate を追加し、ARM64 Mach-O executable writer の pure planning 境界を設計した。`MachOArm64MainCode`、`MachOArm64ConstData`、writer request、payload、plan、target を domain type として定義し、empty payload parts は classified input error にする。

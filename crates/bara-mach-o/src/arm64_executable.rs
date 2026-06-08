@@ -57,14 +57,25 @@ pub struct MachOArm64ExecutableModel {
 }
 
 impl MachOArm64ExecutableModel {
+    fn main_only() -> Self {
+        Self::from_text_segment(MachOArm64TextSegment::main_only())
+    }
+
+    fn main_with_const_section() -> Self {
+        Self::from_text_segment(MachOArm64TextSegment::main_with_const_section())
+    }
+
     fn from_payload(payload: &MachOArm64ExecutablePayload) -> Self {
-        let entry_point = MachOArm64EntryPoint::Main;
-        let text_segment = match payload {
-            MachOArm64ExecutablePayload::MainOnly(_) => MachOArm64TextSegment::main_only(),
+        match payload {
+            MachOArm64ExecutablePayload::MainOnly(_) => Self::main_only(),
             MachOArm64ExecutablePayload::MainWithConstData { .. } => {
-                MachOArm64TextSegment::main_with_const_section()
+                Self::main_with_const_section()
             }
-        };
+        }
+    }
+
+    fn from_text_segment(text_segment: MachOArm64TextSegment) -> Self {
+        let entry_point = MachOArm64EntryPoint::Main;
         let load_commands = MachOArm64LoadCommands::minimal_main_executable(
             MachOArm64SegmentName::Text,
             entry_point,
@@ -119,6 +130,13 @@ impl MachOArm64TextSegment {
     pub const fn const_section(&self) -> Option<MachOArm64ConstSection> {
         self.const_section
     }
+
+    pub const fn const_section_presence(&self) -> MachOArm64ConstSectionPresence {
+        match self.const_section {
+            Some(_) => MachOArm64ConstSectionPresence::Present,
+            None => MachOArm64ConstSectionPresence::Absent,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -153,6 +171,12 @@ pub enum MachOArm64SegmentName {
 pub enum MachOArm64SectionName {
     Text,
     Const,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MachOArm64ConstSectionPresence {
+    Present,
+    Absent,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -276,6 +300,76 @@ pub enum MachOArm64ExecutableWriterInputError {
     EmptyConstData,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MachOArm64ClangPackagingModel {
+    model: MachOArm64ExecutableModel,
+}
+
+impl MachOArm64ClangPackagingModel {
+    pub fn main_only() -> Self {
+        Self {
+            model: MachOArm64ExecutableModel::main_only(),
+        }
+    }
+
+    pub fn main_with_const_section() -> Self {
+        Self {
+            model: MachOArm64ExecutableModel::main_with_const_section(),
+        }
+    }
+
+    pub const fn model(&self) -> &MachOArm64ExecutableModel {
+        &self.model
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MachOArm64PackagingComparisonReport {
+    issues: Vec<MachOArm64PackagingComparisonIssue>,
+}
+
+impl MachOArm64PackagingComparisonReport {
+    fn new(issues: Vec<MachOArm64PackagingComparisonIssue>) -> Self {
+        Self { issues }
+    }
+
+    pub fn is_equivalent(&self) -> bool {
+        self.issues.is_empty()
+    }
+
+    pub fn issues(&self) -> &[MachOArm64PackagingComparisonIssue] {
+        &self.issues
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MachOArm64PackagingComparisonIssue {
+    EntryPointMismatch {
+        clang: MachOArm64EntryPoint,
+        pure_writer: MachOArm64EntryPoint,
+    },
+    TextSegmentNameMismatch {
+        clang: MachOArm64SegmentName,
+        pure_writer: MachOArm64SegmentName,
+    },
+    TextSectionNameMismatch {
+        clang: MachOArm64SectionName,
+        pure_writer: MachOArm64SectionName,
+    },
+    ConstSectionPresenceMismatch {
+        clang: MachOArm64ConstSectionPresence,
+        pure_writer: MachOArm64ConstSectionPresence,
+    },
+    TextSegmentLoadCommandMismatch {
+        clang: MachOArm64Segment64LoadCommand,
+        pure_writer: MachOArm64Segment64LoadCommand,
+    },
+    MainLoadCommandMismatch {
+        clang: MachOArm64MainLoadCommand,
+        pure_writer: MachOArm64MainLoadCommand,
+    },
+}
+
 pub fn plan_mach_o_arm64_executable(
     request: MachOArm64ExecutableWriterRequest,
 ) -> MachOArm64ExecutableWriterPlan {
@@ -287,6 +381,70 @@ pub fn plan_mach_o_arm64_executable(
         payload,
         model,
     }
+}
+
+pub fn compare_mach_o_arm64_clang_packaging(
+    clang: &MachOArm64ClangPackagingModel,
+    pure_writer: &MachOArm64ExecutableWriterPlan,
+) -> MachOArm64PackagingComparisonReport {
+    let clang_model = clang.model();
+    let pure_writer_model = pure_writer.model();
+    let mut issues = Vec::new();
+
+    if clang_model.entry_point() != pure_writer_model.entry_point() {
+        issues.push(MachOArm64PackagingComparisonIssue::EntryPointMismatch {
+            clang: clang_model.entry_point(),
+            pure_writer: pure_writer_model.entry_point(),
+        });
+    }
+    if clang_model.text_segment().name() != pure_writer_model.text_segment().name() {
+        issues.push(
+            MachOArm64PackagingComparisonIssue::TextSegmentNameMismatch {
+                clang: clang_model.text_segment().name(),
+                pure_writer: pure_writer_model.text_segment().name(),
+            },
+        );
+    }
+    if clang_model.text_segment().text_section().name()
+        != pure_writer_model.text_segment().text_section().name()
+    {
+        issues.push(
+            MachOArm64PackagingComparisonIssue::TextSectionNameMismatch {
+                clang: clang_model.text_segment().text_section().name(),
+                pure_writer: pure_writer_model.text_segment().text_section().name(),
+            },
+        );
+    }
+    if clang_model.text_segment().const_section_presence()
+        != pure_writer_model.text_segment().const_section_presence()
+    {
+        issues.push(
+            MachOArm64PackagingComparisonIssue::ConstSectionPresenceMismatch {
+                clang: clang_model.text_segment().const_section_presence(),
+                pure_writer: pure_writer_model.text_segment().const_section_presence(),
+            },
+        );
+    }
+    if clang_model.load_commands().text_segment()
+        != pure_writer_model.load_commands().text_segment()
+    {
+        issues.push(
+            MachOArm64PackagingComparisonIssue::TextSegmentLoadCommandMismatch {
+                clang: clang_model.load_commands().text_segment(),
+                pure_writer: pure_writer_model.load_commands().text_segment(),
+            },
+        );
+    }
+    if clang_model.load_commands().main_entry() != pure_writer_model.load_commands().main_entry() {
+        issues.push(
+            MachOArm64PackagingComparisonIssue::MainLoadCommandMismatch {
+                clang: clang_model.load_commands().main_entry(),
+                pure_writer: pure_writer_model.load_commands().main_entry(),
+            },
+        );
+    }
+
+    MachOArm64PackagingComparisonReport::new(issues)
 }
 
 #[cfg(test)]
@@ -407,6 +565,68 @@ mod tests {
         assert_eq!(
             load_commands.main_entry().entry_point(),
             MachOArm64EntryPoint::Main
+        );
+    }
+
+    #[test]
+    fn verifies_main_only_clang_packaging_model_matches_pure_writer_model() {
+        let main = MachOArm64MainCode::from_emitted_code_bytes([
+            0x40, 0x05, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6,
+        ])
+        .expect("main code is non-empty");
+        let writer_plan =
+            plan_mach_o_arm64_executable(MachOArm64ExecutableWriterRequest::main_only(main));
+        let clang_model = MachOArm64ClangPackagingModel::main_only();
+
+        let report = compare_mach_o_arm64_clang_packaging(&clang_model, &writer_plan);
+
+        assert!(report.is_equivalent());
+        assert!(report.issues().is_empty());
+    }
+
+    #[test]
+    fn verifies_const_clang_packaging_model_matches_pure_writer_model() {
+        let main = MachOArm64MainCode::from_emitted_code_bytes([
+            0x00, 0x00, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6,
+        ])
+        .expect("main code is non-empty");
+        let const_data = MachOArm64ConstData::from_read_only_section_bytes(*b"hello world\n")
+            .expect("const data is non-empty");
+        let writer_plan = plan_mach_o_arm64_executable(
+            MachOArm64ExecutableWriterRequest::main_with_const_data(main, const_data),
+        );
+        let clang_model = MachOArm64ClangPackagingModel::main_with_const_section();
+
+        let report = compare_mach_o_arm64_clang_packaging(&clang_model, &writer_plan);
+
+        assert!(report.is_equivalent());
+        assert!(report.issues().is_empty());
+    }
+
+    #[test]
+    fn reports_const_section_presence_difference_between_packaging_models() {
+        let main = MachOArm64MainCode::from_emitted_code_bytes([
+            0x00, 0x00, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6,
+        ])
+        .expect("main code is non-empty");
+        let const_data = MachOArm64ConstData::from_read_only_section_bytes(*b"hello world\n")
+            .expect("const data is non-empty");
+        let writer_plan = plan_mach_o_arm64_executable(
+            MachOArm64ExecutableWriterRequest::main_with_const_data(main, const_data),
+        );
+        let clang_model = MachOArm64ClangPackagingModel::main_only();
+
+        let report = compare_mach_o_arm64_clang_packaging(&clang_model, &writer_plan);
+
+        assert!(!report.is_equivalent());
+        assert_eq!(
+            report.issues(),
+            &[
+                MachOArm64PackagingComparisonIssue::ConstSectionPresenceMismatch {
+                    clang: MachOArm64ConstSectionPresence::Absent,
+                    pure_writer: MachOArm64ConstSectionPresence::Present
+                }
+            ]
         );
     }
 }
