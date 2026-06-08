@@ -420,6 +420,97 @@ pub(crate) fn native_artifact_metadata_to_json(
     serde_json::to_string(metadata).map_err(JsonError::new)
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct NativeArtifactPackageRequest {
+    source: NativeAssemblySource,
+    output_path: NativeArtifactOutputPath,
+    helper_requirements: NativeArtifactHelperRequirements,
+}
+
+impl NativeArtifactPackageRequest {
+    fn linked_executable(
+        source: NativeAssemblySource,
+        output_path: NativeArtifactOutputPath,
+        helper_requirements: NativeArtifactHelperRequirements,
+    ) -> Self {
+        Self {
+            source,
+            output_path,
+            helper_requirements,
+        }
+    }
+
+    fn source(&self) -> &NativeAssemblySource {
+        &self.source
+    }
+
+    fn output_path(&self) -> &NativeArtifactOutputPath {
+        &self.output_path
+    }
+
+    fn into_linked_executable(self) -> LinkedNativeExecutable {
+        LinkedNativeExecutable::from_existing_output_path_with_helper_requirements(
+            self.output_path,
+            self.helper_requirements,
+        )
+    }
+}
+
+pub(crate) trait NativeArtifactPackager {
+    fn package(
+        &self,
+        request: NativeArtifactPackageRequest,
+    ) -> Result<LinkedNativeExecutable, NativeArtifactError>;
+}
+
+pub(crate) fn package_native_artifact(
+    packager: &impl NativeArtifactPackager,
+    request: NativeArtifactPackageRequest,
+) -> Result<LinkedNativeExecutable, NativeArtifactError> {
+    packager.package(request)
+}
+
+struct ClangNativeArtifactPackager;
+
+impl NativeArtifactPackager for ClangNativeArtifactPackager {
+    fn package(
+        &self,
+        request: NativeArtifactPackageRequest,
+    ) -> Result<LinkedNativeExecutable, NativeArtifactError> {
+        let assembly_path = temporary_assembly_path()?;
+        fs::write(&assembly_path, request.source().as_str()).map_err(|source| {
+            NativeArtifactError::WriteAssembly {
+                path: assembly_path.clone(),
+                source,
+            }
+        })?;
+
+        let toolchain_command =
+            NativeToolchainCommand::clang_link(&assembly_path, request.output_path());
+        let output = toolchain_command
+            .to_command()
+            .output()
+            .map_err(|source| NativeArtifactError::LinkerSpawn { source });
+
+        let _ = fs::remove_file(&assembly_path);
+
+        let output = output?;
+        if !output.status.success() {
+            return Err(NativeArtifactError::LinkerFailed {
+                status: output.status.to_string(),
+                stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+            });
+        }
+        if !request.output_path().as_path().exists() {
+            return Err(NativeArtifactError::MissingLinkedExecutable {
+                path: request.output_path().to_path_buf(),
+            });
+        }
+
+        Ok(request.into_linked_executable())
+    }
+}
+
 pub(crate) fn link_arm64_main_executable(
     body: FunctionArm64Bytes<'_>,
     output_path: &Path,
@@ -428,11 +519,12 @@ pub(crate) fn link_arm64_main_executable(
 
     let output_path = NativeArtifactOutputPath::from_path(output_path);
     let source = arm64_main_assembly_source(body);
-    link_assembly_source(
-        &source,
+    let request = NativeArtifactPackageRequest::linked_executable(
+        source,
         output_path,
         NativeArtifactHelperRequirements::none(),
-    )
+    );
+    package_native_artifact(&ClangNativeArtifactPackager, request)
 }
 
 pub(crate) fn link_arm64_stdout_main_executable(
@@ -456,11 +548,12 @@ pub(crate) fn link_arm64_stdout_main_executable(
 
     let output_path = NativeArtifactOutputPath::from_path(output_path);
     let source = arm64_stdout_main_assembly_source(body, stdout.text());
-    link_assembly_source(
-        &source,
+    let request = NativeArtifactPackageRequest::linked_executable(
+        source,
         output_path,
         NativeArtifactHelperRequirements::write_stdout(),
-    )
+    );
+    package_native_artifact(&ClangNativeArtifactPackager, request)
 }
 
 pub(crate) fn observe_native_executable_artifact(
@@ -495,48 +588,6 @@ pub(crate) fn observe_native_executable_artifact(
         String::from_utf8_lossy(&output.stdout).into_owned(),
         String::from_utf8_lossy(&output.stderr).into_owned(),
     ))
-}
-
-fn link_assembly_source(
-    source: &NativeAssemblySource,
-    output_path: NativeArtifactOutputPath,
-    helper_requirements: NativeArtifactHelperRequirements,
-) -> Result<LinkedNativeExecutable, NativeArtifactError> {
-    let assembly_path = temporary_assembly_path()?;
-    fs::write(&assembly_path, source.as_str()).map_err(|source| {
-        NativeArtifactError::WriteAssembly {
-            path: assembly_path.clone(),
-            source,
-        }
-    })?;
-
-    let toolchain_command = NativeToolchainCommand::clang_link(&assembly_path, &output_path);
-    let output = toolchain_command
-        .to_command()
-        .output()
-        .map_err(|source| NativeArtifactError::LinkerSpawn { source });
-
-    let _ = fs::remove_file(&assembly_path);
-
-    let output = output?;
-    if !output.status.success() {
-        return Err(NativeArtifactError::LinkerFailed {
-            status: output.status.to_string(),
-            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
-        });
-    }
-    if !output_path.as_path().exists() {
-        return Err(NativeArtifactError::MissingLinkedExecutable {
-            path: output_path.to_path_buf(),
-        });
-    }
-
-    Ok(
-        LinkedNativeExecutable::from_existing_output_path_with_helper_requirements(
-            output_path,
-            helper_requirements,
-        ),
-    )
 }
 
 fn ensure_supported_host() -> Result<(), NativeArtifactError> {
@@ -725,6 +776,42 @@ mod tests {
                 String::from("-o"),
                 String::from("/tmp/hello")
             ]
+        );
+    }
+
+    #[test]
+    fn native_artifact_packaging_boundary_accepts_different_packagers() {
+        struct RecordingPackager;
+
+        impl super::NativeArtifactPackager for RecordingPackager {
+            fn package(
+                &self,
+                request: super::NativeArtifactPackageRequest,
+            ) -> Result<LinkedNativeExecutable, NativeArtifactError> {
+                assert!(request.source().as_str().starts_with(".text\n"));
+                Ok(request.into_linked_executable())
+            }
+        }
+
+        let raw =
+            RawArm64Bytes::from_trusted_bytes(&[0x40, 0x05, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]);
+        let source = NativeAssemblySource::main_from_generated_code(
+            NativeGeneratedCode::from_raw_arm64(raw),
+        );
+        let request = super::NativeArtifactPackageRequest::linked_executable(
+            source,
+            NativeArtifactOutputPath::from_path(Path::new("/tmp/return_42")),
+            super::NativeArtifactHelperRequirements::none(),
+        );
+
+        let executable = super::package_native_artifact(&RecordingPackager, request)
+            .expect("fake packager returns a linked executable");
+
+        assert_eq!(executable.path(), Path::new("/tmp/return_42"));
+        assert_eq!(
+            native_artifact_metadata_to_json(executable.metadata())
+                .expect("metadata serializes as json"),
+            "{\"artifact_kind\":\"linked_executable\",\"target_triple\":\"arm64-apple-macos\",\"toolchain\":\"clang\",\"output_path\":\"/tmp/return_42\",\"helper_requirements\":[]}"
         );
     }
 

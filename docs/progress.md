@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 10:02 JST
+最終更新: 2026-06-08 10:06 JST
 
 状態:
 
@@ -17,14 +17,16 @@
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B2 で native artifact の domain model を整理している。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の D2: Artifact domain model。
 - active_branch: `task/b2-artifact-domain-types`。B2 の小ステップ commit を積み増している。
-- related_todo: B2 `generated code、stdout data、toolchain command、output path の責務を分ける` completed。関連設計 TODO は D2。
-- completed_work: `NativeGeneratedCode`、`NativeStdoutData`、`NativeToolchainCommand`、`NativeArtifactOutputPath` を分け、assembly source 生成、stdout bytes、`clang` command assembly、出力先 path の責務を別の domain value にした。
-- remaining_work: B2 の toolchain 境界差し替え、unsupported host の安定出力。
-- next_action: この B2 小ステップを review する。続ける場合の次の小ステップは外部 `clang` packaging と将来の pure Mach-O writer を差し替え可能な境界にする。
-- verification: responsibility split の未実装 failure を確認後、`nix develop -c cargo test -p btbc-cli native_artifact`、`nix develop -c ./scripts/verify` が通過した。
+- related_todo: B2 `外部 clang packaging と将来の pure Mach-O writer を差し替え可能な境界にする` completed。関連設計 TODO は D2。
+- completed_work: `NativeArtifactPackager` trait と `NativeArtifactPackageRequest` を導入し、現在の `clang` packaging を `ClangNativeArtifactPackager` 実装へ閉じた。test fake packager で外部 process を呼ばずに linked executable metadata を返せる。
+- remaining_work: B2 の unsupported host の安定出力。
+- next_action: この B2 小ステップを review する。続ける場合の次の小ステップは macOS ARM64 以外の host を stable classified output にする。
+- verification: packager interface の未実装 failure を確認後、`nix develop -c cargo test -p btbc-cli native_artifact`、`nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-08 10:04 JST: B2 の 4 つ目の小ステップとして、外部 `clang` packaging を `NativeArtifactPackager` trait 境界へ分離した。`ClangNativeArtifactPackager` が現行 process 実行を担当し、test fake packager は同じ request から linked executable metadata を返せる。
+- 検証: `nix develop -c cargo test -p btbc-cli native_artifact_packaging_boundary_accepts_different_packagers` は未実装 trait / request の compile error で期待どおり失敗し、実装後に `nix develop -c cargo test -p btbc-cli native_artifact`、`nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 10:00 JST: B2 の 3 つ目の小ステップとして、generated code、stdout data、toolchain command、output path の責務を分離した。`NativeGeneratedCode`、`NativeStdoutData`、`NativeToolchainCommand`、`NativeArtifactOutputPath` を導入し、`link_assembly_source` は typed output path と toolchain command を組み立ててから外部 process を呼ぶようにした。
 - 検証: `nix develop -c cargo test -p btbc-cli native_artifact_request_types_separate_code_stdout_command_and_output_path` は未実装型 / method の compile error で期待どおり失敗し、実装後に `nix develop -c cargo test -p btbc-cli native_artifact`、`nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 09:48 JST: B2 の 2 つ目の小ステップとして、native linked executable artifact の metadata JSON 出力を追加した。`link-fixture-arm64-main` は text ではなく artifact metadata JSON を返し、metadata は execution result と別の domain value として保持される。
