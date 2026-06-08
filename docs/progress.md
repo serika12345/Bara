@@ -9,37 +9,40 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 18:36 JST
+最終更新: 2026-06-08 18:41 JST
 
 状態:
 
-- project_state: completed。B5 の 4 つ目の小ステップとして、direct
-  branch / conditional branch / fallthrough を typed terminator として
-  IR に追加した。
+- project_state: completed。B5 の 5 つ目の小ステップとして、flags
+  domain model を IR に追加した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B5:
   Control Flow / Stack / Call を開始した。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の
-  D4: Bara IR の責務に沿って、次は flags model と `cmp` / `test` /
-  `jcc` を段階的に追加する。
+  D4: Bara IR の責務に沿って、次は `cmp` / `test` / `jcc` を段階的に追加する。
 - active_branch: `task/b5-add-sub-regression`。base commit は `4d2356f`
   (`Merge pull request #4 from serika12345/task/b4-syscall-ir-request`)。
   latest commit は review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B5 の
-  direct branch / conditional branch / fallthrough を typed terminator として扱う。
-- completed_work: `Terminator::Fallthrough`、`Terminator::DirectJump`、
-  `Terminator::CondJump` と `X86Cond` を IR に追加した。validation はこれらを
-  structural valid terminator として扱い、ARM64 emitter は branch fixup 実装前の
-  explicit unsupported emission として止める。
-- remaining_work: B5 では flags、`cmp` / `test` / `jcc`、`jmp` 実行経路、
+  flags model を定義する。
+- completed_work: `FlagValue::{Known, Unknown}` と `Flags` を `bara-ir`
+  に追加した。`Flags::unknown()` は追跡対象の CF/PF/AF/ZF/SF/OF をすべて
+  unknown として作り、`Flags::new(...)` と accessor で materialized flag
+  state を扱える。
+- remaining_work: B5 では `cmp` / `test` / `jcc`、`jmp` 実行経路、
   stack、call、ARM64 fixup、PC map validation が未完了。
-- next_action: B5 の次の小ステップとして、flags model を定義し、
-  `cmp` / `test` / `jcc` を段階的に追加する。
-- verification: `nix develop -c cargo test -p bara-ir` と
-  `nix develop -c cargo test -p bara-arm64 emit::tests` が通過した。
+- next_action: B5 の次の小ステップとして、`cmp` / `test` / `jcc` を
+  段階的に追加する。
+- verification: `nix develop -c cargo test -p bara-ir flags` が通過した。
   `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-08 18:41 JST: B5 の 5 つ目の小ステップとして、
+  `FlagValue::{Known, Unknown}` と CF/PF/AF/ZF/SF/OF を持つ `Flags`
+  domain model を `bara-ir` に追加した。`cmp` / `test` / `jcc` の
+  decode / lift / emit は後続小ステップに分離した。
+- 検証: `nix develop -c cargo test -p bara-ir flags` が通過した。
+  `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 18:36 JST: B5 の 4 つ目の小ステップとして、
   `Fallthrough`、`DirectJump`、`CondJump`、`X86Cond` を typed IR
   terminator として追加した。branch lowering / fixup はまだ実装せず、

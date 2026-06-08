@@ -245,12 +245,12 @@ pub enum Operand {
 
 ```rust
 pub struct Flags {
-    pub cf: FlagValue,
-    pub pf: FlagValue,
-    pub af: FlagValue,
-    pub zf: FlagValue,
-    pub sf: FlagValue,
-    pub of: FlagValue,
+    cf: FlagValue,
+    pf: FlagValue,
+    af: FlagValue,
+    zf: FlagValue,
+    sf: FlagValue,
+    of: FlagValue,
 }
 
 pub enum FlagValue {
@@ -259,7 +259,11 @@ pub enum FlagValue {
 }
 ```
 
-M1 では flags を観測しない。M3 で `cmp` / `test` / `jcc` と一緒に導入する。
+flags は `Flags::new(...)` または `Flags::unknown()` で作り、`cf()` /
+`pf()` / `af()` / `zf()` / `sf()` / `of()` accessor から読む。
+
+現時点では flags domain model だけを定義し、`cmp` / `test` / `jcc`
+の decode / lift / emit は B5 の後続小ステップで扱う。
 
 ## Metadata
 
