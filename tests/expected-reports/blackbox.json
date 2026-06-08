@@ -33,6 +33,18 @@
       "outcome": "passed"
     },
     {
+      "case_id": "loop_countdown_return_0",
+      "outcome": "passed"
+    },
+    {
+      "case_id": "nested_call_return_42",
+      "outcome": "passed"
+    },
+    {
+      "case_id": "push_pop_return_42",
+      "outcome": "passed"
+    },
+    {
       "case_id": "return_42",
       "outcome": "passed"
     },

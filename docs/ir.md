@@ -72,12 +72,16 @@ runtime 境界へ伝えるための明示的な外部効果要求として扱う
 `Cmp` は x86 の `cmp` と同じく destination operand を書き戻さず、
 後続の flags / conditional branch lowering が読む status flags を更新する
 op として扱う。現時点で decode / lift するのは `cmp eax, imm8/imm32` に
-限り、ARM64 emit は flag lowering 実装前の explicit unsupported として止める。
+限る。ARM64 emit は `cmp x0,#imm12` の範囲だけ lower し、それ以外は
+explicit unsupported として止める。
 
 `Test` は x86 の `test` と同じく operand 同士の bitwise AND 結果を
 書き戻さず、flags 更新だけを表す op として扱う。現時点で decode / lift
-するのは `test eax,eax` に限り、ARM64 emit は flag lowering 実装前の
-explicit unsupported として止める。
+するのは `test eax,eax` に限り、ARM64 emit は `tst x0,x0` へ lower する。
+
+`Push` / `Pop` は現時点では `rax` だけを扱う。guest `rsp` 自体はまだ
+外から観測できる IR value として公開せず、ARM64 emit は 16-byte aligned な
+host stack slot を使って function-local stack value として保持する。
 
 ```rust
 pub enum HostTrapKind {
@@ -147,9 +151,12 @@ pub enum Terminator {
 
 現時点では short `je/jz rel8` を `X86Cond::Equal`、short `jne/jnz rel8` を
 `X86Cond::NotEqual` の `CondJump` へ、short `jmp rel8` を `DirectJump` へ
-decode / lift し、ARM64 emit は `cmp` / `test` が更新した flags を
-`b.eq` / `b.ne` へ lower する。その他の `jcc` 条件と rel32 form は B5 の
-後続小ステップで扱う。
+decode / lift する。`call rel32` は target が同じ decoded byte stream 内の
+block start に存在する場合だけ `DirectCall` へ lift し、外部 target は
+`DirectCallUnsupported` として分類する。ARM64 emit は `cmp` / `test` が
+更新した flags を `b.eq` / `b.ne` へ lower し、direct call は link register
+を保存して `bl` と明示的な `return_to` branch へ lower する。その他の `jcc`
+条件と rel32 form は B5 の後続小ステップで扱う。
 
 `BoundaryRequest` は guest 側から public ABI / external boundary へ出ようとする
 意図を IR に残す。runtime や host OS syscall を直接実行する指示ではない。
@@ -280,10 +287,11 @@ flags は `Flags::new(...)` または `Flags::unknown()` で作り、`cf()` /
 
 現時点では `cmp eax, imm8/imm32` を `IrOp::Cmp` へ、`test eax,eax` を
 `IrOp::Test` へ decode / lift し、short `je/jz rel8` と `jne/jnz rel8` を
-`CondJump` へ、short `jmp rel8` を `DirectJump` へ decode / lift する。
+`CondJump` へ、short `jmp rel8` を `DirectJump` へ、internal target の
+`call rel32` を `DirectCall` へ decode / lift する。
 ARM64 emit は `cmp x0,#imm12`、`tst x0,x0`、`b.eq` / `b.ne`、unconditional
-`b` の最小 lowering を持つ。その他の `jcc` 条件と rel32 form は B5 の
-後続小ステップで扱う。
+`b`、`bl` + link-register save/restore の最小 lowering を持つ。その他の
+`jcc` 条件と rel32 form は B5 の後続小ステップで扱う。
 
 ## Metadata
 

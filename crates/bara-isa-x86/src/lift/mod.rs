@@ -20,10 +20,15 @@ pub fn lift_decoded_function(decoded: &DecodedFunction) -> Result<Program, LiftE
     let mut ops = Vec::new();
     let mut block_start = Some(decoded.entry());
     let mut block_end = decoded.entry();
+    let instruction_starts = decoded
+        .instructions()
+        .iter()
+        .map(DecodedInstruction::start)
+        .collect::<Vec<_>>();
 
     for instruction in decoded.instructions() {
         let start = block_start.get_or_insert(instruction.start());
-        match lift_instruction(instruction)? {
+        match lift_instruction(instruction, &instruction_starts)? {
             LiftedInstruction::Op(op) => {
                 block_end = instruction.end();
                 ops.push(op);
@@ -71,7 +76,10 @@ enum LiftedInstruction {
     Terminator(Terminator),
 }
 
-fn lift_instruction(instruction: &DecodedInstruction) -> Result<LiftedInstruction, LiftError> {
+fn lift_instruction(
+    instruction: &DecodedInstruction,
+    instruction_starts: &[bara_ir::X86Va],
+) -> Result<LiftedInstruction, LiftError> {
     match instruction.kind() {
         DecodedInstructionKind::MovEaxImm32 { imm } => Ok(LiftedInstruction::Op(IrOp::Mov {
             dst: Operand::Reg(X86Reg::Rax),
@@ -113,6 +121,12 @@ fn lift_instruction(instruction: &DecodedInstruction) -> Result<LiftedInstructio
             lhs: Operand::Reg(X86Reg::Rax),
             rhs: Operand::Reg(X86Reg::Rax),
         })),
+        DecodedInstructionKind::PushRax => Ok(LiftedInstruction::Op(IrOp::Push {
+            src: Operand::Reg(X86Reg::Rax),
+        })),
+        DecodedInstructionKind::PopRax => Ok(LiftedInstruction::Op(IrOp::Pop {
+            dst: Operand::Reg(X86Reg::Rax),
+        })),
         DecodedInstructionKind::XorEaxEax => Ok(LiftedInstruction::Op(IrOp::Mov {
             dst: Operand::Reg(X86Reg::Rax),
             src: Operand::ImmU64(0),
@@ -120,6 +134,14 @@ fn lift_instruction(instruction: &DecodedInstruction) -> Result<LiftedInstructio
         DecodedInstructionKind::BaraHostTrapSentinel => Ok(LiftedInstruction::Op(IrOp::HostTrap {
             kind: HostTrapKind::Stdout,
         })),
+        DecodedInstructionKind::CallRel32 { target, return_to }
+            if instruction_starts.contains(target) =>
+        {
+            Ok(LiftedInstruction::Terminator(Terminator::DirectCall {
+                target: *target,
+                return_to: *return_to,
+            }))
+        }
         DecodedInstructionKind::CallRel32 { target, return_to } => {
             Ok(LiftedInstruction::Terminator(Terminator::Unsupported {
                 reason: UnsupportedReason::DirectCallUnsupported {
@@ -661,6 +683,42 @@ mod tests {
     }
 
     #[test]
+    fn lifts_push_pop_rax_to_stack_ops() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(1),
+                    DecodedInstructionKind::PushRax,
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(1),
+                    X86Va::new(2),
+                    DecodedInstructionKind::PopRax,
+                ),
+                DecodedInstruction::new(X86Va::new(2), X86Va::new(3), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded push/pop function lifts");
+
+        assert_eq!(
+            program.blocks()[0].ops(),
+            &[
+                IrOp::Push {
+                    src: Operand::Reg(X86Reg::Rax)
+                },
+                IrOp::Pop {
+                    dst: Operand::Reg(X86Reg::Rax)
+                }
+            ]
+        );
+        assert_eq!(program.blocks()[0].terminator(), &Terminator::Return);
+    }
+
+    #[test]
     fn lifts_je_rel8_to_cond_jump_terminator() {
         let decoded = DecodedFunction::new(
             X86Va::new(0),
@@ -886,6 +944,47 @@ mod tests {
                 reason: UnsupportedReason::DirectCallUnsupported { target, return_to }
             }
         );
+    }
+
+    #[test]
+    fn lifts_direct_call_to_direct_call_terminator_when_target_is_decoded() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(5),
+                    DecodedInstructionKind::CallRel32 {
+                        target: X86Va::new(6),
+                        return_to: X86Va::new(5),
+                    },
+                ),
+                DecodedInstruction::new(X86Va::new(5), X86Va::new(6), DecodedInstructionKind::Ret),
+                DecodedInstruction::new(
+                    X86Va::new(6),
+                    X86Va::new(11),
+                    DecodedInstructionKind::MovEaxImm32 { imm: 42 },
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(11),
+                    X86Va::new(12),
+                    DecodedInstructionKind::Ret,
+                ),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded direct call lifts");
+
+        assert_eq!(
+            program.blocks()[0].terminator(),
+            &Terminator::DirectCall {
+                target: X86Va::new(6),
+                return_to: X86Va::new(5),
+            }
+        );
+        assert_eq!(program.blocks()[1].start(), X86Va::new(5));
+        assert_eq!(program.blocks()[2].start(), X86Va::new(6));
     }
 
     #[test]

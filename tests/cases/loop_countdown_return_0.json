@@ -1,0 +1,9 @@
+{
+  "case_id": "loop_countdown_return_0",
+  "entry": 0,
+  "bytes": "b803000000eb0083e80183f80075f8c3",
+  "abi": {
+    "args": [],
+    "return": "u64"
+  }
+}

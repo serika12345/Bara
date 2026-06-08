@@ -87,6 +87,30 @@ fn link_fixture_arm64_main_writes_return_42_executable() {
     assert_eq!(status.code(), Some(42));
 }
 
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[test]
+fn link_fixture_arm64_main_writes_nested_call_return_42_executable() {
+    let temp_dir =
+        TestTempDir::new("link_fixture_arm64_main_writes_nested_call_return_42_executable");
+    let case_path = temp_dir.write_file(
+        "case.json",
+        include_str!("../../../tests/cases/nested_call_return_42.json"),
+    );
+    let output_path = temp_dir.path.join("nested_call_return_42");
+
+    run_cli(vec![
+        String::from("link-fixture-arm64-main"),
+        case_path.to_string_lossy().into_owned(),
+        output_path.to_string_lossy().into_owned(),
+    ])
+    .expect("nested call fixture links as an ARM64 main executable");
+
+    let status = Command::new(&output_path)
+        .status()
+        .expect("linked executable runs");
+    assert_eq!(status.code(), Some(42));
+}
+
 #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
 #[test]
 fn link_fixture_arm64_main_reports_unsupported_host() {

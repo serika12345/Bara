@@ -9,13 +9,13 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 19:53 JST
+最終更新: 2026-06-08 20:05 JST
 
 状態:
 
 - project_state: in_progress。B5 の large milestone completion に向けて、
-  short `jmp rel8` を typed direct branch として decode / lift し、
-  ARM64 direct branch fixture を runtime まで通した。
+  `push` / `pop`、simple loop、internal direct `call rel32`、nested call を
+  ARM64 runtime と linked native executable artifact まで通した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B5:
   Control Flow / Stack / Call を開始した。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の
@@ -25,23 +25,45 @@
   (`Merge pull request #4 from serika12345/task/b4-syscall-ir-request`)。
   latest commit は review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B5 の
-  short `jmp rel8` を `DirectJump` terminator として decode / lift する。
-- completed_work: `direct_jmp_return_42` fixture は decode / lift で
-  `Terminator::DirectJump` を作り、既存の ARM64 unconditional branch fixup を
-  通って native runtime で `rax=42` を返す。
-- remaining_work: B5 ではその他の `jcc` 条件と rel32、簡単な loop、stack、
-  call、direct call fixup、PC map validation が未完了。
-- next_action: `push` / `pop` と stack pointer model の最小 semantics を
-  追加し、direct `call` / `ret` の土台を作る。
-- verification: `nix develop -c cargo test -p bara-isa-x86
-  decodes_jmp_rel8_and_continues_with_target_block`、`nix develop -c cargo test
-  -p bara-isa-x86 lifts_jmp_rel8_to_direct_jump_terminator`、`nix develop -c
-  cargo test -p bara-runtime direct_jmp_return_42`、
+  `push` / `pop`、stack pointer / return address / direct call の最小
+  semantics、nested call fixture。
+- completed_work: `push_pop_return_42` は abstract stack slot lowering で
+  `rax=42` を復元する。`loop_countdown_return_0` は block 間の `rax`
+  live-in propagation と backward `jne` fixup を通る。`nested_call_return_42`
+  は direct call の link-register save/restore と explicit `return_to`
+  branch で runtime と linked native executable artifact の両方を通る。
+- remaining_work: B5 ではその他の `jcc` 条件と rel32、PC map / fixup
+  validation が未完了。
+- next_action: `jcc` 条件 / rel32 と validation report を片付け、B5 review
+  gate へ進む。
+- verification: `nix develop -c cargo test -p bara-ir
+  push_pop_ops_expose_typed_operands`、`nix develop -c cargo test -p bara-ir
+  control_flow_terminators_are_structurally_valid`、`nix develop -c cargo test -p
+  bara-isa-x86 decodes_push_rax_pop_rax_between_mov_and_ret`、`nix develop -c
+  cargo test -p bara-isa-x86 lifts_push_pop_rax_to_stack_ops`、`nix develop -c
+  cargo test -p bara-isa-x86
+  lifts_direct_call_to_direct_call_terminator_when_target_is_decoded`、`nix develop
+  -c cargo test -p bara-arm64 emits_push_pop_rax_with_aligned_stack_slot`、
+  `nix develop -c cargo test -p bara-arm64
+  emits_direct_call_fixups_and_return_to_block`、`nix develop -c cargo test -p
+  bara-runtime push_pop_return_42`、`nix develop -c cargo test -p bara-runtime
+  nested_call_return_42`、`nix develop -c cargo test -p bara-runtime
+  loop_countdown_return_0`、`nix develop -c cargo test -p btbc-cli
+  link_fixture_arm64_main_writes_nested_call_return_42_executable`、
   `nix develop -c cargo test -p btbc-cli
   check_blackbox_reports_raw_manifest_mach_o_and_probe_fixtures`、および
   `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
+
+- 2026-06-08 20:05 JST: B5 large milestone completion の小ステップとして、
+  `Push` / `Pop` IR、internal-target `DirectCall` terminator、ARM64 の
+  16-byte aligned stack slot lowering、direct call `bl` fixup、link-register
+  save/restore、block 間 `rax` live-in propagation を追加した。
+  `push_pop_return_42`、`loop_countdown_return_0`、`nested_call_return_42` を
+  repository fixture に追加し、nested call は linked native executable artifact
+  としても実行した。検証は snapshot の targeted tests と
+  `nix develop -c ./scripts/verify`。
 
 - 2026-06-08 19:53 JST: B5 large milestone completion の小ステップとして、
   short `jmp rel8` を `DecodedInstructionKind::JmpRel8` と

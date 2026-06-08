@@ -80,6 +80,8 @@ pub enum DecodedInstructionKind {
         imm: X86Imm8,
     },
     TestEaxEax,
+    PushRax,
+    PopRax,
     XorEaxEax,
     JccRel8 {
         condition: X86Cond,

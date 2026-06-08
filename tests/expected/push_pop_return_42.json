@@ -1,0 +1,7 @@
+{
+  "case_id": "push_pop_return_42",
+  "exit_status": 0,
+  "return_value": 42,
+  "stdout": "",
+  "stderr": ""
+}

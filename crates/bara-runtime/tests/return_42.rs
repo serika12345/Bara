@@ -173,6 +173,71 @@ fn direct_jmp_return_42_runs_on_supported_aarch64_unix_hosts() -> Result<(), Str
 }
 
 #[test]
+fn push_pop_return_42_decodes_lifts_and_emits_arm64() -> Result<(), String> {
+    assert_fixture_emits_arm64(
+        "push_pop_return_42",
+        include_str!("../../../tests/cases/push_pop_return_42.json"),
+        &[
+            0x40, 0x05, 0x80, 0xd2, 0xe0, 0x0f, 0x1f, 0xf8, 0xe0, 0x00, 0x80, 0xd2, 0xe0, 0x07,
+            0x41, 0xf8, 0xc0, 0x03, 0x5f, 0xd6,
+        ],
+    )
+}
+
+#[test]
+fn push_pop_return_42_runs_on_supported_aarch64_unix_hosts() -> Result<(), String> {
+    assert_fixture_runs_like_expected(
+        "push_pop_return_42",
+        include_str!("../../../tests/cases/push_pop_return_42.json"),
+        include_str!("../../../tests/expected/push_pop_return_42.json"),
+    )
+}
+
+#[test]
+fn nested_call_return_42_decodes_lifts_and_emits_arm64() -> Result<(), String> {
+    assert_fixture_emits_arm64(
+        "nested_call_return_42",
+        include_str!("../../../tests/cases/nested_call_return_42.json"),
+        &[
+            0xfd, 0x7b, 0xbf, 0xa9, 0x04, 0x00, 0x00, 0x94, 0xfd, 0x7b, 0xc1, 0xa8, 0x01, 0x00,
+            0x00, 0x14, 0xc0, 0x03, 0x5f, 0xd6, 0xfd, 0x7b, 0xbf, 0xa9, 0x04, 0x00, 0x00, 0x94,
+            0xfd, 0x7b, 0xc1, 0xa8, 0x01, 0x00, 0x00, 0x14, 0xc0, 0x03, 0x5f, 0xd6, 0x40, 0x05,
+            0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6,
+        ],
+    )
+}
+
+#[test]
+fn nested_call_return_42_runs_on_supported_aarch64_unix_hosts() -> Result<(), String> {
+    assert_fixture_runs_like_expected(
+        "nested_call_return_42",
+        include_str!("../../../tests/cases/nested_call_return_42.json"),
+        include_str!("../../../tests/expected/nested_call_return_42.json"),
+    )
+}
+
+#[test]
+fn loop_countdown_return_0_decodes_lifts_and_emits_arm64() -> Result<(), String> {
+    assert_fixture_emits_arm64(
+        "loop_countdown_return_0",
+        include_str!("../../../tests/cases/loop_countdown_return_0.json"),
+        &[
+            0x60, 0x00, 0x80, 0xd2, 0x01, 0x00, 0x00, 0x14, 0x00, 0x04, 0x00, 0xd1, 0x1f, 0x00,
+            0x00, 0xf1, 0xc1, 0xff, 0xff, 0x54, 0x01, 0x00, 0x00, 0x14, 0xc0, 0x03, 0x5f, 0xd6,
+        ],
+    )
+}
+
+#[test]
+fn loop_countdown_return_0_runs_on_supported_aarch64_unix_hosts() -> Result<(), String> {
+    assert_fixture_runs_like_expected(
+        "loop_countdown_return_0",
+        include_str!("../../../tests/cases/loop_countdown_return_0.json"),
+        include_str!("../../../tests/expected/loop_countdown_return_0.json"),
+    )
+}
+
+#[test]
 fn xor_eax_eax_return_0_decodes_lifts_and_emits_arm64() -> Result<(), String> {
     assert_fixture_emits_arm64(
         "xor_eax_eax_return_0",

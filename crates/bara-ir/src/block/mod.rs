@@ -77,6 +77,8 @@ pub enum IrOp {
     Sub { dst: Operand, src: Operand },
     Cmp { lhs: Operand, rhs: Operand },
     Test { lhs: Operand, rhs: Operand },
+    Push { src: Operand },
+    Pop { dst: Operand },
     HostTrap { kind: HostTrapKind },
     Unsupported { reason: UnsupportedReason },
 }
@@ -92,6 +94,10 @@ pub enum Terminator {
     },
     DirectJump {
         target: X86Va,
+    },
+    DirectCall {
+        target: X86Va,
+        return_to: X86Va,
     },
     CondJump {
         condition: X86Cond,
@@ -250,6 +256,16 @@ mod tests {
             }
         );
         assert_eq!(
+            Terminator::DirectCall {
+                target: X86Va::new(0x1020),
+                return_to: X86Va::new(0x1005),
+            },
+            Terminator::DirectCall {
+                target: X86Va::new(0x1020),
+                return_to: X86Va::new(0x1005),
+            }
+        );
+        assert_eq!(
             Terminator::Fallthrough {
                 target: X86Va::new(0x1005)
             },
@@ -283,6 +299,26 @@ mod tests {
             IrOp::Test {
                 lhs: Operand::Reg(X86Reg::Rax),
                 rhs: Operand::Reg(X86Reg::Rax),
+            }
+        );
+    }
+
+    #[test]
+    fn push_pop_ops_expose_typed_operands() {
+        assert_eq!(
+            IrOp::Push {
+                src: Operand::Reg(X86Reg::Rax),
+            },
+            IrOp::Push {
+                src: Operand::Reg(X86Reg::Rax),
+            }
+        );
+        assert_eq!(
+            IrOp::Pop {
+                dst: Operand::Reg(X86Reg::Rax),
+            },
+            IrOp::Pop {
+                dst: Operand::Reg(X86Reg::Rax),
             }
         );
     }

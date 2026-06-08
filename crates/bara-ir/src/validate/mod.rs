@@ -208,11 +208,20 @@ mod tests {
                     2,
                     8,
                     12,
-                    Terminator::DirectJump {
-                        target: X86Va::new(12),
+                    Terminator::DirectCall {
+                        target: X86Va::new(16),
+                        return_to: X86Va::new(12),
                     },
                 ),
-                block(3, 12, 16, Terminator::Return),
+                block(
+                    3,
+                    12,
+                    16,
+                    Terminator::DirectJump {
+                        target: X86Va::new(16),
+                    },
+                ),
+                block(4, 16, 20, Terminator::Return),
             ],
         )
         .expect("program has entry block and unique block ids");

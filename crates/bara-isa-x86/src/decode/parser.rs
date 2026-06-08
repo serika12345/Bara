@@ -145,6 +145,24 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                     }
                 }
             }
+            0x50 => {
+                let end = instruction_end(input, at, offset + 1, 1)?;
+                instructions.push(DecodedInstruction::new(
+                    at,
+                    end,
+                    DecodedInstructionKind::PushRax,
+                ));
+                offset += 1;
+            }
+            0x58 => {
+                let end = instruction_end(input, at, offset + 1, 1)?;
+                instructions.push(DecodedInstruction::new(
+                    at,
+                    end,
+                    DecodedInstructionKind::PopRax,
+                ));
+                offset += 1;
+            }
             0x74 | 0x75 => {
                 let end_offset = offset + 2;
                 let displacement = read_u8(input, offset + 1, at, opcode)?;

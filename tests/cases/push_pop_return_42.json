@@ -1,0 +1,9 @@
+{
+  "case_id": "push_pop_return_42",
+  "entry": 0,
+  "bytes": "b82a00000050b80700000058c3",
+  "abi": {
+    "args": [],
+    "return": "u64"
+  }
+}
