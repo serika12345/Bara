@@ -154,6 +154,11 @@ fn lift_instruction(
             condition,
             taken,
             fallthrough,
+        }
+        | DecodedInstructionKind::JccRel32 {
+            condition,
+            taken,
+            fallthrough,
         } => Ok(LiftedInstruction::Terminator(Terminator::CondJump {
             condition: *condition,
             taken: *taken,
@@ -818,6 +823,47 @@ mod tests {
         );
         assert_eq!(program.blocks()[1].start(), X86Va::new(2));
         assert_eq!(program.blocks()[1].terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_jcc_rel32_to_cond_jump_terminator() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(6),
+                    DecodedInstructionKind::JccRel32 {
+                        condition: X86Cond::Less,
+                        taken: X86Va::new(7),
+                        fallthrough: X86Va::new(6),
+                    },
+                ),
+                DecodedInstruction::new(X86Va::new(6), X86Va::new(7), DecodedInstructionKind::Ret),
+                DecodedInstruction::new(
+                    X86Va::new(7),
+                    X86Va::new(12),
+                    DecodedInstructionKind::MovEaxImm32 { imm: 42 },
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(12),
+                    X86Va::new(13),
+                    DecodedInstructionKind::Ret,
+                ),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded jcc rel32 function lifts");
+
+        assert_eq!(
+            program.blocks()[0].terminator(),
+            &Terminator::CondJump {
+                condition: X86Cond::Less,
+                taken: X86Va::new(7),
+                fallthrough: X86Va::new(6)
+            }
+        );
     }
 
     #[test]

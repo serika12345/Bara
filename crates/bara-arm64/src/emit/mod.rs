@@ -525,9 +525,21 @@ fn branch_immediate(source: ArmPc, target: ArmPc, bit_width: u32) -> Result<u32,
 
 fn arm64_condition(condition: X86Cond) -> Result<u32, EmitError> {
     match condition {
+        X86Cond::Overflow => Ok(6),
+        X86Cond::NotOverflow => Ok(7),
+        X86Cond::Below => Ok(3),
+        X86Cond::AboveOrEqual => Ok(2),
         X86Cond::Equal => Ok(0),
         X86Cond::NotEqual => Ok(1),
-        _ => Err(unsupported_ir()),
+        X86Cond::BelowOrEqual => Ok(9),
+        X86Cond::Above => Ok(8),
+        X86Cond::Sign => Ok(4),
+        X86Cond::NotSign => Ok(5),
+        X86Cond::Less => Ok(11),
+        X86Cond::GreaterOrEqual => Ok(10),
+        X86Cond::LessOrEqual => Ok(13),
+        X86Cond::Greater => Ok(12),
+        X86Cond::Parity | X86Cond::NotParity => Err(unsupported_ir()),
     }
 }
 
@@ -887,6 +899,21 @@ mod tests {
     }
 
     #[test]
+    fn missing_branch_target_is_invalid_program() {
+        let program = program_with_ops(
+            vec![IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(42),
+            }],
+            Terminator::DirectJump {
+                target: X86Va::new(8),
+            },
+        );
+
+        assert_eq!(emit_program(&program), Err(EmitError::InvalidProgram));
+    }
+
+    #[test]
     fn emits_conditional_branch_fixups_for_equal() {
         let block0 = BasicBlock::new(
             BlockId::new(0),
@@ -949,6 +976,116 @@ mod tests {
         assert_eq!(emitted.pc_map()[1].target(), ArmPc::new(16));
         assert_eq!(emitted.pc_map()[2].source(), X86Va::new(8));
         assert_eq!(emitted.pc_map()[2].target(), ArmPc::new(24));
+    }
+
+    #[test]
+    fn emits_conditional_branch_fixups_for_less() {
+        let block0 = BasicBlock::new(
+            BlockId::new(0),
+            X86Va::new(0),
+            X86Va::new(4),
+            vec![
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(0),
+                },
+                IrOp::Cmp {
+                    lhs: Operand::Reg(X86Reg::Rax),
+                    rhs: Operand::ImmU64(1),
+                },
+            ],
+            Terminator::CondJump {
+                condition: X86Cond::Less,
+                taken: X86Va::new(8),
+                fallthrough: X86Va::new(4),
+            },
+        )
+        .expect("test block range is valid");
+        let block1 = BasicBlock::new(
+            BlockId::new(1),
+            X86Va::new(4),
+            X86Va::new(8),
+            vec![IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(7),
+            }],
+            Terminator::Return,
+        )
+        .expect("test block range is valid");
+        let block2 = BasicBlock::new(
+            BlockId::new(2),
+            X86Va::new(8),
+            X86Va::new(12),
+            vec![IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(42),
+            }],
+            Terminator::Return,
+        )
+        .expect("test block range is valid");
+        let program =
+            Program::new(X86Va::new(0), vec![block0, block1, block2]).expect("program is valid");
+
+        let emitted = emit_program(&program).expect("less conditional branch emits");
+
+        assert_eq!(
+            emitted.code().bytes(),
+            &[
+                0x00, 0x00, 0x80, 0xd2, 0x1f, 0x04, 0x00, 0xf1, 0x8b, 0x00, 0x00, 0x54, 0x01, 0x00,
+                0x00, 0x14, 0xe0, 0x00, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6, 0x40, 0x05, 0x80, 0xd2,
+                0xc0, 0x03, 0x5f, 0xd6,
+            ]
+        );
+    }
+
+    #[test]
+    fn parity_conditional_branch_is_not_emitted() {
+        let block0 = BasicBlock::new(
+            BlockId::new(0),
+            X86Va::new(0),
+            X86Va::new(4),
+            vec![IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(0),
+            }],
+            Terminator::CondJump {
+                condition: X86Cond::Parity,
+                taken: X86Va::new(4),
+                fallthrough: X86Va::new(8),
+            },
+        )
+        .expect("test block range is valid");
+        let block1 = BasicBlock::new(
+            BlockId::new(1),
+            X86Va::new(4),
+            X86Va::new(8),
+            vec![IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(42),
+            }],
+            Terminator::Return,
+        )
+        .expect("test block range is valid");
+        let block2 = BasicBlock::new(
+            BlockId::new(2),
+            X86Va::new(8),
+            X86Va::new(12),
+            vec![IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(7),
+            }],
+            Terminator::Return,
+        )
+        .expect("test block range is valid");
+        let program =
+            Program::new(X86Va::new(0), vec![block0, block1, block2]).expect("program is valid");
+
+        assert_eq!(
+            emit_program(&program),
+            Err(EmitError::UnsupportedIr {
+                reason: UnsupportedReason::EmitUnsupportedIr
+            })
+        );
     }
 
     #[test]

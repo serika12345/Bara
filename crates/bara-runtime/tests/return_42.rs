@@ -238,6 +238,28 @@ fn loop_countdown_return_0_runs_on_supported_aarch64_unix_hosts() -> Result<(), 
 }
 
 #[test]
+fn jl_rel32_return_42_decodes_lifts_and_emits_arm64() -> Result<(), String> {
+    assert_fixture_emits_arm64(
+        "jl_rel32_return_42",
+        include_str!("../../../tests/cases/jl_rel32_return_42.json"),
+        &[
+            0x00, 0x00, 0x80, 0xd2, 0x1f, 0x04, 0x00, 0xf1, 0x8b, 0x00, 0x00, 0x54, 0x01, 0x00,
+            0x00, 0x14, 0xe0, 0x00, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6, 0x40, 0x05, 0x80, 0xd2,
+            0xc0, 0x03, 0x5f, 0xd6,
+        ],
+    )
+}
+
+#[test]
+fn jl_rel32_return_42_runs_on_supported_aarch64_unix_hosts() -> Result<(), String> {
+    assert_fixture_runs_like_expected(
+        "jl_rel32_return_42",
+        include_str!("../../../tests/cases/jl_rel32_return_42.json"),
+        include_str!("../../../tests/expected/jl_rel32_return_42.json"),
+    )
+}
+
+#[test]
 fn xor_eax_eax_return_0_decodes_lifts_and_emits_arm64() -> Result<(), String> {
     assert_fixture_emits_arm64(
         "xor_eax_eax_return_0",

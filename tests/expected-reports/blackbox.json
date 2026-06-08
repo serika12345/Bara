@@ -29,6 +29,10 @@
       "outcome": "passed"
     },
     {
+      "case_id": "jl_rel32_return_42",
+      "outcome": "passed"
+    },
+    {
       "case_id": "load_u8_from_rdi_return_72",
       "outcome": "passed"
     },

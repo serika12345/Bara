@@ -18,6 +18,22 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                 let opcode2 = read_u8(input, offset + 1, at, opcode)?;
 
                 match opcode2 {
+                    0x80..=0x8f => {
+                        let end_offset = offset + 6;
+                        let displacement = read_i32_at(input, offset + 2, at, opcode)?;
+                        let fallthrough = instruction_end(input, at, end_offset, 6)?;
+                        let taken = relative_target(fallthrough, displacement, at)?;
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            fallthrough,
+                            DecodedInstructionKind::JccRel32 {
+                                condition: jcc_condition(opcode2),
+                                taken,
+                                fallthrough,
+                            },
+                        ));
+                        offset = end_offset;
+                    }
                     0x05 => {
                         let end_offset = offset + 2;
                         let end = instruction_end(input, at, end_offset, 2)?;
@@ -163,7 +179,7 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                 ));
                 offset += 1;
             }
-            0x74 | 0x75 => {
+            0x70..=0x7f => {
                 let end_offset = offset + 2;
                 let displacement = read_u8(input, offset + 1, at, opcode)?;
                 let fallthrough = instruction_end(input, at, end_offset, 2)?;
@@ -176,7 +192,7 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                     at,
                     fallthrough,
                     DecodedInstructionKind::JccRel8 {
-                        condition: short_jcc_condition(opcode),
+                        condition: jcc_condition(opcode),
                         taken,
                         fallthrough,
                     },
@@ -326,6 +342,7 @@ fn decoded_stream_ends_with_terminator(instructions: &[DecodedInstruction]) -> b
         instruction.kind(),
         DecodedInstructionKind::CallRel32 { .. }
             | DecodedInstructionKind::JccRel8 { .. }
+            | DecodedInstructionKind::JccRel32 { .. }
             | DecodedInstructionKind::JmpRel8 { .. }
             | DecodedInstructionKind::Ret
             | DecodedInstructionKind::Syscall
@@ -382,6 +399,28 @@ fn read_i32(
     ]))
 }
 
+fn read_i32_at(
+    input: &X86Bytes,
+    start_offset: usize,
+    at: X86Va,
+    opcode: u8,
+) -> Result<i32, DecodeError> {
+    let end_offset = start_offset
+        .checked_add(4)
+        .ok_or(DecodeError::TruncatedInstruction { at, opcode })?;
+    let imm_bytes = input
+        .bytes()
+        .get(start_offset..end_offset)
+        .ok_or(DecodeError::TruncatedInstruction { at, opcode })?;
+
+    Ok(i32::from_le_bytes([
+        imm_bytes[0],
+        imm_bytes[1],
+        imm_bytes[2],
+        imm_bytes[3],
+    ]))
+}
+
 fn read_u32(
     input: &X86Bytes,
     offset: usize,
@@ -414,11 +453,25 @@ fn relative_target(return_to: X86Va, displacement: i32, at: X86Va) -> Result<X86
     Ok(X86Va::new(target as u64))
 }
 
-fn short_jcc_condition(opcode: u8) -> X86Cond {
-    match opcode {
-        0x74 => X86Cond::Equal,
-        0x75 => X86Cond::NotEqual,
-        _ => unreachable!("caller restricts short jcc opcodes"),
+fn jcc_condition(opcode: u8) -> X86Cond {
+    match opcode & 0x0f {
+        0x0 => X86Cond::Overflow,
+        0x1 => X86Cond::NotOverflow,
+        0x2 => X86Cond::Below,
+        0x3 => X86Cond::AboveOrEqual,
+        0x4 => X86Cond::Equal,
+        0x5 => X86Cond::NotEqual,
+        0x6 => X86Cond::BelowOrEqual,
+        0x7 => X86Cond::Above,
+        0x8 => X86Cond::Sign,
+        0x9 => X86Cond::NotSign,
+        0xa => X86Cond::Parity,
+        0xb => X86Cond::NotParity,
+        0xc => X86Cond::Less,
+        0xd => X86Cond::GreaterOrEqual,
+        0xe => X86Cond::LessOrEqual,
+        0xf => X86Cond::Greater,
+        _ => unreachable!("low nibble is restricted to jcc conditions"),
     }
 }
 

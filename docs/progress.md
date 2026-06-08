@@ -9,52 +9,52 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 20:05 JST
+最終更新: 2026-06-08 20:18 JST
 
 状態:
 
-- project_state: in_progress。B5 の large milestone completion に向けて、
-  `push` / `pop`、simple loop、internal direct `call rel32`、nested call を
-  ARM64 runtime と linked native executable artifact まで通した。
-- active_milestone: in_progress。[TODO.md](../TODO.md) の B5:
-  Control Flow / Stack / Call を開始した。
-- active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の
-  D4: Bara IR の責務に沿って、次は ARM64 branch lowering と direct branch /
-  call execution path を段階的に追加する。
+- project_state: completed。B5 の Control Flow / Stack / Call large milestone
+  は review gate 到達状態。
+- active_milestone: completed。[TODO.md](../TODO.md) の B5:
+  Control Flow / Stack / Call。
+- active_design_focus: completed。[docs/design-todo.md](design-todo.md) の
+  D4: Bara IR の責務に沿って、typed terminator、branch/call validation、
+  parity 以外の conditional branch lowering を追加した。
 - active_branch: `task/b5-add-sub-regression`。base commit は `4d2356f`
   (`Merge pull request #4 from serika12345/task/b4-syscall-ir-request`)。
   latest commit は review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B5 の
-  `push` / `pop`、stack pointer / return address / direct call の最小
-  semantics、nested call fixture。
-- completed_work: `push_pop_return_42` は abstract stack slot lowering で
-  `rax=42` を復元する。`loop_countdown_return_0` は block 間の `rax`
-  live-in propagation と backward `jne` fixup を通る。`nested_call_return_42`
-  は direct call の link-register save/restore と explicit `return_to`
-  branch で runtime と linked native executable artifact の両方を通る。
-- remaining_work: B5 ではその他の `jcc` 条件と rel32、PC map / fixup
-  validation が未完了。
-- next_action: `jcc` 条件 / rel32 と validation report を片付け、B5 review
-  gate へ進む。
-- verification: `nix develop -c cargo test -p bara-ir
-  push_pop_ops_expose_typed_operands`、`nix develop -c cargo test -p bara-ir
-  control_flow_terminators_are_structurally_valid`、`nix develop -c cargo test -p
-  bara-isa-x86 decodes_push_rax_pop_rax_between_mov_and_ret`、`nix develop -c
-  cargo test -p bara-isa-x86 lifts_push_pop_rax_to_stack_ops`、`nix develop -c
-  cargo test -p bara-isa-x86
-  lifts_direct_call_to_direct_call_terminator_when_target_is_decoded`、`nix develop
-  -c cargo test -p bara-arm64 emits_push_pop_rax_with_aligned_stack_slot`、
-  `nix develop -c cargo test -p bara-arm64
-  emits_direct_call_fixups_and_return_to_block`、`nix develop -c cargo test -p
-  bara-runtime push_pop_return_42`、`nix develop -c cargo test -p bara-runtime
-  nested_call_return_42`、`nix develop -c cargo test -p bara-runtime
-  loop_countdown_return_0`、`nix develop -c cargo test -p btbc-cli
-  link_fixture_arm64_main_writes_nested_call_return_42_executable`、
-  `nix develop -c cargo test -p btbc-cli
-  check_blackbox_reports_raw_manifest_mach_o_and_probe_fixtures`、および
-  `nix develop -c ./scripts/verify` が通過した。
+  control-flow fixture、typed terminator、flags model、branch/call lowering、
+  stack operations、validation report。
+- completed_work: `add/sub` regression、basic block splitting、typed
+  terminator、`cmp` / `test` flags-producing IR、short / near `jcc` decode /
+  lift、parity 以外の ARM64 `b.cond` lowering、short direct `jmp`、simple loop、
+  `push` / `pop`、internal direct `call rel32`、nested call fixture、branch /
+  call target existence validation、source PC range overlap validationを実装した。
+  parity `jcc` は decode / lift されるが、ARM64 lowering は flags
+  materialization 拡張まで explicit unsupported として扱う。
+- remaining_work: B5 実装は完了。serialized PC map / fixup schema consistency
+  と parity `jcc` lowering は後続 milestone の TODO に残す。
+- next_action: B5 review gate として pull request を開き、レビュー後に B6:
+  実 Mach-O 入力からの standalone 実行へ進む。
+- verification: `nix develop -c cargo test -p bara-ir missing_`、`nix develop
+  -c cargo test -p bara-isa-x86 rel32`、`nix develop -c cargo test -p
+  bara-isa-x86 decodes_jo`、`nix develop -c cargo test -p bara-arm64
+  conditional_branch`、`nix develop -c cargo test -p bara-arm64
+  missing_branch_target_is_invalid_program`、`nix develop -c cargo test -p
+  bara-runtime jl_rel32_return_42`、および `nix develop -c ./scripts/verify`
+  が通過した。
 
 直近で完了した作業:
+
+- 2026-06-08 20:18 JST: B5 large milestone completion の最終小ステップとして、
+  IR validation に missing branch/fallthrough/call target report を追加し、
+  decoder / lifter は short / near `jcc` 全条件を `CondJump` へ接続した。
+  ARM64 emitter は parity 以外の条件を `b.cond` へ lower し、parity 条件を
+  explicit unsupported として維持する。`jl_rel32_return_42` を repository
+  fixture に追加し、signed-less rel32 branch を decode / lift / emit / runtime
+  regression にした。検証は snapshot の targeted tests と
+  `nix develop -c ./scripts/verify`。
 
 - 2026-06-08 20:05 JST: B5 large milestone completion の小ステップとして、
   `Push` / `Pop` IR、internal-target `DirectCall` terminator、ARM64 の

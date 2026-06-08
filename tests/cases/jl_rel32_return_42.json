@@ -1,0 +1,9 @@
+{
+  "case_id": "jl_rel32_return_42",
+  "entry": 0,
+  "bytes": "b80000000083f8010f8c06000000b807000000c3b82a000000c3",
+  "abi": {
+    "args": [],
+    "return": "u64"
+  }
+}

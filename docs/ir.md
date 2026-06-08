@@ -149,14 +149,14 @@ pub enum Terminator {
 }
 ```
 
-現時点では short `je/jz rel8` を `X86Cond::Equal`、short `jne/jnz rel8` を
-`X86Cond::NotEqual` の `CondJump` へ、short `jmp rel8` を `DirectJump` へ
-decode / lift する。`call rel32` は target が同じ decoded byte stream 内の
-block start に存在する場合だけ `DirectCall` へ lift し、外部 target は
-`DirectCallUnsupported` として分類する。ARM64 emit は `cmp` / `test` が
-更新した flags を `b.eq` / `b.ne` へ lower し、direct call は link register
-を保存して `bl` と明示的な `return_to` branch へ lower する。その他の `jcc`
-条件と rel32 form は B5 の後続小ステップで扱う。
+現時点では short `jcc rel8` と near `jcc rel32` を `CondJump` へ、
+short `jmp rel8` を `DirectJump` へ decode / lift する。`call rel32` は
+target が同じ decoded byte stream 内の block start に存在する場合だけ
+`DirectCall` へ lift し、外部 target は `DirectCallUnsupported` として
+分類する。ARM64 emit は `cmp` / `test` が更新した flags を parity 以外の
+`b.cond` へ lower し、parity 条件は explicit unsupported として止める。
+direct call は link register を保存して `bl` と明示的な `return_to` branch
+へ lower する。
 
 `BoundaryRequest` は guest 側から public ABI / external boundary へ出ようとする
 意図を IR に残す。runtime や host OS syscall を直接実行する指示ではない。
@@ -286,12 +286,12 @@ flags は `Flags::new(...)` または `Flags::unknown()` で作り、`cf()` /
 `pf()` / `af()` / `zf()` / `sf()` / `of()` accessor から読む。
 
 現時点では `cmp eax, imm8/imm32` を `IrOp::Cmp` へ、`test eax,eax` を
-`IrOp::Test` へ decode / lift し、short `je/jz rel8` と `jne/jnz rel8` を
-`CondJump` へ、short `jmp rel8` を `DirectJump` へ、internal target の
-`call rel32` を `DirectCall` へ decode / lift する。
-ARM64 emit は `cmp x0,#imm12`、`tst x0,x0`、`b.eq` / `b.ne`、unconditional
-`b`、`bl` + link-register save/restore の最小 lowering を持つ。その他の
-`jcc` 条件と rel32 form は B5 の後続小ステップで扱う。
+`IrOp::Test` へ decode / lift し、short / near `jcc` を `CondJump` へ、
+short `jmp rel8` を `DirectJump` へ、internal target の `call rel32` を
+`DirectCall` へ decode / lift する。
+ARM64 emit は `cmp x0,#imm12`、`tst x0,x0`、parity 以外の `b.cond`、
+unconditional `b`、`bl` + link-register save/restore の最小 lowering を持つ。
+parity `jcc` は flags materialization 拡張まで unsupported として扱う。
 
 ## Metadata
 
@@ -318,9 +318,9 @@ pub enum Fixup {
 
 ## 初期 invariant checker
 
-- [ ] block に terminator がある。
-- [ ] branch target が存在する。
-- [ ] fallthrough target が存在する。
-- [ ] block range が重ならない。
-- [ ] unsupported op は明示的に残る。
+- [x] block に terminator がある。
+- [x] branch target が存在する。
+- [x] fallthrough target が存在する。
+- [x] block range が重ならない。
+- [x] unsupported terminator は明示的に report される。
 - [ ] PC map が source PC を失っていない。

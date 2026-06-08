@@ -1,0 +1,7 @@
+{
+  "case_id": "jl_rel32_return_42",
+  "exit_status": 0,
+  "return_value": 42,
+  "stdout": "",
+  "stderr": ""
+}
