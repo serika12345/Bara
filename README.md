@@ -60,8 +60,8 @@ Rosetta から使う情報は、テスト harness が出力する外部挙動だ
 
 ## ドキュメント
 
-- [TODO](TODO.md): 全体 TODO とマイルストーン
-- [初期スコープ](docs/scope.md): M1 の対象、初期 ABI、扱わないもの
+- [TODO](TODO.md): 線形実装ロードマップ。実装順はこの文書を上から読む
+- [初期スコープ](docs/scope.md): 初期 raw function 対象、初期 ABI、扱わないもの
 - [クリーンルーム運用](docs/clean-room.md): Rosetta をブラックボックス oracle として扱うルール
 - [コーディングルール](docs/coding-rules.md): シグネチャで仕様を表す方針と `unsafe` 境界
 - [初期 IR 設計](docs/ir.md): 初期 IR、型境界、invariant
@@ -70,9 +70,17 @@ Rosetta から使う情報は、テスト harness が出力する外部挙動だ
 - [Public ABI / import boundary](docs/public-abi-import-boundary.md): public ABI、imports、host helpers、syscall 相当境界の clean-room 設計
 - [将来構想メモ](docs/future-research-concepts.md): 本流 TODO から外した未確立な派生研究の置き場
 
-## 当面のゴール
+## 現在の実装順
 
-最初のマイルストーンは以下です。
+実装順は [TODO.md](TODO.md) の `線形実装ロードマップ` に一本化しています。
+README には独立したマイルストーン一覧を置きません。
+
+現在の本流は、完了済みの最小 `hello world` 成果物から、B4-B7 を通って
+B8: 実 x86_64 macOS アプリ起動へ進みます。B8 後は、推奨ステップとして
+B9: 実 x86 32-bit アプリ対応を扱い、その後 B10: PE / Wine 接続前段へ
+進みます。
+
+初期成功ケースは以下でした。
 
 ```text
 x86_64 bytes:
@@ -86,11 +94,12 @@ result:
   return_value == 42
 ```
 
-これを Rust 実装で decode、IR 化、ARM64 emit、実行し、Rosetta oracle の結果と比較できる状態を作ります。
+この raw function 成功ケースは完了済みロードマップとして
+[docs/hello-world-roadmap.md](docs/hello-world-roadmap.md) に保存しています。
 
 ## Rust workspace
 
-初期 workspace は M1 の関心ごとに分けています。
+初期 workspace は raw function translation の関心ごとに分けています。
 
 ```text
 crates/
@@ -103,7 +112,7 @@ crates/
 
 現在の最小テストは `b8 2a 00 00 00 c3` を decode、IR 化、ARM64 machine code 化し、対応 host では no-args `u64` 関数として実行します。
 
-M1 の実行チェックだけを行う場合:
+最小 raw function smoke check だけを行う場合:
 
 ```sh
 ./scripts/check-m1

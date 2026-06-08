@@ -9,14 +9,14 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 11:51 JST
+最終更新: 2026-06-08 12:06 JST
 
 状態:
 
-- project_state: completed。TODO 本流の長期目標を、B8: 実 x86_64
-  macOS アプリ起動、B9: 実 x86 32-bit アプリ対応、B10: PE / Wine
-  接続前段の順に再整理した。B9 は推奨ステップであり、blocker が大きい
-  場合は記録して飛ばせる。
+- project_state: completed。実装順を [TODO.md](../TODO.md) の
+  `線形実装ロードマップ` に一本化した。旧 M 系マイルストーンと
+  `当面の最短 TODO` の具体項目は B1-B8 の該当箇所へ吸収し、B1-B10 を
+  上から読み、最初の未完了項目を次の作業候補にする。
 - active_milestone: planned。[TODO.md](../TODO.md) の次の実装順は B4:
   x86 syscall / libc 境界から継続し、B8 で実 x86_64 macOS アプリ起動を
   目指す。その後、B10 の Wine 接続前に B9 の 32-bit アプリ対応を先に
@@ -24,18 +24,18 @@
 - active_design_focus: planned。[docs/design-todo.md](design-todo.md) の D3:
   Source ISA mode、D5: Host helper / OS boundary、D6: User-space runtime は
   B8/B9 の設計制約として扱う。
-- active_branch: `main`。latest commit は `8f51a7d`
-  (`Document large milestone PR workflow`)。このロードマップ整理は
+- active_branch: `main`。latest commit は `33a57f4`
+  (`Reframe roadmap around app launch milestones`)。この線形化は
   ドキュメント変更として実施した。
-- related_todo: 旧 B9 の x86 32-bit 対応を見越した設計を、B9:
-  実 x86 32-bit アプリ対応として B8 と B10 の間へ再配置した。旧 B10 の
-  user-space runtime architecture は B8/B9 の過程へ統合した。旧 B11/B12
-  は [将来構想メモ](future-research-concepts.md) に分離した。
-- completed_work: [TODO.md](../TODO.md) の B8 を実 x86_64 macOS アプリ起動へ
-  差し替え、B9 を実 x86 32-bit アプリ対応、B10 を PE / Wine 接続前段に
-  した。B9 は blocker が大きければ飛ばせるが、B10 より先に処理するのが
-  望ましい推奨ステップとして明記した。wasm2c / platform adapter / LLVM IR /
-  Wasm 副出力は本流 TODO から外し、専用の構想メモへ移した。
+- related_todo: [TODO.md](../TODO.md) の B1-B10 が唯一の実行順である。
+  下部に残っていた M 系マイルストーンと当面 TODO の情報は B1-B8 へ
+  吸収し、README も独立した実行順を持たない形に整理した。
+- completed_work: [TODO.md](../TODO.md) の実装順を B1-B10 の線形ロードマップ
+  へ一本化した。B8 は実 x86_64 macOS アプリ起動、B9 は飛ばせる推奨
+  ステップとしての実 x86 32-bit アプリ対応、B10 は PE / Wine 接続前段。
+  旧 M 系の `add/sub`、`cmp/test/jcc`、`push/pop/call`、Rosetta oracle、
+  Haskell verifier、fallback などの具体項目は該当 B 項目へ移した。
+  README は TODO の線形ロードマップだけを実装順として案内する。
 - remaining_work: B4-B7 を進めた後、B8 の app launch scope、user-space
   loader/runtime、source mode guardrail、stable launch report を具体化する。
   B8 後は B9 の 32-bit app support を先に検討し、必要なら blocker として
@@ -47,6 +47,20 @@
 
 直近で完了した作業:
 
+- 2026-06-08 12:06 JST: 旧 M 系マイルストーンと `当面の最短 TODO` の
+  具体情報を、削除ではなく [TODO.md](../TODO.md) の B1-B8 へ吸収した。
+  `add/sub`、`cmp/test/jcc`、`push/pop/call`、Rosetta oracle、Haskell
+  verifier、fallback、metadata 出力などの項目を線形ロードマップ内に残し、
+  実行順は B1-B10 のまま維持した。
+- 検証: documentation-only 変更として `nix develop -c ./scripts/check-no-invisible-chars`
+  と `git diff --check` が通過した。full `./scripts/verify` は code/script/config
+  変更がないため省略した。
+- 2026-06-08 11:59 JST: 実装順を [TODO.md](../TODO.md) の
+  `線形実装ロードマップ` に一本化した。README も独立した実装順を持たず
+  TODO の線形ロードマップへ案内する形にした。
+- 検証: documentation-only 変更として `nix develop -c ./scripts/check-no-invisible-chars`
+  と `git diff --check` が通過した。full `./scripts/verify` は code/script/config
+  変更がないため省略した。
 - 2026-06-08 11:51 JST: B8 と PE / Wine 接続前段の間に、B9:
   実 x86 32-bit アプリ対応を挿入した。B9 は互換性上の論点を Wine 接続前に
   発見するための推奨ステップとし、blocker が大きい場合は記録したうえで
@@ -171,7 +185,7 @@
 
 決定:
 
-- [TODO.md](../TODO.md) は実装マイルストーンと大項目 TODO を管理する。
+- [TODO.md](../TODO.md) は線形実装ロードマップを管理する。
 - [docs/design-todo.md](design-todo.md) は詳細設計、分割方針、リファクタリング、単一責任監査の TODO を管理する。
 
 理由:
@@ -216,7 +230,9 @@
 
 ## 次に進む場所
 
-現在の実装ロードマップは [TODO.md](../TODO.md) の B1 から進める。
+現在の実装ロードマップは [TODO.md](../TODO.md) の `線形実装ロードマップ`
+だけを参照する。上から順に読み、最初の未完了項目を次の作業候補にする。
+現時点の次候補は B4: x86 syscall / libc 境界。
 
 優先度の高い設計監査は [docs/design-todo.md](design-todo.md) の D1 と D2:
 
