@@ -8,6 +8,7 @@ use bara_oracle::{
     binary_format_probe_report_from_json, binary_format_probe_report_to_json,
     compare_observed_results, corpus_report_to_json, executable_manifest_from_json,
     host_trap_plan_from_json, mach_o_entry_function_test_case,
+    mach_o_entry_function_test_case_with_embedded_host_traps,
     mach_o_entry_function_test_case_with_host_traps, observed_result_from_json,
     observed_result_to_json, probe_public_binary_format, test_case_from_json, BinaryFileBytes,
     BinaryFormatProbeError, BinaryFormatProbeReport, BinaryInput, CaseId, ComparisonReport,
@@ -69,6 +70,9 @@ fn run_cli(args: Vec<String>) -> Result<String, CliError> {
                 Path::new(expected_path),
             )
         }
+        [command, binary_path, expected_path] if command == "check-mach-o-host-traps" => {
+            run_check_mach_o_embedded_host_traps(Path::new(binary_path), Path::new(expected_path))
+        }
         [command, binary_path] if command == "probe-binary" => {
             run_probe_binary(Path::new(binary_path))
         }
@@ -90,11 +94,14 @@ fn run_cli(args: Vec<String>) -> Result<String, CliError> {
         [command, binary_path, host_traps_path, output_path]
             if command == "link-mach-o-arm64-stdout-main" =>
         {
-            run_link_mach_o_arm64_stdout_main(
+            run_link_mach_o_arm64_stdout_main_with_host_traps(
                 Path::new(binary_path),
                 Path::new(host_traps_path),
                 Path::new(output_path),
             )
+        }
+        [command, binary_path, output_path] if command == "link-mach-o-arm64-stdout-main" => {
+            run_link_mach_o_arm64_stdout_main(Path::new(binary_path), Path::new(output_path))
         }
         [command] if command == "check-blackbox" => run_check_blackbox(None),
         [command, output_flag, output_dir]
@@ -199,6 +206,16 @@ fn run_link_fixture_arm64_stdout_main(
 
 fn run_link_mach_o_arm64_stdout_main(
     binary_path: &Path,
+    output_path: &Path,
+) -> Result<String, CliError> {
+    link_mach_o_arm64_stdout_main_from_input(
+        read_mach_o_artifact_input_with_embedded_host_traps(binary_path)?,
+        output_path,
+    )
+}
+
+fn run_link_mach_o_arm64_stdout_main_with_host_traps(
+    binary_path: &Path,
     host_traps_path: &Path,
     output_path: &Path,
 ) -> Result<String, CliError> {
@@ -206,6 +223,13 @@ fn run_link_mach_o_arm64_stdout_main(
         binary_path,
         read_host_trap_plan(host_traps_path)?,
     )?;
+    link_mach_o_arm64_stdout_main_from_input(input, output_path)
+}
+
+fn link_mach_o_arm64_stdout_main_from_input(
+    input: MachOArtifactInput,
+    output_path: &Path,
+) -> Result<String, CliError> {
     let test_case = input.test_case;
     let compiled = compile_test_case_function(&test_case).map_err(CliError::FunctionRun)?;
     let artifact = link_arm64_stdout_main_executable_with_source_metadata(
@@ -255,6 +279,17 @@ fn run_check_mach_o_host_traps(
     run_test_case(test_case, expected)
 }
 
+fn run_check_mach_o_embedded_host_traps(
+    binary_path: &Path,
+    expected_path: &Path,
+) -> Result<String, CliError> {
+    let expected_json = read_text_file(expected_path)?;
+    let expected = observed_result_from_json(&expected_json).map_err(CliError::ExpectedJson)?;
+    let test_case = read_mach_o_entry_function_test_case_with_embedded_host_traps(binary_path)?;
+
+    run_test_case(test_case, expected)
+}
+
 fn read_mach_o_entry_function_test_case(binary_path: &Path) -> Result<TestCase, CliError> {
     let bytes = read_binary_file(binary_path)?;
     let input = BinaryInput::from_file_bytes(BinaryFileBytes::from_untrusted_file_contents(bytes));
@@ -275,6 +310,14 @@ fn read_mach_o_artifact_input(binary_path: &Path) -> Result<MachOArtifactInput, 
     )
 }
 
+fn read_mach_o_artifact_input_with_embedded_host_traps(
+    binary_path: &Path,
+) -> Result<MachOArtifactInput, CliError> {
+    read_mach_o_artifact_input_from_binary(binary_path, |case_id, input| {
+        mach_o_entry_function_test_case_with_embedded_host_traps(case_id, input)
+    })
+}
+
 fn read_mach_o_entry_function_test_case_with_host_traps(
     binary_path: &Path,
     host_trap_plan: bara_oracle::TestCaseHostTrapPlan,
@@ -289,18 +332,35 @@ fn read_mach_o_entry_function_test_case_with_host_traps(
     .map_err(CliError::MachOEntryFunctionTestCase)
 }
 
+fn read_mach_o_entry_function_test_case_with_embedded_host_traps(
+    binary_path: &Path,
+) -> Result<TestCase, CliError> {
+    let bytes = read_binary_file(binary_path)?;
+    let input = BinaryInput::from_file_bytes(BinaryFileBytes::from_untrusted_file_contents(bytes));
+    mach_o_entry_function_test_case_with_embedded_host_traps(case_id_from_path(binary_path), &input)
+        .map_err(CliError::MachOEntryFunctionTestCase)
+}
+
 fn read_mach_o_artifact_input_with_host_traps(
     binary_path: &Path,
     host_trap_plan: bara_oracle::TestCaseHostTrapPlan,
 ) -> Result<MachOArtifactInput, CliError> {
+    read_mach_o_artifact_input_from_binary(binary_path, |case_id, input| {
+        mach_o_entry_function_test_case_with_host_traps(case_id, input, host_trap_plan)
+    })
+}
+
+fn read_mach_o_artifact_input_from_binary(
+    binary_path: &Path,
+    test_case_from_input: impl FnOnce(
+        CaseId,
+        &BinaryInput,
+    ) -> Result<TestCase, MachOEntryFunctionTestCaseError>,
+) -> Result<MachOArtifactInput, CliError> {
     let bytes = read_binary_file(binary_path)?;
     let input = BinaryInput::from_file_bytes(BinaryFileBytes::from_untrusted_file_contents(bytes));
-    let test_case = mach_o_entry_function_test_case_with_host_traps(
-        case_id_from_path(binary_path),
-        &input,
-        host_trap_plan,
-    )
-    .map_err(CliError::MachOEntryFunctionTestCase)?;
+    let test_case = test_case_from_input(case_id_from_path(binary_path), &input)
+        .map_err(CliError::MachOEntryFunctionTestCase)?;
     let report = probe_public_binary_format(&input).map_err(CliError::BinaryFormatProbe)?;
     let source_image = NativeSourceImageMetadata::from_mach_o_conversion(
         report
@@ -713,7 +773,7 @@ impl std::fmt::Display for CliError {
         match self {
             Self::Usage => write!(
                 formatter,
-                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | link-fixture-arm64-main <case.json> <out-exe> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
+                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | link-fixture-arm64-main <case.json> <out-exe> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
             ),
             Self::ReadFile { path, source } => {
                 write!(formatter, "failed to read file {}: {source}", path.display())
@@ -962,6 +1022,30 @@ mod tests {
     }
 
     #[test]
+    fn check_mach_o_host_traps_reads_binary_metadata_and_expected_files() {
+        let temp_dir =
+            TestTempDir::new("check_mach_o_host_traps_reads_binary_metadata_and_expected_files");
+        let binary_path = temp_dir.write_binary_file(
+            "mach_o_hello_world_stdout.bin",
+            include_bytes!("../../../tests/binaries/mach_o_hello_world_stdout.bin"),
+        );
+        let expected_path =
+            temp_dir.write_file("expected.json", MACH_O_HELLO_WORLD_STDOUT_EXPECTED_JSON);
+
+        let output = run_cli(vec![
+            String::from("check-mach-o-host-traps"),
+            binary_path.to_string_lossy().into_owned(),
+            expected_path.to_string_lossy().into_owned(),
+        ])
+        .expect("mach-o host trap metadata fixture check succeeds on supported host");
+        let expected = observed_result_from_json(MACH_O_HELLO_WORLD_STDOUT_EXPECTED_JSON)
+            .and_then(|result| observed_result_to_json(&result))
+            .expect("expected mach-o host trap fixture normalizes to output json");
+
+        assert_eq!(output, expected);
+    }
+
+    #[test]
     fn check_mach_o_host_traps_does_not_derive_plan_from_expected_json() {
         let temp_dir =
             TestTempDir::new("check_mach_o_host_traps_does_not_derive_plan_from_expected_json");
@@ -1086,6 +1170,9 @@ mod tests {
             .contains("check-mach-o <binary> <expected.json>"));
         assert!(error
             .to_string()
+            .contains("check-mach-o-host-traps <binary> <expected.json>"));
+        assert!(error
+            .to_string()
             .contains("check-mach-o-host-traps <binary> <host-traps.json> <expected.json>"));
         assert!(error.to_string().contains("probe-binary <path>"));
         assert!(error
@@ -1100,6 +1187,9 @@ mod tests {
         assert!(error
             .to_string()
             .contains("link-fixture-arm64-stdout-main <case.json> <out-exe>"));
+        assert!(error
+            .to_string()
+            .contains("link-mach-o-arm64-stdout-main <binary> <out-exe>"));
         assert!(error.to_string().contains("check-blackbox [--out <dir>]"));
     }
 

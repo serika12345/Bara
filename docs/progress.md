@@ -9,13 +9,13 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 21:47 JST
+最終更新: 2026-06-08 22:28 JST
 
 状態:
 
-- project_state: completed。B6 の 3 つ目の小ステップとして、input Mach-O
-  の entry / segment / stack metadata を native output packaging へ渡す
-  境界を実装した。
+- project_state: completed。B6 の 4 つ目の小ステップとして、fixture 専用
+  host trap JSON への依存を減らし、Mach-O binary metadata から stdout
+  host trap plan を得る経路を実装した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B6:
   実 Mach-O 入力からの standalone 実行。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の
@@ -24,34 +24,49 @@
   `btbc-cli` の出力境界へ接続した。
 - active_branch: `task/b6-macho-return42-artifact`。base commit は `31dbc29`。
   latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B6 の input Mach-O の entry /
-  segment / stack metadata を output packaging に渡す項目。
+- related_todo: [TODO.md](../TODO.md) B6 の fixture 専用 host trap JSON
+  への依存を減らし、binary metadata から必要情報を得る項目。
 - completed_work: `link-mach-o-arm64-main <binary> <out-exe>` を追加し、
   `tests/binaries/mach_o_return_42.bin` を既存の Mach-O entry function
   pipeline、standalone ARM64 emit、`clang` native artifact packaging へ通した。
   `link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe>` も追加し、
   `tests/binaries/mach_o_hello_world_stdout.bin` を既存の Mach-O host trap
   pipeline、stdout helper-aware ARM64 emit、native stdout artifact packaging へ
-  通した。`check-blackbox` には `mach_o_return_42_native_executable_smoke` と
+  通した。現在のデフォルト経路では、同 binary の選択 segment entry 前にある
+  self-authored `BARA_STDOUT\0` payload から stdout host trap plan を作り、
+  `check-mach-o-host-traps <binary> <expected.json>` と
+  `link-mach-o-arm64-stdout-main <binary> <out-exe>` は host-traps JSON を
+  要求しない。明示 host-traps JSON 経路は後方互換の検証用として残す。
+  `check-blackbox` には `mach_o_return_42_native_executable_smoke` と
   `mach_o_hello_world_stdout_native_executable` を追加し、生成 executable を
   実プロセスとして実行する。Mach-O artifact 経路では
   `NativeSourceImageMetadata::MachOExecutable` を package request に渡し、
   metadata JSON に `LC_MAIN` 由来の `entryoff` / `stacksize` と selected
   segment の `name` / `vmaddr` / `fileoff` / `filesize` を含める。
-- remaining_work: fixture 専用 host trap JSON 依存の削減、malformed /
-  unsupported Mach-O の artifact 生成時 blocker classification 維持。
-- next_action: B6 の次小ステップとして、fixture 専用 host trap JSON への
-  依存を減らし、binary metadata から必要情報を得る経路を検討する。
-- verification: `nix develop -c cargo test -p btbc-cli
-  native_artifact_metadata_serializes_mach_o_source_image_metadata`、`nix develop
-  -c cargo test -p btbc-cli link_mach_o_arm64_main`、`nix develop -c cargo test
-  -p btbc-cli link_mach_o_arm64_stdout_main`、`nix develop -c cargo test -p btbc-cli
-  check_blackbox_reports_raw_manifest_mach_o_and_probe_fixtures`、`nix develop
-  -c cargo test -p btbc-cli
+- remaining_work: malformed / unsupported Mach-O の artifact 生成時 blocker
+  classification 維持。
+- next_action: B6 の次小ステップとして、malformed / unsupported Mach-O の
+  blocker classification を artifact 生成でも維持する。
+- verification: `nix develop -c cargo test -p bara-oracle
+  derives_stdout_host_trap_plan_from_mach_o_embedded_metadata`、`nix develop -c
+  cargo test -p btbc-cli check_mach_o_host_traps_reads_binary_metadata_and_expected_files`、
+  `nix develop -c cargo test -p btbc-cli check_mach_o_host_traps`、`nix develop
+  -c cargo test -p btbc-cli link_mach_o_arm64_stdout_main`、`nix develop -c
+  cargo test -p btbc-cli check_blackbox_reports_raw_manifest_mach_o_and_probe_fixtures`、
+  `nix develop -c cargo test -p btbc-cli
   check_blackbox_writes_report_and_schema_specific_actual_outputs`、および
   `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
+
+- 2026-06-08 22:28 JST: B6 の 4 つ目の小ステップとして、fixture 専用
+  host trap JSON への依存を減らした。`mach_o_hello_world_stdout.bin` は
+  selected segment の entry 前に self-authored `BARA_STDOUT\0` payload を
+  持ち、`mach_o_entry_function_test_case_with_embedded_host_traps` はその
+  payload から `TestCaseHostTrapPlan::stdout` を作る。`check-blackbox` と
+  native stdout artifact のデフォルト経路は host-traps JSON を読まず、
+  明示 JSON 経路は互換テストとして残す。検証は snapshot の targeted tests
+  と `nix develop -c ./scripts/verify`。
 
 - 2026-06-08 21:47 JST: B6 の 3 つ目の小ステップとして、input Mach-O の
   entry / segment / stack metadata を native output packaging に渡す境界を

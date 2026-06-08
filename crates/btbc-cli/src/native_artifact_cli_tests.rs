@@ -254,16 +254,11 @@ fn link_mach_o_arm64_stdout_main_writes_hello_world_executable() {
         "mach_o_hello_world_stdout.bin",
         include_bytes!("../../../tests/binaries/mach_o_hello_world_stdout.bin"),
     );
-    let host_traps_path = temp_dir.write_file(
-        "host-traps.json",
-        include_str!("../../../tests/host-traps/mach_o_hello_world_stdout.json"),
-    );
     let output_path = temp_dir.path.join("mach_o_hello_world_stdout");
 
     let output = run_cli(vec![
         String::from("link-mach-o-arm64-stdout-main"),
         binary_path.to_string_lossy().into_owned(),
-        host_traps_path.to_string_lossy().into_owned(),
         output_path.to_string_lossy().into_owned(),
     ])
     .expect("Mach-O backed hello world links as an ARM64 stdout main executable");
@@ -312,16 +307,11 @@ fn link_mach_o_arm64_stdout_main_reports_unsupported_host() {
         "mach_o_hello_world_stdout.bin",
         include_bytes!("../../../tests/binaries/mach_o_hello_world_stdout.bin"),
     );
-    let host_traps_path = temp_dir.write_file(
-        "host-traps.json",
-        include_str!("../../../tests/host-traps/mach_o_hello_world_stdout.json"),
-    );
     let output_path = temp_dir.path.join("mach_o_hello_world_stdout");
 
     let error = run_cli(vec![
         String::from("link-mach-o-arm64-stdout-main"),
         binary_path.to_string_lossy().into_owned(),
-        host_traps_path.to_string_lossy().into_owned(),
         output_path.to_string_lossy().into_owned(),
     ])
     .expect_err("non-macOS ARM64 host is unsupported");

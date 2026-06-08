@@ -12,7 +12,7 @@ use bara_oracle::{
 
 use crate::{
     case_id_from_path, run_check_binary_probe, run_check_executable, run_check_mach_o,
-    run_check_mach_o_host_traps, run_corpus_fixture, run_link_fixture_arm64_main,
+    run_check_mach_o_embedded_host_traps, run_corpus_fixture, run_link_fixture_arm64_main,
     run_link_mach_o_arm64_main, run_link_mach_o_arm64_stdout_main, sorted_case_paths,
     write_corpus_outputs, CliError, FixtureRun,
 };
@@ -70,14 +70,12 @@ const BLACKBOX_FIXTURES: &[BlackboxFixtureSpec] = &[
         case_id: "mach_o_return_42_native_executable_smoke",
         expected_exit_status: 42,
     },
-    BlackboxFixtureSpec::MachOHostTraps {
+    BlackboxFixtureSpec::MachOEmbeddedHostTraps {
         binary: "tests/binaries/mach_o_hello_world_stdout.bin",
-        host_traps: "tests/host-traps/mach_o_hello_world_stdout.json",
         expected: "tests/expected/mach_o_hello_world_stdout.json",
     },
     BlackboxFixtureSpec::MachOStdoutNativeExecutable {
         binary: "tests/binaries/mach_o_hello_world_stdout.bin",
-        host_traps: "tests/host-traps/mach_o_hello_world_stdout.json",
         expected: "tests/expected/mach_o_hello_world_stdout.json",
         case_id: "mach_o_hello_world_stdout_native_executable",
     },
@@ -106,14 +104,12 @@ enum BlackboxFixtureSpec {
         case_id: &'static str,
         expected_exit_status: i32,
     },
-    MachOHostTraps {
+    MachOEmbeddedHostTraps {
         binary: &'static str,
-        host_traps: &'static str,
         expected: &'static str,
     },
     MachOStdoutNativeExecutable {
         binary: &'static str,
-        host_traps: &'static str,
         expected: &'static str,
         case_id: &'static str,
     },
@@ -164,31 +160,23 @@ impl BlackboxFixtureSpec {
                     run_link_mach_o_arm64_main(&repo_fixture_path(binary), artifact_path)
                 },
             ),
-            Self::MachOHostTraps {
-                binary,
-                host_traps,
-                expected,
-            } => {
+            Self::MachOEmbeddedHostTraps { binary, expected } => {
                 let binary_path = repo_fixture_path(binary);
-                let host_traps_path = repo_fixture_path(host_traps);
                 let expected_path = repo_fixture_path(expected);
                 run_single_observed_fixture(case_id_from_path(&binary_path), || {
-                    run_check_mach_o_host_traps(&binary_path, &host_traps_path, &expected_path)
+                    run_check_mach_o_embedded_host_traps(&binary_path, &expected_path)
                 })
             }
             Self::MachOStdoutNativeExecutable {
                 binary,
-                host_traps,
                 expected,
                 case_id,
             } => {
                 let binary_path = repo_fixture_path(binary);
-                let host_traps_path = repo_fixture_path(host_traps);
                 let expected_path = repo_fixture_path(expected);
                 run_mach_o_stdout_native_executable_fixture(
                     &expected_path,
                     &binary_path,
-                    &host_traps_path,
                     case_id,
                     native_artifact_dir,
                 )
@@ -382,7 +370,6 @@ fn run_observed_comparison_fixture(
 fn run_mach_o_stdout_native_executable_fixture(
     expected_path: &Path,
     binary_path: &Path,
-    host_traps_path: &Path,
     case_id: &str,
     native_artifact_dir: Option<&Path>,
 ) -> FixtureRun {
@@ -395,7 +382,7 @@ fn run_mach_o_stdout_native_executable_fixture(
     };
 
     run_observed_comparison_fixture(case_id.clone(), expected_path, || {
-        run_link_mach_o_arm64_stdout_main(binary_path, host_traps_path, artifact.path())
+        run_link_mach_o_arm64_stdout_main(binary_path, artifact.path())
     })
 }
 
