@@ -9,22 +9,24 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 09:37 JST
+最終更新: 2026-06-08 09:51 JST
 
 状態:
 
 - project_state: in_progress。B1 merge 後、B2: 実行可能成果物モデルを開始した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B2 で native artifact の domain model を整理している。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の D2: Artifact domain model。
-- active_branch: `task/b2-artifact-domain-types`。B2 の最初の小ステップ branch。
-- related_todo: B2 `raw ARM64 bytes、native assembly source、linked executable を区別する domain type` completed。関連設計 TODO は D2。
-- completed_work: B1 merge 済み `main` を fast-forward し、local `task/b1-executable-smoke-blackbox-report` を削除した。B2 では `RawArm64Bytes`、`NativeAssemblySource`、`LinkedNativeExecutable` を導入し、native artifact link 後の実行観測が linked executable type を受け取るようにした。
-- remaining_work: B2 の `native artifact` metadata JSON 出力、generated code / stdout data / toolchain command / output path の責務分離、toolchain 境界差し替え、unsupported host の安定出力。
-- next_action: この B2 小ステップを review する。続ける場合の次の小ステップは native artifact metadata JSON 出力。
-- verification: 追加テストを先に失敗させた後、`nix develop -c cargo test -p btbc-cli native_artifact::tests`、`nix develop -c ./scripts/verify` が通過した。
+- active_branch: `task/b2-artifact-domain-types`。B2 の小ステップ commit を積み増している。
+- related_todo: B2 `native artifact の metadata を JSON として出力する` completed。関連設計 TODO は D2。
+- completed_work: `NativeArtifactMetadata` と JSON serializer を導入し、`link-fixture-arm64-main` の成功出力を linked executable artifact metadata JSON にした。metadata は execution result と分け、artifact kind、target triple、toolchain、output path、helper requirements を含む。
+- remaining_work: B2 の generated code / stdout data / toolchain command / output path の責務分離、toolchain 境界差し替え、unsupported host の安定出力。
+- next_action: この B2 小ステップを review する。続ける場合の次の小ステップは generated code / stdout data / toolchain command / output path の責務分離。
+- verification: metadata serializer の未実装 failure を確認後、`nix develop -c cargo test -p btbc-cli native_artifact`、`nix develop -c ./scripts/verify-supply-chain`、`nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-08 09:48 JST: B2 の 2 つ目の小ステップとして、native linked executable artifact の metadata JSON 出力を追加した。`link-fixture-arm64-main` は text ではなく artifact metadata JSON を返し、metadata は execution result と別の domain value として保持される。
+- 検証: `nix develop -c cargo test -p btbc-cli native_artifact_metadata_serializes_as_stable_json` は未実装 serializer / accessor の compile error で期待どおり失敗し、実装後に `nix develop -c cargo test -p btbc-cli native_artifact`、`nix develop -c ./scripts/verify-supply-chain`、`nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 09:35 JST: merge 済み B1 branch を local cleanup し、B2 branch `task/b2-artifact-domain-types` を開始した。B2 の最初の小ステップとして、raw ARM64 bytes、native assembly source、linked executable を `native_artifact` module 内の別 domain type として分離した。
 - 検証: `nix develop -c cargo test -p btbc-cli native_artifact_types_separate_raw_source_and_linked_executable` は未実装型の compile error で期待どおり失敗し、実装後に `nix develop -c cargo test -p btbc-cli native_artifact::tests`、`nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 09:23 JST: B1 の最後の小ステップとして、`docs/hello-world-roadmap.md` を完了済みロードマップに整理し、B1 安定化成果から B2 の実行可能成果物モデルへ接続した。

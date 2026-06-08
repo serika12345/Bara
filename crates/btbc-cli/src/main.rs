@@ -30,7 +30,7 @@ use function_run::{
 };
 use native_artifact::{
     link_arm64_main_executable, link_arm64_stdout_main_executable,
-    observe_native_executable_artifact, NativeArtifactError,
+    native_artifact_metadata_to_json, observe_native_executable_artifact, NativeArtifactError,
 };
 
 fn main() -> ExitCode {
@@ -143,14 +143,10 @@ fn run_link_fixture_arm64_main(case_path: &Path, output_path: &Path) -> Result<S
     let test_case = test_case_from_json(&case_json).map_err(CliError::TestCase)?;
     let compiled = compile_test_case_function_standalone_artifact(&test_case)
         .map_err(CliError::FunctionRun)?;
-    let _artifact = link_arm64_main_executable(compiled.arm64_bytes(), output_path)
+    let artifact = link_arm64_main_executable(compiled.arm64_bytes(), output_path)
         .map_err(CliError::NativeArtifact)?;
 
-    Ok(format!(
-        "linked ARM64 main executable for {} to {}",
-        test_case.case_id().as_str(),
-        output_path.display()
-    ))
+    native_artifact_metadata_to_json(artifact.metadata()).map_err(CliError::Json)
 }
 
 fn run_link_fixture_arm64_stdout_main(

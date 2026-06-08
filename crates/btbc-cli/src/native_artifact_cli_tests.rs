@@ -74,7 +74,13 @@ fn link_fixture_arm64_main_writes_return_42_executable() {
     .expect("return_42 fixture links as an ARM64 main executable");
 
     assert!(output_path.exists());
-    assert!(output.contains("linked ARM64 main executable for return_42"));
+    assert_eq!(
+        output,
+        format!(
+            "{{\"artifact_kind\":\"linked_executable\",\"target_triple\":\"arm64-apple-macos\",\"toolchain\":\"clang\",\"output_path\":\"{}\",\"helper_requirements\":[]}}",
+            output_path.display()
+        )
+    );
     let status = Command::new(&output_path)
         .status()
         .expect("linked executable runs");

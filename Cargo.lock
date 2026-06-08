@@ -50,6 +50,8 @@ dependencies = [
  "bara-isa-x86",
  "bara-oracle",
  "bara-runtime",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
