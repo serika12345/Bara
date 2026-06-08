@@ -152,6 +152,27 @@ fn branch_eq_return_42_runs_on_supported_aarch64_unix_hosts() -> Result<(), Stri
 }
 
 #[test]
+fn direct_jmp_return_42_decodes_lifts_and_emits_arm64() -> Result<(), String> {
+    assert_fixture_emits_arm64(
+        "direct_jmp_return_42",
+        include_str!("../../../tests/cases/direct_jmp_return_42.json"),
+        &[
+            0x03, 0x00, 0x00, 0x14, 0xe0, 0x00, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6, 0x40, 0x05,
+            0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6,
+        ],
+    )
+}
+
+#[test]
+fn direct_jmp_return_42_runs_on_supported_aarch64_unix_hosts() -> Result<(), String> {
+    assert_fixture_runs_like_expected(
+        "direct_jmp_return_42",
+        include_str!("../../../tests/cases/direct_jmp_return_42.json"),
+        include_str!("../../../tests/expected/direct_jmp_return_42.json"),
+    )
+}
+
+#[test]
 fn xor_eax_eax_return_0_decodes_lifts_and_emits_arm64() -> Result<(), String> {
     assert_fixture_emits_arm64(
         "xor_eax_eax_return_0",

@@ -437,6 +437,44 @@ fn decodes_jne_rel8_with_negative_target() {
 }
 
 #[test]
+fn decodes_jmp_rel8_and_continues_with_target_block() {
+    let input = X86Bytes::new(
+        X86Va::new(0),
+        vec![
+            0xeb, 0x06, 0xb8, 0x07, 0x00, 0x00, 0x00, 0xc3, 0xb8, 0x2a, 0x00, 0x00, 0x00, 0xc3,
+        ],
+    )
+    .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0),
+                X86Va::new(2),
+                DecodedInstructionKind::JmpRel8 {
+                    target: X86Va::new(8)
+                }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(2),
+                X86Va::new(7),
+                DecodedInstructionKind::MovEaxImm32 { imm: 7 }
+            ),
+            DecodedInstruction::new(X86Va::new(7), X86Va::new(8), DecodedInstructionKind::Ret),
+            DecodedInstruction::new(
+                X86Va::new(8),
+                X86Va::new(13),
+                DecodedInstructionKind::MovEaxImm32 { imm: 42 }
+            ),
+            DecodedInstruction::new(X86Va::new(13), X86Va::new(14), DecodedInstructionKind::Ret)
+        ]
+    );
+}
+
+#[test]
 fn decodes_xor_eax_eax_then_ret() {
     let input = X86Bytes::new(X86Va::new(0x1000), vec![0x31, 0xc0, 0xc3])
         .expect("test bytes are non-empty");

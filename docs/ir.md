@@ -146,9 +146,10 @@ pub enum Terminator {
 ```
 
 現時点では short `je/jz rel8` を `X86Cond::Equal`、short `jne/jnz rel8` を
-`X86Cond::NotEqual` の `CondJump` へ decode / lift し、ARM64 emit は
-`cmp` / `test` が更新した flags を `b.eq` / `b.ne` へ lower する。その他の
-`jcc` 条件と rel32 form は B5 の後続小ステップで扱う。
+`X86Cond::NotEqual` の `CondJump` へ、short `jmp rel8` を `DirectJump` へ
+decode / lift し、ARM64 emit は `cmp` / `test` が更新した flags を
+`b.eq` / `b.ne` へ lower する。その他の `jcc` 条件と rel32 form は B5 の
+後続小ステップで扱う。
 
 `BoundaryRequest` は guest 側から public ABI / external boundary へ出ようとする
 意図を IR に残す。runtime や host OS syscall を直接実行する指示ではない。
@@ -279,9 +280,10 @@ flags は `Flags::new(...)` または `Flags::unknown()` で作り、`cf()` /
 
 現時点では `cmp eax, imm8/imm32` を `IrOp::Cmp` へ、`test eax,eax` を
 `IrOp::Test` へ decode / lift し、short `je/jz rel8` と `jne/jnz rel8` を
-`CondJump` へ decode / lift する。ARM64 emit は `cmp x0,#imm12`、
-`tst x0,x0`、`b.eq` / `b.ne` の最小 lowering を持つ。その他の `jcc` 条件と
-rel32 form は B5 の後続小ステップで扱う。
+`CondJump` へ、short `jmp rel8` を `DirectJump` へ decode / lift する。
+ARM64 emit は `cmp x0,#imm12`、`tst x0,x0`、`b.eq` / `b.ne`、unconditional
+`b` の最小 lowering を持つ。その他の `jcc` 条件と rel32 form は B5 の
+後続小ステップで扱う。
 
 ## Metadata
 

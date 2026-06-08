@@ -86,6 +86,9 @@ pub enum DecodedInstructionKind {
         taken: X86Va,
         fallthrough: X86Va,
     },
+    JmpRel8 {
+        target: X86Va,
+    },
     CallRel32 {
         target: X86Va,
         return_to: X86Va,

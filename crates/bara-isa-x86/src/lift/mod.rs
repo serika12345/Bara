@@ -137,6 +137,11 @@ fn lift_instruction(instruction: &DecodedInstruction) -> Result<LiftedInstructio
             taken: *taken,
             fallthrough: *fallthrough,
         })),
+        DecodedInstructionKind::JmpRel8 { target } => {
+            Ok(LiftedInstruction::Terminator(Terminator::DirectJump {
+                target: *target,
+            }))
+        }
         DecodedInstructionKind::Syscall => {
             let request =
                 SyscallRequest::new(SyscallAbi::X86_64, instruction.start(), instruction.end())
@@ -755,6 +760,53 @@ mod tests {
         );
         assert_eq!(program.blocks()[1].start(), X86Va::new(2));
         assert_eq!(program.blocks()[1].terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_jmp_rel8_to_direct_jump_terminator() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(2),
+                    DecodedInstructionKind::JmpRel8 {
+                        target: X86Va::new(8),
+                    },
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(2),
+                    X86Va::new(7),
+                    DecodedInstructionKind::MovEaxImm32 { imm: 7 },
+                ),
+                DecodedInstruction::new(X86Va::new(7), X86Va::new(8), DecodedInstructionKind::Ret),
+                DecodedInstruction::new(
+                    X86Va::new(8),
+                    X86Va::new(13),
+                    DecodedInstructionKind::MovEaxImm32 { imm: 42 },
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(13),
+                    X86Va::new(14),
+                    DecodedInstructionKind::Ret,
+                ),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded jmp function lifts");
+
+        assert_eq!(program.blocks().len(), 3);
+        assert_eq!(
+            program.blocks()[0].terminator(),
+            &Terminator::DirectJump {
+                target: X86Va::new(8)
+            }
+        );
+        assert_eq!(program.blocks()[1].start(), X86Va::new(2));
+        assert_eq!(program.blocks()[1].terminator(), &Terminator::Return);
+        assert_eq!(program.blocks()[2].start(), X86Va::new(8));
+        assert_eq!(program.blocks()[2].terminator(), &Terminator::Return);
     }
 
     #[test]

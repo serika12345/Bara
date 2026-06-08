@@ -9,12 +9,13 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 19:45 JST
+最終更新: 2026-06-08 19:53 JST
 
 状態:
 
 - project_state: in_progress。B5 の large milestone completion に向けて、
-  `cmp` / `test` と short `je/jne rel8` の ARM64 branch lowering を追加した。
+  short `jmp rel8` を typed direct branch として decode / lift し、
+  ARM64 direct branch fixture を runtime まで通した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B5:
   Control Flow / Stack / Call を開始した。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の
@@ -24,25 +25,34 @@
   (`Merge pull request #4 from serika12345/task/b4-syscall-ir-request`)。
   latest commit は review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B5 の
-  `cmp` / `test` と short `je/jne rel8` の ARM64 branch lowering を追加する。
-- completed_work: ARM64 emitter は複数 basic block を source order で emit し、
-  block start の PC map と branch fixup を記録してから `b.eq` / `b.ne` /
-  unconditional `b` を patch する。`branch_eq_return_42` fixture は decode /
-  lift / emit / runtime まで通る。
-- remaining_work: B5 ではその他の `jcc` 条件と rel32、`jmp` 実行経路、
-  stack、call、direct call fixup、PC map validation が未完了。
-- next_action: direct `jmp` と if/else 相当の fixture を通し、loop へ進む前に
-  direct branch target と PC map の検証境界を固める。
-- verification: `nix develop -c cargo test -p bara-arm64
-  emits_conditional_branch_fixups_for_equal`、`nix develop -c cargo test -p
-  bara-arm64 emits_cmp_x0_immediate_for_rax_compare_immediate`、`nix develop -c
-  cargo test -p bara-arm64 emits_tst_x0_x0_for_rax_test_rax`、
-  `nix develop -c cargo test -p bara-runtime branch_eq_return_42`、
+  short `jmp rel8` を `DirectJump` terminator として decode / lift する。
+- completed_work: `direct_jmp_return_42` fixture は decode / lift で
+  `Terminator::DirectJump` を作り、既存の ARM64 unconditional branch fixup を
+  通って native runtime で `rax=42` を返す。
+- remaining_work: B5 ではその他の `jcc` 条件と rel32、簡単な loop、stack、
+  call、direct call fixup、PC map validation が未完了。
+- next_action: `push` / `pop` と stack pointer model の最小 semantics を
+  追加し、direct `call` / `ret` の土台を作る。
+- verification: `nix develop -c cargo test -p bara-isa-x86
+  decodes_jmp_rel8_and_continues_with_target_block`、`nix develop -c cargo test
+  -p bara-isa-x86 lifts_jmp_rel8_to_direct_jump_terminator`、`nix develop -c
+  cargo test -p bara-runtime direct_jmp_return_42`、
   `nix develop -c cargo test -p btbc-cli
   check_blackbox_reports_raw_manifest_mach_o_and_probe_fixtures`、および
   `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
+
+- 2026-06-08 19:53 JST: B5 large milestone completion の小ステップとして、
+  short `jmp rel8` を `DecodedInstructionKind::JmpRel8` と
+  `Terminator::DirectJump` へ接続した。`direct_jmp_return_42` を repository
+  fixture に追加し、decode / lift / emit と native runtime 実行の regression
+  とした。検証は `nix develop -c cargo test -p bara-isa-x86
+  decodes_jmp_rel8_and_continues_with_target_block`、`nix develop -c cargo test
+  -p bara-isa-x86 lifts_jmp_rel8_to_direct_jump_terminator`、`nix develop -c
+  cargo test -p bara-runtime direct_jmp_return_42`、`nix develop -c cargo test
+  -p btbc-cli check_blackbox_reports_raw_manifest_mach_o_and_probe_fixtures`、
+  および `nix develop -c ./scripts/verify`。
 
 - 2026-06-08 19:45 JST: B5 large milestone completion の小ステップとして、
   ARM64 emitter に `cmp x0,#imm12`、`tst x0,x0`、`b.eq` / `b.ne`、

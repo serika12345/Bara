@@ -17,6 +17,10 @@
       "outcome": "passed"
     },
     {
+      "case_id": "direct_jmp_return_42",
+      "outcome": "passed"
+    },
+    {
       "case_id": "hello_world_stdout_return_0",
       "outcome": "passed"
     },

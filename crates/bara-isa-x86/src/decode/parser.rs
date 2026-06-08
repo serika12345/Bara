@@ -251,6 +251,19 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                 ));
                 offset = end_offset;
             }
+            0xeb => {
+                let end_offset = offset + 2;
+                let displacement = read_u8(input, offset + 1, at, opcode)?;
+                let end = instruction_end(input, at, end_offset, 2)?;
+                let target =
+                    relative_target(end, i32::from(i8::from_le_bytes([displacement])), at)?;
+                instructions.push(DecodedInstruction::new(
+                    at,
+                    end,
+                    DecodedInstructionKind::JmpRel8 { target },
+                ));
+                offset = end_offset;
+            }
             0xc3 => {
                 let end = instruction_end(input, at, offset + 1, 1)?;
                 instructions.push(DecodedInstruction::new(
@@ -295,6 +308,7 @@ fn decoded_stream_ends_with_terminator(instructions: &[DecodedInstruction]) -> b
         instruction.kind(),
         DecodedInstructionKind::CallRel32 { .. }
             | DecodedInstructionKind::JccRel8 { .. }
+            | DecodedInstructionKind::JmpRel8 { .. }
             | DecodedInstructionKind::Ret
             | DecodedInstructionKind::Syscall
     )
