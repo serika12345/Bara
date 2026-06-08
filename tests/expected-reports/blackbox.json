@@ -13,6 +13,10 @@
       "outcome": "passed"
     },
     {
+      "case_id": "branch_eq_return_42",
+      "outcome": "passed"
+    },
+    {
       "case_id": "hello_world_stdout_return_0",
       "outcome": "passed"
     },

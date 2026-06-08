@@ -9,12 +9,12 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 19:36 JST
+最終更新: 2026-06-08 19:45 JST
 
 状態:
 
 - project_state: in_progress。B5 の large milestone completion に向けて、
-  branch / call target になる trailing block bytes を decoder が保持できるようにした。
+  `cmp` / `test` と short `je/jne rel8` の ARM64 branch lowering を追加した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B5:
   Control Flow / Stack / Call を開始した。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の
@@ -24,21 +24,38 @@
   (`Merge pull request #4 from serika12345/task/b4-syscall-ir-request`)。
   latest commit は review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B5 の
-  その他の `jcc` 条件、rel32、branch lowering を段階的に追加する。
-- completed_work: decoder は `ret` と direct `call rel32` で即停止せず、同じ raw
-  function byte sequence 内の後続 block bytes を typed instruction として保持する。
-  EOF が explicit terminator で終わる場合は missing return sentinel を追加しない。
-- remaining_work: B5 ではその他の `jcc` 条件、rel32、branch lowering、
-  `jmp` 実行経路、stack、call、ARM64 fixup、PC map validation が未完了。
-- next_action: ARM64 emitter を multi-block branch lowering に広げ、`cmp/test`
-  と `je/jne` の実行経路を追加する。
-- verification: `nix develop -c cargo test -p bara-isa-x86 trailing_block_bytes`、
-  `nix develop -c cargo test -p bara-isa-x86 call_rel32_then_fallthrough_instruction`、
-  および `nix develop -c cargo test -p bara-isa-x86
-  missing_ret_becomes_unsupported_instruction` が通過した。
+  `cmp` / `test` と short `je/jne rel8` の ARM64 branch lowering を追加する。
+- completed_work: ARM64 emitter は複数 basic block を source order で emit し、
+  block start の PC map と branch fixup を記録してから `b.eq` / `b.ne` /
+  unconditional `b` を patch する。`branch_eq_return_42` fixture は decode /
+  lift / emit / runtime まで通る。
+- remaining_work: B5 ではその他の `jcc` 条件と rel32、`jmp` 実行経路、
+  stack、call、direct call fixup、PC map validation が未完了。
+- next_action: direct `jmp` と if/else 相当の fixture を通し、loop へ進む前に
+  direct branch target と PC map の検証境界を固める。
+- verification: `nix develop -c cargo test -p bara-arm64
+  emits_conditional_branch_fixups_for_equal`、`nix develop -c cargo test -p
+  bara-arm64 emits_cmp_x0_immediate_for_rax_compare_immediate`、`nix develop -c
+  cargo test -p bara-arm64 emits_tst_x0_x0_for_rax_test_rax`、
+  `nix develop -c cargo test -p bara-runtime branch_eq_return_42`、
+  `nix develop -c cargo test -p btbc-cli
+  check_blackbox_reports_raw_manifest_mach_o_and_probe_fixtures`、および
   `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
+
+- 2026-06-08 19:45 JST: B5 large milestone completion の小ステップとして、
+  ARM64 emitter に `cmp x0,#imm12`、`tst x0,x0`、`b.eq` / `b.ne`、
+  unconditional `b` の branch fixup を追加した。`branch_eq_return_42` を
+  repository fixture に追加し、decode / lift / emit と native runtime 実行の
+  regression とした。検証は `nix develop -c cargo test -p bara-arm64
+  emits_conditional_branch_fixups_for_equal`、`nix develop -c cargo test -p
+  bara-arm64 emits_cmp_x0_immediate_for_rax_compare_immediate`、`nix develop -c
+  cargo test -p bara-arm64 emits_tst_x0_x0_for_rax_test_rax`、
+  `nix develop -c cargo test -p bara-runtime branch_eq_return_42`、
+  `nix develop -c cargo test -p btbc-cli
+  check_blackbox_reports_raw_manifest_mach_o_and_probe_fixtures`、および
+  `nix develop -c ./scripts/verify`。
 
 - 2026-06-08 19:36 JST: B5 large milestone completion の準備として、decoder が
   `ret` と direct `call rel32` の後続 block bytes を保持できるようにした。

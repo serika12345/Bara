@@ -1,0 +1,9 @@
+{
+  "case_id": "branch_eq_return_42",
+  "entry": 0,
+  "bytes": "b80000000085c07406b807000000c3b82a000000c3",
+  "abi": {
+    "args": [],
+    "return": "u64"
+  }
+}

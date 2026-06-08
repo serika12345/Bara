@@ -130,6 +130,28 @@ fn add_sub_eax_imm_return_40_runs_on_supported_aarch64_unix_hosts() -> Result<()
 }
 
 #[test]
+fn branch_eq_return_42_decodes_lifts_and_emits_arm64() -> Result<(), String> {
+    assert_fixture_emits_arm64(
+        "branch_eq_return_42",
+        include_str!("../../../tests/cases/branch_eq_return_42.json"),
+        &[
+            0x00, 0x00, 0x80, 0xd2, 0x1f, 0x00, 0x00, 0xea, 0x80, 0x00, 0x00, 0x54, 0x01, 0x00,
+            0x00, 0x14, 0xe0, 0x00, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6, 0x40, 0x05, 0x80, 0xd2,
+            0xc0, 0x03, 0x5f, 0xd6,
+        ],
+    )
+}
+
+#[test]
+fn branch_eq_return_42_runs_on_supported_aarch64_unix_hosts() -> Result<(), String> {
+    assert_fixture_runs_like_expected(
+        "branch_eq_return_42",
+        include_str!("../../../tests/cases/branch_eq_return_42.json"),
+        include_str!("../../../tests/expected/branch_eq_return_42.json"),
+    )
+}
+
+#[test]
 fn xor_eax_eax_return_0_decodes_lifts_and_emits_arm64() -> Result<(), String> {
     assert_fixture_emits_arm64(
         "xor_eax_eax_return_0",
