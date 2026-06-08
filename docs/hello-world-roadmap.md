@@ -1,18 +1,27 @@
-# hello world までのマイルストーン
+# hello world までの完了済みマイルストーン
+
+状態:
+
+- 完了。最小 `hello world` milestone と、その後の B1: Hello World 成果物の
+  安定化は完了済み。
 
 ## 目的
 
-この文書は、現在の raw x86_64 function bytes 実行から、最小の
-`hello world` 相当を外部観測できるところまでの道筋を定義する。
+この文書は、raw x86_64 function bytes 実行から、最小の `hello world`
+相当を外部観測できるところまでに通った道筋を記録する。
 
 ここでの `hello world` は、最初はプロセス全体や loader を扱わない。
 raw function fixture が runtime 境界を通じて stdout に
 `hello world\n` を出し、`actual.json` / `expected.json` で比較できる状態を
-目標にする。
+最初の目標にした。
 
-## 現在地
+B1 では、その成果を standalone macOS ARM64 executable artifact として
+安定化し、blackbox report、stable JSON report、failure classification、
+責務別 CLI tests へ接続した。
 
-現在は以下を扱える。
+## 完了時点の到達点
+
+完了時点では以下を扱える。
 
 - raw x86_64 function bytes
 - entry offset `0`
@@ -62,6 +71,26 @@ raw function fixture が runtime 境界を通じて stdout に
 - raw testcase から ARM64 machine code artifact への実行なし変換境界
 - raw testcase から macOS ARM64 executable artifact への toolchain packaging 境界
 - standalone macOS ARM64 executable artifact による実 OS stdout emission
+- generated executable smoke test を含む stable blackbox report
+- `link-fixture-arm64-stdout-main` の stable `ObservedResult` JSON report
+- native artifact packaging / toolchain / execution の failure classification
+- native artifact command behavior の責務別 CLI test module
+
+## 次フェーズとの接続
+
+B1 完了時点で、fixture 専用の successful path は以下まで安定した。
+
+- raw ARM64 bytes を保存できる。
+- host-trap-free fixture を macOS ARM64 executable として link できる。
+- stdout host trap fixture を native `_write` prologue 付き executable として
+  link し、実 OS stdout / exit status を JSON report にできる。
+- `check-blackbox --out` は生成 executable smoke を含む stable report を返す。
+
+次の実装入口は [TODO.md](../TODO.md) の B2: 実行可能成果物モデル。
+B2 では、この文書で到達した CLI I/O 境界をそのまま広げるのではなく、
+raw ARM64 bytes、assembly source、linked executable、execution report を
+別の domain type として扱い、artifact metadata と toolchain boundary を
+明確にする。
 
 ## マイルストーン
 

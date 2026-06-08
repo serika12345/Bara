@@ -9,22 +9,24 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-07 23:48 JST
+最終更新: 2026-06-08 09:25 JST
 
 状態:
 
-- project_state: in_progress。完了済みの最小 `hello world` milestone から、実バイナリ対応へ広げる安定化フェーズ。
-- active_milestone: in_progress。[TODO.md](../TODO.md) の B1 で Hello World 成果物の安定化を進めている。
-- active_design_focus: planned。現在の設計監査入口は [docs/design-todo.md](design-todo.md) の D1 と D2。
-- active_branch: `task/b1-executable-smoke-blackbox-report`。B1 の小ステップ commit を積み増している。
-- related_todo: B1 native artifact 関連の CLI テスト分割 completed。関連設計 TODO は D1。
-- completed_work: `emit-fixture-arm64`、`link-fixture-arm64-main`、`link-fixture-arm64-stdout-main` の CLI behavior tests を `main.rs` から `native_artifact_cli_tests.rs` へ移し、native artifact command の責務別 test module とした。
-- remaining_work: B1 の `docs/hello-world-roadmap.md` 完了済みロードマップ整理と次フェーズ文書への接続。
-- next_action: B1 の最後の項目として `docs/hello-world-roadmap.md` を完了済みロードマップとして整理する。
-- verification: `nix develop -c cargo test -p btbc-cli native_artifact_cli_tests` と `nix develop -c ./scripts/verify` passed at 2026-06-07 23:48 JST。
+- project_state: completed。B1: Hello World 成果物の安定化が完了し、review gate 待ち。
+- active_milestone: completed。[TODO.md](../TODO.md) の B1 は全項目完了。
+- active_design_focus: planned。次の設計監査入口は [docs/design-todo.md](design-todo.md) の D1 と D2。
+- active_branch: `task/b1-executable-smoke-blackbox-report`。B1 完了 branch。
+- related_todo: B1 `docs/hello-world-roadmap.md` 完了済みロードマップ整理 completed。
+- completed_work: `docs/hello-world-roadmap.md` を完了済み履歴として整理し、B1 安定化成果と B2: 実行可能成果物モデルへの接続を明記した。
+- remaining_work: B1 なし。レビュー後の次フェーズは B2。
+- next_action: `/review-gate` で B1 branch をレビューし、承認後に `/merge-reviewed` で `main` へ取り込む。次に進める場合は B2 の最小 TODO-backed step から始める。
+- verification: `nix develop -c ./scripts/check-no-invisible-chars`、`git diff --check`、`nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-08 09:23 JST: B1 の最後の小ステップとして、`docs/hello-world-roadmap.md` を完了済みロードマップに整理し、B1 安定化成果から B2 の実行可能成果物モデルへ接続した。
+- 検証: `nix develop -c ./scripts/check-no-invisible-chars`、`git diff --check`、`nix develop -c ./scripts/verify` が通過した。
 - 2026-06-07 21:47 JST: B1 の先頭小ステップとして、生成 executable の smoke test を blackbox report に追加した。`return_42_native_executable_smoke` は `return_42` fixture を native executable として link し、実プロセス exit status 42 と空 stdout/stderr を確認する。
 - 検証: 期待 fixture 更新後に `nix develop -c cargo test -p btbc-cli check_blackbox_reports_raw_manifest_mach_o_and_probe_fixtures` が期待どおり失敗し、実装後に同テスト、`nix develop -c cargo test -p btbc-cli check_blackbox_writes_report_and_schema_specific_actual_outputs`、`nix develop -c ./scripts/verify` が通過した。
 - 2026-06-07 21:54 JST: B1 の 2 つ目の小ステップとして、`link-fixture-arm64-stdout-main` の出力を stable `ObservedResult` JSON report にした。生成 artifact は command 内で実行され、stdout `hello world\n`、exit status 0、stderr 空が JSON に含まれる。
