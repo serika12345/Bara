@@ -108,7 +108,7 @@ fn link_mach_o_arm64_main_writes_return_42_executable() {
     assert_eq!(
         output,
         format!(
-            "{{\"artifact_kind\":\"linked_executable\",\"target_triple\":\"arm64-apple-macos\",\"toolchain\":\"clang\",\"output_path\":\"{}\",\"helper_requirements\":[]}}",
+            "{{\"artifact_kind\":\"linked_executable\",\"target_triple\":\"arm64-apple-macos\",\"toolchain\":\"clang\",\"output_path\":\"{}\",\"helper_requirements\":[],\"source_image\":{{\"kind\":\"mach_o_executable\",\"entry_point\":{{\"entryoff\":130,\"stacksize\":8192}},\"segment\":{{\"name\":\"__TEXT\",\"vmaddr\":4294967296,\"fileoff\":128,\"filesize\":8}}}}}}",
             output_path.display()
         )
     );

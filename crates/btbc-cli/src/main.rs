@@ -29,8 +29,10 @@ use function_run::{
     run_test_case_function, FunctionRunError,
 };
 use native_artifact::{
-    link_arm64_main_executable, link_arm64_stdout_main_executable,
+    link_arm64_main_executable, link_arm64_main_executable_with_source_metadata,
+    link_arm64_stdout_main_executable, link_arm64_stdout_main_executable_with_source_metadata,
     native_artifact_metadata_to_json, observe_native_executable_artifact, NativeArtifactError,
+    NativeSourceImageMetadata, NativeSourceImageMetadataError,
 };
 
 fn main() -> ExitCode {
@@ -162,11 +164,15 @@ fn run_link_fixture_arm64_main(case_path: &Path, output_path: &Path) -> Result<S
 }
 
 fn run_link_mach_o_arm64_main(binary_path: &Path, output_path: &Path) -> Result<String, CliError> {
-    let test_case = read_mach_o_entry_function_test_case(binary_path)?;
-    let compiled = compile_test_case_function_standalone_artifact(&test_case)
+    let input = read_mach_o_artifact_input(binary_path)?;
+    let compiled = compile_test_case_function_standalone_artifact(&input.test_case)
         .map_err(CliError::FunctionRun)?;
-    let artifact = link_arm64_main_executable(compiled.arm64_bytes(), output_path)
-        .map_err(CliError::NativeArtifact)?;
+    let artifact = link_arm64_main_executable_with_source_metadata(
+        compiled.arm64_bytes(),
+        output_path,
+        Some(input.source_image),
+    )
+    .map_err(CliError::NativeArtifact)?;
 
     native_artifact_metadata_to_json(artifact.metadata()).map_err(CliError::Json)
 }
@@ -196,16 +202,18 @@ fn run_link_mach_o_arm64_stdout_main(
     host_traps_path: &Path,
     output_path: &Path,
 ) -> Result<String, CliError> {
-    let test_case = read_mach_o_entry_function_test_case_with_host_traps(
+    let input = read_mach_o_artifact_input_with_host_traps(
         binary_path,
         read_host_trap_plan(host_traps_path)?,
     )?;
+    let test_case = input.test_case;
     let compiled = compile_test_case_function(&test_case).map_err(CliError::FunctionRun)?;
-    let artifact = link_arm64_stdout_main_executable(
+    let artifact = link_arm64_stdout_main_executable_with_source_metadata(
         compiled.arm64_bytes(),
         test_case.host_trap_plan(),
         compiled.stdout_host_trap_request(),
         output_path,
+        Some(input.source_image),
     )
     .map_err(CliError::NativeArtifact)?;
 
@@ -254,6 +262,19 @@ fn read_mach_o_entry_function_test_case(binary_path: &Path) -> Result<TestCase, 
         .map_err(CliError::MachOEntryFunctionTestCase)
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct MachOArtifactInput {
+    test_case: TestCase,
+    source_image: NativeSourceImageMetadata,
+}
+
+fn read_mach_o_artifact_input(binary_path: &Path) -> Result<MachOArtifactInput, CliError> {
+    read_mach_o_artifact_input_with_host_traps(
+        binary_path,
+        bara_oracle::TestCaseHostTrapPlan::none(),
+    )
+}
+
 fn read_mach_o_entry_function_test_case_with_host_traps(
     binary_path: &Path,
     host_trap_plan: bara_oracle::TestCaseHostTrapPlan,
@@ -266,6 +287,33 @@ fn read_mach_o_entry_function_test_case_with_host_traps(
         host_trap_plan,
     )
     .map_err(CliError::MachOEntryFunctionTestCase)
+}
+
+fn read_mach_o_artifact_input_with_host_traps(
+    binary_path: &Path,
+    host_trap_plan: bara_oracle::TestCaseHostTrapPlan,
+) -> Result<MachOArtifactInput, CliError> {
+    let bytes = read_binary_file(binary_path)?;
+    let input = BinaryInput::from_file_bytes(BinaryFileBytes::from_untrusted_file_contents(bytes));
+    let test_case = mach_o_entry_function_test_case_with_host_traps(
+        case_id_from_path(binary_path),
+        &input,
+        host_trap_plan,
+    )
+    .map_err(CliError::MachOEntryFunctionTestCase)?;
+    let report = probe_public_binary_format(&input).map_err(CliError::BinaryFormatProbe)?;
+    let source_image = NativeSourceImageMetadata::from_mach_o_conversion(
+        report
+            .metadata()
+            .mach_o_metadata()
+            .executable_image_conversion(),
+    )
+    .map_err(CliError::NativeSourceImageMetadata)?;
+
+    Ok(MachOArtifactInput {
+        test_case,
+        source_image,
+    })
 }
 
 fn read_host_trap_plan(
@@ -624,6 +672,7 @@ enum CliError {
     },
     FunctionRun(FunctionRunError),
     NativeArtifact(NativeArtifactError),
+    NativeSourceImageMetadata(NativeSourceImageMetadataError),
     ExecutableRun(ExecutableRunError),
     Comparison(ComparisonReport),
     Json(bara_oracle::JsonError),
@@ -643,6 +692,7 @@ impl CliError {
             Self::BinaryProbeComparisonMismatch { .. } => FailureKind::ComparisonMismatch,
             Self::FunctionRun(error) => error.failure_kind(),
             Self::NativeArtifact(error) => error.failure_kind(),
+            Self::NativeSourceImageMetadata(_) => FailureKind::InvalidTestCase,
             Self::ExecutableRun(error) => error.failure_kind(),
             Self::Comparison(_) => FailureKind::ComparisonMismatch,
             Self::ReadFile { .. } | Self::WriteFile { .. } | Self::CreateDir { .. } => {
@@ -726,6 +776,9 @@ impl std::fmt::Display for CliError {
             }
             Self::FunctionRun(error) => write!(formatter, "function run error: {error}"),
             Self::NativeArtifact(error) => write!(formatter, "native artifact error: {error}"),
+            Self::NativeSourceImageMetadata(error) => {
+                write!(formatter, "native source image metadata error: {error}")
+            }
             Self::ExecutableRun(error) => write!(formatter, "executable run error: {error}"),
             Self::Comparison(report) => write!(formatter, "comparison failed: {report:?}"),
             Self::Json(error) => write!(formatter, "{error}"),

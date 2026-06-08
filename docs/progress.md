@@ -9,12 +9,13 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 21:33 JST
+最終更新: 2026-06-08 21:47 JST
 
 状態:
 
-- project_state: completed。B6 の 2 つ目の小ステップとして、Mach-O backed
-  `hello world` 入力を native executable artifact へ変換する経路を実装した。
+- project_state: completed。B6 の 3 つ目の小ステップとして、input Mach-O
+  の entry / segment / stack metadata を native output packaging へ渡す
+  境界を実装した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B6:
   実 Mach-O 入力からの standalone 実行。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の
@@ -23,8 +24,8 @@
   `btbc-cli` の出力境界へ接続した。
 - active_branch: `task/b6-macho-return42-artifact`。base commit は `31dbc29`。
   latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B6 の Mach-O backed `return_42` /
-  `hello world` 入力を native executable artifact へ変換する項目。
+- related_todo: [TODO.md](../TODO.md) B6 の input Mach-O の entry /
+  segment / stack metadata を output packaging に渡す項目。
 - completed_work: `link-mach-o-arm64-main <binary> <out-exe>` を追加し、
   `tests/binaries/mach_o_return_42.bin` を既存の Mach-O entry function
   pipeline、standalone ARM64 emit、`clang` native artifact packaging へ通した。
@@ -33,21 +34,33 @@
   pipeline、stdout helper-aware ARM64 emit、native stdout artifact packaging へ
   通した。`check-blackbox` には `mach_o_return_42_native_executable_smoke` と
   `mach_o_hello_world_stdout_native_executable` を追加し、生成 executable を
-  実プロセスとして実行する。
-- remaining_work: input Mach-O の entry / segment / stack metadata を output
-  packaging へ渡す経路、fixture 専用 host trap JSON 依存の削減、malformed /
+  実プロセスとして実行する。Mach-O artifact 経路では
+  `NativeSourceImageMetadata::MachOExecutable` を package request に渡し、
+  metadata JSON に `LC_MAIN` 由来の `entryoff` / `stacksize` と selected
+  segment の `name` / `vmaddr` / `fileoff` / `filesize` を含める。
+- remaining_work: fixture 専用 host trap JSON 依存の削減、malformed /
   unsupported Mach-O の artifact 生成時 blocker classification 維持。
-- next_action: B6 の次小ステップとして、input Mach-O の entry / segment /
-  stack metadata を native output packaging 側へ渡す境界を設計・実装する。
+- next_action: B6 の次小ステップとして、fixture 専用 host trap JSON への
+  依存を減らし、binary metadata から必要情報を得る経路を検討する。
 - verification: `nix develop -c cargo test -p btbc-cli
-  link_mach_o_arm64_main`、`nix develop -c cargo test -p btbc-cli
-  link_mach_o_arm64_stdout_main`、`nix develop -c cargo test -p btbc-cli
+  native_artifact_metadata_serializes_mach_o_source_image_metadata`、`nix develop
+  -c cargo test -p btbc-cli link_mach_o_arm64_main`、`nix develop -c cargo test
+  -p btbc-cli link_mach_o_arm64_stdout_main`、`nix develop -c cargo test -p btbc-cli
   check_blackbox_reports_raw_manifest_mach_o_and_probe_fixtures`、`nix develop
   -c cargo test -p btbc-cli
   check_blackbox_writes_report_and_schema_specific_actual_outputs`、および
   `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
+
+- 2026-06-08 21:47 JST: B6 の 3 つ目の小ステップとして、input Mach-O の
+  entry / segment / stack metadata を native output packaging に渡す境界を
+  追加した。`NativeArtifactMetadata` は raw fixture では既存 JSON を維持し、
+  Mach-O artifact 経路では optional `source_image` として `entryoff`、
+  `stacksize`、selected segment の `name` / `vmaddr` / `fileoff` / `filesize`
+  を保持する。Mach-O artifact CLI は既存 entry function testcase 変換を先に
+  通すため、malformed / unsupported Mach-O の既存分類を優先する。検証は
+  snapshot の targeted tests と `nix develop -c ./scripts/verify`。
 
 - 2026-06-08 21:33 JST: B6 の 2 つ目の小ステップとして、Mach-O backed
   `hello world` 入力を native executable artifact へ変換する CLI /
