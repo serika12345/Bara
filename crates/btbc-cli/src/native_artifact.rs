@@ -170,6 +170,7 @@ fn write_unsupported_host_report(
 pub(crate) enum NativeStdoutMainUnsupported {
     MissingStdoutTrapPlan,
     MissingEmittedStdoutRequest,
+    UnsupportedEmissionTarget(NativeStdoutEmissionUnsupported),
 }
 
 impl fmt::Display for NativeStdoutMainUnsupported {
@@ -183,6 +184,7 @@ impl fmt::Display for NativeStdoutMainUnsupported {
                 formatter,
                 "stdout main executable requires emitted function stdout request"
             ),
+            Self::UnsupportedEmissionTarget(error) => write!(formatter, "{error}"),
         }
     }
 }
@@ -233,25 +235,32 @@ impl NativeAssemblySource {
             NativeGeneratedCode::from_raw_arm64(body),
             NativeStdoutData::from_bytes(stdout_bytes),
         )
+        .expect("arm64 apple macos stdout emission is supported")
     }
 
     fn stdout_main_from_generated_code_and_stdout(
         generated_code: NativeGeneratedCode<'_>,
         stdout: NativeStdoutData<'_>,
-    ) -> Self {
+    ) -> Result<Self, NativeStdoutEmissionUnsupported> {
+        Self::stdout_main_from_generated_code_and_stdout_for_target(
+            generated_code,
+            stdout,
+            NativeArtifactTargetTriple::Arm64AppleMacos,
+        )
+    }
+
+    fn stdout_main_from_generated_code_and_stdout_for_target(
+        generated_code: NativeGeneratedCode<'_>,
+        stdout: NativeStdoutData<'_>,
+        target_triple: NativeArtifactTargetTriple,
+    ) -> Result<Self, NativeStdoutEmissionUnsupported> {
+        let stdout_emission = NativeStdoutEmissionStrategy::for_target(target_triple)?;
         let mut source = String::from(".text\n.globl _main\n.p2align 2\n_main:\n");
-        source.push_str("stp x29, x30, [sp, #-16]!\n");
-        source.push_str("mov x29, sp\n");
-        source.push_str("mov x0, #1\n");
-        source.push_str("adrp x1, L_stdout_text@PAGE\n");
-        source.push_str("add x1, x1, L_stdout_text@PAGEOFF\n");
-        source.push_str(&format!("mov x2, #{}\n", stdout.as_bytes().len()));
-        source.push_str("bl _write\n");
-        source.push_str("ldp x29, x30, [sp], #16\n");
+        stdout_emission.push_prologue(&mut source, stdout);
         push_byte_directives(&mut source, generated_code.body().as_slice());
         source.push_str(".section __TEXT,__const\n.p2align 2\nL_stdout_text:\n");
         push_byte_directives(&mut source, stdout.as_bytes());
-        Self { source }
+        Ok(Self { source })
     }
 
     pub(crate) fn as_str(&self) -> &str {
@@ -368,6 +377,32 @@ enum NativeArtifactKind {
 enum NativeArtifactTargetTriple {
     #[serde(rename = "arm64-apple-macos")]
     Arm64AppleMacos,
+    #[serde(rename = "aarch64-unknown-linux-gnu")]
+    Aarch64UnknownLinuxGnu,
+    #[serde(rename = "aarch64-pc-windows-msvc")]
+    Aarch64PcWindowsMsvc,
+}
+
+impl NativeArtifactTargetTriple {
+    fn unsupported_stdout_emission_targets() -> [Self; 2] {
+        [Self::Aarch64UnknownLinuxGnu, Self::Aarch64PcWindowsMsvc]
+    }
+
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Arm64AppleMacos => "arm64-apple-macos",
+            Self::Aarch64UnknownLinuxGnu => "aarch64-unknown-linux-gnu",
+            Self::Aarch64PcWindowsMsvc => "aarch64-pc-windows-msvc",
+        }
+    }
+
+    const fn host_os_abi(self) -> NativeHostOsAbi {
+        match self {
+            Self::Arm64AppleMacos => NativeHostOsAbi::Macos,
+            Self::Aarch64UnknownLinuxGnu => NativeHostOsAbi::Linux,
+            Self::Aarch64PcWindowsMsvc => NativeHostOsAbi::Windows,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -427,6 +462,93 @@ impl NativeArtifactHelperRequirements {
 #[serde(rename_all = "snake_case")]
 enum NativeArtifactHelperRequirement {
     WriteStdout,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum NativeHostOsAbi {
+    Macos,
+    Linux,
+    Windows,
+}
+
+impl NativeHostOsAbi {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Macos => "macos",
+            Self::Linux => "linux",
+            Self::Windows => "windows",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct NativeStdoutEmissionUnsupported {
+    helper: NativeArtifactHelperRequirement,
+    target_triple: NativeArtifactTargetTriple,
+    host_os_abi: NativeHostOsAbi,
+}
+
+impl NativeStdoutEmissionUnsupported {
+    const fn for_target(target_triple: NativeArtifactTargetTriple) -> Self {
+        Self {
+            helper: NativeArtifactHelperRequirement::WriteStdout,
+            target_triple,
+            host_os_abi: target_triple.host_os_abi(),
+        }
+    }
+
+    #[cfg(test)]
+    const fn helper(self) -> NativeArtifactHelperRequirement {
+        self.helper
+    }
+
+    #[cfg(test)]
+    const fn target_triple(self) -> NativeArtifactTargetTriple {
+        self.target_triple
+    }
+
+    #[cfg(test)]
+    const fn host_os_abi(self) -> NativeHostOsAbi {
+        self.host_os_abi
+    }
+}
+
+impl fmt::Display for NativeStdoutEmissionUnsupported {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "stdout helper emission is unsupported for target {} with {} OS ABI",
+            self.target_triple.as_str(),
+            self.host_os_abi.as_str()
+        )
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum NativeStdoutEmissionStrategy {
+    MacosArm64Write,
+}
+
+impl NativeStdoutEmissionStrategy {
+    fn for_target(
+        target_triple: NativeArtifactTargetTriple,
+    ) -> Result<Self, NativeStdoutEmissionUnsupported> {
+        let unsupported_targets = NativeArtifactTargetTriple::unsupported_stdout_emission_targets();
+
+        match target_triple {
+            NativeArtifactTargetTriple::Arm64AppleMacos => Ok(Self::MacosArm64Write),
+            target_triple if unsupported_targets.contains(&target_triple) => {
+                Err(NativeStdoutEmissionUnsupported::for_target(target_triple))
+            }
+            target_triple => Err(NativeStdoutEmissionUnsupported::for_target(target_triple)),
+        }
+    }
+
+    fn push_prologue(self, source: &mut String, stdout: NativeStdoutData<'_>) {
+        match self {
+            Self::MacosArm64Write => push_macos_arm64_write_stdout_prologue(source, stdout),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -597,7 +719,7 @@ pub(crate) fn link_arm64_stdout_main_executable(
     ensure_supported_host()?;
 
     let output_path = NativeArtifactOutputPath::from_path(output_path);
-    let source = arm64_stdout_main_assembly_source(body, stdout.text());
+    let source = arm64_stdout_main_assembly_source(body, stdout.text())?;
     let request = NativeArtifactPackageRequest::linked_executable(
         source,
         output_path,
@@ -672,11 +794,16 @@ fn arm64_main_assembly_source_from_bytes(bytes: &[u8]) -> String {
 fn arm64_stdout_main_assembly_source(
     body: FunctionArm64Bytes<'_>,
     stdout_text: &str,
-) -> NativeAssemblySource {
+) -> Result<NativeAssemblySource, NativeArtifactError> {
     NativeAssemblySource::stdout_main_from_generated_code_and_stdout(
         NativeGeneratedCode::from_raw_arm64(RawArm64Bytes::from_function(body)),
         NativeStdoutData::from_text(stdout_text),
     )
+    .map_err(|error| {
+        NativeArtifactError::StdoutMainUnsupported(
+            NativeStdoutMainUnsupported::UnsupportedEmissionTarget(error),
+        )
+    })
 }
 
 #[cfg(test)]
@@ -686,6 +813,17 @@ fn arm64_stdout_main_assembly_source_from_parts(body_bytes: &[u8], stdout_bytes:
         stdout_bytes,
     )
     .into_string()
+}
+
+fn push_macos_arm64_write_stdout_prologue(source: &mut String, stdout: NativeStdoutData<'_>) {
+    source.push_str("stp x29, x30, [sp, #-16]!\n");
+    source.push_str("mov x29, sp\n");
+    source.push_str("mov x0, #1\n");
+    source.push_str("adrp x1, L_stdout_text@PAGE\n");
+    source.push_str("add x1, x1, L_stdout_text@PAGEOFF\n");
+    source.push_str(&format!("mov x2, #{}\n", stdout.as_bytes().len()));
+    source.push_str("bl _write\n");
+    source.push_str("ldp x29, x30, [sp], #16\n");
 }
 
 fn push_byte_directives(source: &mut String, bytes: &[u8]) {
@@ -714,8 +852,10 @@ mod tests {
     use super::{
         arm64_main_assembly_source_from_bytes, arm64_stdout_main_assembly_source_from_parts,
         native_artifact_metadata_to_json, LinkedNativeExecutable, NativeArtifactError,
-        NativeArtifactOutputPath, NativeAssemblySource, NativeGeneratedCode, NativeStdoutData,
-        NativeStdoutMainUnsupported, NativeToolchainCommand, RawArm64Bytes,
+        NativeArtifactHelperRequirement, NativeArtifactOutputPath, NativeArtifactTargetTriple,
+        NativeAssemblySource, NativeGeneratedCode, NativeHostOsAbi, NativeStdoutData,
+        NativeStdoutEmissionStrategy, NativeStdoutMainUnsupported, NativeToolchainCommand,
+        RawArm64Bytes,
     };
 
     #[test]
@@ -827,7 +967,8 @@ mod tests {
         let source = NativeAssemblySource::stdout_main_from_generated_code_and_stdout(
             generated_code,
             stdout,
-        );
+        )
+        .expect("arm64 apple macos stdout emission is supported");
         let command = NativeToolchainCommand::clang_link(Path::new("/tmp/hello.s"), &output_path);
 
         assert_eq!(output_path.as_path(), Path::new("/tmp/hello"));
@@ -908,5 +1049,38 @@ mod tests {
         assert!(source.contains(
             ".byte 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x77, 0x6f, 0x72, 0x6c, 0x64, 0x0a\n"
         ));
+    }
+
+    #[test]
+    fn stdout_helper_emission_strategy_is_selected_by_target_os_abi() {
+        assert_eq!(
+            NativeStdoutEmissionStrategy::for_target(NativeArtifactTargetTriple::Arm64AppleMacos),
+            Ok(NativeStdoutEmissionStrategy::MacosArm64Write)
+        );
+
+        let linux = NativeStdoutEmissionStrategy::for_target(
+            NativeArtifactTargetTriple::Aarch64UnknownLinuxGnu,
+        )
+        .expect_err("linux stdout helper emission is not implemented yet");
+        assert_eq!(linux.helper(), NativeArtifactHelperRequirement::WriteStdout);
+        assert_eq!(
+            linux.target_triple(),
+            NativeArtifactTargetTriple::Aarch64UnknownLinuxGnu
+        );
+        assert_eq!(linux.host_os_abi(), NativeHostOsAbi::Linux);
+
+        let windows = NativeStdoutEmissionStrategy::for_target(
+            NativeArtifactTargetTriple::Aarch64PcWindowsMsvc,
+        )
+        .expect_err("windows stdout helper emission is not implemented yet");
+        assert_eq!(
+            windows.helper(),
+            NativeArtifactHelperRequirement::WriteStdout
+        );
+        assert_eq!(
+            windows.target_triple(),
+            NativeArtifactTargetTriple::Aarch64PcWindowsMsvc
+        );
+        assert_eq!(windows.host_os_abi(), NativeHostOsAbi::Windows);
     }
 }

@@ -79,6 +79,9 @@
 - native stdout emission は output artifact packaging 境界の責務とする。
   現在の macOS ARM64 `_write` prologue は packaging strategy であり、
   decode / lift / IR / ARM64 emit へ OS 固有処理を混ぜない。
+- stdout helper emission は target OS ABI ごとの strategy で選ぶ。現状は
+  `arm64-apple-macos` の `_write` strategy だけを実装し、Linux / Windows
+  は明示的な unsupported emission target として分類する。
 - 今後は B8 の x86_64 macOS アプリ起動、B9 の x86 32-bit アプリ対応、
   B10 の Wine bridge が同じ helper boundary を使えるようにする。
 - wasm2c platform adapter / NDA target adapter は本流 TODO ではなく、

@@ -9,41 +9,48 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 14:34 JST
+最終更新: 2026-06-08 15:40 JST
 
 状態:
 
-- project_state: completed。B4 の 5 つ目の小ステップとして、
-  stdout 相当を Bara host helper から native stdout emission へ変換する
-  境界を文書化した。
+- project_state: completed。B4 の 6 つ目の小ステップとして、
+  macOS / Linux / Windows の OS ABI 差分を stdout helper emission
+  strategy 境界で分離した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B4:
-  x86 syscall / libc 境界。先頭 5 項目は完了し、次は macOS / Linux /
-  Windows の OS ABI 差分を helper boundary で分離する小ステップ。
+  x86 syscall / libc 境界。先頭 6 項目は完了し、次は libc / dyld /
+  import 呼び出しを直接模倣せず public symbol/import model として扱う
+  小ステップ。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の D4:
   Bara IR の責務と D5: Host helper / OS boundary に沿って、native stdout
-  emission を decode / lift / IR / ARM64 emit ではなく output artifact
-  packaging 境界の責務として明文化した。
+  emission を target OS ABI ごとの packaging strategy として分離した。
 - active_branch: `task/b4-syscall-ir-request`。base commit は `19eeedb`
   (`Make roadmap linear without losing milestones`)。latest commit は
   review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B4 の
-  stdout 相当を Bara host helper から native stdout emission へ変換する境界を明文化する。
-- completed_work: [docs/public-abi-import-boundary.md](public-abi-import-boundary.md) に
-  native stdout emission boundary を追加し、`HostTrapKind::Stdout`、
-  `HostHelperRequest::WriteStdout`、manifest helper resolution、CLI preflight、
-  runtime `HostTrapPlan`、standalone native artifact packaging の責務を分けた。
-  macOS ARM64 artifact の `_write` prologue は output artifact packaging
-  境界の戦略であり、guest syscall / libc emulation ではないことを明記した。
-- remaining_work: B4 の OS ABI 差分、libc / dyld / import model、
-  unsupported boundary report schema を順に具体化する。
-- next_action: B4 の次小ステップとして macOS / Linux / Windows の OS ABI 差分を
-  helper boundary で分離する。
-- verification: documentation-only 変更として
-  `nix develop -c ./scripts/check-no-invisible-chars` と `git diff --check` が
-  通過した。code/script/config 変更がないため full `./scripts/verify` は省略した。
+  macOS / Linux / Windows の OS ABI 差分を helper boundary で分離する。
+- completed_work: `btbc-cli` の native artifact packaging 境界に
+  `NativeStdoutEmissionStrategy` と `NativeHostOsAbi` を追加した。macOS ARM64
+  は `_write` prologue strategy を選び、Linux / Windows target triple は
+  `write_stdout` helper emission の explicit unsupported target として分類する。
+  既存の stdout executable artifact 経路は同じ macOS strategy を通る。
+- remaining_work: B4 の libc / dyld / import model、unsupported boundary
+  report schema を順に具体化する。
+- next_action: B4 の次小ステップとして libc / dyld / import 呼び出しを
+  直接模倣せず、public symbol/import model として扱う境界を具体化する。
+- verification: `nix develop -c cargo test -p btbc-cli native_artifact`、
+  `nix develop -c ./scripts/check-domain-types`、`nix develop -c ./scripts/check-no-invisible-chars`、
+  `git diff --check`、および `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-08 15:40 JST: B4 の 6 つ目の小ステップとして、macOS / Linux /
+  Windows の OS ABI 差分を stdout helper emission strategy 境界で分離した。
+  `arm64-apple-macos` は public `_write` prologue strategy に解決され、
+  `aarch64-unknown-linux-gnu` と `aarch64-pc-windows-msvc` は
+  `write_stdout` helper emission の explicit unsupported target として分類される。
+- 検証: `nix develop -c cargo test -p btbc-cli native_artifact`、
+  `nix develop -c ./scripts/check-domain-types`、`nix develop -c ./scripts/check-no-invisible-chars`、
+  `git diff --check`、および `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 14:34 JST: B4 の 5 つ目の小ステップとして、stdout 相当を
   Bara host helper から native stdout emission へ変換する境界を文書化した。
   `write_stdout(ptr_len_to_unit)` は Bara host effect capability であり、

@@ -214,6 +214,10 @@ This path has these current limits:
 - Native emission is currently a macOS ARM64 standalone artifact strategy.
   Linux, Windows, and future object formats must add explicit output adapters
   behind the same helper boundary instead of changing core IR semantics.
+- Output artifact packaging selects native stdout emission by target OS ABI.
+  The current implemented strategy is `arm64-apple-macos` using the public
+  `_write` symbol. Linux and Windows target triples are represented as explicit
+  unsupported stdout emission targets until their adapters are defined.
 - Unsupported helper, ABI, platform, or artifact combinations must remain
   classified before execution.
 
