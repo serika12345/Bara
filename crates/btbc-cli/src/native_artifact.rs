@@ -6,7 +6,8 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use bara_oracle::{CaseId, FailureKind, ObservedResult, TestCaseHostTrapPlan};
+use bara_oracle::{CaseId, FailureKind, JsonError, ObservedResult, TestCaseHostTrapPlan};
+use serde::{Serialize, Serializer};
 
 use crate::function_run::{FunctionArm64Bytes, FunctionStdoutHostTrapRequest};
 
@@ -67,10 +68,9 @@ impl NativeArtifactError {
 impl fmt::Display for NativeArtifactError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnsupportedHost { os, arch } => write!(
-                formatter,
-                "linking ARM64 main executable is unsupported on host {os}/{arch}"
-            ),
+            Self::UnsupportedHost { os, arch } => {
+                write_unsupported_host_report(formatter, os, arch)
+            }
             Self::TempAssemblyPath { source } => {
                 write!(
                     formatter,
@@ -115,6 +115,57 @@ impl fmt::Display for NativeArtifactError {
 
 impl Error for NativeArtifactError {}
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct NativeArtifactUnsupportedHostReport {
+    status: NativeArtifactUnsupportedHostStatus,
+    failure_kind: FailureKind,
+    artifact_kind: NativeArtifactKind,
+    target_triple: NativeArtifactTargetTriple,
+    host: NativeArtifactUnsupportedHost,
+}
+
+impl NativeArtifactUnsupportedHostReport {
+    const fn new(os: &'static str, arch: &'static str) -> Self {
+        Self {
+            status: NativeArtifactUnsupportedHostStatus::UnsupportedHost,
+            failure_kind: FailureKind::EmitError,
+            artifact_kind: NativeArtifactKind::LinkedExecutable,
+            target_triple: NativeArtifactTargetTriple::Arm64AppleMacos,
+            host: NativeArtifactUnsupportedHost::new(os, arch),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum NativeArtifactUnsupportedHostStatus {
+    UnsupportedHost,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct NativeArtifactUnsupportedHost {
+    os: &'static str,
+    arch: &'static str,
+}
+
+impl NativeArtifactUnsupportedHost {
+    const fn new(os: &'static str, arch: &'static str) -> Self {
+        Self { os, arch }
+    }
+}
+
+fn write_unsupported_host_report(
+    formatter: &mut fmt::Formatter<'_>,
+    os: &'static str,
+    arch: &'static str,
+) -> fmt::Result {
+    let report = NativeArtifactUnsupportedHostReport::new(os, arch);
+    match serde_json::to_string(&report) {
+        Ok(json) => formatter.write_str(&json),
+        Err(_) => Err(fmt::Error),
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum NativeStdoutMainUnsupported {
     MissingStdoutTrapPlan,
@@ -138,14 +189,392 @@ impl fmt::Display for NativeStdoutMainUnsupported {
 
 impl Error for NativeStdoutMainUnsupported {}
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct RawArm64Bytes<'a> {
+    bytes: &'a [u8],
+}
+
+impl<'a> RawArm64Bytes<'a> {
+    fn from_function(body: FunctionArm64Bytes<'a>) -> Self {
+        Self {
+            bytes: body.as_slice(),
+        }
+    }
+
+    #[cfg(test)]
+    fn from_trusted_bytes(bytes: &'a [u8]) -> Self {
+        Self { bytes }
+    }
+
+    const fn as_slice(self) -> &'a [u8] {
+        self.bytes
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct NativeAssemblySource {
+    source: String,
+}
+
+impl NativeAssemblySource {
+    fn main_from_raw_arm64(body: RawArm64Bytes<'_>) -> Self {
+        Self::main_from_generated_code(NativeGeneratedCode::from_raw_arm64(body))
+    }
+
+    fn main_from_generated_code(generated_code: NativeGeneratedCode<'_>) -> Self {
+        let mut source = String::from(".text\n.globl _main\n.p2align 2\n_main:\n");
+        push_byte_directives(&mut source, generated_code.body().as_slice());
+        Self { source }
+    }
+
+    #[cfg(test)]
+    fn stdout_main_from_raw_arm64_and_stdout(body: RawArm64Bytes<'_>, stdout_bytes: &[u8]) -> Self {
+        Self::stdout_main_from_generated_code_and_stdout(
+            NativeGeneratedCode::from_raw_arm64(body),
+            NativeStdoutData::from_bytes(stdout_bytes),
+        )
+    }
+
+    fn stdout_main_from_generated_code_and_stdout(
+        generated_code: NativeGeneratedCode<'_>,
+        stdout: NativeStdoutData<'_>,
+    ) -> Self {
+        let mut source = String::from(".text\n.globl _main\n.p2align 2\n_main:\n");
+        source.push_str("stp x29, x30, [sp, #-16]!\n");
+        source.push_str("mov x29, sp\n");
+        source.push_str("mov x0, #1\n");
+        source.push_str("adrp x1, L_stdout_text@PAGE\n");
+        source.push_str("add x1, x1, L_stdout_text@PAGEOFF\n");
+        source.push_str(&format!("mov x2, #{}\n", stdout.as_bytes().len()));
+        source.push_str("bl _write\n");
+        source.push_str("ldp x29, x30, [sp], #16\n");
+        push_byte_directives(&mut source, generated_code.body().as_slice());
+        source.push_str(".section __TEXT,__const\n.p2align 2\nL_stdout_text:\n");
+        push_byte_directives(&mut source, stdout.as_bytes());
+        Self { source }
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
+        &self.source
+    }
+
+    #[cfg(test)]
+    fn into_string(self) -> String {
+        self.source
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct NativeGeneratedCode<'a> {
+    body: RawArm64Bytes<'a>,
+}
+
+impl<'a> NativeGeneratedCode<'a> {
+    fn from_raw_arm64(body: RawArm64Bytes<'a>) -> Self {
+        Self { body }
+    }
+
+    const fn body(self) -> RawArm64Bytes<'a> {
+        self.body
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct NativeStdoutData<'a> {
+    bytes: &'a [u8],
+}
+
+impl<'a> NativeStdoutData<'a> {
+    fn from_text(text: &'a str) -> Self {
+        Self::from_bytes(text.as_bytes())
+    }
+
+    const fn from_bytes(bytes: &'a [u8]) -> Self {
+        Self { bytes }
+    }
+
+    const fn as_bytes(self) -> &'a [u8] {
+        self.bytes
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct LinkedNativeExecutable {
+    output_path: NativeArtifactOutputPath,
+    metadata: NativeArtifactMetadata,
+}
+
+impl LinkedNativeExecutable {
+    #[cfg(test)]
+    fn from_existing_path(path: PathBuf) -> Self {
+        Self::from_existing_output_path_with_helper_requirements(
+            NativeArtifactOutputPath::from_path(path.as_path()),
+            NativeArtifactHelperRequirements::none(),
+        )
+    }
+
+    fn from_existing_output_path_with_helper_requirements(
+        output_path: NativeArtifactOutputPath,
+        helper_requirements: NativeArtifactHelperRequirements,
+    ) -> Self {
+        let metadata =
+            NativeArtifactMetadata::linked_executable(output_path.clone(), helper_requirements);
+        Self {
+            output_path,
+            metadata,
+        }
+    }
+
+    pub(crate) fn path(&self) -> &Path {
+        self.output_path.as_path()
+    }
+
+    pub(crate) const fn metadata(&self) -> &NativeArtifactMetadata {
+        &self.metadata
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub(crate) struct NativeArtifactMetadata {
+    artifact_kind: NativeArtifactKind,
+    target_triple: NativeArtifactTargetTriple,
+    toolchain: NativeArtifactToolchain,
+    output_path: NativeArtifactOutputPath,
+    helper_requirements: Vec<NativeArtifactHelperRequirement>,
+}
+
+impl NativeArtifactMetadata {
+    fn linked_executable(
+        output_path: NativeArtifactOutputPath,
+        helper_requirements: NativeArtifactHelperRequirements,
+    ) -> Self {
+        Self {
+            artifact_kind: NativeArtifactKind::LinkedExecutable,
+            target_triple: NativeArtifactTargetTriple::Arm64AppleMacos,
+            toolchain: NativeArtifactToolchain::Clang,
+            output_path,
+            helper_requirements: helper_requirements.into_values(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum NativeArtifactKind {
+    LinkedExecutable,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum NativeArtifactTargetTriple {
+    #[serde(rename = "arm64-apple-macos")]
+    Arm64AppleMacos,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum NativeArtifactToolchain {
+    #[serde(rename = "clang")]
+    Clang,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct NativeArtifactOutputPath(String);
+
+impl NativeArtifactOutputPath {
+    fn from_path(path: &Path) -> Self {
+        Self(path.to_string_lossy().into_owned())
+    }
+
+    fn as_path(&self) -> &Path {
+        Path::new(&self.0)
+    }
+
+    fn to_path_buf(&self) -> PathBuf {
+        self.as_path().to_path_buf()
+    }
+}
+
+impl Serialize for NativeArtifactOutputPath {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.0)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct NativeArtifactHelperRequirements {
+    values: Vec<NativeArtifactHelperRequirement>,
+}
+
+impl NativeArtifactHelperRequirements {
+    fn none() -> Self {
+        Self { values: Vec::new() }
+    }
+
+    fn write_stdout() -> Self {
+        Self {
+            values: vec![NativeArtifactHelperRequirement::WriteStdout],
+        }
+    }
+
+    fn into_values(self) -> Vec<NativeArtifactHelperRequirement> {
+        self.values
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum NativeArtifactHelperRequirement {
+    WriteStdout,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct NativeToolchainCommand {
+    program: &'static str,
+    args: Vec<String>,
+}
+
+impl NativeToolchainCommand {
+    fn clang_link(assembly_path: &Path, output_path: &NativeArtifactOutputPath) -> Self {
+        Self {
+            program: "clang",
+            args: vec![
+                assembly_path.to_string_lossy().into_owned(),
+                String::from("-o"),
+                output_path.as_path().to_string_lossy().into_owned(),
+            ],
+        }
+    }
+
+    fn to_command(&self) -> Command {
+        let mut command = Command::new(self.program);
+        command.args(&self.args);
+        command
+    }
+
+    #[cfg(test)]
+    const fn program(&self) -> &'static str {
+        self.program
+    }
+
+    #[cfg(test)]
+    fn args(&self) -> &[String] {
+        &self.args
+    }
+}
+
+pub(crate) fn native_artifact_metadata_to_json(
+    metadata: &NativeArtifactMetadata,
+) -> Result<String, JsonError> {
+    serde_json::to_string(metadata).map_err(JsonError::new)
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct NativeArtifactPackageRequest {
+    source: NativeAssemblySource,
+    output_path: NativeArtifactOutputPath,
+    helper_requirements: NativeArtifactHelperRequirements,
+}
+
+impl NativeArtifactPackageRequest {
+    fn linked_executable(
+        source: NativeAssemblySource,
+        output_path: NativeArtifactOutputPath,
+        helper_requirements: NativeArtifactHelperRequirements,
+    ) -> Self {
+        Self {
+            source,
+            output_path,
+            helper_requirements,
+        }
+    }
+
+    fn source(&self) -> &NativeAssemblySource {
+        &self.source
+    }
+
+    fn output_path(&self) -> &NativeArtifactOutputPath {
+        &self.output_path
+    }
+
+    fn into_linked_executable(self) -> LinkedNativeExecutable {
+        LinkedNativeExecutable::from_existing_output_path_with_helper_requirements(
+            self.output_path,
+            self.helper_requirements,
+        )
+    }
+}
+
+pub(crate) trait NativeArtifactPackager {
+    fn package(
+        &self,
+        request: NativeArtifactPackageRequest,
+    ) -> Result<LinkedNativeExecutable, NativeArtifactError>;
+}
+
+pub(crate) fn package_native_artifact(
+    packager: &impl NativeArtifactPackager,
+    request: NativeArtifactPackageRequest,
+) -> Result<LinkedNativeExecutable, NativeArtifactError> {
+    packager.package(request)
+}
+
+struct ClangNativeArtifactPackager;
+
+impl NativeArtifactPackager for ClangNativeArtifactPackager {
+    fn package(
+        &self,
+        request: NativeArtifactPackageRequest,
+    ) -> Result<LinkedNativeExecutable, NativeArtifactError> {
+        let assembly_path = temporary_assembly_path()?;
+        fs::write(&assembly_path, request.source().as_str()).map_err(|source| {
+            NativeArtifactError::WriteAssembly {
+                path: assembly_path.clone(),
+                source,
+            }
+        })?;
+
+        let toolchain_command =
+            NativeToolchainCommand::clang_link(&assembly_path, request.output_path());
+        let output = toolchain_command
+            .to_command()
+            .output()
+            .map_err(|source| NativeArtifactError::LinkerSpawn { source });
+
+        let _ = fs::remove_file(&assembly_path);
+
+        let output = output?;
+        if !output.status.success() {
+            return Err(NativeArtifactError::LinkerFailed {
+                status: output.status.to_string(),
+                stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+            });
+        }
+        if !request.output_path().as_path().exists() {
+            return Err(NativeArtifactError::MissingLinkedExecutable {
+                path: request.output_path().to_path_buf(),
+            });
+        }
+
+        Ok(request.into_linked_executable())
+    }
+}
+
 pub(crate) fn link_arm64_main_executable(
     body: FunctionArm64Bytes<'_>,
     output_path: &Path,
-) -> Result<(), NativeArtifactError> {
+) -> Result<LinkedNativeExecutable, NativeArtifactError> {
     ensure_supported_host()?;
 
+    let output_path = NativeArtifactOutputPath::from_path(output_path);
     let source = arm64_main_assembly_source(body);
-    link_assembly_source(&source, output_path)
+    let request = NativeArtifactPackageRequest::linked_executable(
+        source,
+        output_path,
+        NativeArtifactHelperRequirements::none(),
+    );
+    package_native_artifact(&ClangNativeArtifactPackager, request)
 }
 
 pub(crate) fn link_arm64_stdout_main_executable(
@@ -153,7 +582,7 @@ pub(crate) fn link_arm64_stdout_main_executable(
     host_trap_plan: &TestCaseHostTrapPlan,
     stdout_request: FunctionStdoutHostTrapRequest,
     output_path: &Path,
-) -> Result<(), NativeArtifactError> {
+) -> Result<LinkedNativeExecutable, NativeArtifactError> {
     let Some(stdout) = host_trap_plan.stdout_trap() else {
         return Err(NativeArtifactError::StdoutMainUnsupported(
             NativeStdoutMainUnsupported::MissingStdoutTrapPlan,
@@ -167,14 +596,21 @@ pub(crate) fn link_arm64_stdout_main_executable(
 
     ensure_supported_host()?;
 
+    let output_path = NativeArtifactOutputPath::from_path(output_path);
     let source = arm64_stdout_main_assembly_source(body, stdout.text());
-    link_assembly_source(&source, output_path)
+    let request = NativeArtifactPackageRequest::linked_executable(
+        source,
+        output_path,
+        NativeArtifactHelperRequirements::write_stdout(),
+    );
+    package_native_artifact(&ClangNativeArtifactPackager, request)
 }
 
 pub(crate) fn observe_native_executable_artifact(
     case_id: CaseId,
-    executable_path: &Path,
+    executable: &LinkedNativeExecutable,
 ) -> Result<ObservedResult, NativeArtifactError> {
+    let executable_path = executable.path();
     let output = Command::new(executable_path).output().map_err(|source| {
         NativeArtifactError::RunArtifact {
             path: executable_path.to_path_buf(),
@@ -204,38 +640,6 @@ pub(crate) fn observe_native_executable_artifact(
     ))
 }
 
-fn link_assembly_source(source: &str, output_path: &Path) -> Result<(), NativeArtifactError> {
-    let assembly_path = temporary_assembly_path()?;
-    fs::write(&assembly_path, source).map_err(|source| NativeArtifactError::WriteAssembly {
-        path: assembly_path.clone(),
-        source,
-    })?;
-
-    let output = Command::new("clang")
-        .arg(&assembly_path)
-        .arg("-o")
-        .arg(output_path)
-        .output()
-        .map_err(|source| NativeArtifactError::LinkerSpawn { source });
-
-    let _ = fs::remove_file(&assembly_path);
-
-    let output = output?;
-    if !output.status.success() {
-        return Err(NativeArtifactError::LinkerFailed {
-            status: output.status.to_string(),
-            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
-        });
-    }
-    if !output_path.exists() {
-        return Err(NativeArtifactError::MissingLinkedExecutable {
-            path: output_path.to_path_buf(),
-        });
-    }
-
-    Ok(())
-}
-
 fn ensure_supported_host() -> Result<(), NativeArtifactError> {
     if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
         Ok(())
@@ -255,34 +659,33 @@ fn temporary_assembly_path() -> Result<PathBuf, NativeArtifactError> {
     Ok(std::env::temp_dir().join(format!("bara-arm64-main-{nanos}.s")))
 }
 
-fn arm64_main_assembly_source(body: FunctionArm64Bytes<'_>) -> String {
-    arm64_main_assembly_source_from_bytes(body.as_slice())
+fn arm64_main_assembly_source(body: FunctionArm64Bytes<'_>) -> NativeAssemblySource {
+    NativeAssemblySource::main_from_raw_arm64(RawArm64Bytes::from_function(body))
 }
 
+#[cfg(test)]
 fn arm64_main_assembly_source_from_bytes(bytes: &[u8]) -> String {
-    let mut source = String::from(".text\n.globl _main\n.p2align 2\n_main:\n");
-    push_byte_directives(&mut source, bytes);
-    source
+    NativeAssemblySource::main_from_raw_arm64(RawArm64Bytes::from_trusted_bytes(bytes))
+        .into_string()
 }
 
-fn arm64_stdout_main_assembly_source(body: FunctionArm64Bytes<'_>, stdout_text: &str) -> String {
-    arm64_stdout_main_assembly_source_from_parts(body.as_slice(), stdout_text.as_bytes())
+fn arm64_stdout_main_assembly_source(
+    body: FunctionArm64Bytes<'_>,
+    stdout_text: &str,
+) -> NativeAssemblySource {
+    NativeAssemblySource::stdout_main_from_generated_code_and_stdout(
+        NativeGeneratedCode::from_raw_arm64(RawArm64Bytes::from_function(body)),
+        NativeStdoutData::from_text(stdout_text),
+    )
 }
 
+#[cfg(test)]
 fn arm64_stdout_main_assembly_source_from_parts(body_bytes: &[u8], stdout_bytes: &[u8]) -> String {
-    let mut source = String::from(".text\n.globl _main\n.p2align 2\n_main:\n");
-    source.push_str("stp x29, x30, [sp, #-16]!\n");
-    source.push_str("mov x29, sp\n");
-    source.push_str("mov x0, #1\n");
-    source.push_str("adrp x1, L_stdout_text@PAGE\n");
-    source.push_str("add x1, x1, L_stdout_text@PAGEOFF\n");
-    source.push_str(&format!("mov x2, #{}\n", stdout_bytes.len()));
-    source.push_str("bl _write\n");
-    source.push_str("ldp x29, x30, [sp], #16\n");
-    push_byte_directives(&mut source, body_bytes);
-    source.push_str(".section __TEXT,__const\n.p2align 2\nL_stdout_text:\n");
-    push_byte_directives(&mut source, stdout_bytes);
-    source
+    NativeAssemblySource::stdout_main_from_raw_arm64_and_stdout(
+        RawArm64Bytes::from_trusted_bytes(body_bytes),
+        stdout_bytes,
+    )
+    .into_string()
 }
 
 fn push_byte_directives(source: &mut String, bytes: &[u8]) {
@@ -302,7 +705,7 @@ fn push_byte_directives(source: &mut String, bytes: &[u8]) {
 mod tests {
     use std::{
         io,
-        path::PathBuf,
+        path::{Path, PathBuf},
         time::{SystemTime, UNIX_EPOCH},
     };
 
@@ -310,7 +713,9 @@ mod tests {
 
     use super::{
         arm64_main_assembly_source_from_bytes, arm64_stdout_main_assembly_source_from_parts,
-        NativeArtifactError, NativeStdoutMainUnsupported,
+        native_artifact_metadata_to_json, LinkedNativeExecutable, NativeArtifactError,
+        NativeArtifactOutputPath, NativeAssemblySource, NativeGeneratedCode, NativeStdoutData,
+        NativeStdoutMainUnsupported, NativeToolchainCommand, RawArm64Bytes,
     };
 
     #[test]
@@ -369,6 +774,109 @@ mod tests {
         for error in errors {
             assert_eq!(error.failure_kind(), FailureKind::RunError);
         }
+    }
+
+    #[test]
+    fn native_artifact_types_separate_raw_source_and_linked_executable() {
+        let raw =
+            RawArm64Bytes::from_trusted_bytes(&[0x40, 0x05, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]);
+        let source = NativeAssemblySource::main_from_raw_arm64(raw);
+        let executable =
+            LinkedNativeExecutable::from_existing_path(PathBuf::from("/tmp/return_42"));
+
+        assert_eq!(
+            source.as_str(),
+            ".text\n.globl _main\n.p2align 2\n_main:\n.byte 0x40, 0x05, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6\n"
+        );
+        assert_eq!(executable.path(), Path::new("/tmp/return_42"));
+    }
+
+    #[test]
+    fn native_artifact_metadata_serializes_as_stable_json() {
+        let executable =
+            LinkedNativeExecutable::from_existing_path(PathBuf::from("/tmp/return_42"));
+
+        assert_eq!(
+            native_artifact_metadata_to_json(executable.metadata())
+                .expect("metadata serializes as json"),
+            "{\"artifact_kind\":\"linked_executable\",\"target_triple\":\"arm64-apple-macos\",\"toolchain\":\"clang\",\"output_path\":\"/tmp/return_42\",\"helper_requirements\":[]}"
+        );
+    }
+
+    #[test]
+    fn unsupported_host_error_serializes_as_stable_json_message() {
+        let error = NativeArtifactError::UnsupportedHost {
+            os: "linux",
+            arch: "x86_64",
+        };
+
+        assert_eq!(error.failure_kind(), FailureKind::EmitError);
+        assert_eq!(
+            error.to_string(),
+            "{\"status\":\"unsupported_host\",\"failure_kind\":\"emit_error\",\"artifact_kind\":\"linked_executable\",\"target_triple\":\"arm64-apple-macos\",\"host\":{\"os\":\"linux\",\"arch\":\"x86_64\"}}"
+        );
+    }
+
+    #[test]
+    fn native_artifact_request_types_separate_code_stdout_command_and_output_path() {
+        let output_path = NativeArtifactOutputPath::from_path(Path::new("/tmp/hello"));
+        let raw =
+            RawArm64Bytes::from_trusted_bytes(&[0x00, 0x00, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]);
+        let generated_code = NativeGeneratedCode::from_raw_arm64(raw);
+        let stdout = NativeStdoutData::from_text("hello\n");
+        let source = NativeAssemblySource::stdout_main_from_generated_code_and_stdout(
+            generated_code,
+            stdout,
+        );
+        let command = NativeToolchainCommand::clang_link(Path::new("/tmp/hello.s"), &output_path);
+
+        assert_eq!(output_path.as_path(), Path::new("/tmp/hello"));
+        assert!(source.as_str().contains("mov x2, #6\n"));
+        assert_eq!(command.program(), "clang");
+        assert_eq!(
+            command.args(),
+            [
+                String::from("/tmp/hello.s"),
+                String::from("-o"),
+                String::from("/tmp/hello")
+            ]
+        );
+    }
+
+    #[test]
+    fn native_artifact_packaging_boundary_accepts_different_packagers() {
+        struct RecordingPackager;
+
+        impl super::NativeArtifactPackager for RecordingPackager {
+            fn package(
+                &self,
+                request: super::NativeArtifactPackageRequest,
+            ) -> Result<LinkedNativeExecutable, NativeArtifactError> {
+                assert!(request.source().as_str().starts_with(".text\n"));
+                Ok(request.into_linked_executable())
+            }
+        }
+
+        let raw =
+            RawArm64Bytes::from_trusted_bytes(&[0x40, 0x05, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]);
+        let source = NativeAssemblySource::main_from_generated_code(
+            NativeGeneratedCode::from_raw_arm64(raw),
+        );
+        let request = super::NativeArtifactPackageRequest::linked_executable(
+            source,
+            NativeArtifactOutputPath::from_path(Path::new("/tmp/return_42")),
+            super::NativeArtifactHelperRequirements::none(),
+        );
+
+        let executable = super::package_native_artifact(&RecordingPackager, request)
+            .expect("fake packager returns a linked executable");
+
+        assert_eq!(executable.path(), Path::new("/tmp/return_42"));
+        assert_eq!(
+            native_artifact_metadata_to_json(executable.metadata())
+                .expect("metadata serializes as json"),
+            "{\"artifact_kind\":\"linked_executable\",\"target_triple\":\"arm64-apple-macos\",\"toolchain\":\"clang\",\"output_path\":\"/tmp/return_42\",\"helper_requirements\":[]}"
+        );
     }
 
     #[test]
