@@ -9,36 +9,43 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 16:45 JST
+最終更新: 2026-06-08 17:15 JST
 
 状態:
 
-- project_state: completed。B5 の 2 つ目の小ステップとして、lifter に
-  basic block 分割境界を導入した。
+- project_state: completed。B5 の 3 つ目の小ステップとして、basic
+  block が必ず typed terminator を持ち、末尾の非 terminator instruction
+  stream を暗黙 fallthrough として扱わない境界を追加した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B5:
   Control Flow / Stack / Call を開始した。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の
-  D4: Bara IR の責務に沿って、次は typed terminator と fallthrough 境界を
-  進める。
+  D4: Bara IR の責務に沿って、次は direct branch / conditional branch /
+  fallthrough を typed terminator として表現する。
 - active_branch: `task/b5-add-sub-regression`。base commit は `4d2356f`
   (`Merge pull request #4 from serika12345/task/b4-syscall-ir-request`)。
   latest commit は review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B5 の
-  basic block 分割を導入する。
-- completed_work: `lift_decoded_function` が decoded instruction stream を
-  terminator ごとに `BasicBlock` として確定し、続く instruction から次の
-  block を開始できるようにした。通常の decode 経路はまだ `ret` /
-  boundary / unsupported で停止するため既存 fixture の外部挙動は変えず、
-  control-flow 拡張に必要な lifter 側の分割境界だけを先に入れた。
-- remaining_work: B5 では typed terminator、fallthrough、direct /
-  conditional branch、flags、stack、call、ARM64 fixup、PC map validation が未完了。
-- next_action: B5 の次の小ステップとして、basic block の typed terminator と
-  fallthrough 明示化を進める。
+  basic block は必ず typed terminator を持ち、fallthrough を暗黙にしない。
+- completed_work: `lift_decoded_function` の末尾処理を整理し、decoded stream
+  が非 terminator instruction で終わる場合は lift error や暗黙 fallthrough
+  ではなく、`Terminator::Unsupported` と
+  `UnsupportedReason::MissingReturnTerminator` を持つ `BasicBlock` として
+  確定するようにした。
+- remaining_work: B5 では direct / conditional branch、明示 fallthrough
+  terminator、flags、stack、call、ARM64 fixup、PC map validation が未完了。
+- next_action: B5 の次の小ステップとして、direct branch / conditional
+  branch / fallthrough を typed terminator として扱う。
 - verification: `nix develop -c cargo test -p bara-isa-x86 lift::tests` と
   `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-08 17:15 JST: B5 の 3 つ目の小ステップとして、terminator
+  がない decoded stream 末尾を暗黙 fallthrough とせず、
+  `MissingReturnTerminator` の typed unsupported terminator を持つ
+  `BasicBlock` として lift するようにした。
+- 検証: `nix develop -c cargo test -p bara-isa-x86 lift::tests` と
+  `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 16:45 JST: B5 の 2 つ目の小ステップとして、lifter に
   basic block 分割境界を導入した。`ret` などの terminator instruction で
   block を確定し、後続 instruction があれば次の `BlockId` と source range

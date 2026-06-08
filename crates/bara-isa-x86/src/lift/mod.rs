@@ -19,11 +19,15 @@ pub fn lift_decoded_function(decoded: &DecodedFunction) -> Result<Program, LiftE
     let mut blocks = Vec::new();
     let mut ops = Vec::new();
     let mut block_start = Some(decoded.entry());
+    let mut block_end = decoded.entry();
 
     for instruction in decoded.instructions() {
         let start = block_start.get_or_insert(instruction.start());
         match lift_instruction(instruction)? {
-            LiftedInstruction::Op(op) => ops.push(op),
+            LiftedInstruction::Op(op) => {
+                block_end = instruction.end();
+                ops.push(op);
+            }
             LiftedInstruction::Terminator(terminator) => {
                 let block = BasicBlock::new(
                     BlockId::new(blocks.len() as u32),
@@ -40,7 +44,22 @@ pub fn lift_decoded_function(decoded: &DecodedFunction) -> Result<Program, LiftE
         }
     }
 
-    if blocks.is_empty() || !ops.is_empty() {
+    if !ops.is_empty() {
+        let start = block_start.ok_or(LiftError::EmptyDecodedFunction)?;
+        let block = BasicBlock::new(
+            BlockId::new(blocks.len() as u32),
+            start,
+            block_end,
+            ops,
+            Terminator::Unsupported {
+                reason: UnsupportedReason::MissingReturnTerminator { at: block_end },
+            },
+        )
+        .map_err(LiftError::BasicBlock)?;
+        blocks.push(block);
+    }
+
+    if blocks.is_empty() {
         return Err(LiftError::EmptyDecodedFunction);
     }
 
@@ -207,6 +226,38 @@ mod tests {
             }]
         );
         assert_eq!(program.blocks()[1].terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn does_not_infer_fallthrough_when_decoded_stream_ends_without_terminator() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![DecodedInstruction::new(
+                X86Va::new(0),
+                X86Va::new(5),
+                DecodedInstructionKind::MovEaxImm32 { imm: 42 },
+            )],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("unterminated stream lifts");
+
+        assert_eq!(program.blocks().len(), 1);
+        assert_eq!(program.blocks()[0].start(), X86Va::new(0));
+        assert_eq!(program.blocks()[0].end(), X86Va::new(5));
+        assert_eq!(
+            program.blocks()[0].ops(),
+            &[IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(42)
+            }]
+        );
+        assert_eq!(
+            program.blocks()[0].terminator(),
+            &Terminator::Unsupported {
+                reason: UnsupportedReason::MissingReturnTerminator { at: X86Va::new(5) }
+            }
+        );
     }
 
     #[test]
