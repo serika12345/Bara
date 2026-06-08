@@ -1,4 +1,4 @@
-use bara_ir::{UnsupportedReason, X86Va};
+use bara_ir::{UnsupportedReason, X86Cond, X86Va};
 
 use crate::{
     decode_function, DecodeError, DecodedFunction, DecodedInstruction, DecodedInstructionKind,
@@ -347,6 +347,34 @@ fn decodes_test_eax_eax_between_mov_and_ret() {
                 DecodedInstructionKind::TestEaxEax
             ),
             DecodedInstruction::new(X86Va::new(7), X86Va::new(8), DecodedInstructionKind::Ret)
+        ]
+    );
+}
+
+#[test]
+fn decodes_je_rel8_and_continues_with_fallthrough() {
+    let input = X86Bytes::new(X86Va::new(0x1000), vec![0x74, 0x02, 0xc3])
+        .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0x1000),
+                X86Va::new(0x1002),
+                DecodedInstructionKind::JccRel8 {
+                    condition: X86Cond::Equal,
+                    taken: X86Va::new(0x1004),
+                    fallthrough: X86Va::new(0x1002)
+                }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x1002),
+                X86Va::new(0x1003),
+                DecodedInstructionKind::Ret
+            )
         ]
     );
 }

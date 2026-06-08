@@ -145,6 +145,10 @@ pub enum Terminator {
 }
 ```
 
+現時点では short `je/jz rel8` を `CondJump { condition: X86Cond::Equal, ... }`
+へ decode / lift する。その他の `jcc` 条件、rel32 form、ARM64 branch
+lowering / fixup は B5 の後続小ステップで扱う。
+
 `BoundaryRequest` は guest 側から public ABI / external boundary へ出ようとする
 意図を IR に残す。runtime や host OS syscall を直接実行する指示ではない。
 現在は x86_64 `syscall` と external symbol/import call を typed request として
@@ -273,8 +277,9 @@ flags は `Flags::new(...)` または `Flags::unknown()` で作り、`cf()` /
 `pf()` / `af()` / `zf()` / `sf()` / `of()` accessor から読む。
 
 現時点では `cmp eax, imm8/imm32` を `IrOp::Cmp` へ、`test eax,eax` を
-`IrOp::Test` へ decode / lift する。`jcc` と ARM64 flag lowering /
-branch emit は B5 の後続小ステップで扱う。
+`IrOp::Test` へ decode / lift し、short `je/jz rel8` を `CondJump` へ
+decode / lift する。その他の `jcc` と ARM64 flag lowering / branch emit は
+B5 の後続小ステップで扱う。
 
 ## Metadata
 

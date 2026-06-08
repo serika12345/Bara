@@ -9,36 +9,42 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 18:59 JST
+最終更新: 2026-06-08 19:07 JST
 
 状態:
 
-- project_state: completed。B5 の 7 つ目の小ステップとして、
-  `test eax,eax` を decode / lift し、flags-producing IR op として
+- project_state: completed。B5 の 8 つ目の小ステップとして、
+  short `je/jz rel8` を decode / lift し、typed `CondJump` terminator として
   表現した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B5:
   Control Flow / Stack / Call を開始した。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の
-  D4: Bara IR の責務に沿って、次は `jcc` を段階的に追加する。
+  D4: Bara IR の責務に沿って、次はその他の `jcc` 条件または branch
+  lowering を段階的に追加する。
 - active_branch: `task/b5-add-sub-regression`。base commit は `4d2356f`
   (`Merge pull request #4 from serika12345/task/b4-syscall-ir-request`)。
   latest commit は review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B5 の
-  `test eax,eax` を flags-producing IR op として decode / lift する。
-- completed_work: x86 decode に `TestEaxEax` を追加し、lifter は
-  `IrOp::Test { lhs: Reg(Rax), rhs: Reg(Rax) }` へ変換する。ARM64 emit は
-  flag lowering 実装前の explicit unsupported として止める。
-- remaining_work: B5 では `jcc`、`jmp` 実行経路、
+  short `je/jz rel8` を `CondJump` terminator として decode / lift する。
+- completed_work: x86 decode に `JccRel8 { condition, taken, fallthrough }`
+  を追加し、`0x74` を `X86Cond::Equal` として decode する。lifter は
+  既存の `Terminator::CondJump` へ変換し、fallthrough 側の後続命令を
+  次 block として保持する。
+- remaining_work: B5 ではその他の `jcc` 条件、branch lowering、`jmp` 実行経路、
   stack、call、ARM64 fixup、PC map validation が未完了。
-- next_action: B5 の次の小ステップとして、`jcc` を段階的に追加する。
-- verification: `nix develop -c cargo test -p bara-isa-x86 test_eax`、
-  `nix develop -c cargo test -p bara-ir test_op`、および
-  `nix develop -c cargo test -p bara-arm64 test_ops_are_not_emitted_before_flag_lowering`
-  が通過した。
+- next_action: B5 の次の小ステップとして、その他の `jcc` 条件または
+  branch lowering を段階的に追加する。
+- verification: `nix develop -c cargo test -p bara-isa-x86 je` が通過した。
   `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-08 19:07 JST: B5 の 8 つ目の小ステップとして、
+  short `je/jz rel8` を decode / lift し、`X86Cond::Equal` の
+  `Terminator::CondJump` として IR に追加した。fallthrough 側の後続命令は
+  次 block として保持する。
+- 検証: `nix develop -c cargo test -p bara-isa-x86 je` が通過した。
+  `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 18:59 JST: B5 の 7 つ目の小ステップとして、
   `test eax,eax` を decode / lift し、`IrOp::Test` として
   flags-producing IR に追加した。ARM64 emit は flag lowering 実装前の

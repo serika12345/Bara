@@ -128,6 +128,15 @@ fn lift_instruction(instruction: &DecodedInstruction) -> Result<LiftedInstructio
                 },
             }))
         }
+        DecodedInstructionKind::JccRel8 {
+            condition,
+            taken,
+            fallthrough,
+        } => Ok(LiftedInstruction::Terminator(Terminator::CondJump {
+            condition: *condition,
+            taken: *taken,
+            fallthrough: *fallthrough,
+        })),
         DecodedInstructionKind::Syscall => {
             let request =
                 SyscallRequest::new(SyscallAbi::X86_64, instruction.start(), instruction.end())
@@ -149,7 +158,7 @@ fn lift_instruction(instruction: &DecodedInstruction) -> Result<LiftedInstructio
 mod tests {
     use bara_ir::{
         BlockId, BoundaryRequest, HostTrapKind, IrOp, Operand, SyscallAbi, SyscallRequest,
-        Terminator, UnsupportedReason, X86Reg, X86Va,
+        Terminator, UnsupportedReason, X86Cond, X86Reg, X86Va,
     };
 
     use crate::{
@@ -644,6 +653,69 @@ mod tests {
             ]
         );
         assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_je_rel8_to_cond_jump_terminator() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(2),
+                    DecodedInstructionKind::TestEaxEax,
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(2),
+                    X86Va::new(4),
+                    DecodedInstructionKind::JccRel8 {
+                        condition: X86Cond::Equal,
+                        taken: X86Va::new(8),
+                        fallthrough: X86Va::new(4),
+                    },
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(4),
+                    X86Va::new(9),
+                    DecodedInstructionKind::MovEaxImm32 { imm: 0 },
+                ),
+                DecodedInstruction::new(X86Va::new(9), X86Va::new(10), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded je function lifts");
+
+        assert_eq!(program.blocks().len(), 2);
+        assert_eq!(program.blocks()[0].id(), BlockId::new(0));
+        assert_eq!(program.blocks()[0].start(), X86Va::new(0));
+        assert_eq!(program.blocks()[0].end(), X86Va::new(4));
+        assert_eq!(
+            program.blocks()[0].ops(),
+            &[IrOp::Test {
+                lhs: Operand::Reg(X86Reg::Rax),
+                rhs: Operand::Reg(X86Reg::Rax)
+            }]
+        );
+        assert_eq!(
+            program.blocks()[0].terminator(),
+            &Terminator::CondJump {
+                condition: X86Cond::Equal,
+                taken: X86Va::new(8),
+                fallthrough: X86Va::new(4)
+            }
+        );
+        assert_eq!(program.blocks()[1].id(), BlockId::new(1));
+        assert_eq!(program.blocks()[1].start(), X86Va::new(4));
+        assert_eq!(program.blocks()[1].end(), X86Va::new(10));
+        assert_eq!(
+            program.blocks()[1].ops(),
+            &[IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(0)
+            }]
+        );
+        assert_eq!(program.blocks()[1].terminator(), &Terminator::Return);
     }
 
     #[test]

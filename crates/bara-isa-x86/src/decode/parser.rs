@@ -1,4 +1,4 @@
-use bara_ir::{UnsupportedReason, X86Va};
+use bara_ir::{UnsupportedReason, X86Cond, X86Va};
 
 use super::{
     DecodeError, DecodedFunction, DecodedInstruction, DecodedInstructionKind, X86Bytes, X86Imm32,
@@ -144,6 +144,26 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                         return DecodedFunction::new(input.entry(), instructions);
                     }
                 }
+            }
+            0x74 => {
+                let end_offset = offset + 2;
+                let displacement = read_u8(input, offset + 1, at, opcode)?;
+                let fallthrough = instruction_end(input, at, end_offset, 2)?;
+                let taken = relative_target(
+                    fallthrough,
+                    i32::from(i8::from_le_bytes([displacement])),
+                    at,
+                )?;
+                instructions.push(DecodedInstruction::new(
+                    at,
+                    fallthrough,
+                    DecodedInstructionKind::JccRel8 {
+                        condition: X86Cond::Equal,
+                        taken,
+                        fallthrough,
+                    },
+                ));
+                offset = end_offset;
             }
             0xb8 => {
                 let end_offset = offset + 5;
