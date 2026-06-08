@@ -1,5 +1,6 @@
 use bara_ir::{
-    validate_program, HostTrapKind, IrOp, Operand, Program, Terminator, UnsupportedReason, X86Reg,
+    validate_program, BoundaryRequest, HostTrapKind, IrOp, Operand, Program, Terminator,
+    UnsupportedReason, X86Reg,
 };
 
 use crate::{ArmPc, PcMapEntry};
@@ -175,6 +176,13 @@ pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
             }
             emit_u32_le(&mut code, 0xd65f_03c0);
         }
+        Terminator::BoundaryRequest {
+            request: BoundaryRequest::Syscall(request),
+        } => {
+            return Err(EmitError::UnsupportedIr {
+                reason: UnsupportedReason::SyscallUnsupported { request: *request },
+            });
+        }
         Terminator::Unsupported { reason } => {
             return Err(EmitError::UnsupportedIr {
                 reason: reason.clone(),
@@ -256,8 +264,8 @@ fn emit_u32_le(code: &mut Vec<u8>, instruction: u32) -> usize {
 #[cfg(test)]
 mod tests {
     use bara_ir::{
-        BasicBlock, BlockId, HostTrapKind, IrOp, Operand, Program, Terminator, UnsupportedReason,
-        X86Reg, X86Va,
+        BasicBlock, BlockId, BoundaryRequest, HostTrapKind, IrOp, Operand, Program, SyscallAbi,
+        SyscallRequest, Terminator, UnsupportedReason, X86Reg, X86Va,
     };
 
     use crate::{emit_program, Arm64MachineCode, ArmPc, EmitError};
@@ -439,5 +447,24 @@ mod tests {
         );
 
         assert_eq!(emit_program(&program), Err(EmitError::InvalidProgram));
+    }
+
+    #[test]
+    fn syscall_request_terminator_is_not_emitted() {
+        let request = SyscallRequest::new(SyscallAbi::X86_64, X86Va::new(0), X86Va::new(2))
+            .expect("test syscall range is valid");
+        let program = program_with_ops(
+            Vec::new(),
+            Terminator::BoundaryRequest {
+                request: BoundaryRequest::Syscall(request),
+            },
+        );
+
+        assert_eq!(
+            emit_program(&program),
+            Err(EmitError::UnsupportedIr {
+                reason: UnsupportedReason::SyscallUnsupported { request }
+            })
+        );
     }
 }

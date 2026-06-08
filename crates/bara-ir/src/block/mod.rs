@@ -1,3 +1,4 @@
+use crate::boundary::{BoundaryRequest, SyscallRequest};
 use crate::program::X86Va;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -81,6 +82,7 @@ pub enum IrOp {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Terminator {
     Return,
+    BoundaryRequest { request: BoundaryRequest },
     Unsupported { reason: UnsupportedReason },
 }
 
@@ -107,7 +109,7 @@ pub enum UnsupportedReason {
     DecodeUnsupportedOpcode { opcode: u8, at: X86Va },
     MissingReturnTerminator { at: X86Va },
     DirectCallUnsupported { target: X86Va, return_to: X86Va },
-    SyscallUnsupported { at: X86Va, return_to: X86Va },
+    SyscallUnsupported { request: SyscallRequest },
     EmitUnsupportedIr,
 }
 

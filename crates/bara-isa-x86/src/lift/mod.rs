@@ -1,6 +1,7 @@
 use bara_ir::{
-    BasicBlock, BasicBlockError, BlockId, HostTrapKind, IrOp, Operand, Program, ProgramError,
-    Terminator, UnsupportedReason, X86Reg,
+    BasicBlock, BasicBlockError, BlockId, BoundaryRequest, HostTrapKind, IrOp, Operand, Program,
+    ProgramError, SyscallAbi, SyscallRequest, SyscallRequestError, Terminator, UnsupportedReason,
+    X86Reg,
 };
 
 use crate::{DecodeError, DecodedFunction, DecodedInstructionKind};
@@ -11,6 +12,7 @@ pub enum LiftError {
     BasicBlock(BasicBlockError),
     Program(ProgramError),
     Decode(DecodeError),
+    SyscallRequest(SyscallRequestError),
 }
 
 pub fn lift_decoded_function(decoded: &DecodedFunction) -> Result<Program, LiftError> {
@@ -84,11 +86,11 @@ pub fn lift_decoded_function(decoded: &DecodedFunction) -> Result<Program, LiftE
                 break;
             }
             DecodedInstructionKind::Syscall => {
-                terminator = Some(Terminator::Unsupported {
-                    reason: UnsupportedReason::SyscallUnsupported {
-                        at: instruction.start(),
-                        return_to: instruction.end(),
-                    },
+                let request =
+                    SyscallRequest::new(SyscallAbi::X86_64, instruction.start(), instruction.end())
+                        .map_err(LiftError::SyscallRequest)?;
+                terminator = Some(Terminator::BoundaryRequest {
+                    request: BoundaryRequest::Syscall(request),
                 });
                 break;
             }
@@ -115,7 +117,8 @@ pub fn lift_decoded_function(decoded: &DecodedFunction) -> Result<Program, LiftE
 #[cfg(test)]
 mod tests {
     use bara_ir::{
-        BlockId, HostTrapKind, IrOp, Operand, Terminator, UnsupportedReason, X86Reg, X86Va,
+        BlockId, BoundaryRequest, HostTrapKind, IrOp, Operand, SyscallAbi, SyscallRequest,
+        Terminator, UnsupportedReason, X86Reg, X86Va,
     };
 
     use crate::{
@@ -483,7 +486,7 @@ mod tests {
     }
 
     #[test]
-    fn lifts_syscall_to_unsupported_terminator() {
+    fn lifts_syscall_to_boundary_request_terminator() {
         let decoded = DecodedFunction::new(
             X86Va::new(0x1000),
             vec![DecodedInstruction::new(
@@ -494,16 +497,16 @@ mod tests {
         )
         .expect("decoded function has instructions");
 
-        let program = lift_decoded_function(&decoded).expect("syscall lifts to unsupported IR");
+        let program = lift_decoded_function(&decoded).expect("syscall lifts to IR request");
+        let request =
+            SyscallRequest::new(SyscallAbi::X86_64, X86Va::new(0x1000), X86Va::new(0x1002))
+                .expect("test syscall range is valid");
 
         assert_eq!(program.blocks()[0].ops(), &[]);
         assert_eq!(
             program.blocks()[0].terminator(),
-            &Terminator::Unsupported {
-                reason: UnsupportedReason::SyscallUnsupported {
-                    at: X86Va::new(0x1000),
-                    return_to: X86Va::new(0x1002)
-                }
+            &Terminator::BoundaryRequest {
+                request: BoundaryRequest::Syscall(request)
             }
         );
     }

@@ -9,44 +9,48 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 12:06 JST
+最終更新: 2026-06-08 12:50 JST
 
 状態:
 
-- project_state: completed。実装順を [TODO.md](../TODO.md) の
-  `線形実装ロードマップ` に一本化した。旧 M 系マイルストーンと
-  `当面の最短 TODO` の具体項目は B1-B8 の該当箇所へ吸収し、B1-B10 を
-  上から読み、最初の未完了項目を次の作業候補にする。
-- active_milestone: planned。[TODO.md](../TODO.md) の次の実装順は B4:
-  x86 syscall / libc 境界から継続し、B8 で実 x86_64 macOS アプリ起動を
-  目指す。その後、B10 の Wine 接続前に B9 の 32-bit アプリ対応を先に
-  処理するのが望ましい。
-- active_design_focus: planned。[docs/design-todo.md](design-todo.md) の D3:
-  Source ISA mode、D5: Host helper / OS boundary、D6: User-space runtime は
-  B8/B9 の設計制約として扱う。
-- active_branch: `main`。latest commit は `33a57f4`
-  (`Reframe roadmap around app launch milestones`)。この線形化は
-  ドキュメント変更として実施した。
-- related_todo: [TODO.md](../TODO.md) の B1-B10 が唯一の実行順である。
-  下部に残っていた M 系マイルストーンと当面 TODO の情報は B1-B8 へ
-  吸収し、README も独立した実行順を持たない形に整理した。
-- completed_work: [TODO.md](../TODO.md) の実装順を B1-B10 の線形ロードマップ
-  へ一本化した。B8 は実 x86_64 macOS アプリ起動、B9 は飛ばせる推奨
-  ステップとしての実 x86 32-bit アプリ対応、B10 は PE / Wine 接続前段。
-  旧 M 系の `add/sub`、`cmp/test/jcc`、`push/pop/call`、Rosetta oracle、
-  Haskell verifier、fallback などの具体項目は該当 B 項目へ移した。
-  README は TODO の線形ロードマップだけを実装順として案内する。
-- remaining_work: B4-B7 を進めた後、B8 の app launch scope、user-space
-  loader/runtime、source mode guardrail、stable launch report を具体化する。
-  B8 後は B9 の 32-bit app support を先に検討し、必要なら blocker として
-  記録して B10 へ進む。
-- next_action: B4: x86 syscall / libc 境界から小ステップを再開する。
-- verification: documentation-only 変更として `nix develop -c ./scripts/check-no-invisible-chars`
-  と `git diff --check` が通過した。full `./scripts/verify` は code/script/config
-  変更がないため省略した。
+- project_state: completed。B4 の先頭小ステップとして、x86_64 `syscall` を
+  実行せず typed public ABI request として IR に残す境界を追加した。
+- active_milestone: in_progress。[TODO.md](../TODO.md) の B4:
+  x86 syscall / libc 境界。先頭項目は完了し、次は external symbol / import
+  call を core logic で直接呼ばず helper request へ逃がす小ステップ。
+- active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の D4:
+  Bara IR の責務と D5: Host helper / OS boundary に沿って、syscall を
+  `HostTrap` へ混ぜず `BoundaryRequest::Syscall` として分離した。
+- active_branch: `task/b4-syscall-ir-request`。base commit は `33a57f4`
+  (`Reframe roadmap around app launch milestones`)。この小ステップの commit
+  は review package で確認する。
+- related_todo: [TODO.md](../TODO.md) B4 の
+  `x86 syscall を実行せず、まず public ABI 上の request として IR に表現する`。
+- completed_work: `bara-ir` に `BoundaryRequest`、`SyscallRequest`、
+  `SyscallAbi` を追加し、`bara-isa-x86` の lifter が `syscall` を
+  `Terminator::BoundaryRequest` へ変換するようにした。`bara-arm64` はこの
+  request を emit せず `SyscallUnsupported { request }` として返す。
+- remaining_work: B4 の external symbol / import call request、最小 helper ABI、
+  stdout helper 境界、OS ABI 差分、unsupported boundary report schema を
+  順に具体化する。
+- next_action: B4 の次小ステップとして external symbol / import call を typed
+  helper request に逃がす最小 IR 境界を設計、実装する。
+- verification: `nix develop -c cargo test -p bara-ir`、
+  `nix develop -c cargo test -p bara-isa-x86`、
+  `nix develop -c cargo test -p bara-arm64`、`nix develop -c ./scripts/verify`
+  が通過した。
 
 直近で完了した作業:
 
+- 2026-06-08 12:50 JST: B4 の先頭小ステップとして、x86_64 `syscall` を
+  typed public ABI request として IR に残す境界を追加した。`syscall` は
+  `BoundaryRequest::Syscall(SyscallRequest { abi: X86_64, at, return_to })`
+  として lift され、ARM64 emit は実行コードを出さず
+  `SyscallUnsupported { request }` を返す。
+- 検証: `nix develop -c cargo test -p bara-ir`、
+  `nix develop -c cargo test -p bara-isa-x86`、
+  `nix develop -c cargo test -p bara-arm64`、`nix develop -c ./scripts/verify`
+  が通過した。
 - 2026-06-08 12:06 JST: 旧 M 系マイルストーンと `当面の最短 TODO` の
   具体情報を、削除ではなく [TODO.md](../TODO.md) の B1-B8 へ吸収した。
   `add/sub`、`cmp/test/jcc`、`push/pop/call`、Rosetta oracle、Haskell

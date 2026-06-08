@@ -80,6 +80,9 @@ pub enum HostTrapKind {
 ```rust
 pub enum Terminator {
     Return,
+    BoundaryRequest {
+        request: BoundaryRequest,
+    },
     DirectJump { target: X86Va },
     CondJump {
         cc: X86Cond,
@@ -103,6 +106,27 @@ pub enum Terminator {
     Unsupported {
         reason: UnsupportedReason,
     },
+}
+```
+
+`BoundaryRequest` は guest 側から public ABI / external boundary へ出ようとする
+意図を IR に残す。runtime や host OS syscall を直接実行する指示ではない。
+現在は x86_64 `syscall` を typed request として保持するだけで、ARM64 emit
+では unsupported boundary として止める。
+
+```rust
+pub enum BoundaryRequest {
+    Syscall(SyscallRequest),
+}
+
+pub struct SyscallRequest {
+    abi: SyscallAbi,
+    at: X86Va,
+    return_to: X86Va,
+}
+
+pub enum SyscallAbi {
+    X86_64,
 }
 ```
 
