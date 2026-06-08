@@ -249,7 +249,7 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                     return_to,
                     DecodedInstructionKind::CallRel32 { target, return_to },
                 ));
-                return DecodedFunction::new(input.entry(), instructions);
+                offset = end_offset;
             }
             0xc3 => {
                 let end = instruction_end(input, at, offset + 1, 1)?;
@@ -258,7 +258,7 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                     end,
                     DecodedInstructionKind::Ret,
                 ));
-                return DecodedFunction::new(input.entry(), instructions);
+                offset += 1;
             }
             unsupported => {
                 let end = instruction_end(input, at, offset + 1, 1)?;
@@ -266,6 +266,10 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                 return DecodedFunction::new(input.entry(), instructions);
             }
         }
+    }
+
+    if decoded_stream_ends_with_terminator(&instructions) {
+        return DecodedFunction::new(input.entry(), instructions);
     }
 
     let at = address_at(input, input.bytes().len())?;
@@ -280,6 +284,20 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
         },
     ));
     DecodedFunction::new(input.entry(), instructions)
+}
+
+fn decoded_stream_ends_with_terminator(instructions: &[DecodedInstruction]) -> bool {
+    let Some(instruction) = instructions.last() else {
+        return false;
+    };
+
+    matches!(
+        instruction.kind(),
+        DecodedInstructionKind::CallRel32 { .. }
+            | DecodedInstructionKind::JccRel8 { .. }
+            | DecodedInstructionKind::Ret
+            | DecodedInstructionKind::Syscall
+    )
 }
 
 fn address_at(input: &X86Bytes, offset: usize) -> Result<X86Va, DecodeError> {

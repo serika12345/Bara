@@ -75,6 +75,35 @@ fn decodes_mov_eax_imm32_then_ret() {
 }
 
 #[test]
+fn decodes_ret_then_trailing_block_bytes() {
+    let input = X86Bytes::new(
+        X86Va::new(0),
+        vec![0xb8, 1, 0, 0, 0, 0xc3, 0xb8, 2, 0, 0, 0, 0xc3],
+    )
+    .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0),
+                X86Va::new(5),
+                DecodedInstructionKind::MovEaxImm32 { imm: 1 }
+            ),
+            DecodedInstruction::new(X86Va::new(5), X86Va::new(6), DecodedInstructionKind::Ret),
+            DecodedInstruction::new(
+                X86Va::new(6),
+                X86Va::new(11),
+                DecodedInstructionKind::MovEaxImm32 { imm: 2 }
+            ),
+            DecodedInstruction::new(X86Va::new(11), X86Va::new(12), DecodedInstructionKind::Ret)
+        ]
+    );
+}
+
+#[test]
 fn decodes_mov_rax_rdi_then_ret() {
     let input = X86Bytes::new(X86Va::new(0x1000), vec![0x48, 0x89, 0xf8, 0xc3])
         .expect("test bytes are non-empty");
@@ -468,6 +497,37 @@ fn decodes_call_rel32_with_negative_target() {
                 return_to: X86Va::new(0x1005)
             }
         )]
+    );
+}
+
+#[test]
+fn decodes_call_rel32_then_fallthrough_instruction() {
+    let input = X86Bytes::new(
+        X86Va::new(0),
+        vec![0xe8, 1, 0, 0, 0, 0xb8, 2, 0, 0, 0, 0xc3],
+    )
+    .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0),
+                X86Va::new(5),
+                DecodedInstructionKind::CallRel32 {
+                    target: X86Va::new(6),
+                    return_to: X86Va::new(5)
+                }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(5),
+                X86Va::new(10),
+                DecodedInstructionKind::MovEaxImm32 { imm: 2 }
+            ),
+            DecodedInstruction::new(X86Va::new(10), X86Va::new(11), DecodedInstructionKind::Ret)
+        ]
     );
 }
 

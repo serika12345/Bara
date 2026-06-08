@@ -9,35 +9,45 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 19:26 JST
+最終更新: 2026-06-08 19:36 JST
 
 状態:
 
-- project_state: completed。B5 の 9 つ目の小ステップとして、
-  short `jne/jnz rel8` を decode / lift し、typed `CondJump` terminator として
-  表現した。
+- project_state: in_progress。B5 の large milestone completion に向けて、
+  branch / call target になる trailing block bytes を decoder が保持できるようにした。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B5:
   Control Flow / Stack / Call を開始した。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の
-  D4: Bara IR の責務に沿って、次はその他の `jcc` 条件、rel32、または
-  branch lowering を段階的に追加する。
+  D4: Bara IR の責務に沿って、次は ARM64 branch lowering と direct branch /
+  call execution path を段階的に追加する。
 - active_branch: `task/b5-add-sub-regression`。base commit は `4d2356f`
   (`Merge pull request #4 from serika12345/task/b4-syscall-ir-request`)。
   latest commit は review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B5 の
-  short `jne/jnz rel8` を `CondJump` terminator として decode / lift する。
-- completed_work: x86 decode の short `JccRel8` を `0x75` に広げ、
-  `X86Cond::NotEqual` として decode する。rel8 displacement は signed として
-  target 計算し、lifter は既存の `Terminator::CondJump` へ変換する。
+  その他の `jcc` 条件、rel32、branch lowering を段階的に追加する。
+- completed_work: decoder は `ret` と direct `call rel32` で即停止せず、同じ raw
+  function byte sequence 内の後続 block bytes を typed instruction として保持する。
+  EOF が explicit terminator で終わる場合は missing return sentinel を追加しない。
 - remaining_work: B5 ではその他の `jcc` 条件、rel32、branch lowering、
   `jmp` 実行経路、stack、call、ARM64 fixup、PC map validation が未完了。
-- next_action: B5 の次の小ステップとして、その他の `jcc` 条件、rel32、
-  または branch lowering を段階的に追加する。
-- verification: `nix develop -c cargo test -p bara-isa-x86 jne` が通過した。
+- next_action: ARM64 emitter を multi-block branch lowering に広げ、`cmp/test`
+  と `je/jne` の実行経路を追加する。
+- verification: `nix develop -c cargo test -p bara-isa-x86 trailing_block_bytes`、
+  `nix develop -c cargo test -p bara-isa-x86 call_rel32_then_fallthrough_instruction`、
+  および `nix develop -c cargo test -p bara-isa-x86
+  missing_ret_becomes_unsupported_instruction` が通過した。
   `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-08 19:36 JST: B5 large milestone completion の準備として、decoder が
+  `ret` と direct `call rel32` の後続 block bytes を保持できるようにした。
+  explicit terminator で EOF に到達した場合は missing return sentinel を追加しない。
+- 検証: `nix develop -c cargo test -p bara-isa-x86 trailing_block_bytes`、
+  `nix develop -c cargo test -p bara-isa-x86 call_rel32_then_fallthrough_instruction`、
+  および `nix develop -c cargo test -p bara-isa-x86
+  missing_ret_becomes_unsupported_instruction` が通過した。
+  `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 19:26 JST: B5 の 9 つ目の小ステップとして、
   short `jne/jnz rel8` を decode / lift し、`X86Cond::NotEqual` の
   `Terminator::CondJump` として IR に追加した。負 displacement の target
