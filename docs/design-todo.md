@@ -93,6 +93,10 @@
 - B3 の pure writer planning 境界は `bara-mach-o` crate に置く。`bara-oracle`
   には fixture / probe / external observation を残し、Mach-O artifact serialization
   は writer 側で育てる。
+- B3 の初期 model は `__TEXT` segment、mandatory `__text` section、optional
+  `__const` section、`_main` entry、`LC_SEGMENT_64` / `LC_MAIN` 相当の最小
+  load command model に限定する。offset / size / byte serialization は次の
+  serialization 境界で扱う。
 
 ## D8: Clean-room research boundary
 

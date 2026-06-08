@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 10:46 JST
+最終更新: 2026-06-08 11:08 JST
 
 状態:
 
@@ -17,14 +17,16 @@
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B3。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の D7: Binary format input/output の分離。
 - active_branch: `task/b3-mach-o-output-boundary`。B3 作業 branch。
-- related_todo: B3 `最小 ARM64 Mach-O executable writer を pure function として設計する` completed。関連設計 TODO は D7。
-- completed_work: B2 branch は PR merge 後に local から削除した。B3 では `bara-oracle::binary_format` の Mach-O input parser 群を `input` module、executable image plan/materialization を `output` module へ分離した。続いて `bara-mach-o` crate を追加し、最小 ARM64 Mach-O executable writer の request / payload / plan を I/O なしの pure planning function として定義した。
-- remaining_work: B3 の `_main` / `__TEXT` / `__const` / minimal load commands model、`clang` packaging との差分検証、必要時の追加切り出し。
-- next_action: `_main` entry、`__TEXT`、`__const`、最小 load commands の公開仕様ベース model を `bara-mach-o` に定義する。
-- verification: `nix develop -c cargo test -p bara-mach-o` が未実装 API の compile error で期待どおり失敗し、実装後に通過した。変更全体の gate として `nix develop -c ./scripts/verify-supply-chain` と `nix develop -c ./scripts/verify` が通過した。
+- related_todo: B3 `_main` entry、`__TEXT`、`__const`、最小 load commands の公開仕様ベース model を定義する` completed。関連設計 TODO は D7。
+- completed_work: B2 branch は PR merge 後に local から削除した。B3 では `bara-oracle::binary_format` の Mach-O input parser 群を `input` module、executable image plan/materialization を `output` module へ分離した。続いて `bara-mach-o` crate を追加し、最小 ARM64 Mach-O executable writer の pure planning function、`_main` entry、`__TEXT` / optional `__const`、最小 load command model を定義した。
+- remaining_work: B3 の `clang` packaging 経路と pure writer 経路の出力差分検証、必要時の追加切り出し。
+- next_action: `clang` packaging 経路と pure writer 経路の出力差分を検証するため、writer model から serialization 境界に必要な layout / bytes model を詰める。
+- verification: `nix develop -c cargo test -p bara-mach-o` が未実装 model API の compile error で期待どおり失敗し、実装後に通過した。変更全体の gate として `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-08 11:08 JST: B3 の 3 つ目の小ステップとして、`bara-mach-o` の writer plan に public Mach-O model を追加した。`_main` entry、`__TEXT` segment、mandatory `__text` section、const payload がある場合の `__const` section、最小 `LC_SEGMENT_64` / `LC_MAIN` 相当の load command model を domain type として定義した。
+- 検証: `nix develop -c cargo test -p bara-mach-o` は未実装 model API の compile error で期待どおり失敗し、実装後に通過した。変更全体の `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 10:46 JST: B3 の 2 つ目の小ステップとして、`bara-mach-o` crate を追加し、ARM64 Mach-O executable writer の pure planning 境界を設計した。`MachOArm64MainCode`、`MachOArm64ConstData`、writer request、payload、plan、target を domain type として定義し、empty payload parts は classified input error にする。
 - 検証: `nix develop -c cargo test -p bara-mach-o` は未実装 API の compile error で期待どおり失敗し、実装後に通過した。変更全体の `nix develop -c ./scripts/verify-supply-chain` と `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 10:26 JST: B3 の最初の小ステップとして、Mach-O input parser と output artifact planning / materialization の責務を module 境界で分離した。`binary_format::input` が public format probe / Mach-O metadata / load command parsing を扱い、`binary_format::output` が executable image plan / materialization を扱う。外部公開 API は `binary_format` と crate root の re-export で維持した。
