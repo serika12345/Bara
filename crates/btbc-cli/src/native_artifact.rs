@@ -68,10 +68,9 @@ impl NativeArtifactError {
 impl fmt::Display for NativeArtifactError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnsupportedHost { os, arch } => write!(
-                formatter,
-                "linking ARM64 main executable is unsupported on host {os}/{arch}"
-            ),
+            Self::UnsupportedHost { os, arch } => {
+                write_unsupported_host_report(formatter, os, arch)
+            }
             Self::TempAssemblyPath { source } => {
                 write!(
                     formatter,
@@ -115,6 +114,57 @@ impl fmt::Display for NativeArtifactError {
 }
 
 impl Error for NativeArtifactError {}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct NativeArtifactUnsupportedHostReport {
+    status: NativeArtifactUnsupportedHostStatus,
+    failure_kind: FailureKind,
+    artifact_kind: NativeArtifactKind,
+    target_triple: NativeArtifactTargetTriple,
+    host: NativeArtifactUnsupportedHost,
+}
+
+impl NativeArtifactUnsupportedHostReport {
+    const fn new(os: &'static str, arch: &'static str) -> Self {
+        Self {
+            status: NativeArtifactUnsupportedHostStatus::UnsupportedHost,
+            failure_kind: FailureKind::EmitError,
+            artifact_kind: NativeArtifactKind::LinkedExecutable,
+            target_triple: NativeArtifactTargetTriple::Arm64AppleMacos,
+            host: NativeArtifactUnsupportedHost::new(os, arch),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum NativeArtifactUnsupportedHostStatus {
+    UnsupportedHost,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct NativeArtifactUnsupportedHost {
+    os: &'static str,
+    arch: &'static str,
+}
+
+impl NativeArtifactUnsupportedHost {
+    const fn new(os: &'static str, arch: &'static str) -> Self {
+        Self { os, arch }
+    }
+}
+
+fn write_unsupported_host_report(
+    formatter: &mut fmt::Formatter<'_>,
+    os: &'static str,
+    arch: &'static str,
+) -> fmt::Result {
+    let report = NativeArtifactUnsupportedHostReport::new(os, arch);
+    match serde_json::to_string(&report) {
+        Ok(json) => formatter.write_str(&json),
+        Err(_) => Err(fmt::Error),
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum NativeStdoutMainUnsupported {
@@ -750,6 +800,20 @@ mod tests {
             native_artifact_metadata_to_json(executable.metadata())
                 .expect("metadata serializes as json"),
             "{\"artifact_kind\":\"linked_executable\",\"target_triple\":\"arm64-apple-macos\",\"toolchain\":\"clang\",\"output_path\":\"/tmp/return_42\",\"helper_requirements\":[]}"
+        );
+    }
+
+    #[test]
+    fn unsupported_host_error_serializes_as_stable_json_message() {
+        let error = NativeArtifactError::UnsupportedHost {
+            os: "linux",
+            arch: "x86_64",
+        };
+
+        assert_eq!(error.failure_kind(), FailureKind::EmitError);
+        assert_eq!(
+            error.to_string(),
+            "{\"status\":\"unsupported_host\",\"failure_kind\":\"emit_error\",\"artifact_kind\":\"linked_executable\",\"target_triple\":\"arm64-apple-macos\",\"host\":{\"os\":\"linux\",\"arch\":\"x86_64\"}}"
         );
     }
 

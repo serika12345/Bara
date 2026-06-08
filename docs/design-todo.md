@@ -22,9 +22,9 @@
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。
-- [ ] artifact metadata は実行結果とは分け、生成条件、target triple、toolchain、helper requirements を含める。
-- [ ] 外部 toolchain 経路と pure writer 経路を同じ interface から選べるようにする。
-- [ ] host unsupported、toolchain missing、link failure、execution failure を分類する error/report model を設計する。
+- [x] artifact metadata は実行結果とは分け、生成条件、target triple、toolchain、helper requirements を含める。
+- [x] 外部 toolchain 経路と pure writer 経路を同じ interface から選べるようにする。
+- [x] host unsupported、toolchain missing、link failure、execution failure を分類する error/report model を設計する。
 
 メモ:
 
