@@ -177,6 +177,46 @@ These names are planning vocabulary, not required Rust API names.
   call boundary is not executable yet
 - should be precise enough for corpus expectations and regression tests
 
+## Native stdout emission boundary
+
+The current stdout path is intentionally a Bara host-helper path, not guest
+syscall execution and not libc emulation.
+
+The boundary is:
+
+1. `bara-ir` records stdout as `HostTrapKind::Stdout` and maps that host trap
+   to `HostHelperRequest::WriteStdout` with `HostHelperAbi`:
+   `write_stdout(ptr_len_to_unit)`.
+2. `bara-oracle` executable manifests declare and resolve the
+   `write_stdout` / `ptr_len_to_unit` host helper before execution. A manifest
+   that requests stdout without declaring the helper is invalid.
+3. `btbc-cli` consumes the resolved manifest helper in executable preflight
+   and checks it against the IR-level `HostHelperAbi` before running the
+   function pipeline.
+4. `bara-runtime` may execute a typed `HostTrapPlan` and expose stdout in the
+   observed result. The runtime receives the plan from validated fixture or
+   manifest data; it does not parse manifests or infer guest OS behavior.
+5. Standalone native artifact packaging may convert the accepted
+   `write_stdout(ptr_len_to_unit)` helper requirement into host-native stdout
+   emission. The current macOS ARM64 artifact path does this by generating a
+   packaging prologue that calls the public `_write` symbol with file
+   descriptor `1`, a generated stdout buffer pointer, and the buffer length,
+   then continues into the generated ARM64 function body.
+
+The conversion from Bara host helper to native stdout belongs at the output
+artifact packaging boundary. It must not leak into x86 decode, lift, core IR,
+ARM64 instruction emission, manifest parsing, or oracle comparison.
+
+This path has these current limits:
+
+- `write_stdout` means a Bara-defined host effect capability, not a guest
+  `write` syscall and not `puts`.
+- Native emission is currently a macOS ARM64 standalone artifact strategy.
+  Linux, Windows, and future object formats must add explicit output adapters
+  behind the same helper boundary instead of changing core IR semantics.
+- Unsupported helper, ABI, platform, or artifact combinations must remain
+  classified before execution.
+
 ## First implementation sequence after this document
 
 1. Typed import declaration planning

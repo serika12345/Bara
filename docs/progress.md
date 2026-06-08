@@ -9,42 +9,50 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 14:26 JST
+最終更新: 2026-06-08 14:34 JST
 
 状態:
 
-- project_state: completed。B4 の 4 つ目の小ステップとして、
-  `puts` / `write` 相当の stdout effect を Bara host helper
-  `write_stdout(ptr_len_to_unit)` の typed request として扱えるようにした。
+- project_state: completed。B4 の 5 つ目の小ステップとして、
+  stdout 相当を Bara host helper から native stdout emission へ変換する
+  境界を文書化した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B4:
-  x86 syscall / libc 境界。先頭 4 項目は完了し、次は stdout 相当を
-  Bara host helper から native stdout emission へ変換する境界を明文化する
-  小ステップ。
+  x86 syscall / libc 境界。先頭 5 項目は完了し、次は macOS / Linux /
+  Windows の OS ABI 差分を helper boundary で分離する小ステップ。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の D4:
-  Bara IR の責務と D5: Host helper / OS boundary に沿って、
-  `HostHelperRequest` / `HostHelperAbi` を runtime helper ABI とは別の
-  typed value として固定した。
+  Bara IR の責務と D5: Host helper / OS boundary に沿って、native stdout
+  emission を decode / lift / IR / ARM64 emit ではなく output artifact
+  packaging 境界の責務として明文化した。
 - active_branch: `task/b4-syscall-ir-request`。base commit は `19eeedb`
   (`Make roadmap linear without losing milestones`)。latest commit は
   review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B4 の
-  `puts` / `write` 相当を host helper 経由で stdout に出せるようにする。
-- completed_work: `bara-ir` に `HostHelperRequest::WriteStdout`、
-  `HostHelperAbi`、`HostHelperName`、`HostHelperSignature` を追加し、
-  `HostTrapKind::Stdout` から `write_stdout(ptr_len_to_unit)` へ写像できる
-  pure boundary を定義した。`btbc-cli` の executable manifest preflight は
-  manifest の resolved `write_stdout` helper を IR 側の `HostHelperAbi` と
-  照合し、preflight 結果として保持する。
-- remaining_work: B4 の native stdout emission 境界、OS ABI 差分、
+  stdout 相当を Bara host helper から native stdout emission へ変換する境界を明文化する。
+- completed_work: [docs/public-abi-import-boundary.md](public-abi-import-boundary.md) に
+  native stdout emission boundary を追加し、`HostTrapKind::Stdout`、
+  `HostHelperRequest::WriteStdout`、manifest helper resolution、CLI preflight、
+  runtime `HostTrapPlan`、standalone native artifact packaging の責務を分けた。
+  macOS ARM64 artifact の `_write` prologue は output artifact packaging
+  境界の戦略であり、guest syscall / libc emulation ではないことを明記した。
+- remaining_work: B4 の OS ABI 差分、libc / dyld / import model、
   unsupported boundary report schema を順に具体化する。
-- next_action: B4 の次小ステップとして stdout 相当を Bara host helper から
-  native stdout emission へ変換する境界を明文化する。
-- verification: `nix develop -c cargo test -p bara-ir`、
-  `nix develop -c cargo test -p btbc-cli executable_run`、および
-  `nix develop -c ./scripts/verify` が通過した。
+- next_action: B4 の次小ステップとして macOS / Linux / Windows の OS ABI 差分を
+  helper boundary で分離する。
+- verification: documentation-only 変更として
+  `nix develop -c ./scripts/check-no-invisible-chars` と `git diff --check` が
+  通過した。code/script/config 変更がないため full `./scripts/verify` は省略した。
 
 直近で完了した作業:
 
+- 2026-06-08 14:34 JST: B4 の 5 つ目の小ステップとして、stdout 相当を
+  Bara host helper から native stdout emission へ変換する境界を文書化した。
+  `write_stdout(ptr_len_to_unit)` は Bara host effect capability であり、
+  macOS ARM64 standalone artifact では output packaging 境界が public
+  `_write` prologue に変換する。decode / lift / core IR / ARM64 emit /
+  manifest parsing / oracle comparison へ native emission の責務を漏らさない。
+- 検証: documentation-only 変更として
+  `nix develop -c ./scripts/check-no-invisible-chars` と `git diff --check` が
+  通過した。code/script/config 変更がないため full `./scripts/verify` は省略した。
 - 2026-06-08 14:26 JST: B4 の 4 つ目の小ステップとして、
   `puts` / `write` 相当の stdout effect を Bara host helper
   `write_stdout(ptr_len_to_unit)` の typed request として扱えるようにした。
