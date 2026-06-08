@@ -166,6 +166,11 @@ pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
                     reason: UnsupportedReason::EmitUnsupportedIr,
                 });
             }
+            IrOp::Test { .. } => {
+                return Err(EmitError::UnsupportedIr {
+                    reason: UnsupportedReason::EmitUnsupportedIr,
+                });
+            }
             IrOp::Unsupported { reason } => {
                 return Err(EmitError::UnsupportedIr {
                     reason: reason.clone(),
@@ -551,6 +556,30 @@ mod tests {
                 IrOp::Cmp {
                     lhs: Operand::Reg(X86Reg::Rax),
                     rhs: Operand::ImmU64(42),
+                },
+            ],
+            Terminator::Return,
+        );
+
+        assert_eq!(
+            emit_program(&program),
+            Err(EmitError::UnsupportedIr {
+                reason: UnsupportedReason::EmitUnsupportedIr
+            })
+        );
+    }
+
+    #[test]
+    fn test_ops_are_not_emitted_before_flag_lowering() {
+        let program = program_with_ops(
+            vec![
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(42),
+                },
+                IrOp::Test {
+                    lhs: Operand::Reg(X86Reg::Rax),
+                    rhs: Operand::Reg(X86Reg::Rax),
                 },
             ],
             Terminator::Return,

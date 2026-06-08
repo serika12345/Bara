@@ -327,6 +327,31 @@ fn decodes_cmp_eax_imm32_between_mov_and_ret() {
 }
 
 #[test]
+fn decodes_test_eax_eax_between_mov_and_ret() {
+    let input = X86Bytes::new(X86Va::new(0), vec![0xb8, 0x2a, 0, 0, 0, 0x85, 0xc0, 0xc3])
+        .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0),
+                X86Va::new(5),
+                DecodedInstructionKind::MovEaxImm32 { imm: 42 }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(5),
+                X86Va::new(7),
+                DecodedInstructionKind::TestEaxEax
+            ),
+            DecodedInstruction::new(X86Va::new(7), X86Va::new(8), DecodedInstructionKind::Ret)
+        ]
+    );
+}
+
+#[test]
 fn decodes_xor_eax_eax_then_ret() {
     let input = X86Bytes::new(X86Va::new(0x1000), vec![0x31, 0xc0, 0xc3])
         .expect("test bytes are non-empty");

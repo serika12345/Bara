@@ -65,6 +65,7 @@ pub enum DecodedInstructionKind {
     SubEaxImm8 { imm: X86Imm8 },
     CmpEaxImm32 { imm: X86Imm32 },
     CmpEaxImm8 { imm: X86Imm8 },
+    TestEaxEax,
     XorEaxEax,
     CallRel32 { target: X86Va, return_to: X86Va },
     Syscall,

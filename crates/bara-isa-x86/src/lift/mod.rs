@@ -109,6 +109,10 @@ fn lift_instruction(instruction: &DecodedInstruction) -> Result<LiftedInstructio
             lhs: Operand::Reg(X86Reg::Rax),
             rhs: Operand::ImmU64(imm.as_i64() as u64),
         })),
+        DecodedInstructionKind::TestEaxEax => Ok(LiftedInstruction::Op(IrOp::Test {
+            lhs: Operand::Reg(X86Reg::Rax),
+            rhs: Operand::Reg(X86Reg::Rax),
+        })),
         DecodedInstructionKind::XorEaxEax => Ok(LiftedInstruction::Op(IrOp::Mov {
             dst: Operand::Reg(X86Reg::Rax),
             src: Operand::ImmU64(0),
@@ -597,6 +601,45 @@ mod tests {
                 IrOp::Cmp {
                     lhs: Operand::Reg(X86Reg::Rax),
                     rhs: Operand::ImmU64(42)
+                }
+            ]
+        );
+        assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_test_eax_eax_to_test_rax_rax() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(5),
+                    DecodedInstructionKind::MovEaxImm32 { imm: 42 },
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(5),
+                    X86Va::new(7),
+                    DecodedInstructionKind::TestEaxEax,
+                ),
+                DecodedInstruction::new(X86Va::new(7), X86Va::new(8), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded test function lifts");
+        let block = &program.blocks()[0];
+
+        assert_eq!(
+            block.ops(),
+            &[
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(42)
+                },
+                IrOp::Test {
+                    lhs: Operand::Reg(X86Reg::Rax),
+                    rhs: Operand::Reg(X86Reg::Rax)
                 }
             ]
         );

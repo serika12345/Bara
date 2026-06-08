@@ -74,6 +74,11 @@ runtime 境界へ伝えるための明示的な外部効果要求として扱う
 op として扱う。現時点で decode / lift するのは `cmp eax, imm8/imm32` に
 限り、ARM64 emit は flag lowering 実装前の explicit unsupported として止める。
 
+`Test` は x86 の `test` と同じく operand 同士の bitwise AND 結果を
+書き戻さず、flags 更新だけを表す op として扱う。現時点で decode / lift
+するのは `test eax,eax` に限り、ARM64 emit は flag lowering 実装前の
+explicit unsupported として止める。
+
 ```rust
 pub enum HostTrapKind {
     Stdout,
@@ -267,9 +272,9 @@ pub enum FlagValue {
 flags は `Flags::new(...)` または `Flags::unknown()` で作り、`cf()` /
 `pf()` / `af()` / `zf()` / `sf()` / `of()` accessor から読む。
 
-現時点では `cmp eax, imm8/imm32` を `IrOp::Cmp` へ decode / lift する。
-`test` / `jcc` と `cmp` の ARM64 flag lowering / branch emit は B5 の
-後続小ステップで扱う。
+現時点では `cmp eax, imm8/imm32` を `IrOp::Cmp` へ、`test eax,eax` を
+`IrOp::Test` へ decode / lift する。`jcc` と ARM64 flag lowering /
+branch emit は B5 の後続小ステップで扱う。
 
 ## Metadata
 

@@ -76,6 +76,7 @@ pub enum IrOp {
     Add { dst: Operand, src: Operand },
     Sub { dst: Operand, src: Operand },
     Cmp { lhs: Operand, rhs: Operand },
+    Test { lhs: Operand, rhs: Operand },
     HostTrap { kind: HostTrapKind },
     Unsupported { reason: UnsupportedReason },
 }
@@ -268,6 +269,20 @@ mod tests {
             IrOp::Cmp {
                 lhs: Operand::Reg(X86Reg::Rax),
                 rhs: Operand::ImmU64(42),
+            }
+        );
+    }
+
+    #[test]
+    fn test_op_exposes_typed_operands() {
+        assert_eq!(
+            IrOp::Test {
+                lhs: Operand::Reg(X86Reg::Rax),
+                rhs: Operand::Reg(X86Reg::Rax),
+            },
+            IrOp::Test {
+                lhs: Operand::Reg(X86Reg::Rax),
+                rhs: Operand::Reg(X86Reg::Rax),
             }
         );
     }
