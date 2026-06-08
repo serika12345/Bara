@@ -19,6 +19,8 @@ mod blackbox_run;
 mod executable_run;
 mod function_run;
 mod native_artifact;
+#[cfg(test)]
+mod native_artifact_cli_tests;
 
 use blackbox_run::run_check_blackbox;
 use executable_run::{run_executable_manifest, ExecutableRunError};
@@ -27,7 +29,8 @@ use function_run::{
     run_test_case_function, FunctionRunError,
 };
 use native_artifact::{
-    link_arm64_main_executable, link_arm64_stdout_main_executable, NativeArtifactError,
+    link_arm64_main_executable, link_arm64_stdout_main_executable,
+    observe_native_executable_artifact, NativeArtifactError,
 };
 
 fn main() -> ExitCode {
@@ -165,11 +168,9 @@ fn run_link_fixture_arm64_stdout_main(
     )
     .map_err(CliError::NativeArtifact)?;
 
-    Ok(format!(
-        "linked ARM64 stdout main executable for {} to {}",
-        test_case.case_id().as_str(),
-        output_path.display()
-    ))
+    let actual = observe_native_executable_artifact(test_case.case_id().clone(), output_path)
+        .map_err(CliError::NativeArtifact)?;
+    observed_result_to_json(&actual).map_err(CliError::Json)
 }
 
 fn run_check_executable(manifest_path: &Path, expected_path: &Path) -> Result<String, CliError> {
@@ -376,6 +377,13 @@ enum FixtureOutput {
 }
 
 impl FixtureRun {
+    fn passed(case_id: CaseId) -> Self {
+        Self {
+            report: FixtureReport::new(case_id, FixtureOutcome::Passed),
+            output: None,
+        }
+    }
+
     fn passed_observed(case_id: CaseId, actual: ObservedResult) -> Self {
         Self {
             report: FixtureReport::new(case_id, FixtureOutcome::Passed),
@@ -675,7 +683,6 @@ mod tests {
     use std::{
         fs,
         path::{Path, PathBuf},
-        process::Command,
         time::{SystemTime, UNIX_EPOCH},
     };
 
@@ -759,216 +766,6 @@ mod tests {
                 .expect("expected fixture normalizes to output json");
 
         assert_eq!(output, expected);
-    }
-
-    #[test]
-    fn emit_fixture_arm64_writes_return_42_machine_code_file() {
-        let temp_dir = TestTempDir::new("emit_fixture_arm64_writes_return_42_machine_code_file");
-        let case_path = temp_dir.write_file(
-            "case.json",
-            include_str!("../../../tests/cases/return_42.json"),
-        );
-        let output_path = temp_dir.path.join("return_42.arm64.bin");
-
-        let output = run_cli(vec![
-            String::from("emit-fixture-arm64"),
-            case_path.to_string_lossy().into_owned(),
-            output_path.to_string_lossy().into_owned(),
-        ])
-        .expect("return_42 fixture emits standalone ARM64 machine code");
-
-        assert_eq!(
-            read_binary_file(&output_path),
-            vec![0x40, 0x05, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]
-        );
-        assert!(output.contains("wrote ARM64 machine code for return_42"));
-    }
-
-    #[test]
-    fn emit_fixture_arm64_rejects_stdout_host_trap_fixture() {
-        let temp_dir = TestTempDir::new("emit_fixture_arm64_rejects_stdout_host_trap_fixture");
-        let case_path = temp_dir.write_file(
-            "case.json",
-            include_str!("../../../tests/cases/stdout_trap_return_0.json"),
-        );
-        let output_path = temp_dir.path.join("stdout_trap.arm64.bin");
-
-        let error = run_cli(vec![
-            String::from("emit-fixture-arm64"),
-            case_path.to_string_lossy().into_owned(),
-            output_path.to_string_lossy().into_owned(),
-        ])
-        .expect_err("stdout host trap fixture is rejected for standalone ARM64 output");
-
-        assert!(matches!(
-            error,
-            CliError::FunctionRun(super::function_run::FunctionRunError::StandaloneArtifact(_))
-        ));
-        assert_eq!(error.failure_kind(), FailureKind::EmitError);
-        assert!(!output_path.exists());
-    }
-
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-    #[test]
-    fn link_fixture_arm64_main_writes_return_42_executable() {
-        let temp_dir = TestTempDir::new("link_fixture_arm64_main_writes_return_42_executable");
-        let case_path = temp_dir.write_file(
-            "case.json",
-            include_str!("../../../tests/cases/return_42.json"),
-        );
-        let output_path = temp_dir.path.join("return_42");
-
-        let output = run_cli(vec![
-            String::from("link-fixture-arm64-main"),
-            case_path.to_string_lossy().into_owned(),
-            output_path.to_string_lossy().into_owned(),
-        ])
-        .expect("return_42 fixture links as an ARM64 main executable");
-
-        assert!(output_path.exists());
-        assert!(output.contains("linked ARM64 main executable for return_42"));
-        let status = Command::new(&output_path)
-            .status()
-            .expect("linked executable runs");
-        assert_eq!(status.code(), Some(42));
-    }
-
-    #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
-    #[test]
-    fn link_fixture_arm64_main_reports_unsupported_host() {
-        let temp_dir = TestTempDir::new("link_fixture_arm64_main_reports_unsupported_host");
-        let case_path = temp_dir.write_file(
-            "case.json",
-            include_str!("../../../tests/cases/return_42.json"),
-        );
-        let output_path = temp_dir.path.join("return_42");
-
-        let error = run_cli(vec![
-            String::from("link-fixture-arm64-main"),
-            case_path.to_string_lossy().into_owned(),
-            output_path.to_string_lossy().into_owned(),
-        ])
-        .expect_err("non-macOS ARM64 host is unsupported");
-
-        assert!(matches!(
-            error,
-            CliError::NativeArtifact(
-                super::native_artifact::NativeArtifactError::UnsupportedHost { .. }
-            )
-        ));
-        assert_eq!(error.failure_kind(), FailureKind::EmitError);
-        assert!(!output_path.exists());
-    }
-
-    #[test]
-    fn link_fixture_arm64_main_rejects_stdout_host_trap_fixture() {
-        let temp_dir = TestTempDir::new("link_fixture_arm64_main_rejects_stdout_host_trap_fixture");
-        let case_path = temp_dir.write_file(
-            "case.json",
-            include_str!("../../../tests/cases/stdout_trap_return_0.json"),
-        );
-        let output_path = temp_dir.path.join("stdout_trap");
-
-        let error = run_cli(vec![
-            String::from("link-fixture-arm64-main"),
-            case_path.to_string_lossy().into_owned(),
-            output_path.to_string_lossy().into_owned(),
-        ])
-        .expect_err("stdout host trap fixture is rejected before native linking");
-
-        assert!(matches!(
-            error,
-            CliError::FunctionRun(super::function_run::FunctionRunError::StandaloneArtifact(_))
-        ));
-        assert_eq!(error.failure_kind(), FailureKind::EmitError);
-        assert!(!output_path.exists());
-    }
-
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-    #[test]
-    fn link_fixture_arm64_stdout_main_writes_hello_world_executable() {
-        let temp_dir =
-            TestTempDir::new("link_fixture_arm64_stdout_main_writes_hello_world_executable");
-        let case_path = temp_dir.write_file(
-            "case.json",
-            include_str!("../../../tests/cases/hello_world_stdout_return_0.json"),
-        );
-        let output_path = temp_dir.path.join("hello_world_stdout");
-
-        let output = run_cli(vec![
-            String::from("link-fixture-arm64-stdout-main"),
-            case_path.to_string_lossy().into_owned(),
-            output_path.to_string_lossy().into_owned(),
-        ])
-        .expect("hello_world_stdout fixture links as an ARM64 stdout main executable");
-
-        assert!(output_path.exists());
-        assert!(
-            output.contains("linked ARM64 stdout main executable for hello_world_stdout_return_0")
-        );
-        let process_output = Command::new(&output_path)
-            .output()
-            .expect("linked stdout executable runs");
-        assert_eq!(process_output.status.code(), Some(0));
-        assert_eq!(process_output.stdout, b"hello world\n");
-        assert_eq!(process_output.stderr, b"");
-    }
-
-    #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
-    #[test]
-    fn link_fixture_arm64_stdout_main_reports_unsupported_host() {
-        let temp_dir = TestTempDir::new("link_fixture_arm64_stdout_main_reports_unsupported_host");
-        let case_path = temp_dir.write_file(
-            "case.json",
-            include_str!("../../../tests/cases/hello_world_stdout_return_0.json"),
-        );
-        let output_path = temp_dir.path.join("hello_world_stdout");
-
-        let error = run_cli(vec![
-            String::from("link-fixture-arm64-stdout-main"),
-            case_path.to_string_lossy().into_owned(),
-            output_path.to_string_lossy().into_owned(),
-        ])
-        .expect_err("non-macOS ARM64 host is unsupported");
-
-        assert!(matches!(
-            error,
-            CliError::NativeArtifact(
-                super::native_artifact::NativeArtifactError::UnsupportedHost { .. }
-            )
-        ));
-        assert_eq!(error.failure_kind(), FailureKind::EmitError);
-        assert!(!output_path.exists());
-    }
-
-    #[test]
-    fn link_fixture_arm64_stdout_main_rejects_fixture_without_stdout_request() {
-        let temp_dir = TestTempDir::new(
-            "link_fixture_arm64_stdout_main_rejects_fixture_without_stdout_request",
-        );
-        let case_path = temp_dir.write_file(
-            "case.json",
-            include_str!("../../../tests/cases/return_42.json"),
-        );
-        let output_path = temp_dir.path.join("return_42_stdout");
-
-        let error = run_cli(vec![
-            String::from("link-fixture-arm64-stdout-main"),
-            case_path.to_string_lossy().into_owned(),
-            output_path.to_string_lossy().into_owned(),
-        ])
-        .expect_err("return_42 fixture has no stdout request");
-
-        assert!(matches!(
-            error,
-            CliError::NativeArtifact(
-                super::native_artifact::NativeArtifactError::StdoutMainUnsupported(
-                    super::native_artifact::NativeStdoutMainUnsupported::MissingStdoutTrapPlan
-                )
-            )
-        ));
-        assert_eq!(error.failure_kind(), FailureKind::EmitError);
-        assert!(!output_path.exists());
     }
 
     #[test]
@@ -1431,11 +1228,7 @@ mod tests {
         fs::read_to_string(path).expect("test fixture file is read")
     }
 
-    fn read_binary_file(path: &Path) -> Vec<u8> {
-        fs::read(path).expect("test fixture binary file is read")
-    }
-
     fn expected_blackbox_report_json() -> &'static str {
-        "{\"fixtures\":[{\"case_id\":\"add_eax_imm32_return_45\",\"outcome\":\"passed\"},{\"case_id\":\"add_eax_imm_return_45\",\"outcome\":\"passed\"},{\"case_id\":\"add_sub_eax_imm_return_40\",\"outcome\":\"passed\"},{\"case_id\":\"hello_world_stdout_return_0\",\"outcome\":\"passed\"},{\"case_id\":\"identity_u64\",\"outcome\":\"passed\"},{\"case_id\":\"load_u8_from_rdi_return_72\",\"outcome\":\"passed\"},{\"case_id\":\"return_42\",\"outcome\":\"passed\"},{\"case_id\":\"stdout_trap_return_0\",\"outcome\":\"passed\"},{\"case_id\":\"sub_eax_imm32_return_39\",\"outcome\":\"passed\"},{\"case_id\":\"sub_eax_imm_return_39\",\"outcome\":\"passed\"},{\"case_id\":\"xor_eax_eax_return_0\",\"outcome\":\"passed\"},{\"case_id\":\"xor_then_add_eax_return_7\",\"outcome\":\"passed\"},{\"case_id\":\"hello_world_executable_manifest\",\"outcome\":\"passed\"},{\"case_id\":\"entry_offset_return_42_manifest\",\"outcome\":\"passed\"},{\"case_id\":\"mach_o_return_42\",\"outcome\":\"passed\"},{\"case_id\":\"mach_o_hello_world_stdout\",\"outcome\":\"passed\"},{\"case_id\":\"mach_o_execute_header_probe\",\"outcome\":\"passed\"}]}"
+        "{\"fixtures\":[{\"case_id\":\"add_eax_imm32_return_45\",\"outcome\":\"passed\"},{\"case_id\":\"add_eax_imm_return_45\",\"outcome\":\"passed\"},{\"case_id\":\"add_sub_eax_imm_return_40\",\"outcome\":\"passed\"},{\"case_id\":\"hello_world_stdout_return_0\",\"outcome\":\"passed\"},{\"case_id\":\"identity_u64\",\"outcome\":\"passed\"},{\"case_id\":\"load_u8_from_rdi_return_72\",\"outcome\":\"passed\"},{\"case_id\":\"return_42\",\"outcome\":\"passed\"},{\"case_id\":\"stdout_trap_return_0\",\"outcome\":\"passed\"},{\"case_id\":\"sub_eax_imm32_return_39\",\"outcome\":\"passed\"},{\"case_id\":\"sub_eax_imm_return_39\",\"outcome\":\"passed\"},{\"case_id\":\"xor_eax_eax_return_0\",\"outcome\":\"passed\"},{\"case_id\":\"xor_then_add_eax_return_7\",\"outcome\":\"passed\"},{\"case_id\":\"return_42_native_executable_smoke\",\"outcome\":\"passed\"},{\"case_id\":\"hello_world_executable_manifest\",\"outcome\":\"passed\"},{\"case_id\":\"entry_offset_return_42_manifest\",\"outcome\":\"passed\"},{\"case_id\":\"mach_o_return_42\",\"outcome\":\"passed\"},{\"case_id\":\"mach_o_hello_world_stdout\",\"outcome\":\"passed\"},{\"case_id\":\"mach_o_execute_header_probe\",\"outcome\":\"passed\"}]}"
     }
 }

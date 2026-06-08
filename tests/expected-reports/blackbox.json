@@ -49,6 +49,10 @@
       "outcome": "passed"
     },
     {
+      "case_id": "return_42_native_executable_smoke",
+      "outcome": "passed"
+    },
+    {
       "case_id": "hello_world_executable_manifest",
       "outcome": "passed"
     },
