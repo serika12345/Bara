@@ -4,7 +4,7 @@ use bara_ir::{
     X86Reg,
 };
 
-use crate::{DecodeError, DecodedFunction, DecodedInstructionKind};
+use crate::{DecodeError, DecodedFunction, DecodedInstruction, DecodedInstructionKind};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LiftError {
@@ -16,102 +16,102 @@ pub enum LiftError {
 }
 
 pub fn lift_decoded_function(decoded: &DecodedFunction) -> Result<Program, LiftError> {
+    let mut blocks = Vec::new();
     let mut ops = Vec::new();
-    let mut terminator = None;
-    let mut block_end = decoded.entry();
+    let mut block_start = Some(decoded.entry());
 
     for instruction in decoded.instructions() {
-        block_end = instruction.end();
-        match instruction.kind() {
-            DecodedInstructionKind::MovEaxImm32 { imm } => {
-                ops.push(IrOp::Mov {
-                    dst: Operand::Reg(X86Reg::Rax),
-                    src: Operand::ImmU64(u64::from(*imm)),
-                });
-            }
-            DecodedInstructionKind::MovRaxRdi => {
-                ops.push(IrOp::Mov {
-                    dst: Operand::Reg(X86Reg::Rax),
-                    src: Operand::Reg(X86Reg::Rdi),
-                });
-            }
-            DecodedInstructionKind::MovzxEaxBytePtrRdi => {
-                ops.push(IrOp::Mov {
-                    dst: Operand::Reg(X86Reg::Rax),
-                    src: Operand::Mem8 { base: X86Reg::Rdi },
-                });
-            }
-            DecodedInstructionKind::AddEaxImm32 { imm } => {
-                ops.push(IrOp::Add {
-                    dst: Operand::Reg(X86Reg::Rax),
-                    src: Operand::ImmU64(imm.as_i64() as u64),
-                });
-            }
-            DecodedInstructionKind::AddEaxImm8 { imm } => {
-                ops.push(IrOp::Add {
-                    dst: Operand::Reg(X86Reg::Rax),
-                    src: Operand::ImmU64(imm.as_i64() as u64),
-                });
-            }
-            DecodedInstructionKind::SubEaxImm32 { imm } => {
-                ops.push(IrOp::Sub {
-                    dst: Operand::Reg(X86Reg::Rax),
-                    src: Operand::ImmU64(imm.as_i64() as u64),
-                });
-            }
-            DecodedInstructionKind::SubEaxImm8 { imm } => {
-                ops.push(IrOp::Sub {
-                    dst: Operand::Reg(X86Reg::Rax),
-                    src: Operand::ImmU64(imm.as_i64() as u64),
-                });
-            }
-            DecodedInstructionKind::XorEaxEax => {
-                ops.push(IrOp::Mov {
-                    dst: Operand::Reg(X86Reg::Rax),
-                    src: Operand::ImmU64(0),
-                });
-            }
-            DecodedInstructionKind::BaraHostTrapSentinel => {
-                ops.push(IrOp::HostTrap {
-                    kind: HostTrapKind::Stdout,
-                });
-            }
-            DecodedInstructionKind::CallRel32 { target, return_to } => {
-                terminator = Some(Terminator::Unsupported {
-                    reason: UnsupportedReason::DirectCallUnsupported {
-                        target: *target,
-                        return_to: *return_to,
-                    },
-                });
-                break;
-            }
-            DecodedInstructionKind::Syscall => {
-                let request =
-                    SyscallRequest::new(SyscallAbi::X86_64, instruction.start(), instruction.end())
-                        .map_err(LiftError::SyscallRequest)?;
-                terminator = Some(Terminator::BoundaryRequest {
-                    request: BoundaryRequest::Syscall(request),
-                });
-                break;
-            }
-            DecodedInstructionKind::Ret => {
-                terminator = Some(Terminator::Return);
-                break;
-            }
-            DecodedInstructionKind::Unsupported { reason } => {
-                terminator = Some(Terminator::Unsupported {
-                    reason: reason.clone(),
-                });
-                break;
+        let start = block_start.get_or_insert(instruction.start());
+        match lift_instruction(instruction)? {
+            LiftedInstruction::Op(op) => ops.push(op),
+            LiftedInstruction::Terminator(terminator) => {
+                let block = BasicBlock::new(
+                    BlockId::new(blocks.len() as u32),
+                    *start,
+                    instruction.end(),
+                    ops,
+                    terminator,
+                )
+                .map_err(LiftError::BasicBlock)?;
+                blocks.push(block);
+                ops = Vec::new();
+                block_start = None;
             }
         }
     }
 
-    let terminator = terminator.ok_or(LiftError::EmptyDecodedFunction)?;
-    let block = BasicBlock::new(BlockId::new(0), decoded.entry(), block_end, ops, terminator)
-        .map_err(LiftError::BasicBlock)?;
+    if blocks.is_empty() || !ops.is_empty() {
+        return Err(LiftError::EmptyDecodedFunction);
+    }
 
-    Program::new(decoded.entry(), vec![block]).map_err(LiftError::Program)
+    Program::new(decoded.entry(), blocks).map_err(LiftError::Program)
+}
+
+enum LiftedInstruction {
+    Op(IrOp),
+    Terminator(Terminator),
+}
+
+fn lift_instruction(instruction: &DecodedInstruction) -> Result<LiftedInstruction, LiftError> {
+    match instruction.kind() {
+        DecodedInstructionKind::MovEaxImm32 { imm } => Ok(LiftedInstruction::Op(IrOp::Mov {
+            dst: Operand::Reg(X86Reg::Rax),
+            src: Operand::ImmU64(u64::from(*imm)),
+        })),
+        DecodedInstructionKind::MovRaxRdi => Ok(LiftedInstruction::Op(IrOp::Mov {
+            dst: Operand::Reg(X86Reg::Rax),
+            src: Operand::Reg(X86Reg::Rdi),
+        })),
+        DecodedInstructionKind::MovzxEaxBytePtrRdi => Ok(LiftedInstruction::Op(IrOp::Mov {
+            dst: Operand::Reg(X86Reg::Rax),
+            src: Operand::Mem8 { base: X86Reg::Rdi },
+        })),
+        DecodedInstructionKind::AddEaxImm32 { imm } => Ok(LiftedInstruction::Op(IrOp::Add {
+            dst: Operand::Reg(X86Reg::Rax),
+            src: Operand::ImmU64(imm.as_i64() as u64),
+        })),
+        DecodedInstructionKind::AddEaxImm8 { imm } => Ok(LiftedInstruction::Op(IrOp::Add {
+            dst: Operand::Reg(X86Reg::Rax),
+            src: Operand::ImmU64(imm.as_i64() as u64),
+        })),
+        DecodedInstructionKind::SubEaxImm32 { imm } => Ok(LiftedInstruction::Op(IrOp::Sub {
+            dst: Operand::Reg(X86Reg::Rax),
+            src: Operand::ImmU64(imm.as_i64() as u64),
+        })),
+        DecodedInstructionKind::SubEaxImm8 { imm } => Ok(LiftedInstruction::Op(IrOp::Sub {
+            dst: Operand::Reg(X86Reg::Rax),
+            src: Operand::ImmU64(imm.as_i64() as u64),
+        })),
+        DecodedInstructionKind::XorEaxEax => Ok(LiftedInstruction::Op(IrOp::Mov {
+            dst: Operand::Reg(X86Reg::Rax),
+            src: Operand::ImmU64(0),
+        })),
+        DecodedInstructionKind::BaraHostTrapSentinel => Ok(LiftedInstruction::Op(IrOp::HostTrap {
+            kind: HostTrapKind::Stdout,
+        })),
+        DecodedInstructionKind::CallRel32 { target, return_to } => {
+            Ok(LiftedInstruction::Terminator(Terminator::Unsupported {
+                reason: UnsupportedReason::DirectCallUnsupported {
+                    target: *target,
+                    return_to: *return_to,
+                },
+            }))
+        }
+        DecodedInstructionKind::Syscall => {
+            let request =
+                SyscallRequest::new(SyscallAbi::X86_64, instruction.start(), instruction.end())
+                    .map_err(LiftError::SyscallRequest)?;
+            Ok(LiftedInstruction::Terminator(Terminator::BoundaryRequest {
+                request: BoundaryRequest::Syscall(request),
+            }))
+        }
+        DecodedInstructionKind::Ret => Ok(LiftedInstruction::Terminator(Terminator::Return)),
+        DecodedInstructionKind::Unsupported { reason } => {
+            Ok(LiftedInstruction::Terminator(Terminator::Unsupported {
+                reason: reason.clone(),
+            }))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -155,6 +155,58 @@ mod tests {
             }]
         );
         assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn splits_decoded_instruction_stream_at_return_terminators() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(5),
+                    DecodedInstructionKind::MovEaxImm32 { imm: 42 },
+                ),
+                DecodedInstruction::new(X86Va::new(5), X86Va::new(6), DecodedInstructionKind::Ret),
+                DecodedInstruction::new(
+                    X86Va::new(6),
+                    X86Va::new(11),
+                    DecodedInstructionKind::MovEaxImm32 { imm: 7 },
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(11),
+                    X86Va::new(12),
+                    DecodedInstructionKind::Ret,
+                ),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded function lifts");
+
+        assert_eq!(program.blocks().len(), 2);
+        assert_eq!(program.blocks()[0].id(), BlockId::new(0));
+        assert_eq!(program.blocks()[0].start(), X86Va::new(0));
+        assert_eq!(program.blocks()[0].end(), X86Va::new(6));
+        assert_eq!(
+            program.blocks()[0].ops(),
+            &[IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(42)
+            }]
+        );
+        assert_eq!(program.blocks()[0].terminator(), &Terminator::Return);
+        assert_eq!(program.blocks()[1].id(), BlockId::new(1));
+        assert_eq!(program.blocks()[1].start(), X86Va::new(6));
+        assert_eq!(program.blocks()[1].end(), X86Va::new(12));
+        assert_eq!(
+            program.blocks()[1].ops(),
+            &[IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(7)
+            }]
+        );
+        assert_eq!(program.blocks()[1].terminator(), &Terminator::Return);
     }
 
     #[test]

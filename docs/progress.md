@@ -9,36 +9,42 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 16:32 JST
+最終更新: 2026-06-08 16:45 JST
 
 状態:
 
-- project_state: completed。B5 の最初の小ステップとして、既存の
-  `add` / `sub` fixture coverage が control-flow 前段の regression
-  corpus に含まれている状態を TODO と進行履歴へ反映した。
+- project_state: completed。B5 の 2 つ目の小ステップとして、lifter に
+  basic block 分割境界を導入した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B5:
   Control Flow / Stack / Call を開始した。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の
-  D4: Bara IR の責務に沿って、次は basic block 分割と typed terminator
-  境界を進める。
+  D4: Bara IR の責務に沿って、次は typed terminator と fallthrough 境界を
+  進める。
 - active_branch: `task/b5-add-sub-regression`。base commit は `4d2356f`
   (`Merge pull request #4 from serika12345/task/b4-syscall-ir-request`)。
   latest commit は review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B5 の
-  `add` / `sub` を control-flow fixture と regression corpus の中で扱う。
-- completed_work: `add_eax_imm_return_45`、`add_eax_imm32_return_45`、
-  `sub_eax_imm_return_39`、`sub_eax_imm32_return_39`、
-  `add_sub_eax_imm_return_40`、`xor_then_add_eax_return_7` が raw function
-  corpus、expected fixture、runtime regression、blackbox report に含まれている
-  既存状態を B5 の完了済み小ステップとして整理した。あわせて参照 TODO の
-  `add` / `sub` decode/lift と ARM64 `add/sub` emission の進行状態を実装に合わせた。
-- remaining_work: B5 では basic block 分割、typed terminator、direct /
+  basic block 分割を導入する。
+- completed_work: `lift_decoded_function` が decoded instruction stream を
+  terminator ごとに `BasicBlock` として確定し、続く instruction から次の
+  block を開始できるようにした。通常の decode 経路はまだ `ret` /
+  boundary / unsupported で停止するため既存 fixture の外部挙動は変えず、
+  control-flow 拡張に必要な lifter 側の分割境界だけを先に入れた。
+- remaining_work: B5 では typed terminator、fallthrough、direct /
   conditional branch、flags、stack、call、ARM64 fixup、PC map validation が未完了。
-- next_action: B5 の次の小ステップとして、basic block 分割を導入する。
-- verification: `nix develop -c ./scripts/verify` が通過した。
+- next_action: B5 の次の小ステップとして、basic block の typed terminator と
+  fallthrough 明示化を進める。
+- verification: `nix develop -c cargo test -p bara-isa-x86 lift::tests` と
+  `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-08 16:45 JST: B5 の 2 つ目の小ステップとして、lifter に
+  basic block 分割境界を導入した。`ret` などの terminator instruction で
+  block を確定し、後続 instruction があれば次の `BlockId` と source range
+  を持つ `BasicBlock` として lift する。
+- 検証: `nix develop -c cargo test -p bara-isa-x86 lift::tests` と
+  `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 16:32 JST: B5 の最初の小ステップとして、`add` / `sub`
   fixture coverage が control-flow 前段の regression corpus に含まれている
   状態を TODO と進行履歴へ反映した。既存の `tests/cases`、`tests/expected`、
