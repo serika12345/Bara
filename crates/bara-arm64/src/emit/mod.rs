@@ -190,6 +190,13 @@ pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
                 reason: UnsupportedReason::SyscallUnsupported { request: *request },
             });
         }
+        Terminator::Fallthrough { .. }
+        | Terminator::DirectJump { .. }
+        | Terminator::CondJump { .. } => {
+            return Err(EmitError::UnsupportedIr {
+                reason: UnsupportedReason::EmitUnsupportedIr,
+            });
+        }
         Terminator::Unsupported { reason } => {
             return Err(EmitError::UnsupportedIr {
                 reason: reason.clone(),
@@ -273,7 +280,7 @@ mod tests {
     use bara_ir::{
         BasicBlock, BlockId, BoundaryRequest, ExternalCallRequest, ExternalSymbolId, HelperRequest,
         HostTrapKind, IrOp, Operand, Program, SyscallAbi, SyscallRequest, Terminator,
-        UnsupportedReason, X86Reg, X86Va,
+        UnsupportedReason, X86Cond, X86Reg, X86Va,
     };
 
     use crate::{emit_program, Arm64MachineCode, ArmPc, EmitError};
@@ -494,5 +501,37 @@ mod tests {
                 reason: UnsupportedReason::ExternalCallUnsupported { request }
             })
         );
+    }
+
+    #[test]
+    fn control_flow_terminators_are_not_emitted_before_branch_fixups() {
+        for terminator in [
+            Terminator::Fallthrough {
+                target: X86Va::new(4),
+            },
+            Terminator::DirectJump {
+                target: X86Va::new(8),
+            },
+            Terminator::CondJump {
+                condition: X86Cond::Equal,
+                taken: X86Va::new(8),
+                fallthrough: X86Va::new(4),
+            },
+        ] {
+            let program = program_with_ops(
+                vec![IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(42),
+                }],
+                terminator,
+            );
+
+            assert_eq!(
+                emit_program(&program),
+                Err(EmitError::UnsupportedIr {
+                    reason: UnsupportedReason::EmitUnsupportedIr
+                })
+            );
+        }
     }
 }

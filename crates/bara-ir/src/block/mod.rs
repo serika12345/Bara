@@ -82,8 +82,43 @@ pub enum IrOp {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Terminator {
     Return,
-    BoundaryRequest { request: BoundaryRequest },
-    Unsupported { reason: UnsupportedReason },
+    BoundaryRequest {
+        request: BoundaryRequest,
+    },
+    Fallthrough {
+        target: X86Va,
+    },
+    DirectJump {
+        target: X86Va,
+    },
+    CondJump {
+        condition: X86Cond,
+        taken: X86Va,
+        fallthrough: X86Va,
+    },
+    Unsupported {
+        reason: UnsupportedReason,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum X86Cond {
+    Overflow,
+    NotOverflow,
+    Below,
+    AboveOrEqual,
+    Equal,
+    NotEqual,
+    BelowOrEqual,
+    Above,
+    Sign,
+    NotSign,
+    Parity,
+    NotParity,
+    Less,
+    GreaterOrEqual,
+    LessOrEqual,
+    Greater,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -126,7 +161,7 @@ pub enum UnsupportedReason {
 mod tests {
     use crate::{
         BasicBlock, BasicBlockError, BlockId, HostHelperName, HostHelperRequest,
-        HostHelperSignature, HostTrapKind, IrOp, Operand, Terminator, X86Reg, X86Va,
+        HostHelperSignature, HostTrapKind, IrOp, Operand, Terminator, X86Cond, X86Reg, X86Va,
     };
 
     #[test]
@@ -188,6 +223,38 @@ mod tests {
         assert_eq!(block.end(), X86Va::new(6));
         assert_eq!(block.ops(), &[op]);
         assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn control_flow_terminators_expose_typed_targets() {
+        assert_eq!(
+            Terminator::DirectJump {
+                target: X86Va::new(0x1020)
+            },
+            Terminator::DirectJump {
+                target: X86Va::new(0x1020)
+            }
+        );
+        assert_eq!(
+            Terminator::CondJump {
+                condition: X86Cond::Equal,
+                taken: X86Va::new(0x1020),
+                fallthrough: X86Va::new(0x1005),
+            },
+            Terminator::CondJump {
+                condition: X86Cond::Equal,
+                taken: X86Va::new(0x1020),
+                fallthrough: X86Va::new(0x1005),
+            }
+        );
+        assert_eq!(
+            Terminator::Fallthrough {
+                target: X86Va::new(0x1005)
+            },
+            Terminator::Fallthrough {
+                target: X86Va::new(0x1005)
+            }
+        );
     }
 
     #[test]

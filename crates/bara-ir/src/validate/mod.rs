@@ -66,7 +66,7 @@ mod tests {
     use crate::{
         validate_program, BasicBlock, BlockId, BoundaryRequest, ExternalCallRequest,
         ExternalSymbolId, HelperRequest, Program, SyscallAbi, SyscallRequest, Terminator,
-        UnsupportedReason, ValidationIssue, ValidationReport, X86Va,
+        UnsupportedReason, ValidationIssue, ValidationReport, X86Cond, X86Va,
     };
 
     fn block(id: u32, start: u64, end: u64, terminator: Terminator) -> BasicBlock {
@@ -177,6 +177,45 @@ mod tests {
             )],
         )
         .expect("program has entry block");
+
+        assert!(validate_program(&program).is_valid());
+    }
+
+    #[test]
+    fn control_flow_terminators_are_structurally_valid() {
+        let program = Program::new(
+            X86Va::new(0),
+            vec![
+                block(
+                    0,
+                    0,
+                    4,
+                    Terminator::CondJump {
+                        condition: X86Cond::Equal,
+                        taken: X86Va::new(12),
+                        fallthrough: X86Va::new(4),
+                    },
+                ),
+                block(
+                    1,
+                    4,
+                    8,
+                    Terminator::Fallthrough {
+                        target: X86Va::new(8),
+                    },
+                ),
+                block(
+                    2,
+                    8,
+                    12,
+                    Terminator::DirectJump {
+                        target: X86Va::new(12),
+                    },
+                ),
+                block(3, 12, 16, Terminator::Return),
+            ],
+        )
+        .expect("program has entry block and unique block ids");
 
         assert!(validate_program(&program).is_valid());
     }

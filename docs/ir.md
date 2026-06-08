@@ -106,9 +106,12 @@ pub enum Terminator {
     BoundaryRequest {
         request: BoundaryRequest,
     },
+    Fallthrough {
+        target: X86Va,
+    },
     DirectJump { target: X86Va },
     CondJump {
-        cc: X86Cond,
+        condition: X86Cond,
         taken: X86Va,
         fallthrough: X86Va,
     },

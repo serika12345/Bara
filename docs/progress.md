@@ -9,37 +9,44 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 17:15 JST
+最終更新: 2026-06-08 18:36 JST
 
 状態:
 
-- project_state: completed。B5 の 3 つ目の小ステップとして、basic
-  block が必ず typed terminator を持ち、末尾の非 terminator instruction
-  stream を暗黙 fallthrough として扱わない境界を追加した。
+- project_state: completed。B5 の 4 つ目の小ステップとして、direct
+  branch / conditional branch / fallthrough を typed terminator として
+  IR に追加した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B5:
   Control Flow / Stack / Call を開始した。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の
-  D4: Bara IR の責務に沿って、次は direct branch / conditional branch /
-  fallthrough を typed terminator として表現する。
+  D4: Bara IR の責務に沿って、次は flags model と `cmp` / `test` /
+  `jcc` を段階的に追加する。
 - active_branch: `task/b5-add-sub-regression`。base commit は `4d2356f`
   (`Merge pull request #4 from serika12345/task/b4-syscall-ir-request`)。
   latest commit は review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B5 の
-  basic block は必ず typed terminator を持ち、fallthrough を暗黙にしない。
-- completed_work: `lift_decoded_function` の末尾処理を整理し、decoded stream
-  が非 terminator instruction で終わる場合は lift error や暗黙 fallthrough
-  ではなく、`Terminator::Unsupported` と
-  `UnsupportedReason::MissingReturnTerminator` を持つ `BasicBlock` として
-  確定するようにした。
-- remaining_work: B5 では direct / conditional branch、明示 fallthrough
-  terminator、flags、stack、call、ARM64 fixup、PC map validation が未完了。
-- next_action: B5 の次の小ステップとして、direct branch / conditional
-  branch / fallthrough を typed terminator として扱う。
-- verification: `nix develop -c cargo test -p bara-isa-x86 lift::tests` と
+  direct branch / conditional branch / fallthrough を typed terminator として扱う。
+- completed_work: `Terminator::Fallthrough`、`Terminator::DirectJump`、
+  `Terminator::CondJump` と `X86Cond` を IR に追加した。validation はこれらを
+  structural valid terminator として扱い、ARM64 emitter は branch fixup 実装前の
+  explicit unsupported emission として止める。
+- remaining_work: B5 では flags、`cmp` / `test` / `jcc`、`jmp` 実行経路、
+  stack、call、ARM64 fixup、PC map validation が未完了。
+- next_action: B5 の次の小ステップとして、flags model を定義し、
+  `cmp` / `test` / `jcc` を段階的に追加する。
+- verification: `nix develop -c cargo test -p bara-ir` と
+  `nix develop -c cargo test -p bara-arm64 emit::tests` が通過した。
   `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-08 18:36 JST: B5 の 4 つ目の小ステップとして、
+  `Fallthrough`、`DirectJump`、`CondJump`、`X86Cond` を typed IR
+  terminator として追加した。branch lowering / fixup はまだ実装せず、
+  ARM64 emit は explicit unsupported として分類する。
+- 検証: `nix develop -c cargo test -p bara-ir` と
+  `nix develop -c cargo test -p bara-arm64 emit::tests` が通過した。
+  `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 17:15 JST: B5 の 3 つ目の小ステップとして、terminator
   がない decoded stream 末尾を暗黙 fallthrough とせず、
   `MissingReturnTerminator` の typed unsupported terminator を持つ
