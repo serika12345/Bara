@@ -1,4 +1,4 @@
-use super::{input::BinaryInput, probe::BinaryFormatProbeError};
+use super::{BinaryFormatProbeError, BinaryInput};
 
 use serde::{Deserialize, Serialize};
 

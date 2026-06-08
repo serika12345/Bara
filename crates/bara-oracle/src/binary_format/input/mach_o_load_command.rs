@@ -1,5 +1,4 @@
 use super::{
-    input::BinaryInput,
     mach_o_entry_point_command::{
         parse_entry_point_command_metadata, validate_entry_point_command_byte_size,
         MachOEntryPointCommandMetadata,
@@ -9,6 +8,7 @@ use super::{
         MachOSegmentCommandHeaderMetadata,
     },
     probe::BinaryFormatProbeError,
+    BinaryInput,
 };
 
 use serde::{Deserialize, Serialize};

@@ -1,7 +1,4 @@
-use super::{
-    input::BinaryInput, mach_o_entry_point_command::MachOEntryPointFileOffset,
-    probe::BinaryFormatProbeError,
-};
+use super::{BinaryFormatProbeError, BinaryInput, MachOEntryPointFileOffset};
 
 use serde::{Deserialize, Serialize};
 
