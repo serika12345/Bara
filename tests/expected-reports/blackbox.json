@@ -89,6 +89,10 @@
       "outcome": "passed"
     },
     {
+      "case_id": "mach_o_return_42_native_executable_smoke",
+      "outcome": "passed"
+    },
+    {
       "case_id": "mach_o_hello_world_stdout",
       "outcome": "passed"
     },

@@ -13,7 +13,7 @@ use bara_oracle::{
 use crate::{
     case_id_from_path, run_check_binary_probe, run_check_executable, run_check_mach_o,
     run_check_mach_o_host_traps, run_corpus_fixture, run_link_fixture_arm64_main,
-    sorted_case_paths, write_corpus_outputs, CliError, FixtureRun,
+    run_link_mach_o_arm64_main, sorted_case_paths, write_corpus_outputs, CliError, FixtureRun,
 };
 
 pub(crate) fn run_check_blackbox(output_dir: Option<&Path>) -> Result<String, CliError> {
@@ -64,6 +64,11 @@ const BLACKBOX_FIXTURES: &[BlackboxFixtureSpec] = &[
         binary: "tests/binaries/mach_o_return_42.bin",
         expected: "tests/expected/mach_o_return_42.json",
     },
+    BlackboxFixtureSpec::MachONativeExecutableSmoke {
+        binary: "tests/binaries/mach_o_return_42.bin",
+        case_id: "mach_o_return_42_native_executable_smoke",
+        expected_exit_status: 42,
+    },
     BlackboxFixtureSpec::MachOHostTraps {
         binary: "tests/binaries/mach_o_hello_world_stdout.bin",
         host_traps: "tests/host-traps/mach_o_hello_world_stdout.json",
@@ -89,6 +94,11 @@ enum BlackboxFixtureSpec {
         binary: &'static str,
         expected: &'static str,
     },
+    MachONativeExecutableSmoke {
+        binary: &'static str,
+        case_id: &'static str,
+        expected_exit_status: i32,
+    },
     MachOHostTraps {
         binary: &'static str,
         host_traps: &'static str,
@@ -109,9 +119,11 @@ impl BlackboxFixtureSpec {
                 expected_exit_status,
             } => run_native_executable_smoke(
                 case_id,
-                &repo_fixture_path(case),
                 *expected_exit_status,
                 native_artifact_dir,
+                |artifact_path| {
+                    run_link_fixture_arm64_main(&repo_fixture_path(case), artifact_path)
+                },
             ),
             Self::Executable { manifest, expected } => {
                 let manifest_path = repo_fixture_path(manifest);
@@ -127,6 +139,18 @@ impl BlackboxFixtureSpec {
                     run_check_mach_o(&binary_path, &expected_path)
                 })
             }
+            Self::MachONativeExecutableSmoke {
+                binary,
+                case_id,
+                expected_exit_status,
+            } => run_native_executable_smoke(
+                case_id,
+                *expected_exit_status,
+                native_artifact_dir,
+                |artifact_path| {
+                    run_link_mach_o_arm64_main(&repo_fixture_path(binary), artifact_path)
+                },
+            ),
             Self::MachOHostTraps {
                 binary,
                 host_traps,
@@ -153,9 +177,9 @@ impl BlackboxFixtureSpec {
 
 fn run_native_executable_smoke(
     case_id: &str,
-    case_path: &Path,
     expected_exit_status: i32,
     native_artifact_dir: Option<&Path>,
+    link_artifact: impl FnOnce(&Path) -> Result<String, CliError>,
 ) -> FixtureRun {
     let case_id = CaseId::new(case_id).expect("native smoke case id is non-empty");
     let artifact = match NativeSmokeArtifact::new(&case_id, native_artifact_dir) {
@@ -165,7 +189,7 @@ fn run_native_executable_smoke(
         }
     };
 
-    if let Err(error) = run_link_fixture_arm64_main(case_path, artifact.path()) {
+    if let Err(error) = link_artifact(artifact.path()) {
         return FixtureRun::failed(case_id, error.failure_kind(), error.to_string());
     }
 

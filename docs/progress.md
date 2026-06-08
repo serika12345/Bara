@@ -9,43 +9,51 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 20:18 JST
+最終更新: 2026-06-08 21:12 JST
 
 状態:
 
-- project_state: completed。B5 の Control Flow / Stack / Call large milestone
-  は review gate 到達状態。
-- active_milestone: completed。[TODO.md](../TODO.md) の B5:
-  Control Flow / Stack / Call。
-- active_design_focus: completed。[docs/design-todo.md](design-todo.md) の
-  D4: Bara IR の責務に沿って、typed terminator、branch/call validation、
-  parity 以外の conditional branch lowering を追加した。
-- active_branch: `task/b5-add-sub-regression`。base commit は `4d2356f`
-  (`Merge pull request #4 from serika12345/task/b4-syscall-ir-request`)。
-  latest commit は review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B5 の
-  control-flow fixture、typed terminator、flags model、branch/call lowering、
-  stack operations、validation report。
-- completed_work: `add/sub` regression、basic block splitting、typed
-  terminator、`cmp` / `test` flags-producing IR、short / near `jcc` decode /
-  lift、parity 以外の ARM64 `b.cond` lowering、short direct `jmp`、simple loop、
-  `push` / `pop`、internal direct `call rel32`、nested call fixture、branch /
-  call target existence validation、source PC range overlap validationを実装した。
-  parity `jcc` は decode / lift されるが、ARM64 lowering は flags
-  materialization 拡張まで explicit unsupported として扱う。
-- remaining_work: B5 実装は完了。serialized PC map / fixup schema consistency
-  と parity `jcc` lowering は後続 milestone の TODO に残す。
-- next_action: B5 review gate として pull request を開き、レビュー後に B6:
-  実 Mach-O 入力からの standalone 実行へ進む。
-- verification: `nix develop -c cargo test -p bara-ir missing_`、`nix develop
-  -c cargo test -p bara-isa-x86 rel32`、`nix develop -c cargo test -p
-  bara-isa-x86 decodes_jo`、`nix develop -c cargo test -p bara-arm64
-  conditional_branch`、`nix develop -c cargo test -p bara-arm64
-  missing_branch_target_is_invalid_program`、`nix develop -c cargo test -p
-  bara-runtime jl_rel32_return_42`、および `nix develop -c ./scripts/verify`
-  が通過した。
+- project_state: completed。B6 の先頭小ステップとして、Mach-O backed
+  `return_42` 入力を native executable artifact へ変換する経路を実装した。
+- active_milestone: in_progress。[TODO.md](../TODO.md) の B6:
+  実 Mach-O 入力からの standalone 実行。
+- active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の
+  D7: Binary format input/output の分離に沿って、Mach-O 入力変換は
+  `bara-oracle` の既存 pipeline に留め、native artifact packaging は
+  `btbc-cli` の出力境界へ接続した。
+- active_branch: `task/b6-macho-return42-artifact`。base commit は `31dbc29`。
+  latest commit はこの小ステップの review package で確認する。
+- related_todo: [TODO.md](../TODO.md) B6 の
+  Mach-O backed `return_42` 入力を native executable artifact へ変換する項目。
+- completed_work: `link-mach-o-arm64-main <binary> <out-exe>` を追加し、
+  `tests/binaries/mach_o_return_42.bin` を既存の Mach-O entry function
+  pipeline、standalone ARM64 emit、`clang` native artifact packaging へ通した。
+  `check-blackbox` には `mach_o_return_42_native_executable_smoke` を追加し、
+  生成 executable が実プロセス exit status 42 で終了することを確認する。
+- remaining_work: Mach-O backed `hello world` 入力の native executable artifact
+  化、input Mach-O の entry / segment / stack metadata を output packaging へ
+  渡す経路、fixture 専用 host trap JSON 依存の削減、malformed /
+  unsupported Mach-O の artifact 生成時 blocker classification 維持。
+- next_action: B6 の次小ステップとして、Mach-O backed `hello world` 入力を
+  native executable artifact へ変換し、stdout helper 境界を Mach-O 入力経路へ
+  接続する。
+- verification: `nix develop -c cargo test -p btbc-cli
+  link_mach_o_arm64_main`、`nix develop -c cargo test -p btbc-cli
+  check_blackbox_reports_raw_manifest_mach_o_and_probe_fixtures`、`nix develop
+  -c cargo test -p btbc-cli
+  check_blackbox_writes_report_and_schema_specific_actual_outputs`、および
+  `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
+
+- 2026-06-08 21:12 JST: B6 の先頭小ステップとして、Mach-O backed
+  `return_42` 入力を native executable artifact へ変換する CLI / blackbox
+  経路を追加した。`link-mach-o-arm64-main` は Mach-O 入力を既存の
+  `mach_o_entry_function_test_case` 経由で `TestCase` に変換し、
+  standalone artifact compile と `link_arm64_main_executable` に委譲する。
+  `mach_o_return_42_native_executable_smoke` を blackbox report に追加し、
+  生成 artifact を実行して exit status 42 を確認する。検証は snapshot の
+  targeted tests と `nix develop -c ./scripts/verify`。
 
 - 2026-06-08 20:18 JST: B5 large milestone completion の最終小ステップとして、
   IR validation に missing branch/fallthrough/call target report を追加し、

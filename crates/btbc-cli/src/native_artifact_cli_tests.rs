@@ -89,6 +89,37 @@ fn link_fixture_arm64_main_writes_return_42_executable() {
 
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 #[test]
+fn link_mach_o_arm64_main_writes_return_42_executable() {
+    let temp_dir = TestTempDir::new("link_mach_o_arm64_main_writes_return_42_executable");
+    let binary_path = temp_dir.write_binary_file(
+        "mach_o_return_42.bin",
+        include_bytes!("../../../tests/binaries/mach_o_return_42.bin"),
+    );
+    let output_path = temp_dir.path.join("mach_o_return_42");
+
+    let output = run_cli(vec![
+        String::from("link-mach-o-arm64-main"),
+        binary_path.to_string_lossy().into_owned(),
+        output_path.to_string_lossy().into_owned(),
+    ])
+    .expect("Mach-O backed return_42 links as an ARM64 main executable");
+
+    assert!(output_path.exists());
+    assert_eq!(
+        output,
+        format!(
+            "{{\"artifact_kind\":\"linked_executable\",\"target_triple\":\"arm64-apple-macos\",\"toolchain\":\"clang\",\"output_path\":\"{}\",\"helper_requirements\":[]}}",
+            output_path.display()
+        )
+    );
+    let status = Command::new(&output_path)
+        .status()
+        .expect("linked executable runs");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[test]
 fn link_fixture_arm64_main_writes_nested_call_return_42_executable() {
     let temp_dir =
         TestTempDir::new("link_fixture_arm64_main_writes_nested_call_return_42_executable");
@@ -124,6 +155,33 @@ fn link_fixture_arm64_main_reports_unsupported_host() {
     let error = run_cli(vec![
         String::from("link-fixture-arm64-main"),
         case_path.to_string_lossy().into_owned(),
+        output_path.to_string_lossy().into_owned(),
+    ])
+    .expect_err("non-macOS ARM64 host is unsupported");
+
+    assert!(matches!(
+        error,
+        CliError::NativeArtifact(
+            super::native_artifact::NativeArtifactError::UnsupportedHost { .. }
+        )
+    ));
+    assert_eq!(error.failure_kind(), FailureKind::EmitError);
+    assert!(!output_path.exists());
+}
+
+#[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
+#[test]
+fn link_mach_o_arm64_main_reports_unsupported_host() {
+    let temp_dir = TestTempDir::new("link_mach_o_arm64_main_reports_unsupported_host");
+    let binary_path = temp_dir.write_binary_file(
+        "mach_o_return_42.bin",
+        include_bytes!("../../../tests/binaries/mach_o_return_42.bin"),
+    );
+    let output_path = temp_dir.path.join("mach_o_return_42");
+
+    let error = run_cli(vec![
+        String::from("link-mach-o-arm64-main"),
+        binary_path.to_string_lossy().into_owned(),
         output_path.to_string_lossy().into_owned(),
     ])
     .expect_err("non-macOS ARM64 host is unsupported");
@@ -262,6 +320,12 @@ impl TestTempDir {
     fn write_file(&self, name: &str, contents: &str) -> PathBuf {
         let path = self.path.join(name);
         fs::write(&path, contents).expect("test fixture file is written");
+        path
+    }
+
+    fn write_binary_file(&self, name: &str, contents: &[u8]) -> PathBuf {
+        let path = self.path.join(name);
+        fs::write(&path, contents).expect("test fixture binary file is written");
         path
     }
 }
