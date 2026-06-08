@@ -68,6 +68,7 @@ Rosetta から使う情報は、テスト harness が出力する外部挙動だ
 - [Rosetta Oracle 検証ワークフロー](docs/test-oracle.md): expected/actual 比較の流れ
 - [進行履歴](docs/progress.md): タイムスタンプ付きの現在地、進行中作業、完了履歴
 - [Public ABI / import boundary](docs/public-abi-import-boundary.md): public ABI、imports、host helpers、syscall 相当境界の clean-room 設計
+- [将来構想メモ](docs/future-research-concepts.md): 本流 TODO から外した未確立な派生研究の置き場
 
 ## 当面のゴール
 

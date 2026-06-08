@@ -3,9 +3,11 @@
 この文書は、実装大項目とは分けて、設計上の判断、分割方針、
 肥大化を防ぐための監査観点を残す場所とする。
 
-実装 TODO は [TODO.md](../TODO.md) の B1-B12 に置き、ここには
+実装 TODO は [TODO.md](../TODO.md) の B1-B10 に置き、ここには
 「どの境界をどう切るべきか」「いつ設計を固定しすぎないようにするか」
 を記録する。
+本流から外した未確立な派生研究は
+[将来構想メモ](future-research-concepts.md) に分離する。
 
 ## D1: CLI と command 境界
 
@@ -28,7 +30,8 @@
 
 メモ:
 
-- Hello World では `clang` packaging で十分だが、将来の Mach-O writer、ELF/PE、NDA target packaging を考えると artifact model を先に固める。
+- Hello World では `clang` packaging で十分だが、将来の Mach-O writer や
+  ELF/PE packaging を考えると artifact model を先に固める。
 - artifact は「ファイル」ではなく「生成物とその説明」として扱う。
 
 ## D3: Source ISA mode と x86 bit-width
@@ -41,31 +44,38 @@
 メモ:
 
 - 現状の IR と lifter は x86_64 最小 subset として問題ない。
-- ただし `x86 -> arm64` も最終目標に含めるなら、B9 の前に source mode を型として入れる。
+- B8 の実 x86_64 macOS アプリ起動では x86_64 を対象にするが、source
+  mode を型として入れ、B9 の x86 32-bit アプリ対応を public API から
+  閉じ出さない。
+- B9 は B10 の PE / Wine 接続前に先に処理するのが望ましいが、blocker が
+  大きい場合は記録したうえで飛ばしてよい推奨ステップとする。
 
 ## D4: Bara IR の責務
 
-- [ ] Bara IR は semantic IR として維持し、LLVM IR / Wasm へ置き換えない。
+- [ ] Bara IR は binary translation 固有の semantic IR として維持する。
 - [ ] CFG、terminator、flags、stack、call、memory access、helper request を段階的に表現する。
-- [ ] LLVM IR / Wasm へ落とすと失われる情報は metadata または helper boundary として保持する。
+- [ ] backend や副出力で失われやすい情報は metadata または helper boundary として保持する。
 - [ ] IR validation は I/O を持たない pure report として返す。
 
 メモ:
 
-- LLVM IR / Wasm は出力ターゲットや検証ターゲットとして有用だが、Bara の中心IRにすると binary translation 固有の PC map、partial register、flags、例外境界を失いやすい。
-- Wasm は portable verifier / sandbox runner として、LLVM IR は backend 比較として扱う。
+- 未確立な副出力研究は本流 TODO ではなく、
+  [将来構想メモ](future-research-concepts.md) の構想として扱う。
 
-## D5: Host helper / platform abstraction
+## D5: Host helper / OS boundary
 
-- [ ] stdout、file I/O、time、memory allocation、input、audio、rendering、window/event loop を capability として分ける。
-- [ ] Bara host helper ABI と wasm2c platform imports が共有できる最小 interface を設計する。
+- [ ] stdout、file I/O、time、memory allocation、process exit を capability として分ける。
+- [ ] Bara host helper ABI が syscall / OS API request と runtime helper を区別できる最小 interface を設計する。
 - [ ] helper request は core IR / emit に OS 固有処理を混ぜず、runtime boundary で解決する。
-- [ ] open fake backend で CI と regression を回し、NDA adapter は closed layer に閉じる。
+- [ ] unsupported helper / OS API request を stable blocker classification として返す。
 
 メモ:
 
 - `hello world` の stdout helper は初期成功経路として妥当。
-- 今後は Wine bridge、wasm2c platform adapter、NDA target adapter が同じ helper abstraction を使えるようにする。
+- 今後は B8 の x86_64 macOS アプリ起動、B9 の x86 32-bit アプリ対応、
+  B10 の Wine bridge が同じ helper boundary を使えるようにする。
+- wasm2c platform adapter / NDA target adapter は本流 TODO ではなく、
+  [将来構想メモ](future-research-concepts.md) の未確立構想として扱う。
 
 ## D6: User-space runtime
 
@@ -77,7 +87,8 @@
 メモ:
 
 - ユーザー空間完結は Bara の重要な差別化点。
-- process-wide 互換性が必要な箇所も、まず loader/runtime metadata と helper boundary で表現する。
+- B8 の実 x86_64 macOS アプリ起動では、process-wide 互換性が必要な箇所も、
+  まず loader/runtime metadata と helper boundary で表現する。
 
 ## D7: Binary format input/output の分離
 

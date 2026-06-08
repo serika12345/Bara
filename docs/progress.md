@@ -9,22 +9,60 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 11:21 JST
+最終更新: 2026-06-08 11:51 JST
 
 状態:
 
-- project_state: completed。B3: Mach-O 出力境界は review gate に到達した。
-- active_milestone: completed。[TODO.md](../TODO.md) の B3。
-- active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の D7: Binary format input/output の分離。output writer serialization 境界は後続作業として残る。
-- active_branch: `task/b3-mach-o-output-boundary`。B3 作業 branch。
-- related_todo: B3 の `clang` packaging 経路と pure writer 経路の出力差分検証 completed。関連設計 TODO は D7。
-- completed_work: B2 branch は PR merge 後に local から削除した。B3 では `bara-oracle::binary_format` の Mach-O input parser 群を `input` module、executable image plan/materialization を `output` module へ分離した。続いて `bara-mach-o` crate を追加し、最小 ARM64 Mach-O executable writer の pure planning function、`_main` entry、`__TEXT` / optional `__const`、最小 load command model を定義した。最後に、現時点の writer maturity に合わせ、`clang` packaging model と pure writer model の parity を検証する比較 report を追加した。
-- remaining_work: B3 は完了。D7 の output writer serialization 境界、実 bytes の layout / serialization parity は後続作業として残る。
-- next_action: review gate。B3 branch をレビューし、merge 後に B4: x86 syscall / libc 境界へ進む。
-- verification: `nix develop -c cargo test -p bara-mach-o` は未実装 comparison API の compile error で期待どおり失敗し、実装後に通過した。変更全体の gate として `nix develop -c ./scripts/verify` が通過した。
+- project_state: completed。TODO 本流の長期目標を、B8: 実 x86_64
+  macOS アプリ起動、B9: 実 x86 32-bit アプリ対応、B10: PE / Wine
+  接続前段の順に再整理した。B9 は推奨ステップであり、blocker が大きい
+  場合は記録して飛ばせる。
+- active_milestone: planned。[TODO.md](../TODO.md) の次の実装順は B4:
+  x86 syscall / libc 境界から継続し、B8 で実 x86_64 macOS アプリ起動を
+  目指す。その後、B10 の Wine 接続前に B9 の 32-bit アプリ対応を先に
+  処理するのが望ましい。
+- active_design_focus: planned。[docs/design-todo.md](design-todo.md) の D3:
+  Source ISA mode、D5: Host helper / OS boundary、D6: User-space runtime は
+  B8/B9 の設計制約として扱う。
+- active_branch: `main`。latest commit は `8f51a7d`
+  (`Document large milestone PR workflow`)。このロードマップ整理は
+  ドキュメント変更として実施した。
+- related_todo: 旧 B9 の x86 32-bit 対応を見越した設計を、B9:
+  実 x86 32-bit アプリ対応として B8 と B10 の間へ再配置した。旧 B10 の
+  user-space runtime architecture は B8/B9 の過程へ統合した。旧 B11/B12
+  は [将来構想メモ](future-research-concepts.md) に分離した。
+- completed_work: [TODO.md](../TODO.md) の B8 を実 x86_64 macOS アプリ起動へ
+  差し替え、B9 を実 x86 32-bit アプリ対応、B10 を PE / Wine 接続前段に
+  した。B9 は blocker が大きければ飛ばせるが、B10 より先に処理するのが
+  望ましい推奨ステップとして明記した。wasm2c / platform adapter / LLVM IR /
+  Wasm 副出力は本流 TODO から外し、専用の構想メモへ移した。
+- remaining_work: B4-B7 を進めた後、B8 の app launch scope、user-space
+  loader/runtime、source mode guardrail、stable launch report を具体化する。
+  B8 後は B9 の 32-bit app support を先に検討し、必要なら blocker として
+  記録して B10 へ進む。
+- next_action: B4: x86 syscall / libc 境界から小ステップを再開する。
+- verification: documentation-only 変更として `nix develop -c ./scripts/check-no-invisible-chars`
+  と `git diff --check` が通過した。full `./scripts/verify` は code/script/config
+  変更がないため省略した。
 
 直近で完了した作業:
 
+- 2026-06-08 11:51 JST: B8 と PE / Wine 接続前段の間に、B9:
+  実 x86 32-bit アプリ対応を挿入した。B9 は互換性上の論点を Wine 接続前に
+  発見するための推奨ステップとし、blocker が大きい場合は記録したうえで
+  飛ばして B10: PE / Wine 接続前段へ進んでよいことを明記した。
+- 検証: documentation-only 変更として `nix develop -c ./scripts/check-no-invisible-chars`
+  と `git diff --check` が通過した。full `./scripts/verify` は code/script/config
+  変更がないため省略した。
+- 2026-06-08 11:42 JST: TODO 本流の長期目標を再整理した。PE / Wine
+  接続前に B8: 実 x86_64 macOS アプリ起動へ到達することを明記し、旧 B9
+  の source ISA mode / x86_32 guardrail と旧 B10 の user-space runtime
+  architecture を B8 の設計制約へ統合した。旧 B11/B12 の wasm2c /
+  platform adapter / LLVM IR / Wasm 副出力は
+  [将来構想メモ](future-research-concepts.md) へ移し、本流 TODO から外した。
+- 検証: documentation-only 変更として `nix develop -c ./scripts/check-no-invisible-chars`
+  と `git diff --check` が通過した。full `./scripts/verify` は code/script/config
+  変更がないため省略した。
 - 2026-06-08 11:21 JST: B3 の最後の小ステップとして、`clang` packaging 経路と pure writer 経路の差分検証を `bara-mach-o` の公開仕様ベース model 比較として追加した。`MachOArm64ClangPackagingModel`、comparison report、classified mismatch issue を定義し、`_main` / `__TEXT` / `__text` / optional `__const` / minimal load commands の parity を検証できるようにした。B3 は review gate に到達した。
 - 検証: `nix develop -c cargo test -p bara-mach-o` は未実装 comparison API の compile error で期待どおり失敗し、実装後に通過した。変更全体の `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 11:08 JST: B3 の 3 つ目の小ステップとして、`bara-mach-o` の writer plan に public Mach-O model を追加した。`_main` entry、`__TEXT` segment、mandatory `__text` section、const payload がある場合の `__const` section、最小 `LC_SEGMENT_64` / `LC_MAIN` 相当の load command model を domain type として定義した。
@@ -90,9 +128,15 @@
 現在の主な次フェーズ:
 
 - fixture 専用の成功経路を実バイナリ対応へ広げる。
-- native artifact の stable report と failure classification を整える。
-- CLI 肥大化を抑え、artifact domain model を明確にする。
-- x86 32-bit、user-space runtime、platform abstraction、LLVM/Wasm 副出力を見越して設計を固定しすぎない。
+- B4-B7 で syscall / libc 境界、control flow、Mach-O 入力、oracle /
+  regression 基盤を広げる。
+- B8 で実 x86_64 macOS アプリを user-space runtime から起動できる状態を
+  目指す。
+- B9 で実 x86 32-bit アプリ対応を扱う。blocker が大きい場合は記録して
+  飛ばせるが、B10 の PE / Wine 接続前に先に処理するのが望ましい。
+- PE / Wine 接続前段は B10 として扱う。
+- wasm2c、NDA target adapter、LLVM IR / Wasm 副出力は
+  [将来構想メモ](future-research-concepts.md) に分離し、本流 TODO から外す。
 
 ## 完了済みマイルストーン
 
