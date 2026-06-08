@@ -229,6 +229,55 @@ This path has these current limits:
 - Unsupported helper, ABI, platform, or artifact combinations must remain
   classified before execution.
 
+## Unsupported boundary report schema
+
+Function-level unsupported syscall and external call requests are reported at
+the `btbc-cli` I/O boundary as stable JSON in the fixture failure `message`.
+The outer fixture failure `kind` remains `emit_error`.
+
+The stable message shape is:
+
+```json
+{
+  "status": "unsupported_boundary",
+  "failure_kind": "emit_error",
+  "boundary": {
+    "kind": "syscall",
+    "abi": "x86_64",
+    "at": 4096,
+    "return_to": 4098
+  }
+}
+```
+
+or:
+
+```json
+{
+  "status": "unsupported_boundary",
+  "failure_kind": "emit_error",
+  "boundary": {
+    "kind": "external_call",
+    "symbol_id": 9,
+    "import_target": {
+      "kind": "public_symbol",
+      "namespace": "libc",
+      "symbol": "puts"
+    },
+    "call_site": 8192,
+    "return_to": 8197
+  }
+}
+```
+
+`import_target` is either `{"kind":"unresolved"}` or a public symbol identity:
+
+- `namespace`: `libc` or `dyld`
+- `symbol`: currently `puts`, `write`, or `dyld_stub_binder`
+
+This schema records the boundary that stopped execution. It does not emulate
+the syscall, call libc, reproduce dyld behavior, or resolve imports.
+
 ## First implementation sequence after this document
 
 1. Typed import declaration planning

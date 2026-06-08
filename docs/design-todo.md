@@ -85,6 +85,10 @@
 - libc / dyld / import call は `ExternalSymbolImport` の public symbol
   identity として保持する。`puts` / `write` / `dyld_stub_binder` は
   import identity であり、libc ABI や dyld loader behavior を直接模倣しない。
+- function-level の unsupported syscall / external call は
+  `btbc-cli` の report I/O 境界で `unsupported_boundary` JSON message
+  として分類する。これは停止理由の安定化であり、syscall 実行、
+  libc 呼び出し、dyld import 解決を意味しない。
 - 今後は B8 の x86_64 macOS アプリ起動、B9 の x86 32-bit アプリ対応、
   B10 の Wine bridge が同じ helper boundary を使えるようにする。
 - wasm2c platform adapter / NDA target adapter は本流 TODO ではなく、

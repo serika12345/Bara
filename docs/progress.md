@@ -9,37 +9,51 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 15:51 JST
+最終更新: 2026-06-08 15:59 JST
 
 状態:
 
-- project_state: completed。B4 の 7 つ目の小ステップとして、
-  libc / dyld / import 呼び出しを直接模倣せず、public symbol/import
-  identity として扱う model を追加した。
-- active_milestone: in_progress。[TODO.md](../TODO.md) の B4:
-  x86 syscall / libc 境界。先頭 7 項目は完了し、次は unsupported
-  syscall / external call の分類と report schema を安定させる小ステップ。
-- active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の D4:
-  Bara IR の責務と D5: Host helper / OS boundary に沿って、external
-  imports を `ExternalSymbolImport` の public symbol identity として表現した。
+- project_state: completed。B4 の最後の小ステップとして、unsupported
+  syscall / external call の分類と report schema を安定させた。
+- active_milestone: completed。[TODO.md](../TODO.md) の B4:
+  x86 syscall / libc 境界は review gate に到達した。
+- active_design_focus: completed。B4 範囲では
+  [docs/design-todo.md](design-todo.md) の D4: Bara IR の責務と
+  D5: Host helper / OS boundary に沿って、syscall / external call は
+  実行せず、report I/O 境界で `unsupported_boundary` として分類する。
 - active_branch: `task/b4-syscall-ir-request`。base commit は `19eeedb`
   (`Make roadmap linear without losing milestones`)。latest commit は
   review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B4 の
-  libc / dyld / import 呼び出しを直接模倣せず、public symbol/import model として扱う。
-- completed_work: `bara-ir` に `ExternalSymbolImport`、`ExternalImportTarget`、
-  `PublicSymbolImport`、`PublicLibcSymbol`、`PublicDyldSymbol` を追加した。
-  `ExternalCallRequest` は unresolved symbol id だけでなく public symbol import
-  identity を保持できる。`puts` / `write` / `dyld_stub_binder` は identity
-  として残り、libc ABI や dyld loader behavior はまだ実行しない。
-- remaining_work: B4 の unsupported boundary report schema を具体化する。
-- next_action: B4 の最後の小ステップとして unsupported syscall / external call
-  の分類と report schema を安定させる。
-- verification: `nix develop -c cargo test -p bara-ir` が通過した。
-  続く final B4 step で full `nix develop -c ./scripts/verify` を実行する。
+  unsupported syscall / external call の分類と report schema を安定させる。
+- completed_work: `FunctionRunError::Emit` のうち
+  `SyscallUnsupported` と `ExternalCallUnsupported` を stable JSON message
+  に変換する report schema を追加した。schema は
+  `status: unsupported_boundary`、`failure_kind: emit_error`、
+  `boundary.kind: syscall | external_call` を持ち、syscall ABI、
+  source address range、external symbol id、unresolved/public symbol import
+  target を記録する。
+- remaining_work: B4 内の未完了作業はない。
+- next_action: B4 branch の full verification、commit / push、pull request
+  作成を行い、large milestone review gate で停止する。次の実装候補は
+  B5: Control Flow / Stack / Call。
+- verification: `nix develop -c cargo test -p btbc-cli
+  function_run::tests::unsupported`、`nix develop -c ./scripts/check-domain-types`、
+  `nix develop -c ./scripts/check-no-invisible-chars`、`git diff --check`、
+  `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-08 15:59 JST: B4 の最後の小ステップとして、unsupported
+  syscall / external call の分類と report schema を安定させた。
+  function-level の emit unsupported boundary は corpus failure
+  `message` に stable JSON として出力される。syscall は ABI と
+  address range、external call は symbol id、unresolved/public symbol
+  import target、call site / return address を記録する。
+- 検証: `nix develop -c cargo test -p btbc-cli
+  function_run::tests::unsupported`、`nix develop -c ./scripts/check-domain-types`、
+  `nix develop -c ./scripts/check-no-invisible-chars`、`git diff --check`、
+  `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 15:51 JST: B4 の 7 つ目の小ステップとして、libc / dyld /
   import 呼び出しを直接模倣せず、public symbol/import identity として扱う
   model を追加した。`ExternalCallRequest` は `ExternalSymbolImport` を保持し、
