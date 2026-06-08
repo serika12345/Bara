@@ -72,6 +72,10 @@
 メモ:
 
 - `hello world` の stdout helper は初期成功経路として妥当。
+- `write_stdout(ptr_len_to_unit)` は `HostHelperRequest` / `HostHelperAbi`
+  として IR に保持し、`RuntimeHelper` とは分ける。これにより stdout
+  effect を syscall / libc / OS API の直接実装として扱わず、manifest
+  解決と runtime 境界で扱う capability に留める。
 - 今後は B8 の x86_64 macOS アプリ起動、B9 の x86 32-bit アプリ対応、
   B10 の Wine bridge が同じ helper boundary を使えるようにする。
 - wasm2c platform adapter / NDA target adapter は本流 TODO ではなく、

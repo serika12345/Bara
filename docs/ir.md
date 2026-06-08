@@ -75,6 +75,29 @@ pub enum HostTrapKind {
 }
 ```
 
+`HostTrapKind::Stdout` は Bara host helper request へ写像される。
+これは guest OS syscall や runtime 内部 helper ではなく、manifest や
+runtime 境界で解決される Bara 定義の host effect capability である。
+
+```rust
+pub enum HostHelperRequest {
+    WriteStdout,
+}
+
+pub struct HostHelperAbi {
+    name: HostHelperName,
+    signature: HostHelperSignature,
+}
+
+pub enum HostHelperName {
+    WriteStdout,
+}
+
+pub enum HostHelperSignature {
+    PtrLenToUnit,
+}
+```
+
 ## Terminator
 
 ```rust
@@ -165,6 +188,11 @@ pub enum SyscallAbi {
     X86_64,
 }
 ```
+
+`RuntimeHelper` は変換済みコードが runtime 内部へ戻るための helper ABI を
+表し、`HostHelperRequest` は stdout など host-observable effect の
+capability を表す。この 2 つを分けることで、`write_stdout` のような
+Bara host helper を syscall / libc / OS API の直接実装と混ぜない。
 
 ## Operand
 

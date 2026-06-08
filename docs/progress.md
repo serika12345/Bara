@@ -9,37 +9,51 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 13:13 JST
+最終更新: 2026-06-08 14:26 JST
 
 状態:
 
-- project_state: completed。B4 の 3 つ目の小ステップとして、
-  `helper_call_external`、`helper_unimplemented`、`helper_exit` の最小 ABI を
-  typed domain value として定義した。
+- project_state: completed。B4 の 4 つ目の小ステップとして、
+  `puts` / `write` 相当の stdout effect を Bara host helper
+  `write_stdout(ptr_len_to_unit)` の typed request として扱えるようにした。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B4:
-  x86 syscall / libc 境界。先頭 3 項目は完了し、次は `puts` / `write`
-  相当を host helper 経由で stdout に出せるようにする小ステップ。
+  x86 syscall / libc 境界。先頭 4 項目は完了し、次は stdout 相当を
+  Bara host helper から native stdout emission へ変換する境界を明文化する
+  小ステップ。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の D4:
-  Bara IR の責務と D5: Host helper / OS boundary に沿って、runtime helper
-  ABI を OS 固有処理や実行から分離した typed value として固定した。
+  Bara IR の責務と D5: Host helper / OS boundary に沿って、
+  `HostHelperRequest` / `HostHelperAbi` を runtime helper ABI とは別の
+  typed value として固定した。
 - active_branch: `task/b4-syscall-ir-request`。base commit は `19eeedb`
   (`Make roadmap linear without losing milestones`)。latest commit は
   review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B4 の
-  `helper_call_external`、`helper_unimplemented`、`helper_exit` の最小 ABI を定義する。
-- completed_work: `bara-ir` に `RuntimeHelper`、`RuntimeHelperAbi`、
-  `RuntimeHelperName`、`RuntimeHelperSignature` を追加し、B4 の最小 helper
-  ABI set を `helper_call_external(state, symbol_id)`、
-  `helper_unimplemented(state, reason)`、`helper_exit(state, code)` として固定した。
-- remaining_work: B4 の stdout helper 境界、OS ABI 差分、unsupported boundary
-  report schema を順に具体化する。
-- next_action: B4 の次小ステップとして `puts` / `write` 相当を host helper
-  経由で stdout に出せるようにする境界を具体化する。
-- verification: `nix develop -c cargo test -p bara-ir` と
+  `puts` / `write` 相当を host helper 経由で stdout に出せるようにする。
+- completed_work: `bara-ir` に `HostHelperRequest::WriteStdout`、
+  `HostHelperAbi`、`HostHelperName`、`HostHelperSignature` を追加し、
+  `HostTrapKind::Stdout` から `write_stdout(ptr_len_to_unit)` へ写像できる
+  pure boundary を定義した。`btbc-cli` の executable manifest preflight は
+  manifest の resolved `write_stdout` helper を IR 側の `HostHelperAbi` と
+  照合し、preflight 結果として保持する。
+- remaining_work: B4 の native stdout emission 境界、OS ABI 差分、
+  unsupported boundary report schema を順に具体化する。
+- next_action: B4 の次小ステップとして stdout 相当を Bara host helper から
+  native stdout emission へ変換する境界を明文化する。
+- verification: `nix develop -c cargo test -p bara-ir`、
+  `nix develop -c cargo test -p btbc-cli executable_run`、および
   `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-08 14:26 JST: B4 の 4 つ目の小ステップとして、
+  `puts` / `write` 相当の stdout effect を Bara host helper
+  `write_stdout(ptr_len_to_unit)` の typed request として扱えるようにした。
+  `HostTrapKind::Stdout` は `HostHelperRequest::WriteStdout` へ写像され、
+  executable manifest preflight は resolved manifest helper を IR 側の
+  `HostHelperAbi` と照合してから実行へ進む。
+- 検証: `nix develop -c cargo test -p bara-ir`、
+  `nix develop -c cargo test -p btbc-cli executable_run`、および
+  `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 13:13 JST: B4 の 3 つ目の小ステップとして、
   `helper_call_external`、`helper_unimplemented`、`helper_exit` の最小 ABI を
   typed domain value として定義した。helper ABI は名前と signature の pure

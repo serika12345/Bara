@@ -9,8 +9,9 @@ pub use block::{
 };
 pub use boundary::{
     BoundaryRequest, ExternalCallRequest, ExternalCallRequestError, ExternalSymbolId,
-    HelperRequest, RuntimeHelper, RuntimeHelperAbi, RuntimeHelperName, RuntimeHelperSignature,
-    SyscallAbi, SyscallRequest, SyscallRequestError,
+    HelperRequest, HostHelperAbi, HostHelperName, HostHelperRequest, HostHelperSignature,
+    RuntimeHelper, RuntimeHelperAbi, RuntimeHelperName, RuntimeHelperSignature, SyscallAbi,
+    SyscallRequest, SyscallRequestError,
 };
 pub use program::{Program, ProgramError, X86Va};
 pub use validate::{validate_program, ValidationIssue, ValidationReport};

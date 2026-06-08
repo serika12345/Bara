@@ -20,6 +20,52 @@ impl HelperRequest {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HostHelperRequest {
+    WriteStdout,
+}
+
+impl HostHelperRequest {
+    pub const fn abi(self) -> HostHelperAbi {
+        match self {
+            Self::WriteStdout => HostHelperAbi::new(
+                HostHelperName::WriteStdout,
+                HostHelperSignature::PtrLenToUnit,
+            ),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HostHelperAbi {
+    name: HostHelperName,
+    signature: HostHelperSignature,
+}
+
+impl HostHelperAbi {
+    pub const fn new(name: HostHelperName, signature: HostHelperSignature) -> Self {
+        Self { name, signature }
+    }
+
+    pub const fn name(self) -> HostHelperName {
+        self.name
+    }
+
+    pub const fn signature(self) -> HostHelperSignature {
+        self.signature
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HostHelperName {
+    WriteStdout,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HostHelperSignature {
+    PtrLenToUnit,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RuntimeHelper {
     CallExternal,
     Unimplemented,
@@ -187,9 +233,10 @@ pub enum SyscallRequestError {
 #[cfg(test)]
 mod tests {
     use crate::{
-        ExternalCallRequest, ExternalCallRequestError, ExternalSymbolId, RuntimeHelper,
-        RuntimeHelperAbi, RuntimeHelperName, RuntimeHelperSignature, SyscallAbi, SyscallRequest,
-        SyscallRequestError, X86Va,
+        ExternalCallRequest, ExternalCallRequestError, ExternalSymbolId, HostHelperAbi,
+        HostHelperName, HostHelperRequest, HostHelperSignature, RuntimeHelper, RuntimeHelperAbi,
+        RuntimeHelperName, RuntimeHelperSignature, SyscallAbi, SyscallRequest, SyscallRequestError,
+        X86Va,
     };
 
     #[test]
@@ -304,6 +351,17 @@ mod tests {
                 RuntimeHelper::Unimplemented.abi(),
                 RuntimeHelper::Exit.abi(),
             ]
+        );
+    }
+
+    #[test]
+    fn host_helper_abi_defines_write_stdout() {
+        assert_eq!(
+            HostHelperRequest::WriteStdout.abi(),
+            HostHelperAbi::new(
+                HostHelperName::WriteStdout,
+                HostHelperSignature::PtrLenToUnit,
+            )
         );
     }
 }
