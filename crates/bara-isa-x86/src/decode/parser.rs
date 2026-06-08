@@ -145,7 +145,7 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                     }
                 }
             }
-            0x74 => {
+            0x74 | 0x75 => {
                 let end_offset = offset + 2;
                 let displacement = read_u8(input, offset + 1, at, opcode)?;
                 let fallthrough = instruction_end(input, at, end_offset, 2)?;
@@ -158,7 +158,7 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                     at,
                     fallthrough,
                     DecodedInstructionKind::JccRel8 {
-                        condition: X86Cond::Equal,
+                        condition: short_jcc_condition(opcode),
                         taken,
                         fallthrough,
                     },
@@ -362,6 +362,14 @@ fn relative_target(return_to: X86Va, displacement: i32, at: X86Va) -> Result<X86
     }
 
     Ok(X86Va::new(target as u64))
+}
+
+fn short_jcc_condition(opcode: u8) -> X86Cond {
+    match opcode {
+        0x74 => X86Cond::Equal,
+        0x75 => X86Cond::NotEqual,
+        _ => unreachable!("caller restricts short jcc opcodes"),
+    }
 }
 
 fn unsupported_instruction(at: X86Va, end: X86Va, opcode: u8) -> DecodedInstruction {

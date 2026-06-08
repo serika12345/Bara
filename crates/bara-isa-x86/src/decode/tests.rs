@@ -380,6 +380,34 @@ fn decodes_je_rel8_and_continues_with_fallthrough() {
 }
 
 #[test]
+fn decodes_jne_rel8_with_negative_target() {
+    let input = X86Bytes::new(X86Va::new(0x1000), vec![0x75, 0xfe, 0xc3])
+        .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0x1000),
+                X86Va::new(0x1002),
+                DecodedInstructionKind::JccRel8 {
+                    condition: X86Cond::NotEqual,
+                    taken: X86Va::new(0x1000),
+                    fallthrough: X86Va::new(0x1002)
+                }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x1002),
+                X86Va::new(0x1003),
+                DecodedInstructionKind::Ret
+            )
+        ]
+    );
+}
+
+#[test]
 fn decodes_xor_eax_eax_then_ret() {
     let input = X86Bytes::new(X86Va::new(0x1000), vec![0x31, 0xc0, 0xc3])
         .expect("test bytes are non-empty");

@@ -719,6 +719,45 @@ mod tests {
     }
 
     #[test]
+    fn lifts_jne_rel8_to_not_equal_cond_jump_terminator() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(2),
+                    DecodedInstructionKind::JccRel8 {
+                        condition: X86Cond::NotEqual,
+                        taken: X86Va::new(0),
+                        fallthrough: X86Va::new(2),
+                    },
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(2),
+                    X86Va::new(7),
+                    DecodedInstructionKind::MovEaxImm32 { imm: 0 },
+                ),
+                DecodedInstruction::new(X86Va::new(7), X86Va::new(8), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded jne function lifts");
+
+        assert_eq!(program.blocks().len(), 2);
+        assert_eq!(
+            program.blocks()[0].terminator(),
+            &Terminator::CondJump {
+                condition: X86Cond::NotEqual,
+                taken: X86Va::new(0),
+                fallthrough: X86Va::new(2)
+            }
+        );
+        assert_eq!(program.blocks()[1].start(), X86Va::new(2));
+        assert_eq!(program.blocks()[1].terminator(), &Terminator::Return);
+    }
+
+    #[test]
     fn lifts_xor_eax_eax_to_mov_rax_zero() {
         let decoded = DecodedFunction::new(
             X86Va::new(0),
