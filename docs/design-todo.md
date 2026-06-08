@@ -90,6 +90,9 @@
 
 - 入力解析と出力生成は同じ Mach-O でも変更理由が違う。
 - `bara-oracle` は比較・fixture・外部観測の責務に留め、artifact writer の置き場にしない。
+- B3 の pure writer planning 境界は `bara-mach-o` crate に置く。`bara-oracle`
+  には fixture / probe / external observation を残し、Mach-O artifact serialization
+  は writer 側で育てる。
 
 ## D8: Clean-room research boundary
 

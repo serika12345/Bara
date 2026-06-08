@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 10:26 JST
+最終更新: 2026-06-08 10:46 JST
 
 状態:
 
@@ -17,14 +17,16 @@
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B3。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の D7: Binary format input/output の分離。
 - active_branch: `task/b3-mach-o-output-boundary`。B3 作業 branch。
-- related_todo: B3 `既存の入力 Mach-O parser と出力 Mach-O writer の責務を分ける` completed。関連設計 TODO は D7。
-- completed_work: B2 branch は PR merge 後に local から削除した。B3 では `bara-oracle::binary_format` の Mach-O input parser 群を `input` module、executable image plan/materialization を `output` module へ分離し、既存の公開 API re-export は維持した。
-- remaining_work: B3 の pure ARM64 Mach-O executable writer 設計、`_main` / `__TEXT` / `__const` / minimal load commands model、`clang` packaging との差分検証、必要時の writer crate 切り出し。
-- next_action: 最小 ARM64 Mach-O executable writer を pure function として設計し、target artifact planning / serialization 境界を定義する。
-- verification: module 移動前後で `nix develop -c cargo test -p bara-oracle binary_format::tests` が通過した。変更全体の gate として `nix develop -c ./scripts/verify` が通過した。
+- related_todo: B3 `最小 ARM64 Mach-O executable writer を pure function として設計する` completed。関連設計 TODO は D7。
+- completed_work: B2 branch は PR merge 後に local から削除した。B3 では `bara-oracle::binary_format` の Mach-O input parser 群を `input` module、executable image plan/materialization を `output` module へ分離した。続いて `bara-mach-o` crate を追加し、最小 ARM64 Mach-O executable writer の request / payload / plan を I/O なしの pure planning function として定義した。
+- remaining_work: B3 の `_main` / `__TEXT` / `__const` / minimal load commands model、`clang` packaging との差分検証、必要時の追加切り出し。
+- next_action: `_main` entry、`__TEXT`、`__const`、最小 load commands の公開仕様ベース model を `bara-mach-o` に定義する。
+- verification: `nix develop -c cargo test -p bara-mach-o` が未実装 API の compile error で期待どおり失敗し、実装後に通過した。変更全体の gate として `nix develop -c ./scripts/verify-supply-chain` と `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-08 10:46 JST: B3 の 2 つ目の小ステップとして、`bara-mach-o` crate を追加し、ARM64 Mach-O executable writer の pure planning 境界を設計した。`MachOArm64MainCode`、`MachOArm64ConstData`、writer request、payload、plan、target を domain type として定義し、empty payload parts は classified input error にする。
+- 検証: `nix develop -c cargo test -p bara-mach-o` は未実装 API の compile error で期待どおり失敗し、実装後に通過した。変更全体の `nix develop -c ./scripts/verify-supply-chain` と `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 10:26 JST: B3 の最初の小ステップとして、Mach-O input parser と output artifact planning / materialization の責務を module 境界で分離した。`binary_format::input` が public format probe / Mach-O metadata / load command parsing を扱い、`binary_format::output` が executable image plan / materialization を扱う。外部公開 API は `binary_format` と crate root の re-export で維持した。
 - 検証: 移動前後で `nix develop -c cargo test -p bara-oracle binary_format::tests` が通過した。変更全体の `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 10:09 JST: B2 の最後の小ステップとして、unsupported host を classified stable output にした。`NativeArtifactError::UnsupportedHost` は `EmitError` の分類を保ちつつ、artifact kind、target triple、host os/arch を含む JSON message を返す。

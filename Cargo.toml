@@ -3,6 +3,7 @@ members = [
     "crates/bara-arm64",
     "crates/bara-ir",
     "crates/bara-isa-x86",
+    "crates/bara-mach-o",
     "crates/bara-oracle",
     "crates/bara-runtime",
     "crates/btbc-cli",
