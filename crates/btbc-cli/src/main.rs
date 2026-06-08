@@ -85,6 +85,15 @@ fn run_cli(args: Vec<String>) -> Result<String, CliError> {
         [command, case_path, output_path] if command == "link-fixture-arm64-stdout-main" => {
             run_link_fixture_arm64_stdout_main(Path::new(case_path), Path::new(output_path))
         }
+        [command, binary_path, host_traps_path, output_path]
+            if command == "link-mach-o-arm64-stdout-main" =>
+        {
+            run_link_mach_o_arm64_stdout_main(
+                Path::new(binary_path),
+                Path::new(host_traps_path),
+                Path::new(output_path),
+            )
+        }
         [command] if command == "check-blackbox" => run_check_blackbox(None),
         [command, output_flag, output_dir]
             if command == "check-blackbox" && output_flag == "--out" =>
@@ -182,6 +191,29 @@ fn run_link_fixture_arm64_stdout_main(
     observed_result_to_json(&actual).map_err(CliError::Json)
 }
 
+fn run_link_mach_o_arm64_stdout_main(
+    binary_path: &Path,
+    host_traps_path: &Path,
+    output_path: &Path,
+) -> Result<String, CliError> {
+    let test_case = read_mach_o_entry_function_test_case_with_host_traps(
+        binary_path,
+        read_host_trap_plan(host_traps_path)?,
+    )?;
+    let compiled = compile_test_case_function(&test_case).map_err(CliError::FunctionRun)?;
+    let artifact = link_arm64_stdout_main_executable(
+        compiled.arm64_bytes(),
+        test_case.host_trap_plan(),
+        compiled.stdout_host_trap_request(),
+        output_path,
+    )
+    .map_err(CliError::NativeArtifact)?;
+
+    let actual = observe_native_executable_artifact(test_case.case_id().clone(), &artifact)
+        .map_err(CliError::NativeArtifact)?;
+    observed_result_to_json(&actual).map_err(CliError::Json)
+}
+
 fn run_check_executable(manifest_path: &Path, expected_path: &Path) -> Result<String, CliError> {
     let manifest_json = read_text_file(manifest_path)?;
     let expected_json = read_text_file(expected_path)?;
@@ -205,19 +237,12 @@ fn run_check_mach_o_host_traps(
     host_traps_path: &Path,
     expected_path: &Path,
 ) -> Result<String, CliError> {
-    let bytes = read_binary_file(binary_path)?;
-    let host_traps_json = read_text_file(host_traps_path)?;
     let expected_json = read_text_file(expected_path)?;
-    let host_trap_plan =
-        host_trap_plan_from_json(&host_traps_json).map_err(CliError::HostTrapPlan)?;
     let expected = observed_result_from_json(&expected_json).map_err(CliError::ExpectedJson)?;
-    let input = BinaryInput::from_file_bytes(BinaryFileBytes::from_untrusted_file_contents(bytes));
-    let test_case = mach_o_entry_function_test_case_with_host_traps(
-        case_id_from_path(binary_path),
-        &input,
-        host_trap_plan,
-    )
-    .map_err(CliError::MachOEntryFunctionTestCase)?;
+    let test_case = read_mach_o_entry_function_test_case_with_host_traps(
+        binary_path,
+        read_host_trap_plan(host_traps_path)?,
+    )?;
 
     run_test_case(test_case, expected)
 }
@@ -227,6 +252,27 @@ fn read_mach_o_entry_function_test_case(binary_path: &Path) -> Result<TestCase, 
     let input = BinaryInput::from_file_bytes(BinaryFileBytes::from_untrusted_file_contents(bytes));
     mach_o_entry_function_test_case(case_id_from_path(binary_path), &input)
         .map_err(CliError::MachOEntryFunctionTestCase)
+}
+
+fn read_mach_o_entry_function_test_case_with_host_traps(
+    binary_path: &Path,
+    host_trap_plan: bara_oracle::TestCaseHostTrapPlan,
+) -> Result<TestCase, CliError> {
+    let bytes = read_binary_file(binary_path)?;
+    let input = BinaryInput::from_file_bytes(BinaryFileBytes::from_untrusted_file_contents(bytes));
+    mach_o_entry_function_test_case_with_host_traps(
+        case_id_from_path(binary_path),
+        &input,
+        host_trap_plan,
+    )
+    .map_err(CliError::MachOEntryFunctionTestCase)
+}
+
+fn read_host_trap_plan(
+    host_traps_path: &Path,
+) -> Result<bara_oracle::TestCaseHostTrapPlan, CliError> {
+    let host_traps_json = read_text_file(host_traps_path)?;
+    host_trap_plan_from_json(&host_traps_json).map_err(CliError::HostTrapPlan)
 }
 
 fn run_probe_binary(binary_path: &Path) -> Result<String, CliError> {
@@ -617,7 +663,7 @@ impl std::fmt::Display for CliError {
         match self {
             Self::Usage => write!(
                 formatter,
-                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | link-fixture-arm64-main <case.json> <out-exe> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | check-blackbox [--out <dir>]"
+                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | link-fixture-arm64-main <case.json> <out-exe> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
             ),
             Self::ReadFile { path, source } => {
                 write!(formatter, "failed to read file {}: {source}", path.display())
@@ -1132,9 +1178,21 @@ mod tests {
             ),
             "{\"case_id\":\"mach_o_hello_world_stdout\",\"exit_status\":0,\"return_value\":0,\"stdout\":\"hello world\\n\",\"stderr\":\"\"}"
         );
+        assert_eq!(
+            read_file(
+                &output_dir
+                    .join("actual")
+                    .join("mach_o_hello_world_stdout_native_executable.json")
+            ),
+            "{\"case_id\":\"mach_o_hello_world_stdout_native_executable\",\"exit_status\":0,\"return_value\":0,\"stdout\":\"hello world\\n\",\"stderr\":\"\"}"
+        );
         assert!(output_dir
             .join("native-artifacts")
             .join("mach_o_return_42_native_executable_smoke")
+            .is_file());
+        assert!(output_dir
+            .join("native-artifacts")
+            .join("mach_o_hello_world_stdout_native_executable")
             .is_file());
         let expected_probe = binary_format_probe_report_from_json(include_str!(
             "../../../tests/expected-probes/mach_o_execute_header.json"
@@ -1246,6 +1304,6 @@ mod tests {
     }
 
     fn expected_blackbox_report_json() -> &'static str {
-        "{\"fixtures\":[{\"case_id\":\"add_eax_imm32_return_45\",\"outcome\":\"passed\"},{\"case_id\":\"add_eax_imm_return_45\",\"outcome\":\"passed\"},{\"case_id\":\"add_sub_eax_imm_return_40\",\"outcome\":\"passed\"},{\"case_id\":\"branch_eq_return_42\",\"outcome\":\"passed\"},{\"case_id\":\"direct_jmp_return_42\",\"outcome\":\"passed\"},{\"case_id\":\"hello_world_stdout_return_0\",\"outcome\":\"passed\"},{\"case_id\":\"identity_u64\",\"outcome\":\"passed\"},{\"case_id\":\"jl_rel32_return_42\",\"outcome\":\"passed\"},{\"case_id\":\"load_u8_from_rdi_return_72\",\"outcome\":\"passed\"},{\"case_id\":\"loop_countdown_return_0\",\"outcome\":\"passed\"},{\"case_id\":\"nested_call_return_42\",\"outcome\":\"passed\"},{\"case_id\":\"push_pop_return_42\",\"outcome\":\"passed\"},{\"case_id\":\"return_42\",\"outcome\":\"passed\"},{\"case_id\":\"stdout_trap_return_0\",\"outcome\":\"passed\"},{\"case_id\":\"sub_eax_imm32_return_39\",\"outcome\":\"passed\"},{\"case_id\":\"sub_eax_imm_return_39\",\"outcome\":\"passed\"},{\"case_id\":\"xor_eax_eax_return_0\",\"outcome\":\"passed\"},{\"case_id\":\"xor_then_add_eax_return_7\",\"outcome\":\"passed\"},{\"case_id\":\"return_42_native_executable_smoke\",\"outcome\":\"passed\"},{\"case_id\":\"hello_world_executable_manifest\",\"outcome\":\"passed\"},{\"case_id\":\"entry_offset_return_42_manifest\",\"outcome\":\"passed\"},{\"case_id\":\"mach_o_return_42\",\"outcome\":\"passed\"},{\"case_id\":\"mach_o_return_42_native_executable_smoke\",\"outcome\":\"passed\"},{\"case_id\":\"mach_o_hello_world_stdout\",\"outcome\":\"passed\"},{\"case_id\":\"mach_o_execute_header_probe\",\"outcome\":\"passed\"}]}"
+        "{\"fixtures\":[{\"case_id\":\"add_eax_imm32_return_45\",\"outcome\":\"passed\"},{\"case_id\":\"add_eax_imm_return_45\",\"outcome\":\"passed\"},{\"case_id\":\"add_sub_eax_imm_return_40\",\"outcome\":\"passed\"},{\"case_id\":\"branch_eq_return_42\",\"outcome\":\"passed\"},{\"case_id\":\"direct_jmp_return_42\",\"outcome\":\"passed\"},{\"case_id\":\"hello_world_stdout_return_0\",\"outcome\":\"passed\"},{\"case_id\":\"identity_u64\",\"outcome\":\"passed\"},{\"case_id\":\"jl_rel32_return_42\",\"outcome\":\"passed\"},{\"case_id\":\"load_u8_from_rdi_return_72\",\"outcome\":\"passed\"},{\"case_id\":\"loop_countdown_return_0\",\"outcome\":\"passed\"},{\"case_id\":\"nested_call_return_42\",\"outcome\":\"passed\"},{\"case_id\":\"push_pop_return_42\",\"outcome\":\"passed\"},{\"case_id\":\"return_42\",\"outcome\":\"passed\"},{\"case_id\":\"stdout_trap_return_0\",\"outcome\":\"passed\"},{\"case_id\":\"sub_eax_imm32_return_39\",\"outcome\":\"passed\"},{\"case_id\":\"sub_eax_imm_return_39\",\"outcome\":\"passed\"},{\"case_id\":\"xor_eax_eax_return_0\",\"outcome\":\"passed\"},{\"case_id\":\"xor_then_add_eax_return_7\",\"outcome\":\"passed\"},{\"case_id\":\"return_42_native_executable_smoke\",\"outcome\":\"passed\"},{\"case_id\":\"hello_world_executable_manifest\",\"outcome\":\"passed\"},{\"case_id\":\"entry_offset_return_42_manifest\",\"outcome\":\"passed\"},{\"case_id\":\"mach_o_return_42\",\"outcome\":\"passed\"},{\"case_id\":\"mach_o_return_42_native_executable_smoke\",\"outcome\":\"passed\"},{\"case_id\":\"mach_o_hello_world_stdout\",\"outcome\":\"passed\"},{\"case_id\":\"mach_o_hello_world_stdout_native_executable\",\"outcome\":\"passed\"},{\"case_id\":\"mach_o_execute_header_probe\",\"outcome\":\"passed\"}]}"
     }
 }

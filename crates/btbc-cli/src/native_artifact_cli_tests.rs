@@ -246,6 +246,37 @@ fn link_fixture_arm64_stdout_main_writes_hello_world_executable() {
     assert_eq!(output, expected);
 }
 
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[test]
+fn link_mach_o_arm64_stdout_main_writes_hello_world_executable() {
+    let temp_dir = TestTempDir::new("link_mach_o_arm64_stdout_main_writes_hello_world_executable");
+    let binary_path = temp_dir.write_binary_file(
+        "mach_o_hello_world_stdout.bin",
+        include_bytes!("../../../tests/binaries/mach_o_hello_world_stdout.bin"),
+    );
+    let host_traps_path = temp_dir.write_file(
+        "host-traps.json",
+        include_str!("../../../tests/host-traps/mach_o_hello_world_stdout.json"),
+    );
+    let output_path = temp_dir.path.join("mach_o_hello_world_stdout");
+
+    let output = run_cli(vec![
+        String::from("link-mach-o-arm64-stdout-main"),
+        binary_path.to_string_lossy().into_owned(),
+        host_traps_path.to_string_lossy().into_owned(),
+        output_path.to_string_lossy().into_owned(),
+    ])
+    .expect("Mach-O backed hello world links as an ARM64 stdout main executable");
+
+    assert!(output_path.exists());
+    let expected = observed_result_from_json(include_str!(
+        "../../../tests/expected/mach_o_hello_world_stdout.json"
+    ))
+    .and_then(|result| observed_result_to_json(&result))
+    .expect("expected Mach-O stdout fixture normalizes to output json");
+    assert_eq!(output, expected);
+}
+
 #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
 #[test]
 fn link_fixture_arm64_stdout_main_reports_unsupported_host() {
@@ -259,6 +290,38 @@ fn link_fixture_arm64_stdout_main_reports_unsupported_host() {
     let error = run_cli(vec![
         String::from("link-fixture-arm64-stdout-main"),
         case_path.to_string_lossy().into_owned(),
+        output_path.to_string_lossy().into_owned(),
+    ])
+    .expect_err("non-macOS ARM64 host is unsupported");
+
+    assert!(matches!(
+        error,
+        CliError::NativeArtifact(
+            super::native_artifact::NativeArtifactError::UnsupportedHost { .. }
+        )
+    ));
+    assert_eq!(error.failure_kind(), FailureKind::EmitError);
+    assert!(!output_path.exists());
+}
+
+#[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
+#[test]
+fn link_mach_o_arm64_stdout_main_reports_unsupported_host() {
+    let temp_dir = TestTempDir::new("link_mach_o_arm64_stdout_main_reports_unsupported_host");
+    let binary_path = temp_dir.write_binary_file(
+        "mach_o_hello_world_stdout.bin",
+        include_bytes!("../../../tests/binaries/mach_o_hello_world_stdout.bin"),
+    );
+    let host_traps_path = temp_dir.write_file(
+        "host-traps.json",
+        include_str!("../../../tests/host-traps/mach_o_hello_world_stdout.json"),
+    );
+    let output_path = temp_dir.path.join("mach_o_hello_world_stdout");
+
+    let error = run_cli(vec![
+        String::from("link-mach-o-arm64-stdout-main"),
+        binary_path.to_string_lossy().into_owned(),
+        host_traps_path.to_string_lossy().into_owned(),
         output_path.to_string_lossy().into_owned(),
     ])
     .expect_err("non-macOS ARM64 host is unsupported");

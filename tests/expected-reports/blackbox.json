@@ -97,6 +97,10 @@
       "outcome": "passed"
     },
     {
+      "case_id": "mach_o_hello_world_stdout_native_executable",
+      "outcome": "passed"
+    },
+    {
       "case_id": "mach_o_execute_header_probe",
       "outcome": "passed"
     }
