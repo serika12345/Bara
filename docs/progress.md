@@ -9,41 +9,42 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 15:59 JST
+最終更新: 2026-06-08 16:32 JST
 
 状態:
 
-- project_state: completed。B4 の最後の小ステップとして、unsupported
-  syscall / external call の分類と report schema を安定させた。
-- active_milestone: completed。[TODO.md](../TODO.md) の B4:
-  x86 syscall / libc 境界は review gate に到達した。
-- active_design_focus: completed。B4 範囲では
-  [docs/design-todo.md](design-todo.md) の D4: Bara IR の責務と
-  D5: Host helper / OS boundary に沿って、syscall / external call は
-  実行せず、report I/O 境界で `unsupported_boundary` として分類する。
-- active_branch: `task/b4-syscall-ir-request`。base commit は `19eeedb`
-  (`Make roadmap linear without losing milestones`)。latest commit は
-  review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B4 の
-  unsupported syscall / external call の分類と report schema を安定させる。
-- completed_work: `FunctionRunError::Emit` のうち
-  `SyscallUnsupported` と `ExternalCallUnsupported` を stable JSON message
-  に変換する report schema を追加した。schema は
-  `status: unsupported_boundary`、`failure_kind: emit_error`、
-  `boundary.kind: syscall | external_call` を持ち、syscall ABI、
-  source address range、external symbol id、unresolved/public symbol import
-  target を記録する。
-- remaining_work: B4 内の未完了作業はない。
-- next_action: B4 branch の full verification、commit / push、pull request
-  作成を行い、large milestone review gate で停止する。次の実装候補は
-  B5: Control Flow / Stack / Call。
-- verification: `nix develop -c cargo test -p btbc-cli
-  function_run::tests::unsupported`、`nix develop -c ./scripts/check-domain-types`、
-  `nix develop -c ./scripts/check-no-invisible-chars`、`git diff --check`、
-  `nix develop -c ./scripts/verify` が通過した。
+- project_state: completed。B5 の最初の小ステップとして、既存の
+  `add` / `sub` fixture coverage が control-flow 前段の regression
+  corpus に含まれている状態を TODO と進行履歴へ反映した。
+- active_milestone: in_progress。[TODO.md](../TODO.md) の B5:
+  Control Flow / Stack / Call を開始した。
+- active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の
+  D4: Bara IR の責務に沿って、次は basic block 分割と typed terminator
+  境界を進める。
+- active_branch: `task/b5-add-sub-regression`。base commit は `4d2356f`
+  (`Merge pull request #4 from serika12345/task/b4-syscall-ir-request`)。
+  latest commit は review package で確認する。
+- related_todo: [TODO.md](../TODO.md) B5 の
+  `add` / `sub` を control-flow fixture と regression corpus の中で扱う。
+- completed_work: `add_eax_imm_return_45`、`add_eax_imm32_return_45`、
+  `sub_eax_imm_return_39`、`sub_eax_imm32_return_39`、
+  `add_sub_eax_imm_return_40`、`xor_then_add_eax_return_7` が raw function
+  corpus、expected fixture、runtime regression、blackbox report に含まれている
+  既存状態を B5 の完了済み小ステップとして整理した。あわせて参照 TODO の
+  `add` / `sub` decode/lift と ARM64 `add/sub` emission の進行状態を実装に合わせた。
+- remaining_work: B5 では basic block 分割、typed terminator、direct /
+  conditional branch、flags、stack、call、ARM64 fixup、PC map validation が未完了。
+- next_action: B5 の次の小ステップとして、basic block 分割を導入する。
+- verification: `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-08 16:32 JST: B5 の最初の小ステップとして、`add` / `sub`
+  fixture coverage が control-flow 前段の regression corpus に含まれている
+  状態を TODO と進行履歴へ反映した。既存の `tests/cases`、`tests/expected`、
+  `crates/bara-runtime` regression、`tests/expected-reports/blackbox.json` が
+  `add` / `sub` 単独および複合 fixture を保持している。
+- 検証: `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 15:59 JST: B4 の最後の小ステップとして、unsupported
   syscall / external call の分類と report schema を安定させた。
   function-level の emit unsupported boundary は corpus failure
