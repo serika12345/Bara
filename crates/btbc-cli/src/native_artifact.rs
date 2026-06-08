@@ -138,10 +138,85 @@ impl fmt::Display for NativeStdoutMainUnsupported {
 
 impl Error for NativeStdoutMainUnsupported {}
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct RawArm64Bytes<'a> {
+    bytes: &'a [u8],
+}
+
+impl<'a> RawArm64Bytes<'a> {
+    fn from_function(body: FunctionArm64Bytes<'a>) -> Self {
+        Self {
+            bytes: body.as_slice(),
+        }
+    }
+
+    #[cfg(test)]
+    fn from_trusted_bytes(bytes: &'a [u8]) -> Self {
+        Self { bytes }
+    }
+
+    const fn as_slice(self) -> &'a [u8] {
+        self.bytes
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct NativeAssemblySource {
+    source: String,
+}
+
+impl NativeAssemblySource {
+    fn main_from_raw_arm64(body: RawArm64Bytes<'_>) -> Self {
+        let mut source = String::from(".text\n.globl _main\n.p2align 2\n_main:\n");
+        push_byte_directives(&mut source, body.as_slice());
+        Self { source }
+    }
+
+    fn stdout_main_from_raw_arm64_and_stdout(body: RawArm64Bytes<'_>, stdout_bytes: &[u8]) -> Self {
+        let mut source = String::from(".text\n.globl _main\n.p2align 2\n_main:\n");
+        source.push_str("stp x29, x30, [sp, #-16]!\n");
+        source.push_str("mov x29, sp\n");
+        source.push_str("mov x0, #1\n");
+        source.push_str("adrp x1, L_stdout_text@PAGE\n");
+        source.push_str("add x1, x1, L_stdout_text@PAGEOFF\n");
+        source.push_str(&format!("mov x2, #{}\n", stdout_bytes.len()));
+        source.push_str("bl _write\n");
+        source.push_str("ldp x29, x30, [sp], #16\n");
+        push_byte_directives(&mut source, body.as_slice());
+        source.push_str(".section __TEXT,__const\n.p2align 2\nL_stdout_text:\n");
+        push_byte_directives(&mut source, stdout_bytes);
+        Self { source }
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
+        &self.source
+    }
+
+    #[cfg(test)]
+    fn into_string(self) -> String {
+        self.source
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct LinkedNativeExecutable {
+    path: PathBuf,
+}
+
+impl LinkedNativeExecutable {
+    fn from_existing_path(path: PathBuf) -> Self {
+        Self { path }
+    }
+
+    pub(crate) fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
 pub(crate) fn link_arm64_main_executable(
     body: FunctionArm64Bytes<'_>,
     output_path: &Path,
-) -> Result<(), NativeArtifactError> {
+) -> Result<LinkedNativeExecutable, NativeArtifactError> {
     ensure_supported_host()?;
 
     let source = arm64_main_assembly_source(body);
@@ -153,7 +228,7 @@ pub(crate) fn link_arm64_stdout_main_executable(
     host_trap_plan: &TestCaseHostTrapPlan,
     stdout_request: FunctionStdoutHostTrapRequest,
     output_path: &Path,
-) -> Result<(), NativeArtifactError> {
+) -> Result<LinkedNativeExecutable, NativeArtifactError> {
     let Some(stdout) = host_trap_plan.stdout_trap() else {
         return Err(NativeArtifactError::StdoutMainUnsupported(
             NativeStdoutMainUnsupported::MissingStdoutTrapPlan,
@@ -173,8 +248,9 @@ pub(crate) fn link_arm64_stdout_main_executable(
 
 pub(crate) fn observe_native_executable_artifact(
     case_id: CaseId,
-    executable_path: &Path,
+    executable: &LinkedNativeExecutable,
 ) -> Result<ObservedResult, NativeArtifactError> {
+    let executable_path = executable.path();
     let output = Command::new(executable_path).output().map_err(|source| {
         NativeArtifactError::RunArtifact {
             path: executable_path.to_path_buf(),
@@ -204,11 +280,16 @@ pub(crate) fn observe_native_executable_artifact(
     ))
 }
 
-fn link_assembly_source(source: &str, output_path: &Path) -> Result<(), NativeArtifactError> {
+fn link_assembly_source(
+    source: &NativeAssemblySource,
+    output_path: &Path,
+) -> Result<LinkedNativeExecutable, NativeArtifactError> {
     let assembly_path = temporary_assembly_path()?;
-    fs::write(&assembly_path, source).map_err(|source| NativeArtifactError::WriteAssembly {
-        path: assembly_path.clone(),
-        source,
+    fs::write(&assembly_path, source.as_str()).map_err(|source| {
+        NativeArtifactError::WriteAssembly {
+            path: assembly_path.clone(),
+            source,
+        }
     })?;
 
     let output = Command::new("clang")
@@ -233,7 +314,9 @@ fn link_assembly_source(source: &str, output_path: &Path) -> Result<(), NativeAr
         });
     }
 
-    Ok(())
+    Ok(LinkedNativeExecutable::from_existing_path(
+        output_path.to_path_buf(),
+    ))
 }
 
 fn ensure_supported_host() -> Result<(), NativeArtifactError> {
@@ -255,34 +338,33 @@ fn temporary_assembly_path() -> Result<PathBuf, NativeArtifactError> {
     Ok(std::env::temp_dir().join(format!("bara-arm64-main-{nanos}.s")))
 }
 
-fn arm64_main_assembly_source(body: FunctionArm64Bytes<'_>) -> String {
-    arm64_main_assembly_source_from_bytes(body.as_slice())
+fn arm64_main_assembly_source(body: FunctionArm64Bytes<'_>) -> NativeAssemblySource {
+    NativeAssemblySource::main_from_raw_arm64(RawArm64Bytes::from_function(body))
 }
 
+#[cfg(test)]
 fn arm64_main_assembly_source_from_bytes(bytes: &[u8]) -> String {
-    let mut source = String::from(".text\n.globl _main\n.p2align 2\n_main:\n");
-    push_byte_directives(&mut source, bytes);
-    source
+    NativeAssemblySource::main_from_raw_arm64(RawArm64Bytes::from_trusted_bytes(bytes))
+        .into_string()
 }
 
-fn arm64_stdout_main_assembly_source(body: FunctionArm64Bytes<'_>, stdout_text: &str) -> String {
-    arm64_stdout_main_assembly_source_from_parts(body.as_slice(), stdout_text.as_bytes())
+fn arm64_stdout_main_assembly_source(
+    body: FunctionArm64Bytes<'_>,
+    stdout_text: &str,
+) -> NativeAssemblySource {
+    NativeAssemblySource::stdout_main_from_raw_arm64_and_stdout(
+        RawArm64Bytes::from_function(body),
+        stdout_text.as_bytes(),
+    )
 }
 
+#[cfg(test)]
 fn arm64_stdout_main_assembly_source_from_parts(body_bytes: &[u8], stdout_bytes: &[u8]) -> String {
-    let mut source = String::from(".text\n.globl _main\n.p2align 2\n_main:\n");
-    source.push_str("stp x29, x30, [sp, #-16]!\n");
-    source.push_str("mov x29, sp\n");
-    source.push_str("mov x0, #1\n");
-    source.push_str("adrp x1, L_stdout_text@PAGE\n");
-    source.push_str("add x1, x1, L_stdout_text@PAGEOFF\n");
-    source.push_str(&format!("mov x2, #{}\n", stdout_bytes.len()));
-    source.push_str("bl _write\n");
-    source.push_str("ldp x29, x30, [sp], #16\n");
-    push_byte_directives(&mut source, body_bytes);
-    source.push_str(".section __TEXT,__const\n.p2align 2\nL_stdout_text:\n");
-    push_byte_directives(&mut source, stdout_bytes);
-    source
+    NativeAssemblySource::stdout_main_from_raw_arm64_and_stdout(
+        RawArm64Bytes::from_trusted_bytes(body_bytes),
+        stdout_bytes,
+    )
+    .into_string()
 }
 
 fn push_byte_directives(source: &mut String, bytes: &[u8]) {
@@ -302,7 +384,7 @@ fn push_byte_directives(source: &mut String, bytes: &[u8]) {
 mod tests {
     use std::{
         io,
-        path::PathBuf,
+        path::{Path, PathBuf},
         time::{SystemTime, UNIX_EPOCH},
     };
 
@@ -310,7 +392,8 @@ mod tests {
 
     use super::{
         arm64_main_assembly_source_from_bytes, arm64_stdout_main_assembly_source_from_parts,
-        NativeArtifactError, NativeStdoutMainUnsupported,
+        LinkedNativeExecutable, NativeArtifactError, NativeAssemblySource,
+        NativeStdoutMainUnsupported, RawArm64Bytes,
     };
 
     #[test]
@@ -369,6 +452,21 @@ mod tests {
         for error in errors {
             assert_eq!(error.failure_kind(), FailureKind::RunError);
         }
+    }
+
+    #[test]
+    fn native_artifact_types_separate_raw_source_and_linked_executable() {
+        let raw =
+            RawArm64Bytes::from_trusted_bytes(&[0x40, 0x05, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]);
+        let source = NativeAssemblySource::main_from_raw_arm64(raw);
+        let executable =
+            LinkedNativeExecutable::from_existing_path(PathBuf::from("/tmp/return_42"));
+
+        assert_eq!(
+            source.as_str(),
+            ".text\n.globl _main\n.p2align 2\n_main:\n.byte 0x40, 0x05, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6\n"
+        );
+        assert_eq!(executable.path(), Path::new("/tmp/return_42"));
     }
 
     #[test]
