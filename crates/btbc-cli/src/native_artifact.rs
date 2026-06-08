@@ -7,7 +7,7 @@ use std::{
 };
 
 use bara_oracle::{CaseId, FailureKind, JsonError, ObservedResult, TestCaseHostTrapPlan};
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 
 use crate::function_run::{FunctionArm64Bytes, FunctionStdoutHostTrapRequest};
 
@@ -168,24 +168,39 @@ pub(crate) struct NativeAssemblySource {
 
 impl NativeAssemblySource {
     fn main_from_raw_arm64(body: RawArm64Bytes<'_>) -> Self {
+        Self::main_from_generated_code(NativeGeneratedCode::from_raw_arm64(body))
+    }
+
+    fn main_from_generated_code(generated_code: NativeGeneratedCode<'_>) -> Self {
         let mut source = String::from(".text\n.globl _main\n.p2align 2\n_main:\n");
-        push_byte_directives(&mut source, body.as_slice());
+        push_byte_directives(&mut source, generated_code.body().as_slice());
         Self { source }
     }
 
+    #[cfg(test)]
     fn stdout_main_from_raw_arm64_and_stdout(body: RawArm64Bytes<'_>, stdout_bytes: &[u8]) -> Self {
+        Self::stdout_main_from_generated_code_and_stdout(
+            NativeGeneratedCode::from_raw_arm64(body),
+            NativeStdoutData::from_bytes(stdout_bytes),
+        )
+    }
+
+    fn stdout_main_from_generated_code_and_stdout(
+        generated_code: NativeGeneratedCode<'_>,
+        stdout: NativeStdoutData<'_>,
+    ) -> Self {
         let mut source = String::from(".text\n.globl _main\n.p2align 2\n_main:\n");
         source.push_str("stp x29, x30, [sp, #-16]!\n");
         source.push_str("mov x29, sp\n");
         source.push_str("mov x0, #1\n");
         source.push_str("adrp x1, L_stdout_text@PAGE\n");
         source.push_str("add x1, x1, L_stdout_text@PAGEOFF\n");
-        source.push_str(&format!("mov x2, #{}\n", stdout_bytes.len()));
+        source.push_str(&format!("mov x2, #{}\n", stdout.as_bytes().len()));
         source.push_str("bl _write\n");
         source.push_str("ldp x29, x30, [sp], #16\n");
-        push_byte_directives(&mut source, body.as_slice());
+        push_byte_directives(&mut source, generated_code.body().as_slice());
         source.push_str(".section __TEXT,__const\n.p2align 2\nL_stdout_text:\n");
-        push_byte_directives(&mut source, stdout_bytes);
+        push_byte_directives(&mut source, stdout.as_bytes());
         Self { source }
     }
 
@@ -199,32 +214,69 @@ impl NativeAssemblySource {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct NativeGeneratedCode<'a> {
+    body: RawArm64Bytes<'a>,
+}
+
+impl<'a> NativeGeneratedCode<'a> {
+    fn from_raw_arm64(body: RawArm64Bytes<'a>) -> Self {
+        Self { body }
+    }
+
+    const fn body(self) -> RawArm64Bytes<'a> {
+        self.body
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct NativeStdoutData<'a> {
+    bytes: &'a [u8],
+}
+
+impl<'a> NativeStdoutData<'a> {
+    fn from_text(text: &'a str) -> Self {
+        Self::from_bytes(text.as_bytes())
+    }
+
+    const fn from_bytes(bytes: &'a [u8]) -> Self {
+        Self { bytes }
+    }
+
+    const fn as_bytes(self) -> &'a [u8] {
+        self.bytes
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct LinkedNativeExecutable {
-    path: PathBuf,
+    output_path: NativeArtifactOutputPath,
     metadata: NativeArtifactMetadata,
 }
 
 impl LinkedNativeExecutable {
     #[cfg(test)]
     fn from_existing_path(path: PathBuf) -> Self {
-        Self::from_existing_path_with_helper_requirements(
-            path,
+        Self::from_existing_output_path_with_helper_requirements(
+            NativeArtifactOutputPath::from_path(path.as_path()),
             NativeArtifactHelperRequirements::none(),
         )
     }
 
-    fn from_existing_path_with_helper_requirements(
-        path: PathBuf,
+    fn from_existing_output_path_with_helper_requirements(
+        output_path: NativeArtifactOutputPath,
         helper_requirements: NativeArtifactHelperRequirements,
     ) -> Self {
         let metadata =
-            NativeArtifactMetadata::linked_executable(path.as_path(), helper_requirements);
-        Self { path, metadata }
+            NativeArtifactMetadata::linked_executable(output_path.clone(), helper_requirements);
+        Self {
+            output_path,
+            metadata,
+        }
     }
 
     pub(crate) fn path(&self) -> &Path {
-        &self.path
+        self.output_path.as_path()
     }
 
     pub(crate) const fn metadata(&self) -> &NativeArtifactMetadata {
@@ -243,14 +295,14 @@ pub(crate) struct NativeArtifactMetadata {
 
 impl NativeArtifactMetadata {
     fn linked_executable(
-        output_path: &Path,
+        output_path: NativeArtifactOutputPath,
         helper_requirements: NativeArtifactHelperRequirements,
     ) -> Self {
         Self {
             artifact_kind: NativeArtifactKind::LinkedExecutable,
             target_triple: NativeArtifactTargetTriple::Arm64AppleMacos,
             toolchain: NativeArtifactToolchain::Clang,
-            output_path: NativeArtifactOutputPath::from_path(output_path),
+            output_path,
             helper_requirements: helper_requirements.into_values(),
         }
     }
@@ -274,13 +326,29 @@ enum NativeArtifactToolchain {
     Clang,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-#[serde(transparent)]
-struct NativeArtifactOutputPath(String);
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct NativeArtifactOutputPath(String);
 
 impl NativeArtifactOutputPath {
     fn from_path(path: &Path) -> Self {
         Self(path.to_string_lossy().into_owned())
+    }
+
+    fn as_path(&self) -> &Path {
+        Path::new(&self.0)
+    }
+
+    fn to_path_buf(&self) -> PathBuf {
+        self.as_path().to_path_buf()
+    }
+}
+
+impl Serialize for NativeArtifactOutputPath {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.0)
     }
 }
 
@@ -311,6 +379,41 @@ enum NativeArtifactHelperRequirement {
     WriteStdout,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct NativeToolchainCommand {
+    program: &'static str,
+    args: Vec<String>,
+}
+
+impl NativeToolchainCommand {
+    fn clang_link(assembly_path: &Path, output_path: &NativeArtifactOutputPath) -> Self {
+        Self {
+            program: "clang",
+            args: vec![
+                assembly_path.to_string_lossy().into_owned(),
+                String::from("-o"),
+                output_path.as_path().to_string_lossy().into_owned(),
+            ],
+        }
+    }
+
+    fn to_command(&self) -> Command {
+        let mut command = Command::new(self.program);
+        command.args(&self.args);
+        command
+    }
+
+    #[cfg(test)]
+    const fn program(&self) -> &'static str {
+        self.program
+    }
+
+    #[cfg(test)]
+    fn args(&self) -> &[String] {
+        &self.args
+    }
+}
+
 pub(crate) fn native_artifact_metadata_to_json(
     metadata: &NativeArtifactMetadata,
 ) -> Result<String, JsonError> {
@@ -323,6 +426,7 @@ pub(crate) fn link_arm64_main_executable(
 ) -> Result<LinkedNativeExecutable, NativeArtifactError> {
     ensure_supported_host()?;
 
+    let output_path = NativeArtifactOutputPath::from_path(output_path);
     let source = arm64_main_assembly_source(body);
     link_assembly_source(
         &source,
@@ -350,6 +454,7 @@ pub(crate) fn link_arm64_stdout_main_executable(
 
     ensure_supported_host()?;
 
+    let output_path = NativeArtifactOutputPath::from_path(output_path);
     let source = arm64_stdout_main_assembly_source(body, stdout.text());
     link_assembly_source(
         &source,
@@ -394,7 +499,7 @@ pub(crate) fn observe_native_executable_artifact(
 
 fn link_assembly_source(
     source: &NativeAssemblySource,
-    output_path: &Path,
+    output_path: NativeArtifactOutputPath,
     helper_requirements: NativeArtifactHelperRequirements,
 ) -> Result<LinkedNativeExecutable, NativeArtifactError> {
     let assembly_path = temporary_assembly_path()?;
@@ -405,10 +510,9 @@ fn link_assembly_source(
         }
     })?;
 
-    let output = Command::new("clang")
-        .arg(&assembly_path)
-        .arg("-o")
-        .arg(output_path)
+    let toolchain_command = NativeToolchainCommand::clang_link(&assembly_path, &output_path);
+    let output = toolchain_command
+        .to_command()
         .output()
         .map_err(|source| NativeArtifactError::LinkerSpawn { source });
 
@@ -421,15 +525,15 @@ fn link_assembly_source(
             stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
         });
     }
-    if !output_path.exists() {
+    if !output_path.as_path().exists() {
         return Err(NativeArtifactError::MissingLinkedExecutable {
             path: output_path.to_path_buf(),
         });
     }
 
     Ok(
-        LinkedNativeExecutable::from_existing_path_with_helper_requirements(
-            output_path.to_path_buf(),
+        LinkedNativeExecutable::from_existing_output_path_with_helper_requirements(
+            output_path,
             helper_requirements,
         ),
     )
@@ -468,9 +572,9 @@ fn arm64_stdout_main_assembly_source(
     body: FunctionArm64Bytes<'_>,
     stdout_text: &str,
 ) -> NativeAssemblySource {
-    NativeAssemblySource::stdout_main_from_raw_arm64_and_stdout(
-        RawArm64Bytes::from_function(body),
-        stdout_text.as_bytes(),
+    NativeAssemblySource::stdout_main_from_generated_code_and_stdout(
+        NativeGeneratedCode::from_raw_arm64(RawArm64Bytes::from_function(body)),
+        NativeStdoutData::from_text(stdout_text),
     )
 }
 
@@ -509,7 +613,8 @@ mod tests {
     use super::{
         arm64_main_assembly_source_from_bytes, arm64_stdout_main_assembly_source_from_parts,
         native_artifact_metadata_to_json, LinkedNativeExecutable, NativeArtifactError,
-        NativeAssemblySource, NativeStdoutMainUnsupported, RawArm64Bytes,
+        NativeArtifactOutputPath, NativeAssemblySource, NativeGeneratedCode, NativeStdoutData,
+        NativeStdoutMainUnsupported, NativeToolchainCommand, RawArm64Bytes,
     };
 
     #[test]
@@ -594,6 +699,32 @@ mod tests {
             native_artifact_metadata_to_json(executable.metadata())
                 .expect("metadata serializes as json"),
             "{\"artifact_kind\":\"linked_executable\",\"target_triple\":\"arm64-apple-macos\",\"toolchain\":\"clang\",\"output_path\":\"/tmp/return_42\",\"helper_requirements\":[]}"
+        );
+    }
+
+    #[test]
+    fn native_artifact_request_types_separate_code_stdout_command_and_output_path() {
+        let output_path = NativeArtifactOutputPath::from_path(Path::new("/tmp/hello"));
+        let raw =
+            RawArm64Bytes::from_trusted_bytes(&[0x00, 0x00, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]);
+        let generated_code = NativeGeneratedCode::from_raw_arm64(raw);
+        let stdout = NativeStdoutData::from_text("hello\n");
+        let source = NativeAssemblySource::stdout_main_from_generated_code_and_stdout(
+            generated_code,
+            stdout,
+        );
+        let command = NativeToolchainCommand::clang_link(Path::new("/tmp/hello.s"), &output_path);
+
+        assert_eq!(output_path.as_path(), Path::new("/tmp/hello"));
+        assert!(source.as_str().contains("mov x2, #6\n"));
+        assert_eq!(command.program(), "clang");
+        assert_eq!(
+            command.args(),
+            [
+                String::from("/tmp/hello.s"),
+                String::from("-o"),
+                String::from("/tmp/hello")
+            ]
         );
     }
 
