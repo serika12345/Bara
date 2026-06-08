@@ -91,6 +91,19 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                 ));
                 offset = end_offset;
             }
+            0x3d => {
+                let end_offset = offset + 5;
+                let imm = read_i32(input, offset, end_offset, at, opcode)?;
+                let end = instruction_end(input, at, end_offset, 5)?;
+                instructions.push(DecodedInstruction::new(
+                    at,
+                    end,
+                    DecodedInstructionKind::CmpEaxImm32 {
+                        imm: X86Imm32::new(imm),
+                    },
+                ));
+                offset = end_offset;
+            }
             0x31 => {
                 let end_offset = offset + 2;
                 let operand = read_u8(input, offset + 1, at, opcode)?;
@@ -165,6 +178,16 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                             at,
                             end,
                             DecodedInstructionKind::SubEaxImm8 {
+                                imm: X86Imm8::new(i8::from_le_bytes([imm])),
+                            },
+                        ));
+                        offset = end_offset;
+                    }
+                    0xf8 => {
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::CmpEaxImm8 {
                                 imm: X86Imm8::new(i8::from_le_bytes([imm])),
                             },
                         ));

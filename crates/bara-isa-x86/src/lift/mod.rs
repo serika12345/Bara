@@ -101,6 +101,14 @@ fn lift_instruction(instruction: &DecodedInstruction) -> Result<LiftedInstructio
             dst: Operand::Reg(X86Reg::Rax),
             src: Operand::ImmU64(imm.as_i64() as u64),
         })),
+        DecodedInstructionKind::CmpEaxImm32 { imm } => Ok(LiftedInstruction::Op(IrOp::Cmp {
+            lhs: Operand::Reg(X86Reg::Rax),
+            rhs: Operand::ImmU64(imm.as_i64() as u64),
+        })),
+        DecodedInstructionKind::CmpEaxImm8 { imm } => Ok(LiftedInstruction::Op(IrOp::Cmp {
+            lhs: Operand::Reg(X86Reg::Rax),
+            rhs: Operand::ImmU64(imm.as_i64() as u64),
+        })),
         DecodedInstructionKind::XorEaxEax => Ok(LiftedInstruction::Op(IrOp::Mov {
             dst: Operand::Reg(X86Reg::Rax),
             src: Operand::ImmU64(0),
@@ -503,6 +511,92 @@ mod tests {
                 IrOp::Sub {
                     dst: Operand::Reg(X86Reg::Rax),
                     src: Operand::ImmU64(3)
+                }
+            ]
+        );
+        assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_cmp_eax_imm8_to_cmp_rax_immediate() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(5),
+                    DecodedInstructionKind::MovEaxImm32 { imm: 42 },
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(5),
+                    X86Va::new(8),
+                    DecodedInstructionKind::CmpEaxImm8 {
+                        imm: crate::X86Imm8::new(42),
+                    },
+                ),
+                DecodedInstruction::new(X86Va::new(8), X86Va::new(9), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded cmp function lifts");
+        let block = &program.blocks()[0];
+
+        assert_eq!(
+            block.ops(),
+            &[
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(42)
+                },
+                IrOp::Cmp {
+                    lhs: Operand::Reg(X86Reg::Rax),
+                    rhs: Operand::ImmU64(42)
+                }
+            ]
+        );
+        assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_cmp_eax_imm32_to_cmp_rax_immediate() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(5),
+                    DecodedInstructionKind::MovEaxImm32 { imm: 42 },
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(5),
+                    X86Va::new(10),
+                    DecodedInstructionKind::CmpEaxImm32 {
+                        imm: crate::decode::X86Imm32::new(42),
+                    },
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(10),
+                    X86Va::new(11),
+                    DecodedInstructionKind::Ret,
+                ),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded cmp function lifts");
+        let block = &program.blocks()[0];
+
+        assert_eq!(
+            block.ops(),
+            &[
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(42)
+                },
+                IrOp::Cmp {
+                    lhs: Operand::Reg(X86Reg::Rax),
+                    rhs: Operand::ImmU64(42)
                 }
             ]
         );

@@ -9,34 +9,46 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 18:41 JST
+最終更新: 2026-06-08 18:48 JST
 
 状態:
 
-- project_state: completed。B5 の 5 つ目の小ステップとして、flags
-  domain model を IR に追加した。
+- project_state: completed。B5 の 6 つ目の小ステップとして、
+  `cmp eax, imm8/imm32` を decode / lift し、flags-producing IR op として
+  表現した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B5:
   Control Flow / Stack / Call を開始した。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の
-  D4: Bara IR の責務に沿って、次は `cmp` / `test` / `jcc` を段階的に追加する。
+  D4: Bara IR の責務に沿って、次は `test` / `jcc` を段階的に追加する。
 - active_branch: `task/b5-add-sub-regression`。base commit は `4d2356f`
   (`Merge pull request #4 from serika12345/task/b4-syscall-ir-request`)。
   latest commit は review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B5 の
-  flags model を定義する。
-- completed_work: `FlagValue::{Known, Unknown}` と `Flags` を `bara-ir`
-  に追加した。`Flags::unknown()` は追跡対象の CF/PF/AF/ZF/SF/OF をすべて
-  unknown として作り、`Flags::new(...)` と accessor で materialized flag
-  state を扱える。
-- remaining_work: B5 では `cmp` / `test` / `jcc`、`jmp` 実行経路、
+  `cmp eax, imm8/imm32` を flags-producing IR op として decode / lift する。
+- completed_work: x86 decode に `CmpEaxImm8` / `CmpEaxImm32` を追加し、
+  lifter は `IrOp::Cmp { lhs: Reg(Rax), rhs: ImmU64(...) }` へ変換する。
+  ARM64 emit は flag lowering 実装前の explicit unsupported として止める。
+- remaining_work: B5 では `test` / `jcc`、`jmp` 実行経路、
   stack、call、ARM64 fixup、PC map validation が未完了。
-- next_action: B5 の次の小ステップとして、`cmp` / `test` / `jcc` を
+- next_action: B5 の次の小ステップとして、`test` と `jcc` を
   段階的に追加する。
-- verification: `nix develop -c cargo test -p bara-ir flags` が通過した。
+- verification: `nix develop -c cargo test -p bara-isa-x86 cmp`、
+  `nix develop -c cargo test -p bara-ir cmp`、および
+  `nix develop -c cargo test -p bara-arm64 cmp_ops_are_not_emitted_before_flag_lowering`
+  が通過した。
   `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-08 18:48 JST: B5 の 6 つ目の小ステップとして、
+  `cmp eax, imm8/imm32` を decode / lift し、`IrOp::Cmp` として
+  flags-producing IR に追加した。ARM64 emit は flag lowering 実装前の
+  explicit unsupported として分類する。
+- 検証: `nix develop -c cargo test -p bara-isa-x86 cmp`、
+  `nix develop -c cargo test -p bara-ir cmp`、および
+  `nix develop -c cargo test -p bara-arm64 cmp_ops_are_not_emitted_before_flag_lowering`
+  が通過した。
+  `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 18:41 JST: B5 の 5 つ目の小ステップとして、
   `FlagValue::{Known, Unknown}` と CF/PF/AF/ZF/SF/OF を持つ `Flags`
   domain model を `bara-ir` に追加した。`cmp` / `test` / `jcc` の

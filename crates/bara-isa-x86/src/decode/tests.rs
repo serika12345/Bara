@@ -267,6 +267,66 @@ fn decodes_sub_eax_imm32_between_mov_and_ret() {
 }
 
 #[test]
+fn decodes_cmp_eax_imm8_between_mov_and_ret() {
+    let input = X86Bytes::new(
+        X86Va::new(0),
+        vec![0xb8, 0x2a, 0, 0, 0, 0x83, 0xf8, 0x2a, 0xc3],
+    )
+    .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0),
+                X86Va::new(5),
+                DecodedInstructionKind::MovEaxImm32 { imm: 42 }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(5),
+                X86Va::new(8),
+                DecodedInstructionKind::CmpEaxImm8 {
+                    imm: crate::X86Imm8::new(42)
+                }
+            ),
+            DecodedInstruction::new(X86Va::new(8), X86Va::new(9), DecodedInstructionKind::Ret)
+        ]
+    );
+}
+
+#[test]
+fn decodes_cmp_eax_imm32_between_mov_and_ret() {
+    let input = X86Bytes::new(
+        X86Va::new(0),
+        vec![0xb8, 0x2a, 0, 0, 0, 0x3d, 0x2a, 0, 0, 0, 0xc3],
+    )
+    .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0),
+                X86Va::new(5),
+                DecodedInstructionKind::MovEaxImm32 { imm: 42 }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(5),
+                X86Va::new(10),
+                DecodedInstructionKind::CmpEaxImm32 {
+                    imm: crate::decode::X86Imm32::new(42)
+                }
+            ),
+            DecodedInstruction::new(X86Va::new(10), X86Va::new(11), DecodedInstructionKind::Ret)
+        ]
+    );
+}
+
+#[test]
 fn decodes_xor_eax_eax_then_ret() {
     let input = X86Bytes::new(X86Va::new(0x1000), vec![0x31, 0xc0, 0xc3])
         .expect("test bytes are non-empty");
