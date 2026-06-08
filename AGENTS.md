@@ -276,13 +276,15 @@ Branch workflow:
 5. Push the task branch after commits when network access is available.
 6. Continue until the requested small or large milestone is reached, or until a
    review gate or blocker is reached.
-7. When a large milestone is complete, stop and return a review package with
-   the branch already committed and pushed.
+7. When a large milestone is complete, open a pull request for the completed
+   branch, then stop and return a review package with the branch already
+   committed and pushed.
 
-Large milestone completion is a review gate. Do not merge back to `main`
-autonomously. After user review, if the user approves, merge the branch into
-`main`, clean up the branch if appropriate, update progress documentation, and
-continue to the next milestone only when instructed.
+Large milestone completion is a review gate. Open a pull request for the
+completed branch, but do not merge back to `main` autonomously. After user
+review, if the user approves, merge the branch into `main`, clean up the branch
+if appropriate, update progress documentation, and continue to the next
+milestone only when instructed.
 
 On a dedicated task branch, autonomous commits and pushes are allowed when all
 of these are true:
@@ -302,6 +304,7 @@ review unless instructed otherwise.
 Review package at a milestone stop:
 
 - branch name and latest commit
+- pull request URL
 - completed TODO items
 - changed files summary
 - verification commands and results
@@ -316,7 +319,8 @@ intended to let the user select an action without typing the full instruction.
 
 - `/advance-large`: Create a dedicated work branch and advance the current
   large milestone to completion. Commit and push coherent verified steps on the
-  work branch. Stop at the large milestone review gate with a review package.
+  work branch. Open a pull request, then stop at the large milestone review
+  gate with a review package.
 - `/advance-small`: Create or continue a dedicated work branch and advance the
   next small TODO-backed step. Commit and push the verified step on the work
   branch, then stop with a concise review package.
