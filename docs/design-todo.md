@@ -72,6 +72,23 @@
 メモ:
 
 - `hello world` の stdout helper は初期成功経路として妥当。
+- `write_stdout(ptr_len_to_unit)` は `HostHelperRequest` / `HostHelperAbi`
+  として IR に保持し、`RuntimeHelper` とは分ける。これにより stdout
+  effect を syscall / libc / OS API の直接実装として扱わず、manifest
+  解決と runtime 境界で扱う capability に留める。
+- native stdout emission は output artifact packaging 境界の責務とする。
+  現在の macOS ARM64 `_write` prologue は packaging strategy であり、
+  decode / lift / IR / ARM64 emit へ OS 固有処理を混ぜない。
+- stdout helper emission は target OS ABI ごとの strategy で選ぶ。現状は
+  `arm64-apple-macos` の `_write` strategy だけを実装し、Linux / Windows
+  は明示的な unsupported emission target として分類する。
+- libc / dyld / import call は `ExternalSymbolImport` の public symbol
+  identity として保持する。`puts` / `write` / `dyld_stub_binder` は
+  import identity であり、libc ABI や dyld loader behavior を直接模倣しない。
+- function-level の unsupported syscall / external call は
+  `btbc-cli` の report I/O 境界で `unsupported_boundary` JSON message
+  として分類する。これは停止理由の安定化であり、syscall 実行、
+  libc 呼び出し、dyld import 解決を意味しない。
 - 今後は B8 の x86_64 macOS アプリ起動、B9 の x86 32-bit アプリ対応、
   B10 の Wine bridge が同じ helper boundary を使えるようにする。
 - wasm2c platform adapter / NDA target adapter は本流 TODO ではなく、

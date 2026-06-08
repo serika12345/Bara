@@ -1396,8 +1396,8 @@ HW14 全体の状態:
 成功条件:
 
 - `0f 05` は typed decoded instruction として表現される。
-- lift は syscall を `Terminator::Unsupported` に変換し、命令 address と
-  next-instruction address を stable reason に保持する。
+- lift は syscall を typed boundary request として保持し、命令 address と
+  next-instruction address を request range に保持する。
 - OS syscall 番号、libc、loader、runtime 実行、ARM64 emit には踏み込まない。
 
 #### HW15a: Minimal syscall unsupported boundary
@@ -1410,24 +1410,27 @@ HW14 全体の状態:
 方針:
 
 - decoded instruction は syscall の typed variant として保持する。
-- lift は `SyscallUnsupported { at, return_to }` に分類する。
-- runtime、ARM64 emit、oracle、CLI は変更しない。
+- lift は `BoundaryRequest::Syscall(SyscallRequest { abi: X86_64, at, return_to })`
+  に分類する。
+- runtime、oracle、CLI は変更しない。ARM64 emit は request を実行せず
+  classified unsupported として返す。
 
 成功条件:
 
 - `0f 05` が typed instruction として decode される。
-- syscall は `SyscallUnsupported { at, return_to }` として lift される。
+- syscall は `BoundaryRequest::Syscall` として lift される。
 - syscall は実行経路に入らない。
 
 状態:
 
-- 完了。`syscall` は decode / lift 境界で classified unsupported として扱われ、
-  runtime execution には入らない。
+- 完了。`syscall` は decode / lift 境界で typed boundary request として扱われ、
+  emit 境界では `SyscallUnsupported { request }` として止まり、runtime execution
+  には入らない。
 
 HW15 全体の状態:
 
 - 完了。syscall は OS / libc / runtime 実行へ進まず、public ISA decode と lift 境界の
-  classified unsupported value として固定された。
+  typed boundary request として固定された。
 
 ### HW16: Host helper import resolution plan
 

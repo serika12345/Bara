@@ -1,8 +1,14 @@
 use std::{error::Error, fmt};
 
+use bara_ir::{
+    HostHelperAbi, HostHelperName as IrHostHelperName,
+    HostHelperSignature as IrHostHelperSignature, HostTrapKind,
+};
 use bara_oracle::{
-    ExecutableManifest, ExecutableManifestJsonError, FailureKind, HostHelperName,
-    HostHelperResolutionPlan, HostHelperSignature, ObservedResult, TestCaseHostTrapPlan,
+    ExecutableManifest, ExecutableManifestJsonError, FailureKind,
+    HostHelperName as ManifestHostHelperName, HostHelperResolutionPlan,
+    HostHelperSignature as ManifestHostHelperSignature, ObservedResult, ResolvedHostHelperImport,
+    TestCaseHostTrapPlan,
 };
 
 use crate::function_run::{run_test_case_function, FunctionRunError, FunctionRunResult};
@@ -133,15 +139,13 @@ impl ExecutableRunPreflight {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct PreflightHostHelper {
-    name: HostHelperName,
-    signature: HostHelperSignature,
+    abi: HostHelperAbi,
 }
 
 impl PreflightHostHelper {
     const fn write_stdout_ptr_len_to_unit() -> Self {
         Self {
-            name: HostHelperName::WriteStdout,
-            signature: HostHelperSignature::PtrLenToUnit,
+            abi: HostTrapKind::Stdout.host_helper_request().abi(),
         }
     }
 }
@@ -150,8 +154,8 @@ impl PreflightHostHelper {
 pub(crate) enum ExecutableRunPreflightError {
     MissingResolvedWriteStdout,
     UnexpectedWriteStdoutResolution {
-        actual_name: HostHelperName,
-        actual_signature: HostHelperSignature,
+        actual_name: ManifestHostHelperName,
+        actual_signature: ManifestHostHelperSignature,
     },
 }
 
@@ -182,12 +186,11 @@ fn preflight_executable_run(
         return Ok(ExecutableRunPreflight::no_host_helpers());
     }
 
+    let expected_abi = HostTrapKind::Stdout.host_helper_request().abi();
     let write_stdout = host_helper_resolution_plan
         .write_stdout()
         .ok_or(ExecutableRunPreflightError::MissingResolvedWriteStdout)?;
-    if write_stdout.name() != HostHelperName::WriteStdout
-        || write_stdout.signature() != HostHelperSignature::PtrLenToUnit
-    {
+    if !resolved_host_helper_matches_abi(*write_stdout, expected_abi) {
         return Err(
             ExecutableRunPreflightError::UnexpectedWriteStdoutResolution {
                 actual_name: write_stdout.name(),
@@ -199,6 +202,40 @@ fn preflight_executable_run(
     Ok(ExecutableRunPreflight::with_stdout_host_helper(
         PreflightHostHelper::write_stdout_ptr_len_to_unit(),
     ))
+}
+
+fn resolved_host_helper_matches_abi(
+    resolved: ResolvedHostHelperImport,
+    expected: HostHelperAbi,
+) -> bool {
+    manifest_helper_name_matches_ir(resolved.name(), expected.name())
+        && manifest_helper_signature_matches_ir(resolved.signature(), expected.signature())
+}
+
+fn manifest_helper_name_matches_ir(
+    manifest_name: ManifestHostHelperName,
+    ir_name: IrHostHelperName,
+) -> bool {
+    matches!(
+        (manifest_name, ir_name),
+        (
+            ManifestHostHelperName::WriteStdout,
+            IrHostHelperName::WriteStdout
+        )
+    )
+}
+
+fn manifest_helper_signature_matches_ir(
+    manifest_signature: ManifestHostHelperSignature,
+    ir_signature: IrHostHelperSignature,
+) -> bool {
+    matches!(
+        (manifest_signature, ir_signature),
+        (
+            ManifestHostHelperSignature::PtrLenToUnit,
+            IrHostHelperSignature::PtrLenToUnit
+        )
+    )
 }
 
 pub(crate) fn run_executable_manifest(
@@ -223,9 +260,10 @@ pub(crate) fn run_executable_manifest(
 
 #[cfg(test)]
 mod tests {
+    use bara_ir::HostTrapKind;
     use bara_oracle::{
-        executable_manifest_from_json, HostHelperName, HostHelperResolutionPlan,
-        HostHelperSignature, ObservedResult, TestCaseHostTrapPlan, TestCaseStdoutTrap,
+        executable_manifest_from_json, HostHelperResolutionPlan, ObservedResult,
+        TestCaseHostTrapPlan, TestCaseStdoutTrap,
     };
 
     use super::{
@@ -275,8 +313,7 @@ mod tests {
         assert_eq!(
             preflight,
             ExecutableRunPreflight::with_stdout_host_helper(PreflightHostHelper {
-                name: HostHelperName::WriteStdout,
-                signature: HostHelperSignature::PtrLenToUnit,
+                abi: HostTrapKind::Stdout.host_helper_request().abi(),
             })
         );
     }

@@ -1,3 +1,4 @@
+use crate::boundary::{BoundaryRequest, ExternalCallRequest, HostHelperRequest, SyscallRequest};
 use crate::program::X86Va;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -81,6 +82,7 @@ pub enum IrOp {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Terminator {
     Return,
+    BoundaryRequest { request: BoundaryRequest },
     Unsupported { reason: UnsupportedReason },
 }
 
@@ -102,18 +104,30 @@ pub enum HostTrapKind {
     Stdout,
 }
 
+impl HostTrapKind {
+    pub const fn host_helper_request(self) -> HostHelperRequest {
+        match self {
+            Self::Stdout => HostHelperRequest::WriteStdout,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum UnsupportedReason {
     DecodeUnsupportedOpcode { opcode: u8, at: X86Va },
     MissingReturnTerminator { at: X86Va },
     DirectCallUnsupported { target: X86Va, return_to: X86Va },
-    SyscallUnsupported { at: X86Va, return_to: X86Va },
+    ExternalCallUnsupported { request: ExternalCallRequest },
+    SyscallUnsupported { request: SyscallRequest },
     EmitUnsupportedIr,
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{BasicBlock, BasicBlockError, BlockId, IrOp, Operand, Terminator, X86Reg, X86Va};
+    use crate::{
+        BasicBlock, BasicBlockError, BlockId, HostHelperName, HostHelperRequest,
+        HostHelperSignature, HostTrapKind, IrOp, Operand, Terminator, X86Reg, X86Va,
+    };
 
     #[test]
     fn block_id_exposes_value() {
@@ -174,5 +188,17 @@ mod tests {
         assert_eq!(block.end(), X86Va::new(6));
         assert_eq!(block.ops(), &[op]);
         assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn stdout_host_trap_maps_to_write_stdout_host_helper_request() {
+        let abi = HostTrapKind::Stdout.host_helper_request().abi();
+
+        assert_eq!(
+            HostTrapKind::Stdout.host_helper_request(),
+            HostHelperRequest::WriteStdout
+        );
+        assert_eq!(abi.name(), HostHelperName::WriteStdout);
+        assert_eq!(abi.signature(), HostHelperSignature::PtrLenToUnit);
     }
 }

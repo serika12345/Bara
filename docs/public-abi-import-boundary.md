@@ -144,6 +144,14 @@ These names are planning vocabulary, not required Rust API names.
 - may later describe a symbol, ordinal, syscall ABI, or Bara manifest import
 - remains unresolved until a separate plan accepts, rejects, or classifies it
 
+`external symbol import`:
+
+- a typed IR identity for an external public symbol/import target
+- current examples: `libc::puts`, `libc::write`, and `dyld_stub_binder`
+- preserves symbol identity without executing libc, reproducing dyld loader
+  behavior, or treating imports as direct host calls
+- may be unresolved when only a stable symbol id is known
+
 `host helper declaration`:
 
 - a Bara-defined, explicit helper available at the host boundary
@@ -176,6 +184,99 @@ These names are planning vocabulary, not required Rust API names.
 - a stable reason explaining why an import, syscall, helper, ABI profile, or
   call boundary is not executable yet
 - should be precise enough for corpus expectations and regression tests
+
+## Native stdout emission boundary
+
+The current stdout path is intentionally a Bara host-helper path, not guest
+syscall execution and not libc emulation.
+
+The boundary is:
+
+1. `bara-ir` records stdout as `HostTrapKind::Stdout` and maps that host trap
+   to `HostHelperRequest::WriteStdout` with `HostHelperAbi`:
+   `write_stdout(ptr_len_to_unit)`.
+2. `bara-oracle` executable manifests declare and resolve the
+   `write_stdout` / `ptr_len_to_unit` host helper before execution. A manifest
+   that requests stdout without declaring the helper is invalid.
+3. `btbc-cli` consumes the resolved manifest helper in executable preflight
+   and checks it against the IR-level `HostHelperAbi` before running the
+   function pipeline.
+4. `bara-runtime` may execute a typed `HostTrapPlan` and expose stdout in the
+   observed result. The runtime receives the plan from validated fixture or
+   manifest data; it does not parse manifests or infer guest OS behavior.
+5. Standalone native artifact packaging may convert the accepted
+   `write_stdout(ptr_len_to_unit)` helper requirement into host-native stdout
+   emission. The current macOS ARM64 artifact path does this by generating a
+   packaging prologue that calls the public `_write` symbol with file
+   descriptor `1`, a generated stdout buffer pointer, and the buffer length,
+   then continues into the generated ARM64 function body.
+
+The conversion from Bara host helper to native stdout belongs at the output
+artifact packaging boundary. It must not leak into x86 decode, lift, core IR,
+ARM64 instruction emission, manifest parsing, or oracle comparison.
+
+This path has these current limits:
+
+- `write_stdout` means a Bara-defined host effect capability, not a guest
+  `write` syscall and not `puts`.
+- Native emission is currently a macOS ARM64 standalone artifact strategy.
+  Linux, Windows, and future object formats must add explicit output adapters
+  behind the same helper boundary instead of changing core IR semantics.
+- Output artifact packaging selects native stdout emission by target OS ABI.
+  The current implemented strategy is `arm64-apple-macos` using the public
+  `_write` symbol. Linux and Windows target triples are represented as explicit
+  unsupported stdout emission targets until their adapters are defined.
+- Unsupported helper, ABI, platform, or artifact combinations must remain
+  classified before execution.
+
+## Unsupported boundary report schema
+
+Function-level unsupported syscall and external call requests are reported at
+the `btbc-cli` I/O boundary as stable JSON in the fixture failure `message`.
+The outer fixture failure `kind` remains `emit_error`.
+
+The stable message shape is:
+
+```json
+{
+  "status": "unsupported_boundary",
+  "failure_kind": "emit_error",
+  "boundary": {
+    "kind": "syscall",
+    "abi": "x86_64",
+    "at": 4096,
+    "return_to": 4098
+  }
+}
+```
+
+or:
+
+```json
+{
+  "status": "unsupported_boundary",
+  "failure_kind": "emit_error",
+  "boundary": {
+    "kind": "external_call",
+    "symbol_id": 9,
+    "import_target": {
+      "kind": "public_symbol",
+      "namespace": "libc",
+      "symbol": "puts"
+    },
+    "call_site": 8192,
+    "return_to": 8197
+  }
+}
+```
+
+`import_target` is either `{"kind":"unresolved"}` or a public symbol identity:
+
+- `namespace`: `libc` or `dyld`
+- `symbol`: currently `puts`, `write`, or `dyld_stub_binder`
+
+This schema records the boundary that stopped execution. It does not emulate
+the syscall, call libc, reproduce dyld behavior, or resolve imports.
 
 ## First implementation sequence after this document
 

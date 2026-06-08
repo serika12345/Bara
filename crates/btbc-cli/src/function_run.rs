@@ -1,12 +1,17 @@
 use std::{error::Error, fmt};
 
 use bara_arm64::{emit_program, EmittedHostTrapRequests};
+use bara_ir::{
+    ExternalImportTarget, PublicDyldSymbol, PublicLibcSymbol, PublicSymbolImport, SyscallAbi,
+    UnsupportedReason,
+};
 use bara_isa_x86::{decode_function, lift_decoded_function};
 use bara_oracle::{FailureKind, ObservedResult, TestCase, TestCaseAbi};
 use bara_runtime::{
     run_no_args_u64_with_host_traps, run_one_input_memory_ptr, run_one_u64, HostTrapPlan,
     InputMemory, InputMemoryError, RunArgumentU64, RunError, RunStdout, RunStdoutError,
 };
+use serde::Serialize;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct FunctionCompileResult {
@@ -138,7 +143,7 @@ impl fmt::Display for FunctionRunError {
         match self {
             Self::Decode(error) => write!(formatter, "decode error: {error:?}"),
             Self::Lift(error) => write!(formatter, "lift error: {error:?}"),
-            Self::Emit(error) => write!(formatter, "emit error: {error:?}"),
+            Self::Emit(error) => write_function_emit_error(formatter, error),
             Self::StandaloneArtifact(error) => {
                 write!(formatter, "standalone artifact error: {error}")
             }
@@ -150,6 +155,171 @@ impl fmt::Display for FunctionRunError {
 }
 
 impl Error for FunctionRunError {}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct FunctionUnsupportedBoundaryReport {
+    status: FunctionUnsupportedBoundaryStatus,
+    failure_kind: FailureKind,
+    boundary: FunctionUnsupportedBoundary,
+}
+
+impl FunctionUnsupportedBoundaryReport {
+    fn from_emit_error(error: &bara_arm64::EmitError) -> Option<Self> {
+        match error {
+            bara_arm64::EmitError::UnsupportedIr { reason } => {
+                Self::from_unsupported_reason(reason)
+            }
+            bara_arm64::EmitError::InvalidProgram
+            | bara_arm64::EmitError::EmptyCode
+            | bara_arm64::EmitError::UnsupportedShape => None,
+        }
+    }
+
+    fn from_unsupported_reason(reason: &UnsupportedReason) -> Option<Self> {
+        let boundary = match reason {
+            UnsupportedReason::SyscallUnsupported { request } => {
+                FunctionUnsupportedBoundary::Syscall {
+                    abi: FunctionSyscallAbi::from_ir(request.abi()),
+                    at: request.at().value(),
+                    return_to: request.return_to().value(),
+                }
+            }
+            UnsupportedReason::ExternalCallUnsupported { request } => {
+                FunctionUnsupportedBoundary::ExternalCall {
+                    symbol_id: request.symbol().value(),
+                    import_target: FunctionExternalImportTarget::from_ir(request.import().target()),
+                    call_site: request.call_site().value(),
+                    return_to: request.return_to().value(),
+                }
+            }
+            UnsupportedReason::DecodeUnsupportedOpcode { .. }
+            | UnsupportedReason::MissingReturnTerminator { .. }
+            | UnsupportedReason::DirectCallUnsupported { .. }
+            | UnsupportedReason::EmitUnsupportedIr => return None,
+        };
+
+        Some(Self {
+            status: FunctionUnsupportedBoundaryStatus::UnsupportedBoundary,
+            failure_kind: FailureKind::EmitError,
+            boundary,
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FunctionUnsupportedBoundaryStatus {
+    UnsupportedBoundary,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum FunctionUnsupportedBoundary {
+    Syscall {
+        abi: FunctionSyscallAbi,
+        at: u64,
+        return_to: u64,
+    },
+    ExternalCall {
+        symbol_id: u32,
+        import_target: FunctionExternalImportTarget,
+        call_site: u64,
+        return_to: u64,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum FunctionSyscallAbi {
+    #[serde(rename = "x86_64")]
+    X86_64,
+}
+
+impl FunctionSyscallAbi {
+    const fn from_ir(abi: SyscallAbi) -> Self {
+        match abi {
+            SyscallAbi::X86_64 => Self::X86_64,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum FunctionExternalImportTarget {
+    Unresolved,
+    PublicSymbol {
+        namespace: FunctionPublicSymbolNamespace,
+        symbol: FunctionPublicSymbolName,
+    },
+}
+
+impl FunctionExternalImportTarget {
+    const fn from_ir(target: ExternalImportTarget) -> Self {
+        match target {
+            ExternalImportTarget::Unresolved => Self::Unresolved,
+            ExternalImportTarget::PublicSymbol(import) => match import {
+                PublicSymbolImport::Libc(symbol) => Self::PublicSymbol {
+                    namespace: FunctionPublicSymbolNamespace::Libc,
+                    symbol: FunctionPublicSymbolName::from_libc(symbol),
+                },
+                PublicSymbolImport::Dyld(symbol) => Self::PublicSymbol {
+                    namespace: FunctionPublicSymbolNamespace::Dyld,
+                    symbol: FunctionPublicSymbolName::from_dyld(symbol),
+                },
+            },
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FunctionPublicSymbolNamespace {
+    Libc,
+    Dyld,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FunctionPublicSymbolName {
+    Puts,
+    Write,
+    DyldStubBinder,
+}
+
+impl FunctionPublicSymbolName {
+    const fn from_libc(symbol: PublicLibcSymbol) -> Self {
+        match symbol {
+            PublicLibcSymbol::Puts => Self::Puts,
+            PublicLibcSymbol::Write => Self::Write,
+        }
+    }
+
+    const fn from_dyld(symbol: PublicDyldSymbol) -> Self {
+        match symbol {
+            PublicDyldSymbol::DyldStubBinder => Self::DyldStubBinder,
+        }
+    }
+}
+
+fn write_function_emit_error(
+    formatter: &mut fmt::Formatter<'_>,
+    error: &bara_arm64::EmitError,
+) -> fmt::Result {
+    if let Some(report) = FunctionUnsupportedBoundaryReport::from_emit_error(error) {
+        return write_function_unsupported_boundary_report(formatter, &report);
+    }
+
+    write!(formatter, "emit error: {error:?}")
+}
+
+fn write_function_unsupported_boundary_report(
+    formatter: &mut fmt::Formatter<'_>,
+    report: &FunctionUnsupportedBoundaryReport,
+) -> fmt::Result {
+    match serde_json::to_string(report) {
+        Ok(json) => formatter.write_str(&json),
+        Err(_) => Err(fmt::Error),
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum FunctionStandaloneArtifactError {
@@ -238,7 +408,11 @@ fn runtime_host_trap_plan(
 
 #[cfg(test)]
 mod tests {
-    use bara_oracle::test_case_from_json;
+    use bara_ir::{
+        ExternalCallRequest, ExternalSymbolId, ExternalSymbolImport, PublicLibcSymbol,
+        PublicSymbolImport, SyscallAbi, SyscallRequest, UnsupportedReason, X86Va,
+    };
+    use bara_oracle::{test_case_from_json, FailureKind};
 
     use super::{
         compile_test_case_function, compile_test_case_function_standalone_artifact,
@@ -275,5 +449,60 @@ mod tests {
                 FunctionStandaloneArtifactError::HostTrapRequested
             )
         ));
+    }
+
+    #[test]
+    fn unsupported_syscall_emit_error_uses_stable_boundary_report() {
+        let request =
+            SyscallRequest::new(SyscallAbi::X86_64, X86Va::new(0x1000), X86Va::new(0x1002))
+                .expect("test syscall range is valid");
+        let error = FunctionRunError::Emit(bara_arm64::EmitError::UnsupportedIr {
+            reason: UnsupportedReason::SyscallUnsupported { request },
+        });
+
+        assert_eq!(error.failure_kind(), FailureKind::EmitError);
+        assert_eq!(
+            error.to_string(),
+            "{\"status\":\"unsupported_boundary\",\"failure_kind\":\"emit_error\",\"boundary\":{\"kind\":\"syscall\",\"abi\":\"x86_64\",\"at\":4096,\"return_to\":4098}}"
+        );
+    }
+
+    #[test]
+    fn unsupported_external_call_emit_error_uses_stable_boundary_report() {
+        let import = ExternalSymbolImport::public_symbol(
+            ExternalSymbolId::new(9),
+            PublicSymbolImport::Libc(PublicLibcSymbol::Puts),
+        );
+        let request =
+            ExternalCallRequest::new_import(import, X86Va::new(0x2000), X86Va::new(0x2005))
+                .expect("test external call range is valid");
+        let error = FunctionRunError::Emit(bara_arm64::EmitError::UnsupportedIr {
+            reason: UnsupportedReason::ExternalCallUnsupported { request },
+        });
+
+        assert_eq!(error.failure_kind(), FailureKind::EmitError);
+        assert_eq!(
+            error.to_string(),
+            "{\"status\":\"unsupported_boundary\",\"failure_kind\":\"emit_error\",\"boundary\":{\"kind\":\"external_call\",\"symbol_id\":9,\"import_target\":{\"kind\":\"public_symbol\",\"namespace\":\"libc\",\"symbol\":\"puts\"},\"call_site\":8192,\"return_to\":8197}}"
+        );
+    }
+
+    #[test]
+    fn unsupported_unresolved_external_call_emit_error_uses_stable_boundary_report() {
+        let request = ExternalCallRequest::new(
+            ExternalSymbolId::new(11),
+            X86Va::new(0x3000),
+            X86Va::new(0x3005),
+        )
+        .expect("test external call range is valid");
+        let error = FunctionRunError::Emit(bara_arm64::EmitError::UnsupportedIr {
+            reason: UnsupportedReason::ExternalCallUnsupported { request },
+        });
+
+        assert_eq!(error.failure_kind(), FailureKind::EmitError);
+        assert_eq!(
+            error.to_string(),
+            "{\"status\":\"unsupported_boundary\",\"failure_kind\":\"emit_error\",\"boundary\":{\"kind\":\"external_call\",\"symbol_id\":11,\"import_target\":{\"kind\":\"unresolved\"},\"call_site\":12288,\"return_to\":12293}}"
+        );
     }
 }
