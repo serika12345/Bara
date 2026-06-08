@@ -147,8 +147,61 @@ impl ExternalSymbolId {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct ExternalCallRequest {
+pub struct ExternalSymbolImport {
     symbol: ExternalSymbolId,
+    target: ExternalImportTarget,
+}
+
+impl ExternalSymbolImport {
+    pub const fn unresolved(symbol: ExternalSymbolId) -> Self {
+        Self {
+            symbol,
+            target: ExternalImportTarget::Unresolved,
+        }
+    }
+
+    pub const fn public_symbol(symbol: ExternalSymbolId, import: PublicSymbolImport) -> Self {
+        Self {
+            symbol,
+            target: ExternalImportTarget::PublicSymbol(import),
+        }
+    }
+
+    pub const fn symbol(self) -> ExternalSymbolId {
+        self.symbol
+    }
+
+    pub const fn target(self) -> ExternalImportTarget {
+        self.target
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ExternalImportTarget {
+    Unresolved,
+    PublicSymbol(PublicSymbolImport),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PublicSymbolImport {
+    Libc(PublicLibcSymbol),
+    Dyld(PublicDyldSymbol),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PublicLibcSymbol {
+    Puts,
+    Write,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PublicDyldSymbol {
+    DyldStubBinder,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ExternalCallRequest {
+    import: ExternalSymbolImport,
     call_site: X86Va,
     return_to: X86Va,
 }
@@ -156,6 +209,18 @@ pub struct ExternalCallRequest {
 impl ExternalCallRequest {
     pub fn new(
         symbol: ExternalSymbolId,
+        call_site: X86Va,
+        return_to: X86Va,
+    ) -> Result<Self, ExternalCallRequestError> {
+        Self::new_import(
+            ExternalSymbolImport::unresolved(symbol),
+            call_site,
+            return_to,
+        )
+    }
+
+    pub fn new_import(
+        import: ExternalSymbolImport,
         call_site: X86Va,
         return_to: X86Va,
     ) -> Result<Self, ExternalCallRequestError> {
@@ -167,14 +232,18 @@ impl ExternalCallRequest {
         }
 
         Ok(Self {
-            symbol,
+            import,
             call_site,
             return_to,
         })
     }
 
     pub const fn symbol(self) -> ExternalSymbolId {
-        self.symbol
+        self.import.symbol()
+    }
+
+    pub const fn import(self) -> ExternalSymbolImport {
+        self.import
     }
 
     pub const fn call_site(self) -> X86Va {
@@ -233,10 +302,11 @@ pub enum SyscallRequestError {
 #[cfg(test)]
 mod tests {
     use crate::{
-        ExternalCallRequest, ExternalCallRequestError, ExternalSymbolId, HostHelperAbi,
-        HostHelperName, HostHelperRequest, HostHelperSignature, RuntimeHelper, RuntimeHelperAbi,
-        RuntimeHelperName, RuntimeHelperSignature, SyscallAbi, SyscallRequest, SyscallRequestError,
-        X86Va,
+        ExternalCallRequest, ExternalCallRequestError, ExternalImportTarget, ExternalSymbolId,
+        ExternalSymbolImport, HostHelperAbi, HostHelperName, HostHelperRequest,
+        HostHelperSignature, PublicDyldSymbol, PublicLibcSymbol, PublicSymbolImport, RuntimeHelper,
+        RuntimeHelperAbi, RuntimeHelperName, RuntimeHelperSignature, SyscallAbi, SyscallRequest,
+        SyscallRequestError, X86Va,
     };
 
     #[test]
@@ -284,6 +354,52 @@ mod tests {
         assert_eq!(request.symbol(), ExternalSymbolId::new(7));
         assert_eq!(request.call_site(), X86Va::new(0x2000));
         assert_eq!(request.return_to(), X86Va::new(0x2005));
+    }
+
+    #[test]
+    fn external_call_request_can_carry_public_symbol_import() {
+        let import = ExternalSymbolImport::public_symbol(
+            ExternalSymbolId::new(11),
+            PublicSymbolImport::Libc(PublicLibcSymbol::Puts),
+        );
+        let request =
+            ExternalCallRequest::new_import(import, X86Va::new(0x3000), X86Va::new(0x3005))
+                .expect("test external import call range is valid");
+
+        assert_eq!(request.symbol(), ExternalSymbolId::new(11));
+        assert_eq!(request.import(), import);
+        assert_eq!(
+            request.import().target(),
+            ExternalImportTarget::PublicSymbol(PublicSymbolImport::Libc(PublicLibcSymbol::Puts))
+        );
+    }
+
+    #[test]
+    fn public_symbol_import_model_keeps_libc_and_dyld_symbols_as_identity() {
+        let puts = ExternalSymbolImport::public_symbol(
+            ExternalSymbolId::new(1),
+            PublicSymbolImport::Libc(PublicLibcSymbol::Puts),
+        );
+        let write = ExternalSymbolImport::public_symbol(
+            ExternalSymbolId::new(2),
+            PublicSymbolImport::Libc(PublicLibcSymbol::Write),
+        );
+        let dyld = ExternalSymbolImport::public_symbol(
+            ExternalSymbolId::new(3),
+            PublicSymbolImport::Dyld(PublicDyldSymbol::DyldStubBinder),
+        );
+
+        assert_eq!(puts.symbol(), ExternalSymbolId::new(1));
+        assert_eq!(
+            write.target(),
+            ExternalImportTarget::PublicSymbol(PublicSymbolImport::Libc(PublicLibcSymbol::Write))
+        );
+        assert_eq!(
+            dyld.target(),
+            ExternalImportTarget::PublicSymbol(PublicSymbolImport::Dyld(
+                PublicDyldSymbol::DyldStubBinder
+            ))
+        );
     }
 
     #[test]

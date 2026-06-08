@@ -82,6 +82,9 @@
 - stdout helper emission は target OS ABI ごとの strategy で選ぶ。現状は
   `arm64-apple-macos` の `_write` strategy だけを実装し、Linux / Windows
   は明示的な unsupported emission target として分類する。
+- libc / dyld / import call は `ExternalSymbolImport` の public symbol
+  identity として保持する。`puts` / `write` / `dyld_stub_binder` は
+  import identity であり、libc ABI や dyld loader behavior を直接模倣しない。
 - 今後は B8 の x86_64 macOS アプリ起動、B9 の x86 32-bit アプリ対応、
   B10 の Wine bridge が同じ helper boundary を使えるようにする。
 - wasm2c platform adapter / NDA target adapter は本流 TODO ではなく、

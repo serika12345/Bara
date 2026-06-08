@@ -144,6 +144,14 @@ These names are planning vocabulary, not required Rust API names.
 - may later describe a symbol, ordinal, syscall ABI, or Bara manifest import
 - remains unresolved until a separate plan accepts, rejects, or classifies it
 
+`external symbol import`:
+
+- a typed IR identity for an external public symbol/import target
+- current examples: `libc::puts`, `libc::write`, and `dyld_stub_binder`
+- preserves symbol identity without executing libc, reproducing dyld loader
+  behavior, or treating imports as direct host calls
+- may be unresolved when only a stable symbol id is known
+
 `host helper declaration`:
 
 - a Bara-defined, explicit helper available at the host boundary

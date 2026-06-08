@@ -9,40 +9,44 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 15:40 JST
+最終更新: 2026-06-08 15:51 JST
 
 状態:
 
-- project_state: completed。B4 の 6 つ目の小ステップとして、
-  macOS / Linux / Windows の OS ABI 差分を stdout helper emission
-  strategy 境界で分離した。
+- project_state: completed。B4 の 7 つ目の小ステップとして、
+  libc / dyld / import 呼び出しを直接模倣せず、public symbol/import
+  identity として扱う model を追加した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B4:
-  x86 syscall / libc 境界。先頭 6 項目は完了し、次は libc / dyld /
-  import 呼び出しを直接模倣せず public symbol/import model として扱う
-  小ステップ。
+  x86 syscall / libc 境界。先頭 7 項目は完了し、次は unsupported
+  syscall / external call の分類と report schema を安定させる小ステップ。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の D4:
-  Bara IR の責務と D5: Host helper / OS boundary に沿って、native stdout
-  emission を target OS ABI ごとの packaging strategy として分離した。
+  Bara IR の責務と D5: Host helper / OS boundary に沿って、external
+  imports を `ExternalSymbolImport` の public symbol identity として表現した。
 - active_branch: `task/b4-syscall-ir-request`。base commit は `19eeedb`
   (`Make roadmap linear without losing milestones`)。latest commit は
   review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B4 の
-  macOS / Linux / Windows の OS ABI 差分を helper boundary で分離する。
-- completed_work: `btbc-cli` の native artifact packaging 境界に
-  `NativeStdoutEmissionStrategy` と `NativeHostOsAbi` を追加した。macOS ARM64
-  は `_write` prologue strategy を選び、Linux / Windows target triple は
-  `write_stdout` helper emission の explicit unsupported target として分類する。
-  既存の stdout executable artifact 経路は同じ macOS strategy を通る。
-- remaining_work: B4 の libc / dyld / import model、unsupported boundary
-  report schema を順に具体化する。
-- next_action: B4 の次小ステップとして libc / dyld / import 呼び出しを
-  直接模倣せず、public symbol/import model として扱う境界を具体化する。
-- verification: `nix develop -c cargo test -p btbc-cli native_artifact`、
-  `nix develop -c ./scripts/check-domain-types`、`nix develop -c ./scripts/check-no-invisible-chars`、
-  `git diff --check`、および `nix develop -c ./scripts/verify` が通過した。
+  libc / dyld / import 呼び出しを直接模倣せず、public symbol/import model として扱う。
+- completed_work: `bara-ir` に `ExternalSymbolImport`、`ExternalImportTarget`、
+  `PublicSymbolImport`、`PublicLibcSymbol`、`PublicDyldSymbol` を追加した。
+  `ExternalCallRequest` は unresolved symbol id だけでなく public symbol import
+  identity を保持できる。`puts` / `write` / `dyld_stub_binder` は identity
+  として残り、libc ABI や dyld loader behavior はまだ実行しない。
+- remaining_work: B4 の unsupported boundary report schema を具体化する。
+- next_action: B4 の最後の小ステップとして unsupported syscall / external call
+  の分類と report schema を安定させる。
+- verification: `nix develop -c cargo test -p bara-ir` が通過した。
+  続く final B4 step で full `nix develop -c ./scripts/verify` を実行する。
 
 直近で完了した作業:
 
+- 2026-06-08 15:51 JST: B4 の 7 つ目の小ステップとして、libc / dyld /
+  import 呼び出しを直接模倣せず、public symbol/import identity として扱う
+  model を追加した。`ExternalCallRequest` は `ExternalSymbolImport` を保持し、
+  `libc::puts`、`libc::write`、`dyld_stub_binder` を public symbol identity
+  として表現できる。
+- 検証: `nix develop -c cargo test -p bara-ir` が通過した。続く final B4
+  step で full `nix develop -c ./scripts/verify` を実行する。
 - 2026-06-08 15:40 JST: B4 の 6 つ目の小ステップとして、macOS / Linux /
   Windows の OS ABI 差分を stdout helper emission strategy 境界で分離した。
   `arm64-apple-macos` は public `_write` prologue strategy に解決され、

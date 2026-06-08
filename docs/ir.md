@@ -172,8 +172,32 @@ pub enum RuntimeHelperSignature {
 
 pub struct ExternalSymbolId(u32);
 
-pub struct ExternalCallRequest {
+pub struct ExternalSymbolImport {
     symbol: ExternalSymbolId,
+    target: ExternalImportTarget,
+}
+
+pub enum ExternalImportTarget {
+    Unresolved,
+    PublicSymbol(PublicSymbolImport),
+}
+
+pub enum PublicSymbolImport {
+    Libc(PublicLibcSymbol),
+    Dyld(PublicDyldSymbol),
+}
+
+pub enum PublicLibcSymbol {
+    Puts,
+    Write,
+}
+
+pub enum PublicDyldSymbol {
+    DyldStubBinder,
+}
+
+pub struct ExternalCallRequest {
+    import: ExternalSymbolImport,
     call_site: X86Va,
     return_to: X86Va,
 }
@@ -193,6 +217,11 @@ pub enum SyscallAbi {
 表し、`HostHelperRequest` は stdout など host-observable effect の
 capability を表す。この 2 つを分けることで、`write_stdout` のような
 Bara host helper を syscall / libc / OS API の直接実装と混ぜない。
+
+`ExternalSymbolImport` は libc / dyld / import call を直接模倣するための
+実行指示ではない。public symbol identity を IR に残すための model であり、
+実行、動的 loader、libc ABI 再現、dyld 挙動の模倣は別の helper boundary で
+解決または unsupported 分類する。
 
 ## Operand
 
