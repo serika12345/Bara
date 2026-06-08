@@ -1,0 +1,9 @@
+{
+  "case_id": "nested_call_return_42",
+  "entry": 0,
+  "bytes": "e801000000c3e801000000c3b82a000000c3",
+  "abi": {
+    "args": [],
+    "return": "u64"
+  }
+}

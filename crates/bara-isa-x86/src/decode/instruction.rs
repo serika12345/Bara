@@ -1,4 +1,4 @@
-use bara_ir::{UnsupportedReason, X86Va};
+use bara_ir::{UnsupportedReason, X86Cond, X86Va};
 
 use super::{DecodeError, X86Imm32, X86Imm8};
 
@@ -56,17 +56,54 @@ impl DecodedInstruction {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DecodedInstructionKind {
-    MovEaxImm32 { imm: u32 },
+    MovEaxImm32 {
+        imm: u32,
+    },
     MovRaxRdi,
     MovzxEaxBytePtrRdi,
-    AddEaxImm32 { imm: X86Imm32 },
-    AddEaxImm8 { imm: X86Imm8 },
-    SubEaxImm32 { imm: X86Imm32 },
-    SubEaxImm8 { imm: X86Imm8 },
+    AddEaxImm32 {
+        imm: X86Imm32,
+    },
+    AddEaxImm8 {
+        imm: X86Imm8,
+    },
+    SubEaxImm32 {
+        imm: X86Imm32,
+    },
+    SubEaxImm8 {
+        imm: X86Imm8,
+    },
+    CmpEaxImm32 {
+        imm: X86Imm32,
+    },
+    CmpEaxImm8 {
+        imm: X86Imm8,
+    },
+    TestEaxEax,
+    PushRax,
+    PopRax,
     XorEaxEax,
-    CallRel32 { target: X86Va, return_to: X86Va },
+    JccRel8 {
+        condition: X86Cond,
+        taken: X86Va,
+        fallthrough: X86Va,
+    },
+    JccRel32 {
+        condition: X86Cond,
+        taken: X86Va,
+        fallthrough: X86Va,
+    },
+    JmpRel8 {
+        target: X86Va,
+    },
+    CallRel32 {
+        target: X86Va,
+        return_to: X86Va,
+    },
     Syscall,
     BaraHostTrapSentinel,
     Ret,
-    Unsupported { reason: UnsupportedReason },
+    Unsupported {
+        reason: UnsupportedReason,
+    },
 }

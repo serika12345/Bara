@@ -1,4 +1,4 @@
-use bara_ir::{UnsupportedReason, X86Va};
+use bara_ir::{UnsupportedReason, X86Cond, X86Va};
 
 use crate::{
     decode_function, DecodeError, DecodedFunction, DecodedInstruction, DecodedInstructionKind,
@@ -70,6 +70,35 @@ fn decodes_mov_eax_imm32_then_ret() {
                 X86Va::new(0x1006),
                 DecodedInstructionKind::Ret
             )
+        ]
+    );
+}
+
+#[test]
+fn decodes_ret_then_trailing_block_bytes() {
+    let input = X86Bytes::new(
+        X86Va::new(0),
+        vec![0xb8, 1, 0, 0, 0, 0xc3, 0xb8, 2, 0, 0, 0, 0xc3],
+    )
+    .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0),
+                X86Va::new(5),
+                DecodedInstructionKind::MovEaxImm32 { imm: 1 }
+            ),
+            DecodedInstruction::new(X86Va::new(5), X86Va::new(6), DecodedInstructionKind::Ret),
+            DecodedInstruction::new(
+                X86Va::new(6),
+                X86Va::new(11),
+                DecodedInstructionKind::MovEaxImm32 { imm: 2 }
+            ),
+            DecodedInstruction::new(X86Va::new(11), X86Va::new(12), DecodedInstructionKind::Ret)
         ]
     );
 }
@@ -267,6 +296,266 @@ fn decodes_sub_eax_imm32_between_mov_and_ret() {
 }
 
 #[test]
+fn decodes_cmp_eax_imm8_between_mov_and_ret() {
+    let input = X86Bytes::new(
+        X86Va::new(0),
+        vec![0xb8, 0x2a, 0, 0, 0, 0x83, 0xf8, 0x2a, 0xc3],
+    )
+    .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0),
+                X86Va::new(5),
+                DecodedInstructionKind::MovEaxImm32 { imm: 42 }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(5),
+                X86Va::new(8),
+                DecodedInstructionKind::CmpEaxImm8 {
+                    imm: crate::X86Imm8::new(42)
+                }
+            ),
+            DecodedInstruction::new(X86Va::new(8), X86Va::new(9), DecodedInstructionKind::Ret)
+        ]
+    );
+}
+
+#[test]
+fn decodes_cmp_eax_imm32_between_mov_and_ret() {
+    let input = X86Bytes::new(
+        X86Va::new(0),
+        vec![0xb8, 0x2a, 0, 0, 0, 0x3d, 0x2a, 0, 0, 0, 0xc3],
+    )
+    .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0),
+                X86Va::new(5),
+                DecodedInstructionKind::MovEaxImm32 { imm: 42 }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(5),
+                X86Va::new(10),
+                DecodedInstructionKind::CmpEaxImm32 {
+                    imm: crate::decode::X86Imm32::new(42)
+                }
+            ),
+            DecodedInstruction::new(X86Va::new(10), X86Va::new(11), DecodedInstructionKind::Ret)
+        ]
+    );
+}
+
+#[test]
+fn decodes_test_eax_eax_between_mov_and_ret() {
+    let input = X86Bytes::new(X86Va::new(0), vec![0xb8, 0x2a, 0, 0, 0, 0x85, 0xc0, 0xc3])
+        .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0),
+                X86Va::new(5),
+                DecodedInstructionKind::MovEaxImm32 { imm: 42 }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(5),
+                X86Va::new(7),
+                DecodedInstructionKind::TestEaxEax
+            ),
+            DecodedInstruction::new(X86Va::new(7), X86Va::new(8), DecodedInstructionKind::Ret)
+        ]
+    );
+}
+
+#[test]
+fn decodes_push_rax_pop_rax_between_mov_and_ret() {
+    let input = X86Bytes::new(
+        X86Va::new(0),
+        vec![0xb8, 0x2a, 0x00, 0x00, 0x00, 0x50, 0x58, 0xc3],
+    )
+    .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0),
+                X86Va::new(5),
+                DecodedInstructionKind::MovEaxImm32 { imm: 42 }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(5),
+                X86Va::new(6),
+                DecodedInstructionKind::PushRax
+            ),
+            DecodedInstruction::new(X86Va::new(6), X86Va::new(7), DecodedInstructionKind::PopRax),
+            DecodedInstruction::new(X86Va::new(7), X86Va::new(8), DecodedInstructionKind::Ret)
+        ]
+    );
+}
+
+#[test]
+fn decodes_je_rel8_and_continues_with_fallthrough() {
+    let input = X86Bytes::new(X86Va::new(0x1000), vec![0x74, 0x02, 0xc3])
+        .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0x1000),
+                X86Va::new(0x1002),
+                DecodedInstructionKind::JccRel8 {
+                    condition: X86Cond::Equal,
+                    taken: X86Va::new(0x1004),
+                    fallthrough: X86Va::new(0x1002)
+                }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x1002),
+                X86Va::new(0x1003),
+                DecodedInstructionKind::Ret
+            )
+        ]
+    );
+}
+
+#[test]
+fn decodes_jne_rel8_with_negative_target() {
+    let input = X86Bytes::new(X86Va::new(0x1000), vec![0x75, 0xfe, 0xc3])
+        .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0x1000),
+                X86Va::new(0x1002),
+                DecodedInstructionKind::JccRel8 {
+                    condition: X86Cond::NotEqual,
+                    taken: X86Va::new(0x1000),
+                    fallthrough: X86Va::new(0x1002)
+                }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x1002),
+                X86Va::new(0x1003),
+                DecodedInstructionKind::Ret
+            )
+        ]
+    );
+}
+
+#[test]
+fn decodes_jo_rel8_to_overflow_condition() {
+    let input =
+        X86Bytes::new(X86Va::new(0), vec![0x70, 0x01, 0xc3]).expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions()[0].kind(),
+        &DecodedInstructionKind::JccRel8 {
+            condition: X86Cond::Overflow,
+            taken: X86Va::new(3),
+            fallthrough: X86Va::new(2)
+        }
+    );
+}
+
+#[test]
+fn decodes_jl_rel32_and_continues_with_target_block() {
+    let input = X86Bytes::new(
+        X86Va::new(0),
+        vec![
+            0x0f, 0x8c, 0x01, 0x00, 0x00, 0x00, 0xc3, 0xb8, 0x2a, 0x00, 0x00, 0x00, 0xc3,
+        ],
+    )
+    .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0),
+                X86Va::new(6),
+                DecodedInstructionKind::JccRel32 {
+                    condition: X86Cond::Less,
+                    taken: X86Va::new(7),
+                    fallthrough: X86Va::new(6)
+                }
+            ),
+            DecodedInstruction::new(X86Va::new(6), X86Va::new(7), DecodedInstructionKind::Ret),
+            DecodedInstruction::new(
+                X86Va::new(7),
+                X86Va::new(12),
+                DecodedInstructionKind::MovEaxImm32 { imm: 42 }
+            ),
+            DecodedInstruction::new(X86Va::new(12), X86Va::new(13), DecodedInstructionKind::Ret)
+        ]
+    );
+}
+
+#[test]
+fn decodes_jmp_rel8_and_continues_with_target_block() {
+    let input = X86Bytes::new(
+        X86Va::new(0),
+        vec![
+            0xeb, 0x06, 0xb8, 0x07, 0x00, 0x00, 0x00, 0xc3, 0xb8, 0x2a, 0x00, 0x00, 0x00, 0xc3,
+        ],
+    )
+    .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0),
+                X86Va::new(2),
+                DecodedInstructionKind::JmpRel8 {
+                    target: X86Va::new(8)
+                }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(2),
+                X86Va::new(7),
+                DecodedInstructionKind::MovEaxImm32 { imm: 7 }
+            ),
+            DecodedInstruction::new(X86Va::new(7), X86Va::new(8), DecodedInstructionKind::Ret),
+            DecodedInstruction::new(
+                X86Va::new(8),
+                X86Va::new(13),
+                DecodedInstructionKind::MovEaxImm32 { imm: 42 }
+            ),
+            DecodedInstruction::new(X86Va::new(13), X86Va::new(14), DecodedInstructionKind::Ret)
+        ]
+    );
+}
+
+#[test]
 fn decodes_xor_eax_eax_then_ret() {
     let input = X86Bytes::new(X86Va::new(0x1000), vec![0x31, 0xc0, 0xc3])
         .expect("test bytes are non-empty");
@@ -327,6 +616,37 @@ fn decodes_call_rel32_with_negative_target() {
                 return_to: X86Va::new(0x1005)
             }
         )]
+    );
+}
+
+#[test]
+fn decodes_call_rel32_then_fallthrough_instruction() {
+    let input = X86Bytes::new(
+        X86Va::new(0),
+        vec![0xe8, 1, 0, 0, 0, 0xb8, 2, 0, 0, 0, 0xc3],
+    )
+    .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0),
+                X86Va::new(5),
+                DecodedInstructionKind::CallRel32 {
+                    target: X86Va::new(6),
+                    return_to: X86Va::new(5)
+                }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(5),
+                X86Va::new(10),
+                DecodedInstructionKind::MovEaxImm32 { imm: 2 }
+            ),
+            DecodedInstruction::new(X86Va::new(10), X86Va::new(11), DecodedInstructionKind::Ret)
+        ]
     );
 }
 

@@ -1,4 +1,4 @@
-use bara_ir::{UnsupportedReason, X86Va};
+use bara_ir::{UnsupportedReason, X86Cond, X86Va};
 
 use super::{
     DecodeError, DecodedFunction, DecodedInstruction, DecodedInstructionKind, X86Bytes, X86Imm32,
@@ -18,6 +18,22 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                 let opcode2 = read_u8(input, offset + 1, at, opcode)?;
 
                 match opcode2 {
+                    0x80..=0x8f => {
+                        let end_offset = offset + 6;
+                        let displacement = read_i32_at(input, offset + 2, at, opcode)?;
+                        let fallthrough = instruction_end(input, at, end_offset, 6)?;
+                        let taken = relative_target(fallthrough, displacement, at)?;
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            fallthrough,
+                            DecodedInstructionKind::JccRel32 {
+                                condition: jcc_condition(opcode2),
+                                taken,
+                                fallthrough,
+                            },
+                        ));
+                        offset = end_offset;
+                    }
                     0x05 => {
                         let end_offset = offset + 2;
                         let end = instruction_end(input, at, end_offset, 2)?;
@@ -91,6 +107,19 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                 ));
                 offset = end_offset;
             }
+            0x3d => {
+                let end_offset = offset + 5;
+                let imm = read_i32(input, offset, end_offset, at, opcode)?;
+                let end = instruction_end(input, at, end_offset, 5)?;
+                instructions.push(DecodedInstruction::new(
+                    at,
+                    end,
+                    DecodedInstructionKind::CmpEaxImm32 {
+                        imm: X86Imm32::new(imm),
+                    },
+                ));
+                offset = end_offset;
+            }
             0x31 => {
                 let end_offset = offset + 2;
                 let operand = read_u8(input, offset + 1, at, opcode)?;
@@ -132,6 +161,44 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                     }
                 }
             }
+            0x50 => {
+                let end = instruction_end(input, at, offset + 1, 1)?;
+                instructions.push(DecodedInstruction::new(
+                    at,
+                    end,
+                    DecodedInstructionKind::PushRax,
+                ));
+                offset += 1;
+            }
+            0x58 => {
+                let end = instruction_end(input, at, offset + 1, 1)?;
+                instructions.push(DecodedInstruction::new(
+                    at,
+                    end,
+                    DecodedInstructionKind::PopRax,
+                ));
+                offset += 1;
+            }
+            0x70..=0x7f => {
+                let end_offset = offset + 2;
+                let displacement = read_u8(input, offset + 1, at, opcode)?;
+                let fallthrough = instruction_end(input, at, end_offset, 2)?;
+                let taken = relative_target(
+                    fallthrough,
+                    i32::from(i8::from_le_bytes([displacement])),
+                    at,
+                )?;
+                instructions.push(DecodedInstruction::new(
+                    at,
+                    fallthrough,
+                    DecodedInstructionKind::JccRel8 {
+                        condition: jcc_condition(opcode),
+                        taken,
+                        fallthrough,
+                    },
+                ));
+                offset = end_offset;
+            }
             0xb8 => {
                 let end_offset = offset + 5;
                 let imm = read_u32(input, offset, end_offset, at, opcode)?;
@@ -170,6 +237,36 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                         ));
                         offset = end_offset;
                     }
+                    0xf8 => {
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::CmpEaxImm8 {
+                                imm: X86Imm8::new(i8::from_le_bytes([imm])),
+                            },
+                        ));
+                        offset = end_offset;
+                    }
+                    _ => {
+                        instructions.push(unsupported_instruction(at, end, opcode));
+                        return DecodedFunction::new(input.entry(), instructions);
+                    }
+                }
+            }
+            0x85 => {
+                let end_offset = offset + 2;
+                let operand = read_u8(input, offset + 1, at, opcode)?;
+                let end = instruction_end(input, at, end_offset, 2)?;
+
+                match operand {
+                    0xc0 => {
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::TestEaxEax,
+                        ));
+                        offset = end_offset;
+                    }
                     _ => {
                         instructions.push(unsupported_instruction(at, end, opcode));
                         return DecodedFunction::new(input.entry(), instructions);
@@ -186,7 +283,20 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                     return_to,
                     DecodedInstructionKind::CallRel32 { target, return_to },
                 ));
-                return DecodedFunction::new(input.entry(), instructions);
+                offset = end_offset;
+            }
+            0xeb => {
+                let end_offset = offset + 2;
+                let displacement = read_u8(input, offset + 1, at, opcode)?;
+                let end = instruction_end(input, at, end_offset, 2)?;
+                let target =
+                    relative_target(end, i32::from(i8::from_le_bytes([displacement])), at)?;
+                instructions.push(DecodedInstruction::new(
+                    at,
+                    end,
+                    DecodedInstructionKind::JmpRel8 { target },
+                ));
+                offset = end_offset;
             }
             0xc3 => {
                 let end = instruction_end(input, at, offset + 1, 1)?;
@@ -195,7 +305,7 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                     end,
                     DecodedInstructionKind::Ret,
                 ));
-                return DecodedFunction::new(input.entry(), instructions);
+                offset += 1;
             }
             unsupported => {
                 let end = instruction_end(input, at, offset + 1, 1)?;
@@ -203,6 +313,10 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                 return DecodedFunction::new(input.entry(), instructions);
             }
         }
+    }
+
+    if decoded_stream_ends_with_terminator(&instructions) {
+        return DecodedFunction::new(input.entry(), instructions);
     }
 
     let at = address_at(input, input.bytes().len())?;
@@ -217,6 +331,22 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
         },
     ));
     DecodedFunction::new(input.entry(), instructions)
+}
+
+fn decoded_stream_ends_with_terminator(instructions: &[DecodedInstruction]) -> bool {
+    let Some(instruction) = instructions.last() else {
+        return false;
+    };
+
+    matches!(
+        instruction.kind(),
+        DecodedInstructionKind::CallRel32 { .. }
+            | DecodedInstructionKind::JccRel8 { .. }
+            | DecodedInstructionKind::JccRel32 { .. }
+            | DecodedInstructionKind::JmpRel8 { .. }
+            | DecodedInstructionKind::Ret
+            | DecodedInstructionKind::Syscall
+    )
 }
 
 fn address_at(input: &X86Bytes, offset: usize) -> Result<X86Va, DecodeError> {
@@ -269,6 +399,28 @@ fn read_i32(
     ]))
 }
 
+fn read_i32_at(
+    input: &X86Bytes,
+    start_offset: usize,
+    at: X86Va,
+    opcode: u8,
+) -> Result<i32, DecodeError> {
+    let end_offset = start_offset
+        .checked_add(4)
+        .ok_or(DecodeError::TruncatedInstruction { at, opcode })?;
+    let imm_bytes = input
+        .bytes()
+        .get(start_offset..end_offset)
+        .ok_or(DecodeError::TruncatedInstruction { at, opcode })?;
+
+    Ok(i32::from_le_bytes([
+        imm_bytes[0],
+        imm_bytes[1],
+        imm_bytes[2],
+        imm_bytes[3],
+    ]))
+}
+
 fn read_u32(
     input: &X86Bytes,
     offset: usize,
@@ -299,6 +451,28 @@ fn relative_target(return_to: X86Va, displacement: i32, at: X86Va) -> Result<X86
     }
 
     Ok(X86Va::new(target as u64))
+}
+
+fn jcc_condition(opcode: u8) -> X86Cond {
+    match opcode & 0x0f {
+        0x0 => X86Cond::Overflow,
+        0x1 => X86Cond::NotOverflow,
+        0x2 => X86Cond::Below,
+        0x3 => X86Cond::AboveOrEqual,
+        0x4 => X86Cond::Equal,
+        0x5 => X86Cond::NotEqual,
+        0x6 => X86Cond::BelowOrEqual,
+        0x7 => X86Cond::Above,
+        0x8 => X86Cond::Sign,
+        0x9 => X86Cond::NotSign,
+        0xa => X86Cond::Parity,
+        0xb => X86Cond::NotParity,
+        0xc => X86Cond::Less,
+        0xd => X86Cond::GreaterOrEqual,
+        0xe => X86Cond::LessOrEqual,
+        0xf => X86Cond::Greater,
+        _ => unreachable!("low nibble is restricted to jcc conditions"),
+    }
 }
 
 fn unsupported_instruction(at: X86Va, end: X86Va, opcode: u8) -> DecodedInstruction {

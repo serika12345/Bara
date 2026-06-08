@@ -9,41 +9,155 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 15:59 JST
+最終更新: 2026-06-08 20:18 JST
 
 状態:
 
-- project_state: completed。B4 の最後の小ステップとして、unsupported
-  syscall / external call の分類と report schema を安定させた。
-- active_milestone: completed。[TODO.md](../TODO.md) の B4:
-  x86 syscall / libc 境界は review gate に到達した。
-- active_design_focus: completed。B4 範囲では
-  [docs/design-todo.md](design-todo.md) の D4: Bara IR の責務と
-  D5: Host helper / OS boundary に沿って、syscall / external call は
-  実行せず、report I/O 境界で `unsupported_boundary` として分類する。
-- active_branch: `task/b4-syscall-ir-request`。base commit は `19eeedb`
-  (`Make roadmap linear without losing milestones`)。latest commit は
-  review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B4 の
-  unsupported syscall / external call の分類と report schema を安定させる。
-- completed_work: `FunctionRunError::Emit` のうち
-  `SyscallUnsupported` と `ExternalCallUnsupported` を stable JSON message
-  に変換する report schema を追加した。schema は
-  `status: unsupported_boundary`、`failure_kind: emit_error`、
-  `boundary.kind: syscall | external_call` を持ち、syscall ABI、
-  source address range、external symbol id、unresolved/public symbol import
-  target を記録する。
-- remaining_work: B4 内の未完了作業はない。
-- next_action: B4 branch の full verification、commit / push、pull request
-  作成を行い、large milestone review gate で停止する。次の実装候補は
-  B5: Control Flow / Stack / Call。
-- verification: `nix develop -c cargo test -p btbc-cli
-  function_run::tests::unsupported`、`nix develop -c ./scripts/check-domain-types`、
-  `nix develop -c ./scripts/check-no-invisible-chars`、`git diff --check`、
-  `nix develop -c ./scripts/verify` が通過した。
+- project_state: completed。B5 の Control Flow / Stack / Call large milestone
+  は review gate 到達状態。
+- active_milestone: completed。[TODO.md](../TODO.md) の B5:
+  Control Flow / Stack / Call。
+- active_design_focus: completed。[docs/design-todo.md](design-todo.md) の
+  D4: Bara IR の責務に沿って、typed terminator、branch/call validation、
+  parity 以外の conditional branch lowering を追加した。
+- active_branch: `task/b5-add-sub-regression`。base commit は `4d2356f`
+  (`Merge pull request #4 from serika12345/task/b4-syscall-ir-request`)。
+  latest commit は review package で確認する。
+- related_todo: [TODO.md](../TODO.md) B5 の
+  control-flow fixture、typed terminator、flags model、branch/call lowering、
+  stack operations、validation report。
+- completed_work: `add/sub` regression、basic block splitting、typed
+  terminator、`cmp` / `test` flags-producing IR、short / near `jcc` decode /
+  lift、parity 以外の ARM64 `b.cond` lowering、short direct `jmp`、simple loop、
+  `push` / `pop`、internal direct `call rel32`、nested call fixture、branch /
+  call target existence validation、source PC range overlap validationを実装した。
+  parity `jcc` は decode / lift されるが、ARM64 lowering は flags
+  materialization 拡張まで explicit unsupported として扱う。
+- remaining_work: B5 実装は完了。serialized PC map / fixup schema consistency
+  と parity `jcc` lowering は後続 milestone の TODO に残す。
+- next_action: B5 review gate として pull request を開き、レビュー後に B6:
+  実 Mach-O 入力からの standalone 実行へ進む。
+- verification: `nix develop -c cargo test -p bara-ir missing_`、`nix develop
+  -c cargo test -p bara-isa-x86 rel32`、`nix develop -c cargo test -p
+  bara-isa-x86 decodes_jo`、`nix develop -c cargo test -p bara-arm64
+  conditional_branch`、`nix develop -c cargo test -p bara-arm64
+  missing_branch_target_is_invalid_program`、`nix develop -c cargo test -p
+  bara-runtime jl_rel32_return_42`、および `nix develop -c ./scripts/verify`
+  が通過した。
 
 直近で完了した作業:
 
+- 2026-06-08 20:18 JST: B5 large milestone completion の最終小ステップとして、
+  IR validation に missing branch/fallthrough/call target report を追加し、
+  decoder / lifter は short / near `jcc` 全条件を `CondJump` へ接続した。
+  ARM64 emitter は parity 以外の条件を `b.cond` へ lower し、parity 条件を
+  explicit unsupported として維持する。`jl_rel32_return_42` を repository
+  fixture に追加し、signed-less rel32 branch を decode / lift / emit / runtime
+  regression にした。検証は snapshot の targeted tests と
+  `nix develop -c ./scripts/verify`。
+
+- 2026-06-08 20:05 JST: B5 large milestone completion の小ステップとして、
+  `Push` / `Pop` IR、internal-target `DirectCall` terminator、ARM64 の
+  16-byte aligned stack slot lowering、direct call `bl` fixup、link-register
+  save/restore、block 間 `rax` live-in propagation を追加した。
+  `push_pop_return_42`、`loop_countdown_return_0`、`nested_call_return_42` を
+  repository fixture に追加し、nested call は linked native executable artifact
+  としても実行した。検証は snapshot の targeted tests と
+  `nix develop -c ./scripts/verify`。
+
+- 2026-06-08 19:53 JST: B5 large milestone completion の小ステップとして、
+  short `jmp rel8` を `DecodedInstructionKind::JmpRel8` と
+  `Terminator::DirectJump` へ接続した。`direct_jmp_return_42` を repository
+  fixture に追加し、decode / lift / emit と native runtime 実行の regression
+  とした。検証は `nix develop -c cargo test -p bara-isa-x86
+  decodes_jmp_rel8_and_continues_with_target_block`、`nix develop -c cargo test
+  -p bara-isa-x86 lifts_jmp_rel8_to_direct_jump_terminator`、`nix develop -c
+  cargo test -p bara-runtime direct_jmp_return_42`、`nix develop -c cargo test
+  -p btbc-cli check_blackbox_reports_raw_manifest_mach_o_and_probe_fixtures`、
+  および `nix develop -c ./scripts/verify`。
+
+- 2026-06-08 19:45 JST: B5 large milestone completion の小ステップとして、
+  ARM64 emitter に `cmp x0,#imm12`、`tst x0,x0`、`b.eq` / `b.ne`、
+  unconditional `b` の branch fixup を追加した。`branch_eq_return_42` を
+  repository fixture に追加し、decode / lift / emit と native runtime 実行の
+  regression とした。検証は `nix develop -c cargo test -p bara-arm64
+  emits_conditional_branch_fixups_for_equal`、`nix develop -c cargo test -p
+  bara-arm64 emits_cmp_x0_immediate_for_rax_compare_immediate`、`nix develop -c
+  cargo test -p bara-arm64 emits_tst_x0_x0_for_rax_test_rax`、
+  `nix develop -c cargo test -p bara-runtime branch_eq_return_42`、
+  `nix develop -c cargo test -p btbc-cli
+  check_blackbox_reports_raw_manifest_mach_o_and_probe_fixtures`、および
+  `nix develop -c ./scripts/verify`。
+
+- 2026-06-08 19:36 JST: B5 large milestone completion の準備として、decoder が
+  `ret` と direct `call rel32` の後続 block bytes を保持できるようにした。
+  explicit terminator で EOF に到達した場合は missing return sentinel を追加しない。
+- 検証: `nix develop -c cargo test -p bara-isa-x86 trailing_block_bytes`、
+  `nix develop -c cargo test -p bara-isa-x86 call_rel32_then_fallthrough_instruction`、
+  および `nix develop -c cargo test -p bara-isa-x86
+  missing_ret_becomes_unsupported_instruction` が通過した。
+  `nix develop -c ./scripts/verify` が通過した。
+- 2026-06-08 19:26 JST: B5 の 9 つ目の小ステップとして、
+  short `jne/jnz rel8` を decode / lift し、`X86Cond::NotEqual` の
+  `Terminator::CondJump` として IR に追加した。負 displacement の target
+  計算も regression で確認した。
+- 検証: `nix develop -c cargo test -p bara-isa-x86 jne` が通過した。
+  `nix develop -c ./scripts/verify` が通過した。
+- 2026-06-08 19:07 JST: B5 の 8 つ目の小ステップとして、
+  short `je/jz rel8` を decode / lift し、`X86Cond::Equal` の
+  `Terminator::CondJump` として IR に追加した。fallthrough 側の後続命令は
+  次 block として保持する。
+- 検証: `nix develop -c cargo test -p bara-isa-x86 je` が通過した。
+  `nix develop -c ./scripts/verify` が通過した。
+- 2026-06-08 18:59 JST: B5 の 7 つ目の小ステップとして、
+  `test eax,eax` を decode / lift し、`IrOp::Test` として
+  flags-producing IR に追加した。ARM64 emit は flag lowering 実装前の
+  explicit unsupported として分類する。
+- 検証: `nix develop -c cargo test -p bara-isa-x86 test_eax`、
+  `nix develop -c cargo test -p bara-ir test_op`、および
+  `nix develop -c cargo test -p bara-arm64 test_ops_are_not_emitted_before_flag_lowering`
+  が通過した。
+  `nix develop -c ./scripts/verify` が通過した。
+- 2026-06-08 18:48 JST: B5 の 6 つ目の小ステップとして、
+  `cmp eax, imm8/imm32` を decode / lift し、`IrOp::Cmp` として
+  flags-producing IR に追加した。ARM64 emit は flag lowering 実装前の
+  explicit unsupported として分類する。
+- 検証: `nix develop -c cargo test -p bara-isa-x86 cmp`、
+  `nix develop -c cargo test -p bara-ir cmp`、および
+  `nix develop -c cargo test -p bara-arm64 cmp_ops_are_not_emitted_before_flag_lowering`
+  が通過した。
+  `nix develop -c ./scripts/verify` が通過した。
+- 2026-06-08 18:41 JST: B5 の 5 つ目の小ステップとして、
+  `FlagValue::{Known, Unknown}` と CF/PF/AF/ZF/SF/OF を持つ `Flags`
+  domain model を `bara-ir` に追加した。`cmp` / `test` / `jcc` の
+  decode / lift / emit は後続小ステップに分離した。
+- 検証: `nix develop -c cargo test -p bara-ir flags` が通過した。
+  `nix develop -c ./scripts/verify` が通過した。
+- 2026-06-08 18:36 JST: B5 の 4 つ目の小ステップとして、
+  `Fallthrough`、`DirectJump`、`CondJump`、`X86Cond` を typed IR
+  terminator として追加した。branch lowering / fixup はまだ実装せず、
+  ARM64 emit は explicit unsupported として分類する。
+- 検証: `nix develop -c cargo test -p bara-ir` と
+  `nix develop -c cargo test -p bara-arm64 emit::tests` が通過した。
+  `nix develop -c ./scripts/verify` が通過した。
+- 2026-06-08 17:15 JST: B5 の 3 つ目の小ステップとして、terminator
+  がない decoded stream 末尾を暗黙 fallthrough とせず、
+  `MissingReturnTerminator` の typed unsupported terminator を持つ
+  `BasicBlock` として lift するようにした。
+- 検証: `nix develop -c cargo test -p bara-isa-x86 lift::tests` と
+  `nix develop -c ./scripts/verify` が通過した。
+- 2026-06-08 16:45 JST: B5 の 2 つ目の小ステップとして、lifter に
+  basic block 分割境界を導入した。`ret` などの terminator instruction で
+  block を確定し、後続 instruction があれば次の `BlockId` と source range
+  を持つ `BasicBlock` として lift する。
+- 検証: `nix develop -c cargo test -p bara-isa-x86 lift::tests` と
+  `nix develop -c ./scripts/verify` が通過した。
+- 2026-06-08 16:32 JST: B5 の最初の小ステップとして、`add` / `sub`
+  fixture coverage が control-flow 前段の regression corpus に含まれている
+  状態を TODO と進行履歴へ反映した。既存の `tests/cases`、`tests/expected`、
+  `crates/bara-runtime` regression、`tests/expected-reports/blackbox.json` が
+  `add` / `sub` 単独および複合 fixture を保持している。
+- 検証: `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-08 15:59 JST: B4 の最後の小ステップとして、unsupported
   syscall / external call の分類と report schema を安定させた。
   function-level の emit unsupported boundary は corpus failure

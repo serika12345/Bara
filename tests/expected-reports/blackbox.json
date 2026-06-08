@@ -13,6 +13,14 @@
       "outcome": "passed"
     },
     {
+      "case_id": "branch_eq_return_42",
+      "outcome": "passed"
+    },
+    {
+      "case_id": "direct_jmp_return_42",
+      "outcome": "passed"
+    },
+    {
       "case_id": "hello_world_stdout_return_0",
       "outcome": "passed"
     },
@@ -21,7 +29,23 @@
       "outcome": "passed"
     },
     {
+      "case_id": "jl_rel32_return_42",
+      "outcome": "passed"
+    },
+    {
       "case_id": "load_u8_from_rdi_return_72",
+      "outcome": "passed"
+    },
+    {
+      "case_id": "loop_countdown_return_0",
+      "outcome": "passed"
+    },
+    {
+      "case_id": "nested_call_return_42",
+      "outcome": "passed"
+    },
+    {
+      "case_id": "push_pop_return_42",
       "outcome": "passed"
     },
     {

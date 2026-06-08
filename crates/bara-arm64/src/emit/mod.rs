@@ -1,6 +1,6 @@
 use bara_ir::{
     validate_program, BoundaryRequest, HelperRequest, HostTrapKind, IrOp, Operand, Program,
-    Terminator, UnsupportedReason, X86Reg,
+    Terminator, UnsupportedReason, X86Cond, X86Reg, X86Va,
 };
 
 use crate::{ArmPc, PcMapEntry};
@@ -88,80 +88,222 @@ pub enum EmitError {
     UnsupportedShape,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct BlockOffset {
+    source: X86Va,
+    target: ArmPc,
+}
+
+impl BlockOffset {
+    const fn new(source: X86Va, target: ArmPc) -> Self {
+        Self { source, target }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct BranchFixup {
+    offset: usize,
+    source: ArmPc,
+    target: X86Va,
+    kind: BranchFixupKind,
+}
+
+impl BranchFixup {
+    const fn new(offset: usize, source: ArmPc, target: X86Va, kind: BranchFixupKind) -> Self {
+        Self {
+            offset,
+            source,
+            target,
+            kind,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum BranchFixupKind {
+    Unconditional,
+    Call,
+    Conditional { condition: X86Cond },
+}
+
 pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
     if !validate_program(program).is_valid() {
         return Err(EmitError::InvalidProgram);
     }
 
-    let [block] = program.blocks() else {
-        return Err(EmitError::UnsupportedShape);
-    };
-
     let mut code = Vec::new();
-    let mut has_rax_value = false;
     let mut host_trap_requests = EmittedHostTrapRequests::none();
+    let mut pc_map = Vec::new();
+    let mut block_offsets = Vec::new();
+    let mut branch_fixups = Vec::new();
+    let rax_live_in_blocks = rax_live_in_blocks(program);
 
-    for op in block.ops() {
-        match op {
-            IrOp::HostTrap {
-                kind: HostTrapKind::Stdout,
-            } => {
-                host_trap_requests = EmittedHostTrapRequests::stdout();
+    for block in program.blocks() {
+        let block_target = current_arm_pc(&code)?;
+        pc_map.push(PcMapEntry::new(block.start(), block_target));
+        block_offsets.push(BlockOffset::new(block.start(), block_target));
+
+        let mut has_rax_value = rax_live_in_blocks.contains(&block.start());
+
+        for op in block.ops() {
+            match op {
+                IrOp::HostTrap {
+                    kind: HostTrapKind::Stdout,
+                } => {
+                    host_trap_requests = EmittedHostTrapRequests::stdout();
+                }
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(value),
+                } => {
+                    emit_mov_x0_u64(&mut code, *value);
+                    has_rax_value = true;
+                }
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::Reg(X86Reg::Rdi),
+                } => {
+                    has_rax_value = true;
+                }
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::Mem8 { base: X86Reg::Rdi },
+                } => {
+                    emit_ldrb_w0_x0(&mut code);
+                    has_rax_value = true;
+                }
+                IrOp::Mov { .. } => {
+                    return Err(unsupported_ir());
+                }
+                IrOp::Add {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(value),
+                } => {
+                    if !has_rax_value {
+                        return Err(EmitError::UnsupportedShape);
+                    }
+                    emit_add_x0_imm12(&mut code, *value)?;
+                }
+                IrOp::Add { .. } => {
+                    return Err(unsupported_ir());
+                }
+                IrOp::Sub {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(value),
+                } => {
+                    if !has_rax_value {
+                        return Err(EmitError::UnsupportedShape);
+                    }
+                    emit_sub_x0_imm12(&mut code, *value)?;
+                }
+                IrOp::Sub { .. } => {
+                    return Err(unsupported_ir());
+                }
+                IrOp::Cmp {
+                    lhs: Operand::Reg(X86Reg::Rax),
+                    rhs: Operand::ImmU64(value),
+                } => {
+                    if !has_rax_value {
+                        return Err(EmitError::UnsupportedShape);
+                    }
+                    emit_cmp_x0_imm12(&mut code, *value)?;
+                }
+                IrOp::Cmp { .. } => {
+                    return Err(unsupported_ir());
+                }
+                IrOp::Test {
+                    lhs: Operand::Reg(X86Reg::Rax),
+                    rhs: Operand::Reg(X86Reg::Rax),
+                } => {
+                    if !has_rax_value {
+                        return Err(EmitError::UnsupportedShape);
+                    }
+                    emit_tst_x0_x0(&mut code);
+                }
+                IrOp::Test { .. } => {
+                    return Err(unsupported_ir());
+                }
+                IrOp::Push {
+                    src: Operand::Reg(X86Reg::Rax),
+                } => {
+                    if !has_rax_value {
+                        return Err(EmitError::UnsupportedShape);
+                    }
+                    emit_push_x0(&mut code);
+                }
+                IrOp::Push { .. } => {
+                    return Err(unsupported_ir());
+                }
+                IrOp::Pop {
+                    dst: Operand::Reg(X86Reg::Rax),
+                } => {
+                    emit_pop_x0(&mut code);
+                    has_rax_value = true;
+                }
+                IrOp::Pop { .. } => {
+                    return Err(unsupported_ir());
+                }
+                IrOp::Unsupported { reason } => {
+                    return Err(EmitError::UnsupportedIr {
+                        reason: reason.clone(),
+                    });
+                }
             }
-            IrOp::Mov {
-                dst: Operand::Reg(X86Reg::Rax),
-                src: Operand::ImmU64(value),
-            } => {
-                emit_mov_x0_u64(&mut code, *value);
-                has_rax_value = true;
-            }
-            IrOp::Mov {
-                dst: Operand::Reg(X86Reg::Rax),
-                src: Operand::Reg(X86Reg::Rdi),
-            } => {
-                has_rax_value = true;
-            }
-            IrOp::Mov {
-                dst: Operand::Reg(X86Reg::Rax),
-                src: Operand::Mem8 { base: X86Reg::Rdi },
-            } => {
-                emit_ldrb_w0_x0(&mut code);
-                has_rax_value = true;
-            }
-            IrOp::Mov { .. } => {
-                return Err(EmitError::UnsupportedIr {
-                    reason: UnsupportedReason::EmitUnsupportedIr,
-                });
-            }
-            IrOp::Add {
-                dst: Operand::Reg(X86Reg::Rax),
-                src: Operand::ImmU64(value),
-            } => {
+        }
+
+        match block.terminator() {
+            Terminator::Return => {
                 if !has_rax_value {
                     return Err(EmitError::UnsupportedShape);
                 }
-                emit_add_x0_imm12(&mut code, *value)?;
+                emit_u32_le(&mut code, 0xd65f_03c0);
             }
-            IrOp::Add { .. } => {
-                return Err(EmitError::UnsupportedIr {
-                    reason: UnsupportedReason::EmitUnsupportedIr,
-                });
-            }
-            IrOp::Sub {
-                dst: Operand::Reg(X86Reg::Rax),
-                src: Operand::ImmU64(value),
+            Terminator::BoundaryRequest {
+                request: BoundaryRequest::Helper(HelperRequest::CallExternal(request)),
             } => {
-                if !has_rax_value {
-                    return Err(EmitError::UnsupportedShape);
-                }
-                emit_sub_x0_imm12(&mut code, *value)?;
-            }
-            IrOp::Sub { .. } => {
                 return Err(EmitError::UnsupportedIr {
-                    reason: UnsupportedReason::EmitUnsupportedIr,
+                    reason: UnsupportedReason::ExternalCallUnsupported { request: *request },
                 });
             }
-            IrOp::Unsupported { reason } => {
+            Terminator::BoundaryRequest {
+                request: BoundaryRequest::Syscall(request),
+            } => {
+                return Err(EmitError::UnsupportedIr {
+                    reason: UnsupportedReason::SyscallUnsupported { request: *request },
+                });
+            }
+            Terminator::Fallthrough { target } | Terminator::DirectJump { target } => {
+                emit_branch_placeholder(
+                    &mut code,
+                    &mut branch_fixups,
+                    *target,
+                    BranchFixupKind::Unconditional,
+                )?;
+            }
+            Terminator::CondJump {
+                condition,
+                taken,
+                fallthrough,
+            } => {
+                emit_branch_placeholder(
+                    &mut code,
+                    &mut branch_fixups,
+                    *taken,
+                    BranchFixupKind::Conditional {
+                        condition: *condition,
+                    },
+                )?;
+                emit_branch_placeholder(
+                    &mut code,
+                    &mut branch_fixups,
+                    *fallthrough,
+                    BranchFixupKind::Unconditional,
+                )?;
+            }
+            Terminator::DirectCall { target, return_to } => {
+                emit_direct_call_placeholders(&mut code, &mut branch_fixups, *target, *return_to)?;
+            }
+            Terminator::Unsupported { reason } => {
                 return Err(EmitError::UnsupportedIr {
                     reason: reason.clone(),
                 });
@@ -169,41 +311,236 @@ pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
         }
     }
 
-    match block.terminator() {
-        Terminator::Return => {
-            if !has_rax_value {
-                return Err(EmitError::UnsupportedShape);
-            }
-            emit_u32_le(&mut code, 0xd65f_03c0);
-        }
-        Terminator::BoundaryRequest {
-            request: BoundaryRequest::Helper(HelperRequest::CallExternal(request)),
-        } => {
-            return Err(EmitError::UnsupportedIr {
-                reason: UnsupportedReason::ExternalCallUnsupported { request: *request },
-            });
-        }
-        Terminator::BoundaryRequest {
-            request: BoundaryRequest::Syscall(request),
-        } => {
-            return Err(EmitError::UnsupportedIr {
-                reason: UnsupportedReason::SyscallUnsupported { request: *request },
-            });
-        }
-        Terminator::Unsupported { reason } => {
-            return Err(EmitError::UnsupportedIr {
-                reason: reason.clone(),
-            });
-        }
-    }
+    apply_branch_fixups(&mut code, &branch_fixups, &block_offsets)?;
 
     let machine_code = Arm64MachineCode::new(code)?;
-    let pc_map = vec![PcMapEntry::new(block.start(), ArmPc::new(0))];
     Ok(EmittedFunction::with_host_trap_requests(
         machine_code,
         pc_map,
         host_trap_requests,
     ))
+}
+
+fn rax_live_in_blocks(program: &Program) -> Vec<X86Va> {
+    let blocks = program.blocks();
+    let mut live_in = vec![false; blocks.len()];
+    let mut changed = true;
+
+    while changed {
+        changed = false;
+
+        for (index, block) in blocks.iter().enumerate() {
+            let has_rax = block_output_has_rax(block, live_in[index]);
+            match block.terminator() {
+                Terminator::Fallthrough { target } | Terminator::DirectJump { target } => {
+                    changed |= propagate_rax_to_block(blocks, &mut live_in, *target, has_rax);
+                }
+                Terminator::CondJump {
+                    taken, fallthrough, ..
+                } => {
+                    changed |= propagate_rax_to_block(blocks, &mut live_in, *taken, has_rax);
+                    changed |= propagate_rax_to_block(blocks, &mut live_in, *fallthrough, has_rax);
+                }
+                Terminator::DirectCall { target, return_to } => {
+                    changed |= propagate_rax_to_block(blocks, &mut live_in, *target, has_rax);
+                    changed |= propagate_rax_to_block(blocks, &mut live_in, *return_to, true);
+                }
+                Terminator::Return
+                | Terminator::BoundaryRequest { .. }
+                | Terminator::Unsupported { .. } => {}
+            }
+        }
+    }
+
+    program
+        .blocks()
+        .iter()
+        .zip(live_in)
+        .filter_map(
+            |(block, is_live)| {
+                if is_live {
+                    Some(block.start())
+                } else {
+                    None
+                }
+            },
+        )
+        .collect()
+}
+
+fn block_output_has_rax(block: &bara_ir::BasicBlock, mut has_rax: bool) -> bool {
+    for op in block.ops() {
+        match op {
+            IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                ..
+            }
+            | IrOp::Pop {
+                dst: Operand::Reg(X86Reg::Rax),
+            } => {
+                has_rax = true;
+            }
+            IrOp::Mov { .. }
+            | IrOp::Add { .. }
+            | IrOp::Sub { .. }
+            | IrOp::Cmp { .. }
+            | IrOp::Test { .. }
+            | IrOp::Push { .. }
+            | IrOp::HostTrap { .. }
+            | IrOp::Pop { .. }
+            | IrOp::Unsupported { .. } => {}
+        }
+    }
+
+    has_rax
+}
+
+fn propagate_rax_to_block(
+    blocks: &[bara_ir::BasicBlock],
+    live_in: &mut [bool],
+    target: X86Va,
+    has_rax: bool,
+) -> bool {
+    if !has_rax {
+        return false;
+    }
+
+    let Some(index) = blocks.iter().position(|block| block.start() == target) else {
+        return false;
+    };
+
+    if live_in[index] {
+        return false;
+    }
+
+    live_in[index] = true;
+    true
+}
+
+fn unsupported_ir() -> EmitError {
+    EmitError::UnsupportedIr {
+        reason: UnsupportedReason::EmitUnsupportedIr,
+    }
+}
+
+fn current_arm_pc(code: &[u8]) -> Result<ArmPc, EmitError> {
+    u64::try_from(code.len())
+        .map(ArmPc::new)
+        .map_err(|_| unsupported_ir())
+}
+
+fn emit_direct_call_placeholders(
+    code: &mut Vec<u8>,
+    branch_fixups: &mut Vec<BranchFixup>,
+    target: X86Va,
+    return_to: X86Va,
+) -> Result<(), EmitError> {
+    emit_save_link_register(code);
+    emit_branch_placeholder(code, branch_fixups, target, BranchFixupKind::Call)?;
+    emit_restore_link_register(code);
+    emit_branch_placeholder(
+        code,
+        branch_fixups,
+        return_to,
+        BranchFixupKind::Unconditional,
+    )
+}
+
+fn emit_branch_placeholder(
+    code: &mut Vec<u8>,
+    branch_fixups: &mut Vec<BranchFixup>,
+    target: X86Va,
+    kind: BranchFixupKind,
+) -> Result<(), EmitError> {
+    let source = current_arm_pc(code)?;
+    let offset = code.len();
+    emit_u32_le(code, 0);
+    branch_fixups.push(BranchFixup::new(offset, source, target, kind));
+    Ok(())
+}
+
+fn apply_branch_fixups(
+    code: &mut [u8],
+    branch_fixups: &[BranchFixup],
+    block_offsets: &[BlockOffset],
+) -> Result<(), EmitError> {
+    for fixup in branch_fixups {
+        let Some(target) = find_block_target(fixup.target, block_offsets) else {
+            return Err(unsupported_ir());
+        };
+        let instruction = encode_branch(fixup.source, target, fixup.kind)?;
+        let end = fixup.offset.checked_add(4).ok_or_else(unsupported_ir)?;
+        let Some(slot) = code.get_mut(fixup.offset..end) else {
+            return Err(unsupported_ir());
+        };
+        slot.copy_from_slice(&instruction.to_le_bytes());
+    }
+
+    Ok(())
+}
+
+fn find_block_target(source: X86Va, block_offsets: &[BlockOffset]) -> Option<ArmPc> {
+    block_offsets
+        .iter()
+        .find(|offset| offset.source == source)
+        .map(|offset| offset.target)
+}
+
+fn encode_branch(source: ArmPc, target: ArmPc, kind: BranchFixupKind) -> Result<u32, EmitError> {
+    match kind {
+        BranchFixupKind::Unconditional => {
+            let imm26 = branch_immediate(source, target, 26)?;
+            Ok(0x1400_0000 | imm26)
+        }
+        BranchFixupKind::Call => {
+            let imm26 = branch_immediate(source, target, 26)?;
+            Ok(0x9400_0000 | imm26)
+        }
+        BranchFixupKind::Conditional { condition } => {
+            let imm19 = branch_immediate(source, target, 19)?;
+            Ok(0x5400_0000 | (imm19 << 5) | arm64_condition(condition)?)
+        }
+    }
+}
+
+fn branch_immediate(source: ArmPc, target: ArmPc, bit_width: u32) -> Result<u32, EmitError> {
+    let delta_bytes = i128::from(target.value()) - i128::from(source.value());
+    if delta_bytes % 4 != 0 {
+        return Err(unsupported_ir());
+    }
+
+    let delta_words = delta_bytes / 4;
+    let min = -(1i128 << (bit_width - 1));
+    let max = (1i128 << (bit_width - 1)) - 1;
+    if delta_words < min || delta_words > max {
+        return Err(unsupported_ir());
+    }
+
+    if delta_words < 0 {
+        Ok(((1i128 << bit_width) + delta_words) as u32)
+    } else {
+        Ok(delta_words as u32)
+    }
+}
+
+fn arm64_condition(condition: X86Cond) -> Result<u32, EmitError> {
+    match condition {
+        X86Cond::Overflow => Ok(6),
+        X86Cond::NotOverflow => Ok(7),
+        X86Cond::Below => Ok(3),
+        X86Cond::AboveOrEqual => Ok(2),
+        X86Cond::Equal => Ok(0),
+        X86Cond::NotEqual => Ok(1),
+        X86Cond::BelowOrEqual => Ok(9),
+        X86Cond::Above => Ok(8),
+        X86Cond::Sign => Ok(4),
+        X86Cond::NotSign => Ok(5),
+        X86Cond::Less => Ok(11),
+        X86Cond::GreaterOrEqual => Ok(10),
+        X86Cond::LessOrEqual => Ok(13),
+        X86Cond::Greater => Ok(12),
+        X86Cond::Parity | X86Cond::NotParity => Err(unsupported_ir()),
+    }
 }
 
 fn emit_mov_x0_u64(code: &mut Vec<u8>, value: u64) -> usize {
@@ -259,6 +596,38 @@ fn emit_sub_x0_imm12(code: &mut Vec<u8>, value: u64) -> Result<usize, EmitError>
     Ok(emit_u32_le(code, 0xd100_0000 | (imm12 << 10)))
 }
 
+fn emit_cmp_x0_imm12(code: &mut Vec<u8>, value: u64) -> Result<usize, EmitError> {
+    let Ok(imm12) = u32::try_from(value) else {
+        return Err(unsupported_ir());
+    };
+
+    if imm12 > 0xfff {
+        return Err(unsupported_ir());
+    }
+
+    Ok(emit_u32_le(code, 0xf100_001f | (imm12 << 10)))
+}
+
+fn emit_tst_x0_x0(code: &mut Vec<u8>) -> usize {
+    emit_u32_le(code, 0xea00_001f)
+}
+
+fn emit_push_x0(code: &mut Vec<u8>) -> usize {
+    emit_u32_le(code, 0xf81f_0fe0)
+}
+
+fn emit_pop_x0(code: &mut Vec<u8>) -> usize {
+    emit_u32_le(code, 0xf841_07e0)
+}
+
+fn emit_save_link_register(code: &mut Vec<u8>) -> usize {
+    emit_u32_le(code, 0xa9bf_7bfd)
+}
+
+fn emit_restore_link_register(code: &mut Vec<u8>) -> usize {
+    emit_u32_le(code, 0xa8c1_7bfd)
+}
+
 fn emit_ldrb_w0_x0(code: &mut Vec<u8>) -> usize {
     emit_u32_le(code, 0x3940_0000)
 }
@@ -273,7 +642,7 @@ mod tests {
     use bara_ir::{
         BasicBlock, BlockId, BoundaryRequest, ExternalCallRequest, ExternalSymbolId, HelperRequest,
         HostTrapKind, IrOp, Operand, Program, SyscallAbi, SyscallRequest, Terminator,
-        UnsupportedReason, X86Reg, X86Va,
+        UnsupportedReason, X86Cond, X86Reg, X86Va,
     };
 
     use crate::{emit_program, Arm64MachineCode, ArmPc, EmitError};
@@ -421,6 +790,39 @@ mod tests {
     }
 
     #[test]
+    fn emits_push_pop_rax_with_aligned_stack_slot() {
+        let program = program_with_ops(
+            vec![
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(42),
+                },
+                IrOp::Push {
+                    src: Operand::Reg(X86Reg::Rax),
+                },
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(7),
+                },
+                IrOp::Pop {
+                    dst: Operand::Reg(X86Reg::Rax),
+                },
+            ],
+            Terminator::Return,
+        );
+
+        let emitted = emit_program(&program).expect("push/pop IR emits");
+
+        assert_eq!(
+            emitted.code().bytes(),
+            &[
+                0x40, 0x05, 0x80, 0xd2, 0xe0, 0x0f, 0x1f, 0xf8, 0xe0, 0x00, 0x80, 0xd2, 0xe0, 0x07,
+                0x41, 0xf8, 0xc0, 0x03, 0x5f, 0xd6,
+            ]
+        );
+    }
+
+    #[test]
     fn emits_mov_x0_with_multiple_u16_chunks() {
         let program = program_with_ops(
             vec![IrOp::Mov {
@@ -493,6 +895,293 @@ mod tests {
             Err(EmitError::UnsupportedIr {
                 reason: UnsupportedReason::ExternalCallUnsupported { request }
             })
+        );
+    }
+
+    #[test]
+    fn missing_branch_target_is_invalid_program() {
+        let program = program_with_ops(
+            vec![IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(42),
+            }],
+            Terminator::DirectJump {
+                target: X86Va::new(8),
+            },
+        );
+
+        assert_eq!(emit_program(&program), Err(EmitError::InvalidProgram));
+    }
+
+    #[test]
+    fn emits_conditional_branch_fixups_for_equal() {
+        let block0 = BasicBlock::new(
+            BlockId::new(0),
+            X86Va::new(0),
+            X86Va::new(4),
+            vec![
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(0),
+                },
+                IrOp::Test {
+                    lhs: Operand::Reg(X86Reg::Rax),
+                    rhs: Operand::Reg(X86Reg::Rax),
+                },
+            ],
+            Terminator::CondJump {
+                condition: X86Cond::Equal,
+                taken: X86Va::new(8),
+                fallthrough: X86Va::new(4),
+            },
+        )
+        .expect("test block range is valid");
+        let block1 = BasicBlock::new(
+            BlockId::new(1),
+            X86Va::new(4),
+            X86Va::new(8),
+            vec![IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(7),
+            }],
+            Terminator::Return,
+        )
+        .expect("test block range is valid");
+        let block2 = BasicBlock::new(
+            BlockId::new(2),
+            X86Va::new(8),
+            X86Va::new(12),
+            vec![IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(42),
+            }],
+            Terminator::Return,
+        )
+        .expect("test block range is valid");
+        let program =
+            Program::new(X86Va::new(0), vec![block0, block1, block2]).expect("program is valid");
+
+        let emitted = emit_program(&program).expect("control flow emits");
+
+        assert_eq!(
+            emitted.code().bytes(),
+            &[
+                0x00, 0x00, 0x80, 0xd2, 0x1f, 0x00, 0x00, 0xea, 0x80, 0x00, 0x00, 0x54, 0x01, 0x00,
+                0x00, 0x14, 0xe0, 0x00, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6, 0x40, 0x05, 0x80, 0xd2,
+                0xc0, 0x03, 0x5f, 0xd6,
+            ]
+        );
+        assert_eq!(emitted.pc_map()[0].source(), X86Va::new(0));
+        assert_eq!(emitted.pc_map()[1].source(), X86Va::new(4));
+        assert_eq!(emitted.pc_map()[1].target(), ArmPc::new(16));
+        assert_eq!(emitted.pc_map()[2].source(), X86Va::new(8));
+        assert_eq!(emitted.pc_map()[2].target(), ArmPc::new(24));
+    }
+
+    #[test]
+    fn emits_conditional_branch_fixups_for_less() {
+        let block0 = BasicBlock::new(
+            BlockId::new(0),
+            X86Va::new(0),
+            X86Va::new(4),
+            vec![
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(0),
+                },
+                IrOp::Cmp {
+                    lhs: Operand::Reg(X86Reg::Rax),
+                    rhs: Operand::ImmU64(1),
+                },
+            ],
+            Terminator::CondJump {
+                condition: X86Cond::Less,
+                taken: X86Va::new(8),
+                fallthrough: X86Va::new(4),
+            },
+        )
+        .expect("test block range is valid");
+        let block1 = BasicBlock::new(
+            BlockId::new(1),
+            X86Va::new(4),
+            X86Va::new(8),
+            vec![IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(7),
+            }],
+            Terminator::Return,
+        )
+        .expect("test block range is valid");
+        let block2 = BasicBlock::new(
+            BlockId::new(2),
+            X86Va::new(8),
+            X86Va::new(12),
+            vec![IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(42),
+            }],
+            Terminator::Return,
+        )
+        .expect("test block range is valid");
+        let program =
+            Program::new(X86Va::new(0), vec![block0, block1, block2]).expect("program is valid");
+
+        let emitted = emit_program(&program).expect("less conditional branch emits");
+
+        assert_eq!(
+            emitted.code().bytes(),
+            &[
+                0x00, 0x00, 0x80, 0xd2, 0x1f, 0x04, 0x00, 0xf1, 0x8b, 0x00, 0x00, 0x54, 0x01, 0x00,
+                0x00, 0x14, 0xe0, 0x00, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6, 0x40, 0x05, 0x80, 0xd2,
+                0xc0, 0x03, 0x5f, 0xd6,
+            ]
+        );
+    }
+
+    #[test]
+    fn parity_conditional_branch_is_not_emitted() {
+        let block0 = BasicBlock::new(
+            BlockId::new(0),
+            X86Va::new(0),
+            X86Va::new(4),
+            vec![IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(0),
+            }],
+            Terminator::CondJump {
+                condition: X86Cond::Parity,
+                taken: X86Va::new(4),
+                fallthrough: X86Va::new(8),
+            },
+        )
+        .expect("test block range is valid");
+        let block1 = BasicBlock::new(
+            BlockId::new(1),
+            X86Va::new(4),
+            X86Va::new(8),
+            vec![IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(42),
+            }],
+            Terminator::Return,
+        )
+        .expect("test block range is valid");
+        let block2 = BasicBlock::new(
+            BlockId::new(2),
+            X86Va::new(8),
+            X86Va::new(12),
+            vec![IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(7),
+            }],
+            Terminator::Return,
+        )
+        .expect("test block range is valid");
+        let program =
+            Program::new(X86Va::new(0), vec![block0, block1, block2]).expect("program is valid");
+
+        assert_eq!(
+            emit_program(&program),
+            Err(EmitError::UnsupportedIr {
+                reason: UnsupportedReason::EmitUnsupportedIr
+            })
+        );
+    }
+
+    #[test]
+    fn emits_direct_call_fixups_and_return_to_block() {
+        let block0 = BasicBlock::new(
+            BlockId::new(0),
+            X86Va::new(0),
+            X86Va::new(5),
+            Vec::new(),
+            Terminator::DirectCall {
+                target: X86Va::new(6),
+                return_to: X86Va::new(5),
+            },
+        )
+        .expect("test block range is valid");
+        let block1 = BasicBlock::new(
+            BlockId::new(1),
+            X86Va::new(5),
+            X86Va::new(6),
+            Vec::new(),
+            Terminator::Return,
+        )
+        .expect("test block range is valid");
+        let block2 = BasicBlock::new(
+            BlockId::new(2),
+            X86Va::new(6),
+            X86Va::new(12),
+            vec![IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(42),
+            }],
+            Terminator::Return,
+        )
+        .expect("test block range is valid");
+        let program =
+            Program::new(X86Va::new(0), vec![block0, block1, block2]).expect("program is valid");
+
+        let emitted = emit_program(&program).expect("direct call emits");
+
+        assert_eq!(
+            emitted.code().bytes(),
+            &[
+                0xfd, 0x7b, 0xbf, 0xa9, 0x04, 0x00, 0x00, 0x94, 0xfd, 0x7b, 0xc1, 0xa8, 0x01, 0x00,
+                0x00, 0x14, 0xc0, 0x03, 0x5f, 0xd6, 0x40, 0x05, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6,
+            ]
+        );
+        assert_eq!(emitted.pc_map()[0].target(), ArmPc::new(0));
+        assert_eq!(emitted.pc_map()[1].target(), ArmPc::new(16));
+        assert_eq!(emitted.pc_map()[2].target(), ArmPc::new(20));
+    }
+
+    #[test]
+    fn emits_cmp_x0_immediate_for_rax_compare_immediate() {
+        let program = program_with_ops(
+            vec![
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(42),
+                },
+                IrOp::Cmp {
+                    lhs: Operand::Reg(X86Reg::Rax),
+                    rhs: Operand::ImmU64(42),
+                },
+            ],
+            Terminator::Return,
+        );
+
+        let emitted = emit_program(&program).expect("cmp flags emit");
+
+        assert_eq!(
+            emitted.code().bytes(),
+            &[0x40, 0x05, 0x80, 0xd2, 0x1f, 0xa8, 0x00, 0xf1, 0xc0, 0x03, 0x5f, 0xd6]
+        );
+    }
+
+    #[test]
+    fn emits_tst_x0_x0_for_rax_test_rax() {
+        let program = program_with_ops(
+            vec![
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(42),
+                },
+                IrOp::Test {
+                    lhs: Operand::Reg(X86Reg::Rax),
+                    rhs: Operand::Reg(X86Reg::Rax),
+                },
+            ],
+            Terminator::Return,
+        );
+
+        let emitted = emit_program(&program).expect("test flags emit");
+
+        assert_eq!(
+            emitted.code().bytes(),
+            &[0x40, 0x05, 0x80, 0xd2, 0x1f, 0x00, 0x00, 0xea, 0xc0, 0x03, 0x5f, 0xd6]
         );
     }
 }

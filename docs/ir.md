@@ -69,6 +69,20 @@ pub enum IrOp {
 `HostTrap` は OS syscall ではなく、Bara 専用 sentinel/helper sequence を
 runtime 境界へ伝えるための明示的な外部効果要求として扱う。
 
+`Cmp` は x86 の `cmp` と同じく destination operand を書き戻さず、
+後続の flags / conditional branch lowering が読む status flags を更新する
+op として扱う。現時点で decode / lift するのは `cmp eax, imm8/imm32` に
+限る。ARM64 emit は `cmp x0,#imm12` の範囲だけ lower し、それ以外は
+explicit unsupported として止める。
+
+`Test` は x86 の `test` と同じく operand 同士の bitwise AND 結果を
+書き戻さず、flags 更新だけを表す op として扱う。現時点で decode / lift
+するのは `test eax,eax` に限り、ARM64 emit は `tst x0,x0` へ lower する。
+
+`Push` / `Pop` は現時点では `rax` だけを扱う。guest `rsp` 自体はまだ
+外から観測できる IR value として公開せず、ARM64 emit は 16-byte aligned な
+host stack slot を使って function-local stack value として保持する。
+
 ```rust
 pub enum HostTrapKind {
     Stdout,
@@ -106,9 +120,12 @@ pub enum Terminator {
     BoundaryRequest {
         request: BoundaryRequest,
     },
+    Fallthrough {
+        target: X86Va,
+    },
     DirectJump { target: X86Va },
     CondJump {
-        cc: X86Cond,
+        condition: X86Cond,
         taken: X86Va,
         fallthrough: X86Va,
     },
@@ -131,6 +148,15 @@ pub enum Terminator {
     },
 }
 ```
+
+現時点では short `jcc rel8` と near `jcc rel32` を `CondJump` へ、
+short `jmp rel8` を `DirectJump` へ decode / lift する。`call rel32` は
+target が同じ decoded byte stream 内の block start に存在する場合だけ
+`DirectCall` へ lift し、外部 target は `DirectCallUnsupported` として
+分類する。ARM64 emit は `cmp` / `test` が更新した flags を parity 以外の
+`b.cond` へ lower し、parity 条件は explicit unsupported として止める。
+direct call は link register を保存して `bl` と明示的な `return_to` branch
+へ lower する。
 
 `BoundaryRequest` は guest 側から public ABI / external boundary へ出ようとする
 意図を IR に残す。runtime や host OS syscall を直接実行する指示ではない。
@@ -242,12 +268,12 @@ pub enum Operand {
 
 ```rust
 pub struct Flags {
-    pub cf: FlagValue,
-    pub pf: FlagValue,
-    pub af: FlagValue,
-    pub zf: FlagValue,
-    pub sf: FlagValue,
-    pub of: FlagValue,
+    cf: FlagValue,
+    pf: FlagValue,
+    af: FlagValue,
+    zf: FlagValue,
+    sf: FlagValue,
+    of: FlagValue,
 }
 
 pub enum FlagValue {
@@ -256,7 +282,16 @@ pub enum FlagValue {
 }
 ```
 
-M1 では flags を観測しない。M3 で `cmp` / `test` / `jcc` と一緒に導入する。
+flags は `Flags::new(...)` または `Flags::unknown()` で作り、`cf()` /
+`pf()` / `af()` / `zf()` / `sf()` / `of()` accessor から読む。
+
+現時点では `cmp eax, imm8/imm32` を `IrOp::Cmp` へ、`test eax,eax` を
+`IrOp::Test` へ decode / lift し、short / near `jcc` を `CondJump` へ、
+short `jmp rel8` を `DirectJump` へ、internal target の `call rel32` を
+`DirectCall` へ decode / lift する。
+ARM64 emit は `cmp x0,#imm12`、`tst x0,x0`、parity 以外の `b.cond`、
+unconditional `b`、`bl` + link-register save/restore の最小 lowering を持つ。
+parity `jcc` は flags materialization 拡張まで unsupported として扱う。
 
 ## Metadata
 
@@ -283,9 +318,9 @@ pub enum Fixup {
 
 ## 初期 invariant checker
 
-- [ ] block に terminator がある。
-- [ ] branch target が存在する。
-- [ ] fallthrough target が存在する。
-- [ ] block range が重ならない。
-- [ ] unsupported op は明示的に残る。
+- [x] block に terminator がある。
+- [x] branch target が存在する。
+- [x] fallthrough target が存在する。
+- [x] block range が重ならない。
+- [x] unsupported terminator は明示的に report される。
 - [ ] PC map が source PC を失っていない。

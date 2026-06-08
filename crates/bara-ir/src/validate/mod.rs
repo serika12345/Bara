@@ -31,6 +31,10 @@ pub enum ValidationIssue {
     UnsupportedTerminator {
         at: X86Va,
     },
+    MissingBlockTarget {
+        at: X86Va,
+        target: X86Va,
+    },
 }
 
 pub fn validate_program(program: &Program) -> ValidationReport {
@@ -41,10 +45,14 @@ pub fn validate_program(program: &Program) -> ValidationReport {
         issues.push(ValidationIssue::EmptyProgram);
     }
 
+    let block_starts = blocks.iter().map(|block| block.start()).collect::<Vec<_>>();
+
     for (left_index, left) in blocks.iter().enumerate() {
         if matches!(left.terminator(), Terminator::Unsupported { .. }) {
             issues.push(ValidationIssue::UnsupportedTerminator { at: left.end() });
         }
+
+        validate_terminator_targets(left.end(), left.terminator(), &block_starts, &mut issues);
 
         for right in &blocks[(left_index + 1)..] {
             if left.start() < right.end() && right.start() < left.end() {
@@ -61,12 +69,49 @@ pub fn validate_program(program: &Program) -> ValidationReport {
     ValidationReport::new(issues)
 }
 
+fn validate_terminator_targets(
+    at: X86Va,
+    terminator: &Terminator,
+    block_starts: &[X86Va],
+    issues: &mut Vec<ValidationIssue>,
+) {
+    match terminator {
+        Terminator::Fallthrough { target } | Terminator::DirectJump { target } => {
+            validate_block_target(at, *target, block_starts, issues);
+        }
+        Terminator::CondJump {
+            taken, fallthrough, ..
+        } => {
+            validate_block_target(at, *taken, block_starts, issues);
+            validate_block_target(at, *fallthrough, block_starts, issues);
+        }
+        Terminator::DirectCall { target, return_to } => {
+            validate_block_target(at, *target, block_starts, issues);
+            validate_block_target(at, *return_to, block_starts, issues);
+        }
+        Terminator::Return
+        | Terminator::BoundaryRequest { .. }
+        | Terminator::Unsupported { .. } => {}
+    }
+}
+
+fn validate_block_target(
+    at: X86Va,
+    target: X86Va,
+    block_starts: &[X86Va],
+    issues: &mut Vec<ValidationIssue>,
+) {
+    if !block_starts.contains(&target) {
+        issues.push(ValidationIssue::MissingBlockTarget { at, target });
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
         validate_program, BasicBlock, BlockId, BoundaryRequest, ExternalCallRequest,
         ExternalSymbolId, HelperRequest, Program, SyscallAbi, SyscallRequest, Terminator,
-        UnsupportedReason, ValidationIssue, ValidationReport, X86Va,
+        UnsupportedReason, ValidationIssue, ValidationReport, X86Cond, X86Va,
     };
 
     fn block(id: u32, start: u64, end: u64, terminator: Terminator) -> BasicBlock {
@@ -179,5 +224,113 @@ mod tests {
         .expect("program has entry block");
 
         assert!(validate_program(&program).is_valid());
+    }
+
+    #[test]
+    fn control_flow_terminators_are_structurally_valid() {
+        let program = Program::new(
+            X86Va::new(0),
+            vec![
+                block(
+                    0,
+                    0,
+                    4,
+                    Terminator::CondJump {
+                        condition: X86Cond::Equal,
+                        taken: X86Va::new(12),
+                        fallthrough: X86Va::new(4),
+                    },
+                ),
+                block(
+                    1,
+                    4,
+                    8,
+                    Terminator::Fallthrough {
+                        target: X86Va::new(8),
+                    },
+                ),
+                block(
+                    2,
+                    8,
+                    12,
+                    Terminator::DirectCall {
+                        target: X86Va::new(16),
+                        return_to: X86Va::new(12),
+                    },
+                ),
+                block(
+                    3,
+                    12,
+                    16,
+                    Terminator::DirectJump {
+                        target: X86Va::new(16),
+                    },
+                ),
+                block(4, 16, 20, Terminator::Return),
+            ],
+        )
+        .expect("program has entry block and unique block ids");
+
+        assert!(validate_program(&program).is_valid());
+    }
+
+    #[test]
+    fn missing_control_flow_targets_are_reported() {
+        let program = Program::new(
+            X86Va::new(0),
+            vec![block(
+                0,
+                0,
+                4,
+                Terminator::CondJump {
+                    condition: X86Cond::Equal,
+                    taken: X86Va::new(8),
+                    fallthrough: X86Va::new(4),
+                },
+            )],
+        )
+        .expect("program has entry block");
+
+        assert_eq!(
+            validate_program(&program).issues(),
+            &[
+                ValidationIssue::MissingBlockTarget {
+                    at: X86Va::new(4),
+                    target: X86Va::new(8)
+                },
+                ValidationIssue::MissingBlockTarget {
+                    at: X86Va::new(4),
+                    target: X86Va::new(4)
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn missing_direct_call_return_target_is_reported() {
+        let program = Program::new(
+            X86Va::new(0),
+            vec![
+                block(
+                    0,
+                    0,
+                    5,
+                    Terminator::DirectCall {
+                        target: X86Va::new(6),
+                        return_to: X86Va::new(5),
+                    },
+                ),
+                block(1, 6, 12, Terminator::Return),
+            ],
+        )
+        .expect("program has entry block");
+
+        assert_eq!(
+            validate_program(&program).issues(),
+            &[ValidationIssue::MissingBlockTarget {
+                at: X86Va::new(5),
+                target: X86Va::new(5)
+            }]
+        );
     }
 }

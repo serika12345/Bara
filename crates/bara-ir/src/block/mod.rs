@@ -75,6 +75,10 @@ pub enum IrOp {
     Mov { dst: Operand, src: Operand },
     Add { dst: Operand, src: Operand },
     Sub { dst: Operand, src: Operand },
+    Cmp { lhs: Operand, rhs: Operand },
+    Test { lhs: Operand, rhs: Operand },
+    Push { src: Operand },
+    Pop { dst: Operand },
     HostTrap { kind: HostTrapKind },
     Unsupported { reason: UnsupportedReason },
 }
@@ -82,8 +86,47 @@ pub enum IrOp {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Terminator {
     Return,
-    BoundaryRequest { request: BoundaryRequest },
-    Unsupported { reason: UnsupportedReason },
+    BoundaryRequest {
+        request: BoundaryRequest,
+    },
+    Fallthrough {
+        target: X86Va,
+    },
+    DirectJump {
+        target: X86Va,
+    },
+    DirectCall {
+        target: X86Va,
+        return_to: X86Va,
+    },
+    CondJump {
+        condition: X86Cond,
+        taken: X86Va,
+        fallthrough: X86Va,
+    },
+    Unsupported {
+        reason: UnsupportedReason,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum X86Cond {
+    Overflow,
+    NotOverflow,
+    Below,
+    AboveOrEqual,
+    Equal,
+    NotEqual,
+    BelowOrEqual,
+    Above,
+    Sign,
+    NotSign,
+    Parity,
+    NotParity,
+    Less,
+    GreaterOrEqual,
+    LessOrEqual,
+    Greater,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -126,7 +169,7 @@ pub enum UnsupportedReason {
 mod tests {
     use crate::{
         BasicBlock, BasicBlockError, BlockId, HostHelperName, HostHelperRequest,
-        HostHelperSignature, HostTrapKind, IrOp, Operand, Terminator, X86Reg, X86Va,
+        HostHelperSignature, HostTrapKind, IrOp, Operand, Terminator, X86Cond, X86Reg, X86Va,
     };
 
     #[test]
@@ -188,6 +231,96 @@ mod tests {
         assert_eq!(block.end(), X86Va::new(6));
         assert_eq!(block.ops(), &[op]);
         assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn control_flow_terminators_expose_typed_targets() {
+        assert_eq!(
+            Terminator::DirectJump {
+                target: X86Va::new(0x1020)
+            },
+            Terminator::DirectJump {
+                target: X86Va::new(0x1020)
+            }
+        );
+        assert_eq!(
+            Terminator::CondJump {
+                condition: X86Cond::Equal,
+                taken: X86Va::new(0x1020),
+                fallthrough: X86Va::new(0x1005),
+            },
+            Terminator::CondJump {
+                condition: X86Cond::Equal,
+                taken: X86Va::new(0x1020),
+                fallthrough: X86Va::new(0x1005),
+            }
+        );
+        assert_eq!(
+            Terminator::DirectCall {
+                target: X86Va::new(0x1020),
+                return_to: X86Va::new(0x1005),
+            },
+            Terminator::DirectCall {
+                target: X86Va::new(0x1020),
+                return_to: X86Va::new(0x1005),
+            }
+        );
+        assert_eq!(
+            Terminator::Fallthrough {
+                target: X86Va::new(0x1005)
+            },
+            Terminator::Fallthrough {
+                target: X86Va::new(0x1005)
+            }
+        );
+    }
+
+    #[test]
+    fn cmp_op_exposes_typed_operands() {
+        assert_eq!(
+            IrOp::Cmp {
+                lhs: Operand::Reg(X86Reg::Rax),
+                rhs: Operand::ImmU64(42),
+            },
+            IrOp::Cmp {
+                lhs: Operand::Reg(X86Reg::Rax),
+                rhs: Operand::ImmU64(42),
+            }
+        );
+    }
+
+    #[test]
+    fn test_op_exposes_typed_operands() {
+        assert_eq!(
+            IrOp::Test {
+                lhs: Operand::Reg(X86Reg::Rax),
+                rhs: Operand::Reg(X86Reg::Rax),
+            },
+            IrOp::Test {
+                lhs: Operand::Reg(X86Reg::Rax),
+                rhs: Operand::Reg(X86Reg::Rax),
+            }
+        );
+    }
+
+    #[test]
+    fn push_pop_ops_expose_typed_operands() {
+        assert_eq!(
+            IrOp::Push {
+                src: Operand::Reg(X86Reg::Rax),
+            },
+            IrOp::Push {
+                src: Operand::Reg(X86Reg::Rax),
+            }
+        );
+        assert_eq!(
+            IrOp::Pop {
+                dst: Operand::Reg(X86Reg::Rax),
+            },
+            IrOp::Pop {
+                dst: Operand::Reg(X86Reg::Rax),
+            }
+        );
     }
 
     #[test]
