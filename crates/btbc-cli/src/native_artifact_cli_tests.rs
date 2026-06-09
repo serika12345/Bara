@@ -10,7 +10,8 @@ use bara_mach_o::{
     MachOArm64ExecutableWriterRequest, MachOArm64MainCode,
 };
 use bara_oracle::{
-    observed_result_from_json, observed_result_to_json, BinaryFormatProbeError, FailureKind,
+    binary_format_probe_report_to_json, observed_result_from_json, observed_result_to_json,
+    probe_public_binary_format, BinaryFileBytes, BinaryFormatProbeError, BinaryInput, FailureKind,
     MachOEntryFunctionTestCaseError, MachOExecutableImageConversionBlocker,
     MachOExecutableImagePlanError,
 };
@@ -181,6 +182,27 @@ fn mach_o_stdout_input_reaches_pure_writer_serialization_plan() {
             .bytes_at(const_section)
             .expect("const range is in serialized bytes"),
         stdout.text().as_bytes()
+    );
+
+    let output_probe_input = BinaryInput::from_file_bytes(
+        BinaryFileBytes::from_untrusted_file_contents(Vec::from(serialized.bytes())),
+    );
+    let output_probe = probe_public_binary_format(&output_probe_input)
+        .expect("serialized writer output probes as public Mach-O");
+    let output_probe_json =
+        binary_format_probe_report_to_json(&output_probe).expect("probe report serializes");
+    assert_eq!(
+        output_probe_json,
+        format!(
+            "{{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\",\"metadata\":{{\"mach_o\":{{\"file_type\":\"executable\",\"load_commands\":{{\"count\":2,\"byte_size\":{},\"recognized_entry_points\":[{{\"byte_size\":24,\"entryoff\":{},\"stacksize\":0}}],\"recognized_segments\":[{{\"byte_size\":{},\"name\":\"__TEXT\",\"vmaddr\":4294967296,\"fileoff\":0,\"filesize\":{}}}],\"unsupported_commands\":[]}},\"executable_image_conversion\":{{\"status\":\"convertible\",\"entry_point\":{{\"byte_size\":24,\"entryoff\":{},\"stacksize\":0}},\"segment\":{{\"byte_size\":{},\"name\":\"__TEXT\",\"vmaddr\":4294967296,\"fileoff\":0,\"filesize\":{}}}}}}}}}}}",
+            layout.load_commands().size().value(),
+            layout.text_section().offset().value(),
+            layout.load_commands().size().value() - 24,
+            layout.total_size().value(),
+            layout.text_section().offset().value(),
+            layout.load_commands().size().value() - 24,
+            layout.total_size().value()
+        )
     );
 }
 

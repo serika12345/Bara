@@ -138,6 +138,10 @@ impl MachOArm64SerializedExecutable {
         &self.layout
     }
 
+    pub fn bytes(&self) -> MachOArm64SerializedByteSlice<'_> {
+        MachOArm64SerializedByteSlice::new(&self.bytes)
+    }
+
     pub fn bytes_at(
         &self,
         range: MachOArm64FileRange,
@@ -165,6 +169,12 @@ impl<'a> MachOArm64SerializedByteSlice<'a> {
 impl PartialEq<&[u8]> for MachOArm64SerializedByteSlice<'_> {
     fn eq(&self, other: &&[u8]) -> bool {
         self.bytes == *other
+    }
+}
+
+impl From<MachOArm64SerializedByteSlice<'_>> for Vec<u8> {
+    fn from(value: MachOArm64SerializedByteSlice<'_>) -> Self {
+        value.bytes.to_vec()
     }
 }
 
