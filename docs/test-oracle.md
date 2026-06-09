@@ -119,10 +119,16 @@ M1 では以下だけを比較する。
 ## コマンド案
 
 ```text
+btbc-cli build-x86_64-macho-fixture tests/cases/return_42.json target/bara-oracle/x86_64/return_42
 btbc-cli check-fixture tests/cases/return_42.json tests/expected/return_42.json
 btbc-cli check-corpus tests/cases tests/expected --out target/bara-blackbox
 ./scripts/verify-blackbox
 ```
+
+`build-x86_64-macho-fixture` は、初期 B7 では no-args / `u64` return かつ
+host trap なしの testcase bytes を x86_64 Mach-O `_main` として assemble /
+link する。引数 ABI、stdout host trap、JSON を出す oracle harness は後続の
+x86_64 oracle runner で扱う。
 
 `check-corpus` は全 testcase を走査し、成功時は case 単位の JSON report
 を出す。失敗がある場合も最後まで走査し、同じ JSON report を出して非ゼロ終了

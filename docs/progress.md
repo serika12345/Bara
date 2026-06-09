@@ -9,78 +9,48 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-09 21:55 JST
+最終更新: 2026-06-09 22:22 JST
 
 状態:
 
-- project_state: completed。B6 の最後の小ステップとして、output Mach-O の
-  layout / serialization parity を公開仕様ベースで検証し、B6 の実装 TODO が
-  完了した。
-- active_milestone: completed。[TODO.md](../TODO.md) の B6:
-  実 Mach-O 入力からの standalone 実行。
-- active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の
-  D7: Binary format input/output の分離に沿って、Mach-O 入力変換は
-  `bara-oracle` の既存 pipeline に留め、native artifact packaging は
-  `btbc-cli` の出力境界へ接続した。
-- active_branch: `task/b6-macho-return42-artifact`。base commit は `31dbc29`。
-  latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B6 の output Mach-O の layout /
-  serialization parity を公開仕様ベースで検証する項目。
-- completed_work: `link-mach-o-arm64-main <binary> <out-exe>` を追加し、
-  `tests/binaries/mach_o_return_42.bin` を既存の Mach-O entry function
-  pipeline、standalone ARM64 emit、`clang` native artifact packaging へ通した。
-  `link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe>` も追加し、
-  `tests/binaries/mach_o_hello_world_stdout.bin` を既存の Mach-O host trap
-  pipeline、stdout helper-aware ARM64 emit、native stdout artifact packaging へ
-  通した。現在のデフォルト経路では、同 binary の選択 segment entry 前にある
-  self-authored `BARA_STDOUT\0` payload から stdout host trap plan を作り、
-  `check-mach-o-host-traps <binary> <expected.json>` と
-  `link-mach-o-arm64-stdout-main <binary> <out-exe>` は host-traps JSON を
-  要求しない。明示 host-traps JSON 経路は後方互換の検証用として残す。
-  `check-blackbox` には `mach_o_return_42_native_executable_smoke` と
-  `mach_o_hello_world_stdout_native_executable` を追加し、生成 executable を
-  実プロセスとして実行する。Mach-O artifact 経路では
-  `NativeSourceImageMetadata::MachOExecutable` を package request に渡し、
-  metadata JSON に `LC_MAIN` 由来の `entryoff` / `stacksize` と selected
-  segment の `name` / `vmaddr` / `fileoff` / `filesize` を含める。artifact
-  CLI は native linking に進む前に Mach-O entry function pipeline を通すため、
-  malformed input は `MachOEntryFunctionTestCaseError::Probe`、unsupported
-  conversion は `MachOEntryFunctionTestCaseError::Plan(NotConvertible { blocker })`
-  として保持される。`MachOEntryFunctionInput` は Mach-O から materialize した
-  `ExecutableImage` と entry-derived `TestCase` を同じ domain value として保持し、
-  `btbc-cli` の Mach-O native artifact 入力はこの型を通して compile に進む。
-  `ProgramImageMetadata` は code section、symbol、relocation、import、unwind
-  metadata collection を持ち、Mach-O entry pipeline は selected code segment
-  range を code section として `MachOEntryFunctionInput` に添付する。Mach-O
-  native artifact compile 経路は、この metadata を `Program` へ渡してから ARM64
-  emit に進む。Program metadata の code section range は Mach-O entry offset
-  以降になり、entry 前の self-authored `BARA_STDOUT\0` payload は
-  `ConstData` section と stdout host trap request として binary metadata 由来で
-  解決される。`bara-mach-o` の pure writer は Mach-O 64 header、
-  `LC_SEGMENT_64`、section table、`LC_MAIN`、payload bytes を型付き layout と
-  serialized bytes として作る。`btbc-cli` の実 Mach-O stdout fixture 入力経路は
-  compile 済み ARM64 main bytes と binary metadata 由来 stdout const bytes を
-  writer serialization plan へ渡す regression を持つ。serialized output Mach-O は
-  既存の public Mach-O probe へ渡され、writer layout の `LC_MAIN` entryoff、
-  `LC_SEGMENT_64` command size、segment file size と probe report が一致する。
-- remaining_work: B6 の実装 TODO は完了。large milestone review gate として
-  branch を commit / push し、pull request を開く。
-- next_action: B6 完了 branch の review package と pull request を作成する。
-- verification: 新規 regression の red/green を確認し、`nix develop -c cargo test
-  -p bara-ir program_preserves_image_metadata_collections`、`nix develop -c cargo test
-  -p bara-isa-x86 lifts_decoded_function_with_image_metadata`、`nix develop -c cargo test
-  -p bara-oracle builds_entry_function_input_from_full_mach_o_executable_image`、および
-  `nix develop -c cargo test -p bara-oracle
-  derives_const_data_and_stdout_request_from_mach_o_embedded_metadata`、
-  `nix develop -c cargo test -p bara-mach-o
-  serializes_main_only_offsets_sizes_and_payload_bytes`、`nix develop -c cargo test
-  -p bara-mach-o serializes_const_payload_offsets_sizes_and_payload_bytes`、
-  `nix develop -c cargo test -p bara-mach-o`、`nix develop -c cargo test -p btbc-cli
-  mach_o_stdout_input_reaches_pure_writer_serialization_plan`、および
-  `nix develop -c ./scripts/check-domain-types`、`nix develop -c ./scripts/verify-supply-chain`、
-  `nix develop -c ./scripts/verify` が通過した。
+- project_state: completed。B7 の先頭小ステップとして、`clang -target
+  x86_64-apple-macos13` で x86_64 Mach-O testcase executable を生成する
+  CLI 境界を追加した。
+- active_milestone: in_progress。[TODO.md](../TODO.md) の B7:
+  Oracle / Regression 基盤。
+- active_design_focus: none。今回の変更は B7 の入力 fixture 生成境界に限定し、
+  clean-room ルール上は自前 testcase と public Mach-O / clang command の範囲に
+  留めた。
+- active_branch: `task/b7-x86_64-macho-fixture-generation`。base commit は
+  `8d39a4a`。latest commit はこの小ステップの review package で確認する。
+- related_todo: [TODO.md](../TODO.md) B7 の
+  `clang -target x86_64-apple-macos...` で x86_64 テスト Mach-O を生成する項目。
+- completed_work: `btbc-cli build-x86_64-macho-fixture <case.json> <out-exe>` を
+  追加した。初期 generator は no-args / `u64` return かつ host trap なしの
+  testcase bytes を x86_64 Mach-O `_main` として assembly source にし、
+  `clang -target x86_64-apple-macos13 -x assembler` で link する。出力は
+  `mach_o_executable`、`case_id`、`target_triple`、`toolchain`、`output_path` を
+  含む stable metadata JSON とした。引数 ABI と stdout host trap は、後続の
+  x86_64 oracle runner harness の責務として classified unsupported にしている。
+- remaining_work: B7 は継続中。x86_64 oracle runner、Rosetta 実行による
+  `expected.json` 生成、Bara 変換結果の `actual.json` 生成、比較と metadata
+  artifact 出力は未実装。
+- next_action: x86_64 oracle runner を作り、生成した Mach-O を Rosetta 上で
+  実行して stable JSON を得る境界を追加する。
+- verification: `nix develop -c cargo test -p btbc-cli x86_64_mach_o_fixture` と
+  `nix develop -c cargo test -p btbc-cli build_x86_64_macho_fixture` が通過した。
+  `nix develop -c ./scripts/check-domain-types` と
+  `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
+
+- 2026-06-09 22:22 JST: B7 の先頭小ステップとして、
+  `build-x86_64-macho-fixture` CLI を追加した。`return_42` testcase は
+  x86_64 Mach-O `_main` として assemble / link され、生成 binary の Mach-O
+  magic と public header 上の x86_64 cputype を regression で確認する。引数 ABI
+  と host trap fixture は後続 runner harness へ分離し、現時点では classified
+  unsupported とした。検証は snapshot の targeted tests と最終
+  `nix develop -c ./scripts/verify`。
 
 - 2026-06-09 21:55 JST: B6 の最後の小ステップとして、pure writer の
   serialized output Mach-O を既存の public Mach-O probe に通す regression を
