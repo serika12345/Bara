@@ -6,7 +6,11 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use bara_oracle::{CaseId, FailureKind, JsonError, ObservedResult, TestCaseHostTrapPlan};
+use bara_oracle::{
+    CaseId, FailureKind, JsonError, MachOEntryPointCommandMetadata, MachOExecutableImageConversion,
+    MachOExecutableImageConversionBlocker, MachOSegmentCommandHeaderMetadata, ObservedResult,
+    TestCaseHostTrapPlan,
+};
 use serde::{Serialize, Serializer};
 
 use crate::function_run::{FunctionArm64Bytes, FunctionStdoutHostTrapRequest};
@@ -316,18 +320,23 @@ pub(crate) struct LinkedNativeExecutable {
 impl LinkedNativeExecutable {
     #[cfg(test)]
     fn from_existing_path(path: PathBuf) -> Self {
-        Self::from_existing_output_path_with_helper_requirements(
+        Self::from_existing_output_path_with_metadata(
             NativeArtifactOutputPath::from_path(path.as_path()),
             NativeArtifactHelperRequirements::none(),
+            None,
         )
     }
 
-    fn from_existing_output_path_with_helper_requirements(
+    fn from_existing_output_path_with_metadata(
         output_path: NativeArtifactOutputPath,
         helper_requirements: NativeArtifactHelperRequirements,
+        source_image: Option<NativeSourceImageMetadata>,
     ) -> Self {
-        let metadata =
-            NativeArtifactMetadata::linked_executable(output_path.clone(), helper_requirements);
+        let metadata = NativeArtifactMetadata::linked_executable(
+            output_path.clone(),
+            helper_requirements,
+            source_image,
+        );
         Self {
             output_path,
             metadata,
@@ -350,12 +359,15 @@ pub(crate) struct NativeArtifactMetadata {
     toolchain: NativeArtifactToolchain,
     output_path: NativeArtifactOutputPath,
     helper_requirements: Vec<NativeArtifactHelperRequirement>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source_image: Option<NativeSourceImageMetadata>,
 }
 
 impl NativeArtifactMetadata {
     fn linked_executable(
         output_path: NativeArtifactOutputPath,
         helper_requirements: NativeArtifactHelperRequirements,
+        source_image: Option<NativeSourceImageMetadata>,
     ) -> Self {
         Self {
             artifact_kind: NativeArtifactKind::LinkedExecutable,
@@ -363,9 +375,64 @@ impl NativeArtifactMetadata {
             toolchain: NativeArtifactToolchain::Clang,
             output_path,
             helper_requirements: helper_requirements.into_values(),
+            source_image,
         }
     }
 }
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub(crate) enum NativeSourceImageMetadata {
+    MachOExecutable {
+        entry_point: MachOEntryPointCommandMetadata,
+        segment: MachOSegmentCommandHeaderMetadata,
+    },
+}
+
+impl NativeSourceImageMetadata {
+    pub(crate) fn from_mach_o_conversion(
+        conversion: &MachOExecutableImageConversion,
+    ) -> Result<Self, NativeSourceImageMetadataError> {
+        let entry_point = conversion.entry_point().ok_or_else(|| {
+            NativeSourceImageMetadataError::NotConvertible {
+                blocker: conversion.blocker(),
+            }
+        })?;
+        let segment =
+            conversion
+                .segment()
+                .ok_or_else(|| NativeSourceImageMetadataError::NotConvertible {
+                    blocker: conversion.blocker(),
+                })?;
+
+        Ok(Self::MachOExecutable {
+            entry_point: entry_point.metadata(),
+            segment: segment.header().clone(),
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum NativeSourceImageMetadataError {
+    NotConvertible {
+        blocker: Option<MachOExecutableImageConversionBlocker>,
+    },
+}
+
+impl fmt::Display for NativeSourceImageMetadataError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NotConvertible { blocker } => {
+                write!(
+                    formatter,
+                    "Mach-O executable image metadata is not convertible: {blocker:?}"
+                )
+            }
+        }
+    }
+}
+
+impl Error for NativeSourceImageMetadataError {}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -597,6 +664,7 @@ pub(crate) struct NativeArtifactPackageRequest {
     source: NativeAssemblySource,
     output_path: NativeArtifactOutputPath,
     helper_requirements: NativeArtifactHelperRequirements,
+    source_image: Option<NativeSourceImageMetadata>,
 }
 
 impl NativeArtifactPackageRequest {
@@ -609,6 +677,21 @@ impl NativeArtifactPackageRequest {
             source,
             output_path,
             helper_requirements,
+            source_image: None,
+        }
+    }
+
+    fn linked_executable_with_source_image(
+        source: NativeAssemblySource,
+        output_path: NativeArtifactOutputPath,
+        helper_requirements: NativeArtifactHelperRequirements,
+        source_image: NativeSourceImageMetadata,
+    ) -> Self {
+        Self {
+            source,
+            output_path,
+            helper_requirements,
+            source_image: Some(source_image),
         }
     }
 
@@ -621,9 +704,10 @@ impl NativeArtifactPackageRequest {
     }
 
     fn into_linked_executable(self) -> LinkedNativeExecutable {
-        LinkedNativeExecutable::from_existing_output_path_with_helper_requirements(
+        LinkedNativeExecutable::from_existing_output_path_with_metadata(
             self.output_path,
             self.helper_requirements,
+            self.source_image,
         )
     }
 }
@@ -683,18 +767,48 @@ impl NativeArtifactPackager for ClangNativeArtifactPackager {
     }
 }
 
+fn native_artifact_package_request(
+    source: NativeAssemblySource,
+    output_path: NativeArtifactOutputPath,
+    helper_requirements: NativeArtifactHelperRequirements,
+    source_image: Option<NativeSourceImageMetadata>,
+) -> NativeArtifactPackageRequest {
+    match source_image {
+        Some(source_image) => NativeArtifactPackageRequest::linked_executable_with_source_image(
+            source,
+            output_path,
+            helper_requirements,
+            source_image,
+        ),
+        None => NativeArtifactPackageRequest::linked_executable(
+            source,
+            output_path,
+            helper_requirements,
+        ),
+    }
+}
+
 pub(crate) fn link_arm64_main_executable(
     body: FunctionArm64Bytes<'_>,
     output_path: &Path,
+) -> Result<LinkedNativeExecutable, NativeArtifactError> {
+    link_arm64_main_executable_with_source_metadata(body, output_path, None)
+}
+
+pub(crate) fn link_arm64_main_executable_with_source_metadata(
+    body: FunctionArm64Bytes<'_>,
+    output_path: &Path,
+    source_image: Option<NativeSourceImageMetadata>,
 ) -> Result<LinkedNativeExecutable, NativeArtifactError> {
     ensure_supported_host()?;
 
     let output_path = NativeArtifactOutputPath::from_path(output_path);
     let source = arm64_main_assembly_source(body);
-    let request = NativeArtifactPackageRequest::linked_executable(
+    let request = native_artifact_package_request(
         source,
         output_path,
         NativeArtifactHelperRequirements::none(),
+        source_image,
     );
     package_native_artifact(&ClangNativeArtifactPackager, request)
 }
@@ -704,6 +818,22 @@ pub(crate) fn link_arm64_stdout_main_executable(
     host_trap_plan: &TestCaseHostTrapPlan,
     stdout_request: FunctionStdoutHostTrapRequest,
     output_path: &Path,
+) -> Result<LinkedNativeExecutable, NativeArtifactError> {
+    link_arm64_stdout_main_executable_with_source_metadata(
+        body,
+        host_trap_plan,
+        stdout_request,
+        output_path,
+        None,
+    )
+}
+
+pub(crate) fn link_arm64_stdout_main_executable_with_source_metadata(
+    body: FunctionArm64Bytes<'_>,
+    host_trap_plan: &TestCaseHostTrapPlan,
+    stdout_request: FunctionStdoutHostTrapRequest,
+    output_path: &Path,
+    source_image: Option<NativeSourceImageMetadata>,
 ) -> Result<LinkedNativeExecutable, NativeArtifactError> {
     let Some(stdout) = host_trap_plan.stdout_trap() else {
         return Err(NativeArtifactError::StdoutMainUnsupported(
@@ -720,10 +850,11 @@ pub(crate) fn link_arm64_stdout_main_executable(
 
     let output_path = NativeArtifactOutputPath::from_path(output_path);
     let source = arm64_stdout_main_assembly_source(body, stdout.text())?;
-    let request = NativeArtifactPackageRequest::linked_executable(
+    let request = native_artifact_package_request(
         source,
         output_path,
         NativeArtifactHelperRequirements::write_stdout(),
+        source_image,
     );
     package_native_artifact(&ClangNativeArtifactPackager, request)
 }
@@ -847,15 +978,15 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
-    use bara_oracle::FailureKind;
+    use bara_oracle::{probe_public_binary_format, BinaryFileBytes, BinaryInput, FailureKind};
 
     use super::{
         arm64_main_assembly_source_from_bytes, arm64_stdout_main_assembly_source_from_parts,
         native_artifact_metadata_to_json, LinkedNativeExecutable, NativeArtifactError,
         NativeArtifactHelperRequirement, NativeArtifactOutputPath, NativeArtifactTargetTriple,
-        NativeAssemblySource, NativeGeneratedCode, NativeHostOsAbi, NativeStdoutData,
-        NativeStdoutEmissionStrategy, NativeStdoutMainUnsupported, NativeToolchainCommand,
-        RawArm64Bytes,
+        NativeAssemblySource, NativeGeneratedCode, NativeHostOsAbi, NativeSourceImageMetadata,
+        NativeStdoutData, NativeStdoutEmissionStrategy, NativeStdoutMainUnsupported,
+        NativeToolchainCommand, RawArm64Bytes,
     };
 
     #[test]
@@ -940,6 +1071,33 @@ mod tests {
             native_artifact_metadata_to_json(executable.metadata())
                 .expect("metadata serializes as json"),
             "{\"artifact_kind\":\"linked_executable\",\"target_triple\":\"arm64-apple-macos\",\"toolchain\":\"clang\",\"output_path\":\"/tmp/return_42\",\"helper_requirements\":[]}"
+        );
+    }
+
+    #[test]
+    fn native_artifact_metadata_serializes_mach_o_source_image_metadata() {
+        let output_path = NativeArtifactOutputPath::from_path(Path::new("/tmp/mach_o_return_42"));
+        let input = BinaryInput::from_file_bytes(BinaryFileBytes::from_untrusted_file_contents(
+            include_bytes!("../../../tests/binaries/mach_o_return_42.bin").to_vec(),
+        ));
+        let report = probe_public_binary_format(&input).expect("Mach-O fixture probe succeeds");
+        let source_image = NativeSourceImageMetadata::from_mach_o_conversion(
+            report
+                .metadata()
+                .mach_o_metadata()
+                .executable_image_conversion(),
+        )
+        .expect("test Mach-O conversion is convertible");
+        let executable = LinkedNativeExecutable::from_existing_output_path_with_metadata(
+            output_path,
+            super::NativeArtifactHelperRequirements::none(),
+            Some(source_image),
+        );
+
+        assert_eq!(
+            native_artifact_metadata_to_json(executable.metadata())
+                .expect("metadata serializes as json"),
+            "{\"artifact_kind\":\"linked_executable\",\"target_triple\":\"arm64-apple-macos\",\"toolchain\":\"clang\",\"output_path\":\"/tmp/mach_o_return_42\",\"helper_requirements\":[],\"source_image\":{\"kind\":\"mach_o_executable\",\"entry_point\":{\"entryoff\":130,\"stacksize\":8192},\"segment\":{\"name\":\"__TEXT\",\"vmaddr\":4294967296,\"fileoff\":128,\"filesize\":8}}}"
         );
     }
 

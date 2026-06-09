@@ -1,3 +1,12 @@
+mod image_metadata;
+
+pub use image_metadata::{
+    ProgramImageImport, ProgramImageImports, ProgramImageMetadata, ProgramImageMetadataError,
+    ProgramImageRange, ProgramImageRelocation, ProgramImageRelocationTarget,
+    ProgramImageRelocations, ProgramImageSection, ProgramImageSectionKind, ProgramImageSections,
+    ProgramImageSymbol, ProgramImageSymbols, ProgramUnwindEntry, ProgramUnwindMetadata,
+};
+
 use crate::block::{BasicBlock, BlockId};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -27,10 +36,19 @@ impl X86Va {
 pub struct Program {
     entry: X86Va,
     blocks: Vec<BasicBlock>,
+    image_metadata: ProgramImageMetadata,
 }
 
 impl Program {
     pub fn new(entry: X86Va, blocks: Vec<BasicBlock>) -> Result<Self, ProgramError> {
+        Self::with_image_metadata(entry, blocks, ProgramImageMetadata::empty())
+    }
+
+    pub fn with_image_metadata(
+        entry: X86Va,
+        blocks: Vec<BasicBlock>,
+        image_metadata: ProgramImageMetadata,
+    ) -> Result<Self, ProgramError> {
         let has_entry = blocks.iter().any(|block| block.start() == entry);
         if !has_entry {
             return Err(ProgramError::MissingEntryBlock { entry });
@@ -44,7 +62,11 @@ impl Program {
             seen.push(block.id());
         }
 
-        Ok(Self { entry, blocks })
+        Ok(Self {
+            entry,
+            blocks,
+            image_metadata,
+        })
     }
 
     pub const fn entry(&self) -> X86Va {
@@ -53,6 +75,10 @@ impl Program {
 
     pub fn blocks(&self) -> &[BasicBlock] {
         &self.blocks
+    }
+
+    pub const fn image_metadata(&self) -> &ProgramImageMetadata {
+        &self.image_metadata
     }
 }
 
@@ -65,7 +91,13 @@ pub enum ProgramError {
 
 #[cfg(test)]
 mod tests {
-    use crate::{BasicBlock, BlockId, Program, ProgramError, Terminator, X86Va};
+    use crate::{
+        BasicBlock, BlockId, ExternalSymbolId, ExternalSymbolImport, Program, ProgramError,
+        ProgramImageImport, ProgramImageImports, ProgramImageMetadata, ProgramImageRange,
+        ProgramImageRelocation, ProgramImageRelocationTarget, ProgramImageRelocations,
+        ProgramImageSection, ProgramImageSectionKind, ProgramImageSections, ProgramImageSymbol,
+        ProgramImageSymbols, ProgramUnwindEntry, ProgramUnwindMetadata, Terminator, X86Va,
+    };
 
     fn block(id: u32, start: u64, end: u64) -> BasicBlock {
         BasicBlock::new(
@@ -121,5 +153,40 @@ mod tests {
 
         assert_eq!(program.entry(), X86Va::new(0));
         assert_eq!(program.blocks()[0].id(), BlockId::new(7));
+        assert!(program.image_metadata().is_empty());
+    }
+
+    #[test]
+    fn program_preserves_image_metadata_collections() {
+        let code_range = ProgramImageRange::new(X86Va::new(0x1000), X86Va::new(0x1008))
+            .expect("range is non-empty");
+        let import = ExternalSymbolImport::unresolved(ExternalSymbolId::new(7));
+        let metadata = ProgramImageMetadata::new(
+            ProgramImageSections::from_items([ProgramImageSection::new(
+                ProgramImageSectionKind::Code,
+                code_range,
+            )]),
+            ProgramImageSymbols::from_items([ProgramImageSymbol::external_import(import)]),
+            ProgramImageRelocations::from_items([ProgramImageRelocation::new(
+                X86Va::new(0x1002),
+                ProgramImageRelocationTarget::ExternalSymbol(ExternalSymbolId::new(7)),
+            )]),
+            ProgramImageImports::from_items([ProgramImageImport::new(import)]),
+            ProgramUnwindMetadata::from_entries([ProgramUnwindEntry::new(code_range)]),
+        );
+
+        let program =
+            Program::with_image_metadata(X86Va::new(0), vec![block(7, 0, 1)], metadata.clone())
+                .expect("program has entry block and metadata");
+
+        assert_eq!(program.image_metadata(), &metadata);
+        assert_eq!(
+            program.image_metadata().sections().items()[0].kind(),
+            ProgramImageSectionKind::Code
+        );
+        assert_eq!(
+            program.image_metadata().relocations().items()[0].target(),
+            ProgramImageRelocationTarget::ExternalSymbol(ExternalSymbolId::new(7))
+        );
     }
 }

@@ -1,3 +1,11 @@
+mod serialization;
+
+pub use serialization::{
+    serialize_mach_o_arm64_executable, MachOArm64ByteSize,
+    MachOArm64ExecutableWriterSerializationError, MachOArm64FileOffset, MachOArm64FileRange,
+    MachOArm64SerializedByteSlice, MachOArm64SerializedExecutable, MachOArm64SerializedLayout,
+};
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MachOArm64MainCode {
     bytes: Box<[u8]>,
@@ -16,6 +24,14 @@ impl MachOArm64MainCode {
         }
 
         Ok(Self { bytes })
+    }
+
+    fn as_bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    fn byte_len(&self) -> usize {
+        self.bytes.len()
     }
 }
 
@@ -38,6 +54,14 @@ impl MachOArm64ConstData {
 
         Ok(Self { bytes })
     }
+
+    fn as_bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    fn byte_len(&self) -> usize {
+        self.bytes.len()
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -47,6 +71,28 @@ pub enum MachOArm64ExecutablePayload {
         main: MachOArm64MainCode,
         const_data: MachOArm64ConstData,
     },
+}
+
+impl MachOArm64ExecutablePayload {
+    fn main(&self) -> &MachOArm64MainCode {
+        match self {
+            Self::MainOnly(main) | Self::MainWithConstData { main, .. } => main,
+        }
+    }
+
+    fn const_data(&self) -> Option<&MachOArm64ConstData> {
+        match self {
+            Self::MainOnly(_) => None,
+            Self::MainWithConstData { const_data, .. } => Some(const_data),
+        }
+    }
+
+    const fn section_count(&self) -> usize {
+        match self {
+            Self::MainOnly(_) => 1,
+            Self::MainWithConstData { .. } => 2,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

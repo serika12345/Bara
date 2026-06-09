@@ -9,43 +9,170 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 20:18 JST
+最終更新: 2026-06-09 21:55 JST
 
 状態:
 
-- project_state: completed。B5 の Control Flow / Stack / Call large milestone
-  は review gate 到達状態。
-- active_milestone: completed。[TODO.md](../TODO.md) の B5:
-  Control Flow / Stack / Call。
-- active_design_focus: completed。[docs/design-todo.md](design-todo.md) の
-  D4: Bara IR の責務に沿って、typed terminator、branch/call validation、
-  parity 以外の conditional branch lowering を追加した。
-- active_branch: `task/b5-add-sub-regression`。base commit は `4d2356f`
-  (`Merge pull request #4 from serika12345/task/b4-syscall-ir-request`)。
-  latest commit は review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B5 の
-  control-flow fixture、typed terminator、flags model、branch/call lowering、
-  stack operations、validation report。
-- completed_work: `add/sub` regression、basic block splitting、typed
-  terminator、`cmp` / `test` flags-producing IR、short / near `jcc` decode /
-  lift、parity 以外の ARM64 `b.cond` lowering、short direct `jmp`、simple loop、
-  `push` / `pop`、internal direct `call rel32`、nested call fixture、branch /
-  call target existence validation、source PC range overlap validationを実装した。
-  parity `jcc` は decode / lift されるが、ARM64 lowering は flags
-  materialization 拡張まで explicit unsupported として扱う。
-- remaining_work: B5 実装は完了。serialized PC map / fixup schema consistency
-  と parity `jcc` lowering は後続 milestone の TODO に残す。
-- next_action: B5 review gate として pull request を開き、レビュー後に B6:
-  実 Mach-O 入力からの standalone 実行へ進む。
-- verification: `nix develop -c cargo test -p bara-ir missing_`、`nix develop
-  -c cargo test -p bara-isa-x86 rel32`、`nix develop -c cargo test -p
-  bara-isa-x86 decodes_jo`、`nix develop -c cargo test -p bara-arm64
-  conditional_branch`、`nix develop -c cargo test -p bara-arm64
-  missing_branch_target_is_invalid_program`、`nix develop -c cargo test -p
-  bara-runtime jl_rel32_return_42`、および `nix develop -c ./scripts/verify`
-  が通過した。
+- project_state: completed。B6 の最後の小ステップとして、output Mach-O の
+  layout / serialization parity を公開仕様ベースで検証し、B6 の実装 TODO が
+  完了した。
+- active_milestone: completed。[TODO.md](../TODO.md) の B6:
+  実 Mach-O 入力からの standalone 実行。
+- active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の
+  D7: Binary format input/output の分離に沿って、Mach-O 入力変換は
+  `bara-oracle` の既存 pipeline に留め、native artifact packaging は
+  `btbc-cli` の出力境界へ接続した。
+- active_branch: `task/b6-macho-return42-artifact`。base commit は `31dbc29`。
+  latest commit はこの小ステップの review package で確認する。
+- related_todo: [TODO.md](../TODO.md) B6 の output Mach-O の layout /
+  serialization parity を公開仕様ベースで検証する項目。
+- completed_work: `link-mach-o-arm64-main <binary> <out-exe>` を追加し、
+  `tests/binaries/mach_o_return_42.bin` を既存の Mach-O entry function
+  pipeline、standalone ARM64 emit、`clang` native artifact packaging へ通した。
+  `link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe>` も追加し、
+  `tests/binaries/mach_o_hello_world_stdout.bin` を既存の Mach-O host trap
+  pipeline、stdout helper-aware ARM64 emit、native stdout artifact packaging へ
+  通した。現在のデフォルト経路では、同 binary の選択 segment entry 前にある
+  self-authored `BARA_STDOUT\0` payload から stdout host trap plan を作り、
+  `check-mach-o-host-traps <binary> <expected.json>` と
+  `link-mach-o-arm64-stdout-main <binary> <out-exe>` は host-traps JSON を
+  要求しない。明示 host-traps JSON 経路は後方互換の検証用として残す。
+  `check-blackbox` には `mach_o_return_42_native_executable_smoke` と
+  `mach_o_hello_world_stdout_native_executable` を追加し、生成 executable を
+  実プロセスとして実行する。Mach-O artifact 経路では
+  `NativeSourceImageMetadata::MachOExecutable` を package request に渡し、
+  metadata JSON に `LC_MAIN` 由来の `entryoff` / `stacksize` と selected
+  segment の `name` / `vmaddr` / `fileoff` / `filesize` を含める。artifact
+  CLI は native linking に進む前に Mach-O entry function pipeline を通すため、
+  malformed input は `MachOEntryFunctionTestCaseError::Probe`、unsupported
+  conversion は `MachOEntryFunctionTestCaseError::Plan(NotConvertible { blocker })`
+  として保持される。`MachOEntryFunctionInput` は Mach-O から materialize した
+  `ExecutableImage` と entry-derived `TestCase` を同じ domain value として保持し、
+  `btbc-cli` の Mach-O native artifact 入力はこの型を通して compile に進む。
+  `ProgramImageMetadata` は code section、symbol、relocation、import、unwind
+  metadata collection を持ち、Mach-O entry pipeline は selected code segment
+  range を code section として `MachOEntryFunctionInput` に添付する。Mach-O
+  native artifact compile 経路は、この metadata を `Program` へ渡してから ARM64
+  emit に進む。Program metadata の code section range は Mach-O entry offset
+  以降になり、entry 前の self-authored `BARA_STDOUT\0` payload は
+  `ConstData` section と stdout host trap request として binary metadata 由来で
+  解決される。`bara-mach-o` の pure writer は Mach-O 64 header、
+  `LC_SEGMENT_64`、section table、`LC_MAIN`、payload bytes を型付き layout と
+  serialized bytes として作る。`btbc-cli` の実 Mach-O stdout fixture 入力経路は
+  compile 済み ARM64 main bytes と binary metadata 由来 stdout const bytes を
+  writer serialization plan へ渡す regression を持つ。serialized output Mach-O は
+  既存の public Mach-O probe へ渡され、writer layout の `LC_MAIN` entryoff、
+  `LC_SEGMENT_64` command size、segment file size と probe report が一致する。
+- remaining_work: B6 の実装 TODO は完了。large milestone review gate として
+  branch を commit / push し、pull request を開く。
+- next_action: B6 完了 branch の review package と pull request を作成する。
+- verification: 新規 regression の red/green を確認し、`nix develop -c cargo test
+  -p bara-ir program_preserves_image_metadata_collections`、`nix develop -c cargo test
+  -p bara-isa-x86 lifts_decoded_function_with_image_metadata`、`nix develop -c cargo test
+  -p bara-oracle builds_entry_function_input_from_full_mach_o_executable_image`、および
+  `nix develop -c cargo test -p bara-oracle
+  derives_const_data_and_stdout_request_from_mach_o_embedded_metadata`、
+  `nix develop -c cargo test -p bara-mach-o
+  serializes_main_only_offsets_sizes_and_payload_bytes`、`nix develop -c cargo test
+  -p bara-mach-o serializes_const_payload_offsets_sizes_and_payload_bytes`、
+  `nix develop -c cargo test -p bara-mach-o`、`nix develop -c cargo test -p btbc-cli
+  mach_o_stdout_input_reaches_pure_writer_serialization_plan`、および
+  `nix develop -c ./scripts/check-domain-types`、`nix develop -c ./scripts/verify-supply-chain`、
+  `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
+
+- 2026-06-09 21:55 JST: B6 の最後の小ステップとして、pure writer の
+  serialized output Mach-O を既存の public Mach-O probe に通す regression を
+  追加した。`mach_o_hello_world_stdout.bin` 由来の compile 経路で作った writer
+  output が、writer layout の entry offset、load command size、segment file
+  size と一致する `LC_MAIN` / `LC_SEGMENT_64` metadata として probe される。
+  これにより B6 の実装 TODO は完了し、次は large milestone review gate として
+  branch の PR を開く。検証は snapshot の targeted test と最終
+  `nix develop -c ./scripts/verify`。
+
+- 2026-06-09 21:42 JST: B6 の 9 つ目の小ステップとして、`bara-mach-o`
+  の pure writer に offset / size / byte serialization 境界を追加した。
+  writer は minimal ARM64 Mach-O の header、`LC_SEGMENT_64`、section table、
+  `LC_MAIN`、text / const payload bytes を型付き layout と serialized bytes
+  として返す。`btbc-cli` の実 Mach-O stdout fixture 入力経路から compile した
+  ARM64 main bytes と binary metadata 由来 stdout const bytes が、この writer
+  serialization plan の text / const range に配置されることを検証した。検証は
+  snapshot の targeted tests と最終 `nix develop -c ./scripts/verify`。
+
+- 2026-06-09 21:28 JST: B6 の 8 つ目の小ステップとして、Mach-O entry
+  pipeline の Program image metadata を entry-aware にした。code section は
+  selected segment 全体ではなく entry offset 以降の range として保持する。
+  Embedded stdout metadata がある場合は、entry 前の self-authored
+  `BARA_STDOUT\0` payload を `ConstData` section として保持し、同じ binary
+  metadata から stdout host trap request を作る。検証は snapshot の targeted
+  tests と最終 `nix develop -c ./scripts/verify`。
+
+- 2026-06-09 21:18 JST: B6 の 7 つ目の小ステップとして、
+  `ProgramImageMetadata` を `bara-ir` に追加した。metadata は code sections、
+  symbols、relocations、imports、unwind entries を typed collection として
+  持つ。`Program::new` は空 metadata の互換 API として残し、
+  `Program::with_image_metadata` と
+  `lift_decoded_function_with_image_metadata` が metadata 付き Program を作る。
+  Mach-O entry pipeline は selected code segment range を code section として
+  `MachOEntryFunctionInput` に添付し、Mach-O native artifact compile 経路は
+  その metadata を IR へ渡す。検証は snapshot の targeted tests と最終
+  `nix develop -c ./scripts/verify`。
+
+- 2026-06-09 20:46 JST: B6 の 6 つ目の小ステップとして、
+  `MachOEntryFunctionInput` を追加し、Mach-O executable image 全体と
+  entry-derived `TestCase` を同じ pipeline 出力として保持するようにした。
+  既存の `mach_o_entry_function_test_case*` API は互換 wrapper として残し、
+  `btbc-cli` の Mach-O native artifact link 経路は `TestCase` 単体ではなく
+  `MachOEntryFunctionInput` を受ける。回帰テストでは entry bytes だけでなく、
+  selected code segment 全体と entry offset が保持されることを確認した。検証は
+  snapshot の targeted tests と最終 `nix develop -c ./scripts/verify`。
+
+- 2026-06-09 20:08 JST: B6 の 5 つ目の小ステップとして、malformed /
+  unsupported Mach-O の artifact 生成時 blocker classification を回帰テストで
+  固定した。`link-mach-o-arm64-main` と `link-mach-o-arm64-stdout-main` は
+  short Mach-O input を `MachOEntryFunctionTestCaseError::Probe(InputTooShort)`
+  として、entry point はあるが segment がない input を
+  `MachOEntryFunctionTestCaseError::Plan(NotConvertible { blocker:
+  MissingSegment })` として返し、native artifact output を作らない。検証は
+  targeted tests と `nix develop -c ./scripts/verify`。
+
+- 2026-06-08 22:28 JST: B6 の 4 つ目の小ステップとして、fixture 専用
+  host trap JSON への依存を減らした。`mach_o_hello_world_stdout.bin` は
+  selected segment の entry 前に self-authored `BARA_STDOUT\0` payload を
+  持ち、`mach_o_entry_function_test_case_with_embedded_host_traps` はその
+  payload から `TestCaseHostTrapPlan::stdout` を作る。`check-blackbox` と
+  native stdout artifact のデフォルト経路は host-traps JSON を読まず、
+  明示 JSON 経路は互換テストとして残す。検証は snapshot の targeted tests
+  と `nix develop -c ./scripts/verify`。
+
+- 2026-06-08 21:47 JST: B6 の 3 つ目の小ステップとして、input Mach-O の
+  entry / segment / stack metadata を native output packaging に渡す境界を
+  追加した。`NativeArtifactMetadata` は raw fixture では既存 JSON を維持し、
+  Mach-O artifact 経路では optional `source_image` として `entryoff`、
+  `stacksize`、selected segment の `name` / `vmaddr` / `fileoff` / `filesize`
+  を保持する。Mach-O artifact CLI は既存 entry function testcase 変換を先に
+  通すため、malformed / unsupported Mach-O の既存分類を優先する。検証は
+  snapshot の targeted tests と `nix develop -c ./scripts/verify`。
+
+- 2026-06-08 21:33 JST: B6 の 2 つ目の小ステップとして、Mach-O backed
+  `hello world` 入力を native executable artifact へ変換する CLI /
+  blackbox 経路を追加した。`link-mach-o-arm64-stdout-main` は Mach-O 入力と
+  host trap plan を既存の `mach_o_entry_function_test_case_with_host_traps`
+  経由で `TestCase` に変換し、stdout helper-aware compile と
+  `link_arm64_stdout_main_executable` に委譲する。
+  `mach_o_hello_world_stdout_native_executable` を blackbox report に追加し、
+  生成 artifact を実行して stdout `hello world\n` と exit status 0 を確認する。
+  検証は snapshot の targeted tests と `nix develop -c ./scripts/verify`。
+
+- 2026-06-08 21:12 JST: B6 の先頭小ステップとして、Mach-O backed
+  `return_42` 入力を native executable artifact へ変換する CLI / blackbox
+  経路を追加した。`link-mach-o-arm64-main` は Mach-O 入力を既存の
+  `mach_o_entry_function_test_case` 経由で `TestCase` に変換し、
+  standalone artifact compile と `link_arm64_main_executable` に委譲する。
+  `mach_o_return_42_native_executable_smoke` を blackbox report に追加し、
+  生成 artifact を実行して exit status 42 を確認する。検証は snapshot の
+  targeted tests と `nix develop -c ./scripts/verify`。
 
 - 2026-06-08 20:18 JST: B5 large milestone completion の最終小ステップとして、
   IR validation に missing branch/fallthrough/call target report を追加し、

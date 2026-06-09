@@ -16,5 +16,11 @@ pub use boundary::{
     SyscallRequest, SyscallRequestError,
 };
 pub use flags::{FlagValue, Flags};
-pub use program::{Program, ProgramError, X86Va};
+pub use program::{
+    Program, ProgramError, ProgramImageImport, ProgramImageImports, ProgramImageMetadata,
+    ProgramImageMetadataError, ProgramImageRange, ProgramImageRelocation,
+    ProgramImageRelocationTarget, ProgramImageRelocations, ProgramImageSection,
+    ProgramImageSectionKind, ProgramImageSections, ProgramImageSymbol, ProgramImageSymbols,
+    ProgramUnwindEntry, ProgramUnwindMetadata, X86Va,
+};
 pub use validate::{validate_program, ValidationIssue, ValidationReport};
