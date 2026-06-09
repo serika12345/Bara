@@ -1,5 +1,6 @@
 use crate::{
-    mach_o_entry_function_input, mach_o_entry_function_test_case_with_embedded_host_traps,
+    mach_o_entry_function_input, mach_o_entry_function_input_with_embedded_host_traps,
+    mach_o_entry_function_test_case_with_embedded_host_traps,
     mach_o_entry_function_test_case_with_host_traps, CaseId, TestCaseAbi, TestCaseHostTrapPlan,
     TestCaseStackSize, TestCaseStdoutTrap,
 };
@@ -87,7 +88,7 @@ fn builds_entry_function_input_from_full_mach_o_executable_image() {
         entry_input.program_image_metadata().sections().items()[0]
             .range()
             .start(),
-        X86Va::new(0)
+        X86Va::new(2)
     );
     assert_eq!(
         entry_input.program_image_metadata().sections().items()[0]
@@ -173,6 +174,48 @@ fn derives_stdout_host_trap_plan_from_mach_o_embedded_metadata() {
     assert_eq!(
         testcase.stack_state().size(),
         Some(TestCaseStackSize::from_trusted_nonzero_byte_count(0x2000))
+    );
+}
+
+#[test]
+fn derives_const_data_and_stdout_request_from_mach_o_embedded_metadata() {
+    let input = BinaryInput::from_hex(concat!(
+        "cffaedfe07000001030000000200000002000000600000000000000000000000",
+        "1900000048000000",
+        "5f5f5445585400000000000000000000",
+        "0000000001000000",
+        "0000000000000000",
+        "8000000000000000",
+        "1d00000000000000",
+        "00000000000000000000000000000000",
+        "2800008018000000",
+        "9800000000000000",
+        "0020000000000000",
+        "424152415f5354444f55540068656c6c6f20776f726c640a",
+        "0f0b31c0c3",
+    ))
+    .expect("hex fixture is valid");
+    let case_id = CaseId::new("mach_o_hello_world_stdout").expect("case id is non-empty");
+
+    let entry_input = mach_o_entry_function_input_with_embedded_host_traps(case_id, &input)
+        .expect("pipeline derives binary metadata");
+    let sections = entry_input.program_image_metadata().sections().items();
+
+    assert_eq!(sections.len(), 2);
+    assert_eq!(sections[0].kind(), ProgramImageSectionKind::Code);
+    assert_eq!(sections[0].range().start(), X86Va::new(24));
+    assert_eq!(sections[0].range().end(), X86Va::new(29));
+    assert_eq!(sections[1].kind(), ProgramImageSectionKind::ConstData);
+    assert_eq!(sections[1].range().start(), X86Va::new(0));
+    assert_eq!(sections[1].range().end(), X86Va::new(24));
+    assert_eq!(
+        entry_input
+            .test_case()
+            .host_trap_plan()
+            .stdout_trap()
+            .expect("stdout request is derived from binary metadata")
+            .text(),
+        "hello world\n"
     );
 }
 

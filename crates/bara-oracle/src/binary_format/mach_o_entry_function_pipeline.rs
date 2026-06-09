@@ -137,9 +137,11 @@ fn mach_o_entry_function_input_with_host_trap_plan(
         plan_mach_o_executable_image(conversion).map_err(MachOEntryFunctionTestCaseError::Plan)?;
     let image = materialize_mach_o_executable_image(input, &plan)
         .map_err(MachOEntryFunctionTestCaseError::Materialization)?;
+    let embedded_stdout_metadata = embedded_stdout_metadata_from_image(&image)?;
     let host_trap_plan = host_trap_plan_from_image(&image)?;
-    let program_image_metadata = program_image_metadata_from_executable_image(&image)
-        .map_err(MachOEntryFunctionTestCaseError::ProgramImageMetadata)?;
+    let program_image_metadata =
+        program_image_metadata_from_executable_image(&image, embedded_stdout_metadata.as_ref())
+            .map_err(MachOEntryFunctionTestCaseError::ProgramImageMetadata)?;
 
     let test_case = mach_o_executable_image_entry_function_with_host_traps_and_stack_state(
         case_id,
@@ -158,21 +160,34 @@ fn mach_o_entry_function_input_with_host_trap_plan(
 
 fn program_image_metadata_from_executable_image(
     image: &ExecutableImage,
+    embedded_stdout_metadata: Option<&EmbeddedStdoutMetadata>,
 ) -> Result<ProgramImageMetadata, ProgramImageMetadataError> {
     let code = image.code_segment().x86_bytes();
     let code_len = u64::try_from(code.bytes().len())
+        .map_err(|_| ProgramImageMetadataError::AddressOverflow)?;
+    let code_start = code
+        .entry()
+        .checked_add(image.entry().offset().value())
         .map_err(|_| ProgramImageMetadataError::AddressOverflow)?;
     let code_end = code
         .entry()
         .checked_add(code_len)
         .map_err(|_| ProgramImageMetadataError::AddressOverflow)?;
-    let code_range = ProgramImageRange::new(code.entry(), code_end)?;
+    let code_range = ProgramImageRange::new(code_start, code_end)?;
+    let mut sections = vec![ProgramImageSection::new(
+        ProgramImageSectionKind::Code,
+        code_range,
+    )];
+
+    if let Some(metadata) = embedded_stdout_metadata {
+        sections.push(ProgramImageSection::new(
+            ProgramImageSectionKind::ConstData,
+            metadata.const_data_range(),
+        ));
+    }
 
     Ok(ProgramImageMetadata::new(
-        ProgramImageSections::from_items([ProgramImageSection::new(
-            ProgramImageSectionKind::Code,
-            code_range,
-        )]),
+        ProgramImageSections::from_items(sections),
         ProgramImageSymbols::empty(),
         ProgramImageRelocations::empty(),
         ProgramImageImports::empty(),
@@ -185,14 +200,48 @@ const MACH_O_EMBEDDED_STDOUT_TRAP_MAGIC: &[u8] = b"BARA_STDOUT\0";
 fn testcase_host_trap_plan_from_embedded_stdout_metadata(
     image: &ExecutableImage,
 ) -> Result<TestCaseHostTrapPlan, MachOEntryFunctionTestCaseError> {
-    let Ok(entry_offset) = usize::try_from(image.entry().offset().value()) else {
+    let Some(metadata) = embedded_stdout_metadata_from_image(image)? else {
         return Ok(TestCaseHostTrapPlan::none());
     };
-    let Some(entry_prefix) = image.code_segment().x86_bytes().bytes().get(..entry_offset) else {
-        return Ok(TestCaseHostTrapPlan::none());
+
+    Ok(TestCaseHostTrapPlan::stdout(metadata.stdout_trap()))
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct EmbeddedStdoutMetadata {
+    stdout: TestCaseStdoutTrap,
+    const_data_range: ProgramImageRange,
+}
+
+impl EmbeddedStdoutMetadata {
+    const fn new(stdout: TestCaseStdoutTrap, const_data_range: ProgramImageRange) -> Self {
+        Self {
+            stdout,
+            const_data_range,
+        }
+    }
+
+    fn stdout_trap(&self) -> TestCaseStdoutTrap {
+        self.stdout.clone()
+    }
+
+    const fn const_data_range(&self) -> ProgramImageRange {
+        self.const_data_range
+    }
+}
+
+fn embedded_stdout_metadata_from_image(
+    image: &ExecutableImage,
+) -> Result<Option<EmbeddedStdoutMetadata>, MachOEntryFunctionTestCaseError> {
+    let Ok(entry_offset) = usize::try_from(image.entry().offset().value()) else {
+        return Ok(None);
+    };
+    let code = image.code_segment().x86_bytes();
+    let Some(entry_prefix) = code.bytes().get(..entry_offset) else {
+        return Ok(None);
     };
     let Some(stdout_payload) = entry_prefix.strip_prefix(MACH_O_EMBEDDED_STDOUT_TRAP_MAGIC) else {
-        return Ok(TestCaseHostTrapPlan::none());
+        return Ok(None);
     };
 
     let stdout_text = std::str::from_utf8(stdout_payload)
@@ -202,8 +251,22 @@ fn testcase_host_trap_plan_from_embedded_stdout_metadata(
         .to_owned();
     let stdout = TestCaseStdoutTrap::from_text(stdout_text)
         .map_err(MachOEntryFunctionTestCaseError::EmbeddedStdoutTrap)?;
+    let const_data_end = code
+        .entry()
+        .checked_add(u64::try_from(entry_offset).map_err(|_| {
+            MachOEntryFunctionTestCaseError::ProgramImageMetadata(
+                ProgramImageMetadataError::AddressOverflow,
+            )
+        })?)
+        .map_err(|_| {
+            MachOEntryFunctionTestCaseError::ProgramImageMetadata(
+                ProgramImageMetadataError::AddressOverflow,
+            )
+        })?;
+    let const_data_range = ProgramImageRange::new(code.entry(), const_data_end)
+        .map_err(MachOEntryFunctionTestCaseError::ProgramImageMetadata)?;
 
-    Ok(TestCaseHostTrapPlan::stdout(stdout))
+    Ok(Some(EmbeddedStdoutMetadata::new(stdout, const_data_range)))
 }
 
 fn testcase_stack_state_from_mach_o_conversion(
