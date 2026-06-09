@@ -9,13 +9,13 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-09 21:28 JST
+最終更新: 2026-06-09 21:42 JST
 
 状態:
 
-- project_state: completed。B6 の 8 つ目の小ステップとして、entry offset、
-  code segment、const data、stdout request を binary metadata 由来で解決する
-  境界を追加した。
+- project_state: completed。B6 の 9 つ目の小ステップとして、pure Mach-O
+  writer の offset / size / byte serialization 境界を実バイナリ入力経路から
+  検証した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B6:
   実 Mach-O 入力からの standalone 実行。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の
@@ -24,8 +24,8 @@
   `btbc-cli` の出力境界へ接続した。
 - active_branch: `task/b6-macho-return42-artifact`。base commit は `31dbc29`。
   latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B6 の entry offset、code segment、
-  const data、stdout request を binary metadata 由来で解決する項目。
+- related_todo: [TODO.md](../TODO.md) B6 の pure Mach-O writer の offset /
+  size / byte serialization 境界を実バイナリ入力経路から検証する項目。
 - completed_work: `link-mach-o-arm64-main <binary> <out-exe>` を追加し、
   `tests/binaries/mach_o_return_42.bin` を既存の Mach-O entry function
   pipeline、standalone ARM64 emit、`clang` native artifact packaging へ通した。
@@ -56,22 +56,40 @@
   emit に進む。Program metadata の code section range は Mach-O entry offset
   以降になり、entry 前の self-authored `BARA_STDOUT\0` payload は
   `ConstData` section と stdout host trap request として binary metadata 由来で
-  解決される。
-- remaining_work: pure Mach-O writer の offset / size / byte serialization 境界を
-  実バイナリ入力経路から検証する。output Mach-O の layout / serialization parity
-  を公開仕様ベースで検証する。
-- next_action: B6 の次小ステップとして、pure Mach-O writer の offset / size /
-  byte serialization 境界を実バイナリ入力経路から検証する。
+  解決される。`bara-mach-o` の pure writer は Mach-O 64 header、
+  `LC_SEGMENT_64`、section table、`LC_MAIN`、payload bytes を型付き layout と
+  serialized bytes として作る。`btbc-cli` の実 Mach-O stdout fixture 入力経路は
+  compile 済み ARM64 main bytes と binary metadata 由来 stdout const bytes を
+  writer serialization plan へ渡す regression を持つ。
+- remaining_work: output Mach-O の layout / serialization parity を公開仕様ベースで
+  検証する。
+- next_action: B6 の次小ステップとして、serialized output Mach-O を既存の
+  public Mach-O probe と layout assertions に通し、公開仕様ベースの parity を
+  検証する。
 - verification: 新規 regression の red/green を確認し、`nix develop -c cargo test
   -p bara-ir program_preserves_image_metadata_collections`、`nix develop -c cargo test
   -p bara-isa-x86 lifts_decoded_function_with_image_metadata`、`nix develop -c cargo test
   -p bara-oracle builds_entry_function_input_from_full_mach_o_executable_image`、および
   `nix develop -c cargo test -p bara-oracle
   derives_const_data_and_stdout_request_from_mach_o_embedded_metadata`、
-  `nix develop -c cargo test -p btbc-cli`、`nix develop -c ./scripts/verify`
-  が通過した。
+  `nix develop -c cargo test -p bara-mach-o
+  serializes_main_only_offsets_sizes_and_payload_bytes`、`nix develop -c cargo test
+  -p bara-mach-o serializes_const_payload_offsets_sizes_and_payload_bytes`、
+  `nix develop -c cargo test -p bara-mach-o`、`nix develop -c cargo test -p btbc-cli
+  mach_o_stdout_input_reaches_pure_writer_serialization_plan`、および
+  `nix develop -c ./scripts/check-domain-types`、`nix develop -c ./scripts/verify-supply-chain`、
+  `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
+
+- 2026-06-09 21:42 JST: B6 の 9 つ目の小ステップとして、`bara-mach-o`
+  の pure writer に offset / size / byte serialization 境界を追加した。
+  writer は minimal ARM64 Mach-O の header、`LC_SEGMENT_64`、section table、
+  `LC_MAIN`、text / const payload bytes を型付き layout と serialized bytes
+  として返す。`btbc-cli` の実 Mach-O stdout fixture 入力経路から compile した
+  ARM64 main bytes と binary metadata 由来 stdout const bytes が、この writer
+  serialization plan の text / const range に配置されることを検証した。検証は
+  snapshot の targeted tests と最終 `nix develop -c ./scripts/verify`。
 
 - 2026-06-09 21:28 JST: B6 の 8 つ目の小ステップとして、Mach-O entry
   pipeline の Program image metadata を entry-aware にした。code section は

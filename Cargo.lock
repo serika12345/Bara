@@ -52,6 +52,7 @@ dependencies = [
  "bara-arm64",
  "bara-ir",
  "bara-isa-x86",
+ "bara-mach-o",
  "bara-oracle",
  "bara-runtime",
  "serde",

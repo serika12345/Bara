@@ -111,7 +111,7 @@
 
 - [x] Mach-O / PE / ELF の input parser と output writer を別責務にする。
 - [ ] input parser は public format から executable image metadata を作る。
-- [ ] output writer は target artifact を作る pure planning / serialization 境界にする。
+- [x] output writer は target artifact を作る pure planning / serialization 境界にする。
 - [x] writer が育つ場合は oracle crate から独立した crate へ切り出す。
 
 メモ:

@@ -5,6 +5,10 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use bara_mach_o::{
+    plan_mach_o_arm64_executable, serialize_mach_o_arm64_executable, MachOArm64ConstData,
+    MachOArm64ExecutableWriterRequest, MachOArm64MainCode,
+};
 use bara_oracle::{
     observed_result_from_json, observed_result_to_json, BinaryFormatProbeError, FailureKind,
     MachOEntryFunctionTestCaseError, MachOExecutableImageConversionBlocker,
@@ -120,6 +124,64 @@ fn link_mach_o_arm64_main_writes_return_42_executable() {
         .status()
         .expect("linked executable runs");
     assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn mach_o_stdout_input_reaches_pure_writer_serialization_plan() {
+    let temp_dir = TestTempDir::new("mach_o_stdout_input_reaches_pure_writer_serialization_plan");
+    let binary_path = temp_dir.write_binary_file(
+        "mach_o_hello_world_stdout.bin",
+        include_bytes!("../../../tests/binaries/mach_o_hello_world_stdout.bin"),
+    );
+    let input = super::read_mach_o_artifact_input_with_embedded_host_traps(&binary_path)
+        .expect("Mach-O stdout fixture builds artifact input");
+    let stdout = input
+        .entry_function
+        .test_case()
+        .host_trap_plan()
+        .stdout_trap()
+        .expect("embedded metadata provides stdout text");
+    let compiled = super::compile_mach_o_entry_function(&input.entry_function)
+        .expect("Mach-O stdout entry function compiles");
+    let main =
+        MachOArm64MainCode::from_emitted_code_bytes(compiled.arm64_bytes().as_slice().to_vec())
+            .expect("compiled ARM64 main bytes are non-empty");
+    let const_data =
+        MachOArm64ConstData::from_read_only_section_bytes(stdout.text().as_bytes().to_vec())
+            .expect("stdout const data is non-empty");
+    let writer_plan = plan_mach_o_arm64_executable(
+        MachOArm64ExecutableWriterRequest::main_with_const_data(main, const_data),
+    );
+
+    let serialized = serialize_mach_o_arm64_executable(&writer_plan)
+        .expect("pure writer serializes Mach-O-derived payload");
+    let layout = serialized.layout();
+    let const_section = layout
+        .const_section()
+        .expect("stdout payload is represented as const data");
+
+    assert_eq!(layout.text_section().offset().value(), 288);
+    assert_eq!(
+        layout.text_section().size().value(),
+        compiled.arm64_bytes().as_slice().len() as u64
+    );
+    assert_eq!(
+        const_section.offset().value(),
+        layout.text_section().offset().value() + layout.text_section().size().value()
+    );
+    assert_eq!(const_section.size().value(), 12);
+    assert_eq!(
+        serialized
+            .bytes_at(layout.text_section())
+            .expect("text range is in serialized bytes"),
+        compiled.arm64_bytes().as_slice()
+    );
+    assert_eq!(
+        serialized
+            .bytes_at(const_section)
+            .expect("const range is in serialized bytes"),
+        stdout.text().as_bytes()
+    );
 }
 
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]

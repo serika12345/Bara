@@ -19,6 +19,7 @@ crates/bara-ir/src/validate/mod.rs:    pub fn new(issues: Vec<ValidationIssue>) 
 crates/bara-isa-x86/src/decode/bytes.rs:    pub fn bytes(&self) -> &[u8] {
 crates/bara-isa-x86/src/decode/bytes.rs:    pub fn new(entry: X86Va, bytes: Vec<u8>) -> Result<Self, DecodeError> {
 crates/bara-isa-x86/src/decode/instruction.rs:    pub fn new(entry: X86Va, instructions: Vec<DecodedInstruction>) -> Result<Self, DecodeError> {
+crates/bara-mach-o/src/arm64_executable/serialization.rs:    pub const fn value(self) -> u64 {
 crates/bara-oracle/src/compare/mod.rs:    pub fn new(issues: Vec<ComparisonIssue>) -> Self {
 crates/bara-oracle/src/json/mod.rs:pub fn corpus_report_to_json(report: &CorpusReport) -> Result<String, JsonError> {
 crates/bara-oracle/src/json/mod.rs:pub fn observed_result_to_json(result: &ObservedResult) -> Result<String, JsonError> {
