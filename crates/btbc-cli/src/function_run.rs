@@ -5,8 +5,8 @@ use bara_ir::{
     ExternalImportTarget, PublicDyldSymbol, PublicLibcSymbol, PublicSymbolImport, SyscallAbi,
     UnsupportedReason,
 };
-use bara_isa_x86::{decode_function, lift_decoded_function};
-use bara_oracle::{FailureKind, ObservedResult, TestCase, TestCaseAbi};
+use bara_isa_x86::{decode_function, lift_decoded_function_with_image_metadata};
+use bara_oracle::{FailureKind, MachOEntryFunctionInput, ObservedResult, TestCase, TestCaseAbi};
 use bara_runtime::{
     run_no_args_u64_with_host_traps, run_one_input_memory_ptr, run_one_u64, HostTrapPlan,
     InputMemory, InputMemoryError, RunArgumentU64, RunError, RunStdout, RunStdoutError,
@@ -344,7 +344,24 @@ pub(crate) fn compile_test_case_function(
 ) -> Result<FunctionCompileResult, FunctionRunError> {
     let input = test_case.x86_bytes().clone();
     let decoded = decode_function(&input).map_err(FunctionRunError::Decode)?;
-    let program = lift_decoded_function(&decoded).map_err(FunctionRunError::Lift)?;
+    let program =
+        lift_decoded_function_with_image_metadata(&decoded, bara_ir::ProgramImageMetadata::empty())
+            .map_err(FunctionRunError::Lift)?;
+    let emitted = emit_program(&program).map_err(FunctionRunError::Emit)?;
+
+    Ok(FunctionCompileResult::new(emitted))
+}
+
+pub(crate) fn compile_mach_o_entry_function(
+    entry_function: &MachOEntryFunctionInput,
+) -> Result<FunctionCompileResult, FunctionRunError> {
+    let input = entry_function.test_case().x86_bytes().clone();
+    let decoded = decode_function(&input).map_err(FunctionRunError::Decode)?;
+    let program = lift_decoded_function_with_image_metadata(
+        &decoded,
+        entry_function.program_image_metadata().clone(),
+    )
+    .map_err(FunctionRunError::Lift)?;
     let emitted = emit_program(&program).map_err(FunctionRunError::Emit)?;
 
     Ok(FunctionCompileResult::new(emitted))
@@ -354,6 +371,22 @@ pub(crate) fn compile_test_case_function_standalone_artifact(
     test_case: &TestCase,
 ) -> Result<FunctionCompileResult, FunctionRunError> {
     let compiled = compile_test_case_function(test_case)?;
+    if !test_case.host_trap_plan().is_empty()
+        || compiled.emitted().host_trap_requests().stdout_requested()
+    {
+        return Err(FunctionRunError::StandaloneArtifact(
+            FunctionStandaloneArtifactError::HostTrapRequested,
+        ));
+    }
+
+    Ok(compiled)
+}
+
+pub(crate) fn compile_mach_o_entry_function_standalone_artifact(
+    entry_function: &MachOEntryFunctionInput,
+) -> Result<FunctionCompileResult, FunctionRunError> {
+    let compiled = compile_mach_o_entry_function(entry_function)?;
+    let test_case = entry_function.test_case();
     if !test_case.host_trap_plan().is_empty()
         || compiled.emitted().host_trap_requests().stdout_requested()
     {

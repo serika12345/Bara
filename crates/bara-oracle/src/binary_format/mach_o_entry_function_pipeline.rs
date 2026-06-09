@@ -3,6 +3,12 @@ use crate::{
     TestCaseStackSize, TestCaseStackState, TestCaseStdoutTrap, TestCaseStdoutTrapError,
 };
 
+use bara_ir::{
+    ProgramImageImports, ProgramImageMetadata, ProgramImageMetadataError, ProgramImageRange,
+    ProgramImageRelocations, ProgramImageSection, ProgramImageSectionKind, ProgramImageSections,
+    ProgramImageSymbols, ProgramUnwindMetadata,
+};
+
 use super::{
     mach_o_executable_image_entry_function::{
         mach_o_executable_image_entry_function_with_host_traps_and_stack_state,
@@ -18,6 +24,7 @@ pub enum MachOEntryFunctionTestCaseError {
     Probe(BinaryFormatProbeError),
     Plan(MachOExecutableImagePlanError),
     Materialization(MachOExecutableImageMaterializationError),
+    ProgramImageMetadata(ProgramImageMetadataError),
     EntryFunction(MachOExecutableImageEntryFunctionError),
     EmbeddedStdoutTrap(TestCaseStdoutTrapError),
 }
@@ -26,13 +33,19 @@ pub enum MachOEntryFunctionTestCaseError {
 pub struct MachOEntryFunctionInput {
     test_case: TestCase,
     executable_image: ExecutableImage,
+    program_image_metadata: ProgramImageMetadata,
 }
 
 impl MachOEntryFunctionInput {
-    const fn new(test_case: TestCase, executable_image: ExecutableImage) -> Self {
+    const fn new(
+        test_case: TestCase,
+        executable_image: ExecutableImage,
+        program_image_metadata: ProgramImageMetadata,
+    ) -> Self {
         Self {
             test_case,
             executable_image,
+            program_image_metadata,
         }
     }
 
@@ -42,6 +55,10 @@ impl MachOEntryFunctionInput {
 
     pub const fn executable_image(&self) -> &ExecutableImage {
         &self.executable_image
+    }
+
+    pub const fn program_image_metadata(&self) -> &ProgramImageMetadata {
+        &self.program_image_metadata
     }
 
     pub fn into_test_case(self) -> TestCase {
@@ -121,6 +138,8 @@ fn mach_o_entry_function_input_with_host_trap_plan(
     let image = materialize_mach_o_executable_image(input, &plan)
         .map_err(MachOEntryFunctionTestCaseError::Materialization)?;
     let host_trap_plan = host_trap_plan_from_image(&image)?;
+    let program_image_metadata = program_image_metadata_from_executable_image(&image)
+        .map_err(MachOEntryFunctionTestCaseError::ProgramImageMetadata)?;
 
     let test_case = mach_o_executable_image_entry_function_with_host_traps_and_stack_state(
         case_id,
@@ -130,7 +149,35 @@ fn mach_o_entry_function_input_with_host_trap_plan(
     )
     .map_err(MachOEntryFunctionTestCaseError::EntryFunction)?;
 
-    Ok(MachOEntryFunctionInput::new(test_case, image))
+    Ok(MachOEntryFunctionInput::new(
+        test_case,
+        image,
+        program_image_metadata,
+    ))
+}
+
+fn program_image_metadata_from_executable_image(
+    image: &ExecutableImage,
+) -> Result<ProgramImageMetadata, ProgramImageMetadataError> {
+    let code = image.code_segment().x86_bytes();
+    let code_len = u64::try_from(code.bytes().len())
+        .map_err(|_| ProgramImageMetadataError::AddressOverflow)?;
+    let code_end = code
+        .entry()
+        .checked_add(code_len)
+        .map_err(|_| ProgramImageMetadataError::AddressOverflow)?;
+    let code_range = ProgramImageRange::new(code.entry(), code_end)?;
+
+    Ok(ProgramImageMetadata::new(
+        ProgramImageSections::from_items([ProgramImageSection::new(
+            ProgramImageSectionKind::Code,
+            code_range,
+        )]),
+        ProgramImageSymbols::empty(),
+        ProgramImageRelocations::empty(),
+        ProgramImageImports::empty(),
+        ProgramUnwindMetadata::empty(),
+    ))
 }
 
 const MACH_O_EMBEDDED_STDOUT_TRAP_MAGIC: &[u8] = b"BARA_STDOUT\0";

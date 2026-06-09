@@ -1,0 +1,311 @@
+use crate::{
+    boundary::{ExternalSymbolId, ExternalSymbolImport},
+    program::X86Va,
+};
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ProgramImageMetadata {
+    sections: ProgramImageSections,
+    symbols: ProgramImageSymbols,
+    relocations: ProgramImageRelocations,
+    imports: ProgramImageImports,
+    unwind: ProgramUnwindMetadata,
+}
+
+impl ProgramImageMetadata {
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    pub const fn new(
+        sections: ProgramImageSections,
+        symbols: ProgramImageSymbols,
+        relocations: ProgramImageRelocations,
+        imports: ProgramImageImports,
+        unwind: ProgramUnwindMetadata,
+    ) -> Self {
+        Self {
+            sections,
+            symbols,
+            relocations,
+            imports,
+            unwind,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.sections.is_empty()
+            && self.symbols.is_empty()
+            && self.relocations.is_empty()
+            && self.imports.is_empty()
+            && self.unwind.is_empty()
+    }
+
+    pub const fn sections(&self) -> &ProgramImageSections {
+        &self.sections
+    }
+
+    pub const fn symbols(&self) -> &ProgramImageSymbols {
+        &self.symbols
+    }
+
+    pub const fn relocations(&self) -> &ProgramImageRelocations {
+        &self.relocations
+    }
+
+    pub const fn imports(&self) -> &ProgramImageImports {
+        &self.imports
+    }
+
+    pub const fn unwind(&self) -> &ProgramUnwindMetadata {
+        &self.unwind
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ProgramImageSections {
+    items: Vec<ProgramImageSection>,
+}
+
+impl ProgramImageSections {
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    pub fn from_items(items: impl IntoIterator<Item = ProgramImageSection>) -> Self {
+        Self {
+            items: items.into_iter().collect(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn items(&self) -> &[ProgramImageSection] {
+        &self.items
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProgramImageSection {
+    kind: ProgramImageSectionKind,
+    range: ProgramImageRange,
+}
+
+impl ProgramImageSection {
+    pub const fn new(kind: ProgramImageSectionKind, range: ProgramImageRange) -> Self {
+        Self { kind, range }
+    }
+
+    pub const fn kind(self) -> ProgramImageSectionKind {
+        self.kind
+    }
+
+    pub const fn range(self) -> ProgramImageRange {
+        self.range
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ProgramImageSectionKind {
+    Code,
+    ConstData,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProgramImageRange {
+    start: X86Va,
+    end: X86Va,
+}
+
+impl ProgramImageRange {
+    pub fn new(start: X86Va, end: X86Va) -> Result<Self, ProgramImageMetadataError> {
+        if start >= end {
+            return Err(ProgramImageMetadataError::EmptyOrReversedRange);
+        }
+
+        Ok(Self { start, end })
+    }
+
+    pub const fn start(self) -> X86Va {
+        self.start
+    }
+
+    pub const fn end(self) -> X86Va {
+        self.end
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ProgramImageSymbols {
+    items: Vec<ProgramImageSymbol>,
+}
+
+impl ProgramImageSymbols {
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    pub fn from_items(items: impl IntoIterator<Item = ProgramImageSymbol>) -> Self {
+        Self {
+            items: items.into_iter().collect(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn items(&self) -> &[ProgramImageSymbol] {
+        &self.items
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ProgramImageSymbol {
+    ExternalImport(ExternalSymbolImport),
+}
+
+impl ProgramImageSymbol {
+    pub const fn external_import(import: ExternalSymbolImport) -> Self {
+        Self::ExternalImport(import)
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ProgramImageRelocations {
+    items: Vec<ProgramImageRelocation>,
+}
+
+impl ProgramImageRelocations {
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    pub fn from_items(items: impl IntoIterator<Item = ProgramImageRelocation>) -> Self {
+        Self {
+            items: items.into_iter().collect(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn items(&self) -> &[ProgramImageRelocation] {
+        &self.items
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProgramImageRelocation {
+    at: X86Va,
+    target: ProgramImageRelocationTarget,
+}
+
+impl ProgramImageRelocation {
+    pub const fn new(at: X86Va, target: ProgramImageRelocationTarget) -> Self {
+        Self { at, target }
+    }
+
+    pub const fn at(self) -> X86Va {
+        self.at
+    }
+
+    pub const fn target(self) -> ProgramImageRelocationTarget {
+        self.target
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ProgramImageRelocationTarget {
+    Address(X86Va),
+    ExternalSymbol(ExternalSymbolId),
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ProgramImageImports {
+    items: Vec<ProgramImageImport>,
+}
+
+impl ProgramImageImports {
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    pub fn from_items(items: impl IntoIterator<Item = ProgramImageImport>) -> Self {
+        Self {
+            items: items.into_iter().collect(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn items(&self) -> &[ProgramImageImport] {
+        &self.items
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProgramImageImport {
+    import: ExternalSymbolImport,
+}
+
+impl ProgramImageImport {
+    pub const fn new(import: ExternalSymbolImport) -> Self {
+        Self { import }
+    }
+
+    pub const fn import(self) -> ExternalSymbolImport {
+        self.import
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ProgramUnwindMetadata {
+    entries: Vec<ProgramUnwindEntry>,
+}
+
+impl ProgramUnwindMetadata {
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    pub fn from_entries(entries: impl IntoIterator<Item = ProgramUnwindEntry>) -> Self {
+        Self {
+            entries: entries.into_iter().collect(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn entries(&self) -> &[ProgramUnwindEntry] {
+        &self.entries
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProgramUnwindEntry {
+    range: ProgramImageRange,
+}
+
+impl ProgramUnwindEntry {
+    pub const fn new(range: ProgramImageRange) -> Self {
+        Self { range }
+    }
+
+    pub const fn range(self) -> ProgramImageRange {
+        self.range
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ProgramImageMetadataError {
+    EmptyOrReversedRange,
+    AddressOverflow,
+}

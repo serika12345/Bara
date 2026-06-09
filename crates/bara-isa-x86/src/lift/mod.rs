@@ -1,7 +1,7 @@
 use bara_ir::{
     BasicBlock, BasicBlockError, BlockId, BoundaryRequest, HostTrapKind, IrOp, Operand, Program,
-    ProgramError, SyscallAbi, SyscallRequest, SyscallRequestError, Terminator, UnsupportedReason,
-    X86Reg,
+    ProgramError, ProgramImageMetadata, SyscallAbi, SyscallRequest, SyscallRequestError,
+    Terminator, UnsupportedReason, X86Reg,
 };
 
 use crate::{DecodeError, DecodedFunction, DecodedInstruction, DecodedInstructionKind};
@@ -16,6 +16,13 @@ pub enum LiftError {
 }
 
 pub fn lift_decoded_function(decoded: &DecodedFunction) -> Result<Program, LiftError> {
+    lift_decoded_function_with_image_metadata(decoded, ProgramImageMetadata::empty())
+}
+
+pub fn lift_decoded_function_with_image_metadata(
+    decoded: &DecodedFunction,
+    image_metadata: ProgramImageMetadata,
+) -> Result<Program, LiftError> {
     let mut blocks = Vec::new();
     let mut ops = Vec::new();
     let mut block_start = Some(decoded.entry());
@@ -68,7 +75,8 @@ pub fn lift_decoded_function(decoded: &DecodedFunction) -> Result<Program, LiftE
         return Err(LiftError::EmptyDecodedFunction);
     }
 
-    Program::new(decoded.entry(), blocks).map_err(LiftError::Program)
+    Program::with_image_metadata(decoded.entry(), blocks, image_metadata)
+        .map_err(LiftError::Program)
 }
 
 enum LiftedInstruction {
@@ -189,12 +197,15 @@ fn lift_instruction(
 #[cfg(test)]
 mod tests {
     use bara_ir::{
-        BlockId, BoundaryRequest, HostTrapKind, IrOp, Operand, SyscallAbi, SyscallRequest,
-        Terminator, UnsupportedReason, X86Cond, X86Reg, X86Va,
+        BlockId, BoundaryRequest, HostTrapKind, IrOp, Operand, ProgramImageImports,
+        ProgramImageMetadata, ProgramImageRange, ProgramImageRelocations, ProgramImageSection,
+        ProgramImageSectionKind, ProgramImageSections, ProgramImageSymbols, ProgramUnwindMetadata,
+        SyscallAbi, SyscallRequest, Terminator, UnsupportedReason, X86Cond, X86Reg, X86Va,
     };
 
     use crate::{
-        lift_decoded_function, DecodedFunction, DecodedInstruction, DecodedInstructionKind,
+        lift_decoded_function, lift_decoded_function_with_image_metadata, DecodedFunction,
+        DecodedInstruction, DecodedInstructionKind,
     };
 
     #[test]
@@ -227,6 +238,39 @@ mod tests {
             }]
         );
         assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_decoded_function_with_image_metadata() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(5),
+                    DecodedInstructionKind::MovEaxImm32 { imm: 42 },
+                ),
+                DecodedInstruction::new(X86Va::new(5), X86Va::new(6), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+        let range = ProgramImageRange::new(X86Va::new(0), X86Va::new(6))
+            .expect("metadata range is non-empty");
+        let metadata = ProgramImageMetadata::new(
+            ProgramImageSections::from_items([ProgramImageSection::new(
+                ProgramImageSectionKind::Code,
+                range,
+            )]),
+            ProgramImageSymbols::empty(),
+            ProgramImageRelocations::empty(),
+            ProgramImageImports::empty(),
+            ProgramUnwindMetadata::empty(),
+        );
+
+        let program = lift_decoded_function_with_image_metadata(&decoded, metadata.clone())
+            .expect("decoded function lifts with metadata");
+
+        assert_eq!(program.image_metadata(), &metadata);
     }
 
     #[test]

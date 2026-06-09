@@ -28,6 +28,7 @@ mod native_artifact_cli_tests;
 use blackbox_run::run_check_blackbox;
 use executable_run::{run_executable_manifest, ExecutableRunError};
 use function_run::{
+    compile_mach_o_entry_function, compile_mach_o_entry_function_standalone_artifact,
     compile_test_case_function, compile_test_case_function_standalone_artifact,
     run_test_case_function, FunctionRunError,
 };
@@ -174,7 +175,7 @@ fn run_link_fixture_arm64_main(case_path: &Path, output_path: &Path) -> Result<S
 
 fn run_link_mach_o_arm64_main(binary_path: &Path, output_path: &Path) -> Result<String, CliError> {
     let input = read_mach_o_artifact_input(binary_path)?;
-    let compiled = compile_test_case_function_standalone_artifact(input.entry_function.test_case())
+    let compiled = compile_mach_o_entry_function_standalone_artifact(&input.entry_function)
         .map_err(CliError::FunctionRun)?;
     let artifact = link_arm64_main_executable_with_source_metadata(
         compiled.arm64_bytes(),
@@ -237,7 +238,7 @@ fn link_mach_o_arm64_stdout_main_from_input(
         source_image,
     } = input;
     let test_case = entry_function.test_case();
-    let compiled = compile_test_case_function(test_case).map_err(CliError::FunctionRun)?;
+    let compiled = compile_mach_o_entry_function(&entry_function).map_err(CliError::FunctionRun)?;
     let artifact = link_arm64_stdout_main_executable_with_source_metadata(
         compiled.arm64_bytes(),
         test_case.host_trap_plan(),

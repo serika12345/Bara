@@ -4,6 +4,8 @@ use crate::{
     TestCaseStackSize, TestCaseStdoutTrap,
 };
 
+use bara_ir::{ProgramImageSectionKind, X86Va};
+
 use super::*;
 
 #[test]
@@ -77,6 +79,29 @@ fn builds_entry_function_input_from_full_mach_o_executable_image() {
         &[0x90, 0x90, 0xb8, 0x2a, 0x00, 0x00, 0x00, 0xc3]
     );
     assert_eq!(entry_input.executable_image().entry().offset().value(), 2);
+    assert_eq!(
+        entry_input.program_image_metadata().sections().items()[0].kind(),
+        ProgramImageSectionKind::Code
+    );
+    assert_eq!(
+        entry_input.program_image_metadata().sections().items()[0]
+            .range()
+            .start(),
+        X86Va::new(0)
+    );
+    assert_eq!(
+        entry_input.program_image_metadata().sections().items()[0]
+            .range()
+            .end(),
+        X86Va::new(8)
+    );
+    assert!(entry_input.program_image_metadata().symbols().is_empty());
+    assert!(entry_input
+        .program_image_metadata()
+        .relocations()
+        .is_empty());
+    assert!(entry_input.program_image_metadata().imports().is_empty());
+    assert!(entry_input.program_image_metadata().unwind().is_empty());
 }
 
 #[test]
