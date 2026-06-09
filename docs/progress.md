@@ -9,13 +9,13 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-08 22:28 JST
+最終更新: 2026-06-09 20:08 JST
 
 状態:
 
-- project_state: completed。B6 の 4 つ目の小ステップとして、fixture 専用
-  host trap JSON への依存を減らし、Mach-O binary metadata から stdout
-  host trap plan を得る経路を実装した。
+- project_state: completed。B6 の 5 つ目の小ステップとして、malformed /
+  unsupported Mach-O の blocker classification を artifact 生成でも維持する
+  回帰テストを追加した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B6:
   実 Mach-O 入力からの standalone 実行。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の
@@ -24,8 +24,8 @@
   `btbc-cli` の出力境界へ接続した。
 - active_branch: `task/b6-macho-return42-artifact`。base commit は `31dbc29`。
   latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B6 の fixture 専用 host trap JSON
-  への依存を減らし、binary metadata から必要情報を得る項目。
+- related_todo: [TODO.md](../TODO.md) B6 の malformed / unsupported
+  Mach-O の blocker classification を artifact 生成でも維持する項目。
 - completed_work: `link-mach-o-arm64-main <binary> <out-exe>` を追加し、
   `tests/binaries/mach_o_return_42.bin` を既存の Mach-O entry function
   pipeline、standalone ARM64 emit、`clang` native artifact packaging へ通した。
@@ -42,22 +42,30 @@
   実プロセスとして実行する。Mach-O artifact 経路では
   `NativeSourceImageMetadata::MachOExecutable` を package request に渡し、
   metadata JSON に `LC_MAIN` 由来の `entryoff` / `stacksize` と selected
-  segment の `name` / `vmaddr` / `fileoff` / `filesize` を含める。
-- remaining_work: malformed / unsupported Mach-O の artifact 生成時 blocker
-  classification 維持。
-- next_action: B6 の次小ステップとして、malformed / unsupported Mach-O の
-  blocker classification を artifact 生成でも維持する。
-- verification: `nix develop -c cargo test -p bara-oracle
-  derives_stdout_host_trap_plan_from_mach_o_embedded_metadata`、`nix develop -c
-  cargo test -p btbc-cli check_mach_o_host_traps_reads_binary_metadata_and_expected_files`、
-  `nix develop -c cargo test -p btbc-cli check_mach_o_host_traps`、`nix develop
-  -c cargo test -p btbc-cli link_mach_o_arm64_stdout_main`、`nix develop -c
-  cargo test -p btbc-cli check_blackbox_reports_raw_manifest_mach_o_and_probe_fixtures`、
-  `nix develop -c cargo test -p btbc-cli
-  check_blackbox_writes_report_and_schema_specific_actual_outputs`、および
+  segment の `name` / `vmaddr` / `fileoff` / `filesize` を含める。artifact
+  CLI は native linking に進む前に Mach-O entry function pipeline を通すため、
+  malformed input は `MachOEntryFunctionTestCaseError::Probe`、unsupported
+  conversion は `MachOEntryFunctionTestCaseError::Plan(NotConvertible { blocker })`
+  として保持される。
+- remaining_work: raw x86_64 bytes 入力ではなく、Mach-O executable image
+  全体から entry function / entry image を構成する。
+- next_action: B6 の次小ステップとして、raw x86_64 bytes 入力ではなく、
+  Mach-O executable image 全体から entry function / entry image を構成する。
+- verification: `nix develop -c cargo test -p btbc-cli
+  preserves_malformed_mach_o_probe_classification`、`nix develop -c cargo test
+  -p btbc-cli preserves_unsupported_mach_o_blocker_classification`、および
   `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
+
+- 2026-06-09 20:08 JST: B6 の 5 つ目の小ステップとして、malformed /
+  unsupported Mach-O の artifact 生成時 blocker classification を回帰テストで
+  固定した。`link-mach-o-arm64-main` と `link-mach-o-arm64-stdout-main` は
+  short Mach-O input を `MachOEntryFunctionTestCaseError::Probe(InputTooShort)`
+  として、entry point はあるが segment がない input を
+  `MachOEntryFunctionTestCaseError::Plan(NotConvertible { blocker:
+  MissingSegment })` として返し、native artifact output を作らない。検証は
+  targeted tests と `nix develop -c ./scripts/verify`。
 
 - 2026-06-08 22:28 JST: B6 の 4 つ目の小ステップとして、fixture 専用
   host trap JSON への依存を減らした。`mach_o_hello_world_stdout.bin` は

@@ -5,7 +5,11 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use bara_oracle::{observed_result_from_json, observed_result_to_json, FailureKind};
+use bara_oracle::{
+    observed_result_from_json, observed_result_to_json, BinaryFormatProbeError, FailureKind,
+    MachOEntryFunctionTestCaseError, MachOExecutableImageConversionBlocker,
+    MachOExecutableImagePlanError,
+};
 
 use super::{run_cli, CliError};
 
@@ -197,6 +201,49 @@ fn link_mach_o_arm64_main_reports_unsupported_host() {
 }
 
 #[test]
+fn link_mach_o_arm64_main_preserves_malformed_mach_o_probe_classification() {
+    let temp_dir =
+        TestTempDir::new("link_mach_o_arm64_main_preserves_malformed_mach_o_probe_classification");
+    let binary_path = temp_dir.write_binary_file("short_mach_o.bin", &[0xcf, 0xfa, 0xed]);
+    let output_path = temp_dir.path.join("short_mach_o");
+
+    let error = run_cli(vec![
+        String::from("link-mach-o-arm64-main"),
+        binary_path.to_string_lossy().into_owned(),
+        output_path.to_string_lossy().into_owned(),
+    ])
+    .expect_err("malformed Mach-O is rejected before native linking");
+
+    assert!(matches!(
+        error,
+        CliError::MachOEntryFunctionTestCase(MachOEntryFunctionTestCaseError::Probe(
+            BinaryFormatProbeError::InputTooShort
+        ))
+    ));
+    assert_eq!(error.failure_kind(), FailureKind::InvalidTestCase);
+    assert!(!output_path.exists());
+}
+
+#[test]
+fn link_mach_o_arm64_main_preserves_unsupported_mach_o_blocker_classification() {
+    let temp_dir = TestTempDir::new(
+        "link_mach_o_arm64_main_preserves_unsupported_mach_o_blocker_classification",
+    );
+    let binary_path =
+        temp_dir.write_binary_file("mach_o_missing_segment.bin", MACH_O_MISSING_SEGMENT_BIN);
+    let output_path = temp_dir.path.join("mach_o_missing_segment");
+
+    let error = run_cli(vec![
+        String::from("link-mach-o-arm64-main"),
+        binary_path.to_string_lossy().into_owned(),
+        output_path.to_string_lossy().into_owned(),
+    ])
+    .expect_err("unsupported Mach-O is rejected before native linking");
+
+    assert_missing_segment_blocker_error(error, &output_path);
+}
+
+#[test]
 fn link_fixture_arm64_main_rejects_stdout_host_trap_fixture() {
     let temp_dir = TestTempDir::new("link_fixture_arm64_main_rejects_stdout_host_trap_fixture");
     let case_path = temp_dir.write_file(
@@ -327,6 +374,50 @@ fn link_mach_o_arm64_stdout_main_reports_unsupported_host() {
 }
 
 #[test]
+fn link_mach_o_arm64_stdout_main_preserves_malformed_mach_o_probe_classification() {
+    let temp_dir = TestTempDir::new(
+        "link_mach_o_arm64_stdout_main_preserves_malformed_mach_o_probe_classification",
+    );
+    let binary_path = temp_dir.write_binary_file("short_mach_o.bin", &[0xcf, 0xfa, 0xed]);
+    let output_path = temp_dir.path.join("short_mach_o_stdout");
+
+    let error = run_cli(vec![
+        String::from("link-mach-o-arm64-stdout-main"),
+        binary_path.to_string_lossy().into_owned(),
+        output_path.to_string_lossy().into_owned(),
+    ])
+    .expect_err("malformed Mach-O is rejected before native stdout linking");
+
+    assert!(matches!(
+        error,
+        CliError::MachOEntryFunctionTestCase(MachOEntryFunctionTestCaseError::Probe(
+            BinaryFormatProbeError::InputTooShort
+        ))
+    ));
+    assert_eq!(error.failure_kind(), FailureKind::InvalidTestCase);
+    assert!(!output_path.exists());
+}
+
+#[test]
+fn link_mach_o_arm64_stdout_main_preserves_unsupported_mach_o_blocker_classification() {
+    let temp_dir = TestTempDir::new(
+        "link_mach_o_arm64_stdout_main_preserves_unsupported_mach_o_blocker_classification",
+    );
+    let binary_path =
+        temp_dir.write_binary_file("mach_o_missing_segment.bin", MACH_O_MISSING_SEGMENT_BIN);
+    let output_path = temp_dir.path.join("mach_o_missing_segment_stdout");
+
+    let error = run_cli(vec![
+        String::from("link-mach-o-arm64-stdout-main"),
+        binary_path.to_string_lossy().into_owned(),
+        output_path.to_string_lossy().into_owned(),
+    ])
+    .expect_err("unsupported Mach-O is rejected before native stdout linking");
+
+    assert_missing_segment_blocker_error(error, &output_path);
+}
+
+#[test]
 fn link_fixture_arm64_stdout_main_rejects_fixture_without_stdout_request() {
     let temp_dir =
         TestTempDir::new("link_fixture_arm64_stdout_main_rejects_fixture_without_stdout_request");
@@ -387,6 +478,26 @@ impl Drop for TestTempDir {
     fn drop(&mut self) {
         fs::remove_dir_all(&self.path).expect("test temp dir is removed");
     }
+}
+
+const MACH_O_MISSING_SEGMENT_BIN: &[u8] = &[
+    0xcf, 0xfa, 0xed, 0xfe, 0x07, 0x00, 0x00, 0x01, 0x03, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
+    0x01, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x28, 0x00, 0x00, 0x80, 0x18, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+];
+
+fn assert_missing_segment_blocker_error(error: CliError, output_path: &Path) {
+    assert!(matches!(
+        error,
+        CliError::MachOEntryFunctionTestCase(MachOEntryFunctionTestCaseError::Plan(
+            MachOExecutableImagePlanError::NotConvertible {
+                blocker: MachOExecutableImageConversionBlocker::MissingSegment
+            }
+        ))
+    ));
+    assert_eq!(error.failure_kind(), FailureKind::InvalidTestCase);
+    assert!(!output_path.exists());
 }
 
 fn read_binary_file(path: &Path) -> Vec<u8> {
