@@ -1,5 +1,5 @@
 use crate::{
-    mach_o_entry_function_test_case_with_embedded_host_traps,
+    mach_o_entry_function_input, mach_o_entry_function_test_case_with_embedded_host_traps,
     mach_o_entry_function_test_case_with_host_traps, CaseId, TestCaseAbi, TestCaseHostTrapPlan,
     TestCaseStackSize, TestCaseStdoutTrap,
 };
@@ -39,6 +39,44 @@ fn builds_no_args_u64_testcase_from_mach_o_binary_input() {
         testcase.stack_state().size(),
         Some(TestCaseStackSize::from_trusted_nonzero_byte_count(0x2000))
     );
+}
+
+#[test]
+fn builds_entry_function_input_from_full_mach_o_executable_image() {
+    let input = BinaryInput::from_hex(concat!(
+        "cffaedfe07000001030000000200000002000000600000000000000000000000",
+        "1900000048000000",
+        "5f5f5445585400000000000000000000",
+        "0000000001000000",
+        "0000000000000000",
+        "8000000000000000",
+        "0800000000000000",
+        "00000000000000000000000000000000",
+        "2800008018000000",
+        "8200000000000000",
+        "0020000000000000",
+        "9090b82a000000c3",
+    ))
+    .expect("hex fixture is valid");
+    let case_id = CaseId::new("mach_o_return_42").expect("case id is non-empty");
+
+    let entry_input =
+        mach_o_entry_function_input(case_id.clone(), &input).expect("pipeline succeeds");
+
+    assert_eq!(entry_input.test_case().case_id(), &case_id);
+    assert_eq!(
+        entry_input.test_case().x86_bytes().bytes(),
+        &[0xb8, 0x2a, 0x00, 0x00, 0x00, 0xc3]
+    );
+    assert_eq!(
+        entry_input
+            .executable_image()
+            .code_segment()
+            .x86_bytes()
+            .bytes(),
+        &[0x90, 0x90, 0xb8, 0x2a, 0x00, 0x00, 0x00, 0xc3]
+    );
+    assert_eq!(entry_input.executable_image().entry().offset().value(), 2);
 }
 
 #[test]

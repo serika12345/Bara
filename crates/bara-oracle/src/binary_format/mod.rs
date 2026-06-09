@@ -15,8 +15,11 @@ pub use input::{
     RecognizedMachOSegmentCommand, UnsupportedMachOLoadCommand,
 };
 pub use mach_o_entry_function_pipeline::{
-    mach_o_entry_function_test_case, mach_o_entry_function_test_case_with_embedded_host_traps,
-    mach_o_entry_function_test_case_with_host_traps, MachOEntryFunctionTestCaseError,
+    mach_o_entry_function_input, mach_o_entry_function_input_with_embedded_host_traps,
+    mach_o_entry_function_input_with_host_traps, mach_o_entry_function_test_case,
+    mach_o_entry_function_test_case_with_embedded_host_traps,
+    mach_o_entry_function_test_case_with_host_traps, MachOEntryFunctionInput,
+    MachOEntryFunctionTestCaseError,
 };
 pub use mach_o_executable_image_entry_function::{
     mach_o_executable_image_entry_function, mach_o_executable_image_entry_function_with_host_traps,

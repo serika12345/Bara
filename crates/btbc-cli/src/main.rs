@@ -7,13 +7,15 @@ use std::{
 use bara_oracle::{
     binary_format_probe_report_from_json, binary_format_probe_report_to_json,
     compare_observed_results, corpus_report_to_json, executable_manifest_from_json,
-    host_trap_plan_from_json, mach_o_entry_function_test_case,
+    host_trap_plan_from_json, mach_o_entry_function_input_with_embedded_host_traps,
+    mach_o_entry_function_input_with_host_traps, mach_o_entry_function_test_case,
     mach_o_entry_function_test_case_with_embedded_host_traps,
     mach_o_entry_function_test_case_with_host_traps, observed_result_from_json,
     observed_result_to_json, probe_public_binary_format, test_case_from_json, BinaryFileBytes,
     BinaryFormatProbeError, BinaryFormatProbeReport, BinaryInput, CaseId, ComparisonReport,
     CorpusReport, ExecutableManifest, ExpectedResult, FailureKind, FailureMessage, FixtureOutcome,
-    FixtureReport, MachOEntryFunctionTestCaseError, ObservedResult, TestCase,
+    FixtureReport, MachOEntryFunctionInput, MachOEntryFunctionTestCaseError, ObservedResult,
+    TestCase,
 };
 
 mod blackbox_run;
@@ -172,7 +174,7 @@ fn run_link_fixture_arm64_main(case_path: &Path, output_path: &Path) -> Result<S
 
 fn run_link_mach_o_arm64_main(binary_path: &Path, output_path: &Path) -> Result<String, CliError> {
     let input = read_mach_o_artifact_input(binary_path)?;
-    let compiled = compile_test_case_function_standalone_artifact(&input.test_case)
+    let compiled = compile_test_case_function_standalone_artifact(input.entry_function.test_case())
         .map_err(CliError::FunctionRun)?;
     let artifact = link_arm64_main_executable_with_source_metadata(
         compiled.arm64_bytes(),
@@ -230,14 +232,18 @@ fn link_mach_o_arm64_stdout_main_from_input(
     input: MachOArtifactInput,
     output_path: &Path,
 ) -> Result<String, CliError> {
-    let test_case = input.test_case;
-    let compiled = compile_test_case_function(&test_case).map_err(CliError::FunctionRun)?;
+    let MachOArtifactInput {
+        entry_function,
+        source_image,
+    } = input;
+    let test_case = entry_function.test_case();
+    let compiled = compile_test_case_function(test_case).map_err(CliError::FunctionRun)?;
     let artifact = link_arm64_stdout_main_executable_with_source_metadata(
         compiled.arm64_bytes(),
         test_case.host_trap_plan(),
         compiled.stdout_host_trap_request(),
         output_path,
-        Some(input.source_image),
+        Some(source_image),
     )
     .map_err(CliError::NativeArtifact)?;
 
@@ -299,7 +305,7 @@ fn read_mach_o_entry_function_test_case(binary_path: &Path) -> Result<TestCase, 
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct MachOArtifactInput {
-    test_case: TestCase,
+    entry_function: MachOEntryFunctionInput,
     source_image: NativeSourceImageMetadata,
 }
 
@@ -314,7 +320,7 @@ fn read_mach_o_artifact_input_with_embedded_host_traps(
     binary_path: &Path,
 ) -> Result<MachOArtifactInput, CliError> {
     read_mach_o_artifact_input_from_binary(binary_path, |case_id, input| {
-        mach_o_entry_function_test_case_with_embedded_host_traps(case_id, input)
+        mach_o_entry_function_input_with_embedded_host_traps(case_id, input)
     })
 }
 
@@ -346,20 +352,23 @@ fn read_mach_o_artifact_input_with_host_traps(
     host_trap_plan: bara_oracle::TestCaseHostTrapPlan,
 ) -> Result<MachOArtifactInput, CliError> {
     read_mach_o_artifact_input_from_binary(binary_path, |case_id, input| {
-        mach_o_entry_function_test_case_with_host_traps(case_id, input, host_trap_plan)
+        mach_o_entry_function_input_with_host_traps(case_id, input, host_trap_plan)
     })
 }
 
 fn read_mach_o_artifact_input_from_binary(
     binary_path: &Path,
-    test_case_from_input: impl FnOnce(
+    entry_function_from_input: impl FnOnce(
         CaseId,
         &BinaryInput,
-    ) -> Result<TestCase, MachOEntryFunctionTestCaseError>,
+    ) -> Result<
+        MachOEntryFunctionInput,
+        MachOEntryFunctionTestCaseError,
+    >,
 ) -> Result<MachOArtifactInput, CliError> {
     let bytes = read_binary_file(binary_path)?;
     let input = BinaryInput::from_file_bytes(BinaryFileBytes::from_untrusted_file_contents(bytes));
-    let test_case = test_case_from_input(case_id_from_path(binary_path), &input)
+    let entry_function = entry_function_from_input(case_id_from_path(binary_path), &input)
         .map_err(CliError::MachOEntryFunctionTestCase)?;
     let report = probe_public_binary_format(&input).map_err(CliError::BinaryFormatProbe)?;
     let source_image = NativeSourceImageMetadata::from_mach_o_conversion(
@@ -371,7 +380,7 @@ fn read_mach_o_artifact_input_from_binary(
     .map_err(CliError::NativeSourceImageMetadata)?;
 
     Ok(MachOArtifactInput {
-        test_case,
+        entry_function,
         source_image,
     })
 }

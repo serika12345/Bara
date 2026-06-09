@@ -22,11 +22,64 @@ pub enum MachOEntryFunctionTestCaseError {
     EmbeddedStdoutTrap(TestCaseStdoutTrapError),
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MachOEntryFunctionInput {
+    test_case: TestCase,
+    executable_image: ExecutableImage,
+}
+
+impl MachOEntryFunctionInput {
+    const fn new(test_case: TestCase, executable_image: ExecutableImage) -> Self {
+        Self {
+            test_case,
+            executable_image,
+        }
+    }
+
+    pub const fn test_case(&self) -> &TestCase {
+        &self.test_case
+    }
+
+    pub const fn executable_image(&self) -> &ExecutableImage {
+        &self.executable_image
+    }
+
+    pub fn into_test_case(self) -> TestCase {
+        self.test_case
+    }
+}
+
+pub fn mach_o_entry_function_input(
+    case_id: CaseId,
+    input: &BinaryInput,
+) -> Result<MachOEntryFunctionInput, MachOEntryFunctionTestCaseError> {
+    mach_o_entry_function_input_with_host_traps(case_id, input, TestCaseHostTrapPlan::none())
+}
+
+pub fn mach_o_entry_function_input_with_host_traps(
+    case_id: CaseId,
+    input: &BinaryInput,
+    host_trap_plan: TestCaseHostTrapPlan,
+) -> Result<MachOEntryFunctionInput, MachOEntryFunctionTestCaseError> {
+    mach_o_entry_function_input_with_host_trap_plan(case_id, input, move |_| Ok(host_trap_plan))
+}
+
+pub fn mach_o_entry_function_input_with_embedded_host_traps(
+    case_id: CaseId,
+    input: &BinaryInput,
+) -> Result<MachOEntryFunctionInput, MachOEntryFunctionTestCaseError> {
+    mach_o_entry_function_input_with_host_trap_plan(
+        case_id,
+        input,
+        testcase_host_trap_plan_from_embedded_stdout_metadata,
+    )
+}
+
 pub fn mach_o_entry_function_test_case(
     case_id: CaseId,
     input: &BinaryInput,
 ) -> Result<TestCase, MachOEntryFunctionTestCaseError> {
-    mach_o_entry_function_test_case_with_host_traps(case_id, input, TestCaseHostTrapPlan::none())
+    mach_o_entry_function_input(case_id, input).map(MachOEntryFunctionInput::into_test_case)
 }
 
 pub fn mach_o_entry_function_test_case_with_host_traps(
@@ -34,21 +87,19 @@ pub fn mach_o_entry_function_test_case_with_host_traps(
     input: &BinaryInput,
     host_trap_plan: TestCaseHostTrapPlan,
 ) -> Result<TestCase, MachOEntryFunctionTestCaseError> {
-    mach_o_entry_function_test_case_with_host_trap_plan(case_id, input, move |_| Ok(host_trap_plan))
+    mach_o_entry_function_input_with_host_traps(case_id, input, host_trap_plan)
+        .map(MachOEntryFunctionInput::into_test_case)
 }
 
 pub fn mach_o_entry_function_test_case_with_embedded_host_traps(
     case_id: CaseId,
     input: &BinaryInput,
 ) -> Result<TestCase, MachOEntryFunctionTestCaseError> {
-    mach_o_entry_function_test_case_with_host_trap_plan(
-        case_id,
-        input,
-        testcase_host_trap_plan_from_embedded_stdout_metadata,
-    )
+    mach_o_entry_function_input_with_embedded_host_traps(case_id, input)
+        .map(MachOEntryFunctionInput::into_test_case)
 }
 
-fn mach_o_entry_function_test_case_with_host_trap_plan(
+fn mach_o_entry_function_input_with_host_trap_plan(
     case_id: CaseId,
     input: &BinaryInput,
     host_trap_plan_from_image: impl FnOnce(
@@ -57,7 +108,7 @@ fn mach_o_entry_function_test_case_with_host_trap_plan(
         TestCaseHostTrapPlan,
         MachOEntryFunctionTestCaseError,
     >,
-) -> Result<TestCase, MachOEntryFunctionTestCaseError> {
+) -> Result<MachOEntryFunctionInput, MachOEntryFunctionTestCaseError> {
     let report =
         probe_public_binary_format(input).map_err(MachOEntryFunctionTestCaseError::Probe)?;
     let conversion = report
@@ -71,13 +122,15 @@ fn mach_o_entry_function_test_case_with_host_trap_plan(
         .map_err(MachOEntryFunctionTestCaseError::Materialization)?;
     let host_trap_plan = host_trap_plan_from_image(&image)?;
 
-    mach_o_executable_image_entry_function_with_host_traps_and_stack_state(
+    let test_case = mach_o_executable_image_entry_function_with_host_traps_and_stack_state(
         case_id,
         &image,
         host_trap_plan,
         stack_state,
     )
-    .map_err(MachOEntryFunctionTestCaseError::EntryFunction)
+    .map_err(MachOEntryFunctionTestCaseError::EntryFunction)?;
+
+    Ok(MachOEntryFunctionInput::new(test_case, image))
 }
 
 const MACH_O_EMBEDDED_STDOUT_TRAP_MAGIC: &[u8] = b"BARA_STDOUT\0";

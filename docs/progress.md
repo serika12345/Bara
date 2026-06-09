@@ -9,13 +9,12 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-09 20:08 JST
+最終更新: 2026-06-09 20:46 JST
 
 状態:
 
-- project_state: completed。B6 の 5 つ目の小ステップとして、malformed /
-  unsupported Mach-O の blocker classification を artifact 生成でも維持する
-  回帰テストを追加した。
+- project_state: completed。B6 の 6 つ目の小ステップとして、Mach-O
+  executable image 全体から entry function 入力を構成する境界を追加した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B6:
   実 Mach-O 入力からの standalone 実行。
 - active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の
@@ -24,8 +23,8 @@
   `btbc-cli` の出力境界へ接続した。
 - active_branch: `task/b6-macho-return42-artifact`。base commit は `31dbc29`。
   latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B6 の malformed / unsupported
-  Mach-O の blocker classification を artifact 生成でも維持する項目。
+- related_todo: [TODO.md](../TODO.md) B6 の raw x86_64 bytes 入力ではなく、
+  Mach-O executable image 全体から entry function / entry image を構成する項目。
 - completed_work: `link-mach-o-arm64-main <binary> <out-exe>` を追加し、
   `tests/binaries/mach_o_return_42.bin` を既存の Mach-O entry function
   pipeline、standalone ARM64 emit、`clang` native artifact packaging へ通した。
@@ -46,17 +45,29 @@
   CLI は native linking に進む前に Mach-O entry function pipeline を通すため、
   malformed input は `MachOEntryFunctionTestCaseError::Probe`、unsupported
   conversion は `MachOEntryFunctionTestCaseError::Plan(NotConvertible { blocker })`
-  として保持される。
-- remaining_work: raw x86_64 bytes 入力ではなく、Mach-O executable image
-  全体から entry function / entry image を構成する。
-- next_action: B6 の次小ステップとして、raw x86_64 bytes 入力ではなく、
-  Mach-O executable image 全体から entry function / entry image を構成する。
-- verification: `nix develop -c cargo test -p btbc-cli
-  preserves_malformed_mach_o_probe_classification`、`nix develop -c cargo test
-  -p btbc-cli preserves_unsupported_mach_o_blocker_classification`、および
-  `nix develop -c ./scripts/verify` が通過した。
+  として保持される。`MachOEntryFunctionInput` は Mach-O から materialize した
+  `ExecutableImage` と entry-derived `TestCase` を同じ domain value として保持し、
+  `btbc-cli` の Mach-O native artifact 入力はこの型を通して compile に進む。
+- remaining_work: relocation、import、symbol、unwind metadata を Normalized
+  Program IR へ渡す最小 model を作る。entry offset、code segment、const data、
+  stdout request を binary metadata 由来で解決する範囲を広げる。
+- next_action: B6 の次小ステップとして、relocation、import、symbol、unwind
+  metadata を Normalized Program IR へ渡す最小 model を設計・実装する。
+- verification: 新規 regression の red/green を確認し、`nix develop -c cargo test
+  -p bara-oracle builds_entry_function_input_from_full_mach_o_executable_image`、
+  `nix develop -c cargo test -p btbc-cli`、`nix develop -c cargo test
+  -p bara-oracle`、および `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
+
+- 2026-06-09 20:46 JST: B6 の 6 つ目の小ステップとして、
+  `MachOEntryFunctionInput` を追加し、Mach-O executable image 全体と
+  entry-derived `TestCase` を同じ pipeline 出力として保持するようにした。
+  既存の `mach_o_entry_function_test_case*` API は互換 wrapper として残し、
+  `btbc-cli` の Mach-O native artifact link 経路は `TestCase` 単体ではなく
+  `MachOEntryFunctionInput` を受ける。回帰テストでは entry bytes だけでなく、
+  selected code segment 全体と entry offset が保持されることを確認した。検証は
+  snapshot の targeted tests と最終 `nix develop -c ./scripts/verify`。
 
 - 2026-06-09 20:08 JST: B6 の 5 つ目の小ステップとして、malformed /
   unsupported Mach-O の artifact 生成時 blocker classification を回帰テストで
