@@ -9,38 +9,44 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-10 22:51 JST
+最終更新: 2026-06-10 23:01 JST
 
 状態:
 
-- project_state: completed。B7 の 7 つ目の小ステップとして、fixture compile
-  artifact report に state layout、cache validation identity、helper
-  requirements を追加した。
+- project_state: completed。B7 の 8 つ目の小ステップとして、generated
+  executable smoke を実プロセス実行の regression gate に昇格した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B7:
   Oracle / Regression 基盤。
-- active_design_focus: B7 artifact report schema。compile artifact の副出力として
-  source testcase 由来の state layout と cache identity、emitter 由来の helper
-  requirements を stable JSON DTO に写す境界に限定した。
+- active_design_focus: B7 generated executable regression gate。既存の
+  `check-blackbox` native executable smoke を `ObservedResult` 比較と
+  `actual/*.json` 保存に接続する境界に限定した。
 - active_branch: `task/b7-x86_64-macho-fixture-generation`。base commit は
   `8d39a4a`。latest commit はこの小ステップの review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B7 の
-  state layout description、cache validation identity、helper requirements を
-  artifact report に含める項目。
-- completed_work: `btbc-cli emit-fixture-artifacts <case.json> <out-dir>` が
-  `artifact.report.json` を追加で保存するようになった。この report は
-  function-level v0 state layout、fixture function v0 cache validation identity、
-  `write_stdout(ptr_len_to_unit)` などの helper requirements を記録する。
-- remaining_work: B7 は継続中。generated executable を実プロセスとして走らせる
-  regression gate、expected / actual artifact metadata の統合、Rosetta
-  black-box oracle 経路の clean-room 再検討は未実装。
-- next_action: generated executable を実プロセスとして走らせる regression gate を
-  追加する。
-- verification: `nix develop -c cargo test -p btbc-cli emit_fixture_artifacts` が
-  通過した。`nix develop -c cargo test -p btbc-cli usage_includes_probe_binary_command`、
-  `nix develop -c ./scripts/check-domain-types`、`nix develop -c ./scripts/verify` も
-  通過した。
+  generated executable を実プロセスとして走らせる regression gate を追加する項目。
+- completed_work: `check-blackbox --out` の generated executable smoke が、linked
+  native executable を実プロセスとして実行し、process exit status、stdout、stderr
+  を `ObservedResult` として比較・保存するようになった。
+- remaining_work: B7 は継続中。expected / actual artifact metadata の統合、
+  Rosetta black-box oracle 経路の clean-room 再検討、fixture shrink / failure
+  classification / corpus update の運用は未実装。
+- next_action: expected / actual に stdout、stderr、exit status、return value、
+  artifact metadata を含める境界を追加する。
+- verification: targeted blackbox tests として
+  `nix develop -c cargo test -p btbc-cli check_blackbox_writes_report_and_schema_specific_actual_outputs`
+  と
+  `nix develop -c cargo test -p btbc-cli check_blackbox_reports_raw_manifest_mach_o_and_probe_fixtures`
+  が通過した。`nix develop -c ./scripts/check-domain-types` と
+  `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
+
+- 2026-06-10 23:01 JST: B7 の 8 つ目の小ステップとして、
+  generated executable smoke を `ObservedResult` regression gate に昇格した。
+  `check-blackbox --out` は `return_42_native_executable_smoke` と
+  `mach_o_return_42_native_executable_smoke` の process execution result を
+  `actual/*.json` に保存する。検証は snapshot の targeted tests と最終
+  `nix develop -c ./scripts/verify`。
 
 - 2026-06-10 22:51 JST: B7 の 7 つ目の小ステップとして、
   `emit-fixture-artifacts` が `artifact.report.json` を保存するようにした。

@@ -736,13 +736,6 @@ enum FixtureOutput {
 }
 
 impl FixtureRun {
-    fn passed(case_id: CaseId) -> Self {
-        Self {
-            report: FixtureReport::new(case_id, FixtureOutcome::Passed),
-            output: None,
-        }
-    }
-
     fn passed_observed(case_id: CaseId, actual: ObservedResult) -> Self {
         Self {
             report: FixtureReport::new(case_id, FixtureOutcome::Passed),
@@ -1917,6 +1910,22 @@ mod tests {
                     .join("mach_o_hello_world_stdout_native_executable.json")
             ),
             "{\"case_id\":\"mach_o_hello_world_stdout_native_executable\",\"exit_status\":0,\"return_value\":0,\"stdout\":\"hello world\\n\",\"stderr\":\"\"}"
+        );
+        assert_eq!(
+            read_file(
+                &output_dir
+                    .join("actual")
+                    .join("return_42_native_executable_smoke.json")
+            ),
+            "{\"case_id\":\"return_42_native_executable_smoke\",\"exit_status\":42,\"return_value\":42,\"stdout\":\"\",\"stderr\":\"\"}"
+        );
+        assert_eq!(
+            read_file(
+                &output_dir
+                    .join("actual")
+                    .join("mach_o_return_42_native_executable_smoke.json")
+            ),
+            "{\"case_id\":\"mach_o_return_42_native_executable_smoke\",\"exit_status\":42,\"return_value\":42,\"stdout\":\"\",\"stderr\":\"\"}"
         );
         assert!(output_dir
             .join("native-artifacts")

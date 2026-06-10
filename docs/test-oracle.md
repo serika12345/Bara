@@ -168,11 +168,15 @@ cache validation identity、helper requirements をまとめる。
 する。
 
 `--out` を指定すると、エージェントが後続ターンで読める成果物を保存する。
+`check-blackbox --out` は generated executable smoke も実プロセスとして実行し、
+その process exit status、stdout、stderr を `ObservedResult` として
+`actual/<case_id>.json` に保存する。
 
 ```text
 target/bara-blackbox/
   report.json
   actual/<case_id>.json
+  native-artifacts/<case_id>
   compiled/<case_id>/compiled.ir.json
   compiled/<case_id>/pcmap.json
   compiled/<case_id>/fixups.json

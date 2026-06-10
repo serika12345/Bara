@@ -225,23 +225,63 @@ fn run_native_executable_smoke(
         }
     };
 
-    if output.status.code() != Some(expected_exit_status)
-        || !output.stdout.is_empty()
-        || !output.stderr.is_empty()
-    {
+    let Some(actual) = native_executable_smoke_observed_result(case_id.clone(), &output) else {
         return FixtureRun::failed(
             case_id,
+            FailureKind::RunError,
+            String::from("native executable smoke artifact terminated without exit status"),
+        );
+    };
+    let Some(expected) =
+        native_executable_smoke_expected_result(case_id.clone(), expected_exit_status)
+    else {
+        return FixtureRun::failed(
+            case_id,
+            FailureKind::InvalidExpected,
+            format!("native executable smoke expected negative exit status {expected_exit_status}"),
+        );
+    };
+    let comparison = compare_observed_results(&expected, &actual);
+    let actual_case_id = actual.case_id().clone();
+    if !comparison.is_match() {
+        return FixtureRun::failed_with_actual(
+            actual_case_id,
             FailureKind::ComparisonMismatch,
-            format!(
-                "native executable smoke mismatch: expected exit status {expected_exit_status}, empty stdout, empty stderr; actual exit status {:?}, stdout {:?}, stderr {:?}",
-                output.status.code(),
-                String::from_utf8_lossy(&output.stdout),
-                String::from_utf8_lossy(&output.stderr)
-            ),
+            format!("native executable smoke comparison failed: {comparison:?}"),
+            actual,
         );
     }
 
-    FixtureRun::passed(case_id)
+    FixtureRun::passed_observed(actual_case_id, actual)
+}
+
+fn native_executable_smoke_expected_result(
+    case_id: CaseId,
+    expected_exit_status: i32,
+) -> Option<ObservedResult> {
+    let return_value = u64::try_from(expected_exit_status).ok()?;
+    Some(ObservedResult::new(
+        case_id,
+        expected_exit_status,
+        return_value,
+        String::new(),
+        String::new(),
+    ))
+}
+
+fn native_executable_smoke_observed_result(
+    case_id: CaseId,
+    output: &std::process::Output,
+) -> Option<ObservedResult> {
+    let exit_status = output.status.code()?;
+    let return_value = u64::try_from(exit_status).ok()?;
+    Some(ObservedResult::new(
+        case_id,
+        exit_status,
+        return_value,
+        String::from_utf8_lossy(&output.stdout).into_owned(),
+        String::from_utf8_lossy(&output.stderr).into_owned(),
+    ))
 }
 
 struct NativeSmokeArtifact {
