@@ -9,38 +9,41 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-10 21:00 JST
+最終更新: 2026-06-10 21:19 JST
 
 状態:
 
-- project_state: completed。B7 の 3 つ目の小ステップとして、Rosetta 実行で
-  `expected.json` を生成する CLI 境界を追加した。
+- project_state: completed。B7 の 4 つ目の小ステップとして、Bara 変換結果を
+  ARM64 native runner で実行し、`actual.json` を生成する CLI 境界を追加した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B7:
   Oracle / Regression 基盤。
-- active_design_focus: none。今回の変更は B7 の Rosetta black-box oracle
-  実行境界に限定し、clean-room ルール上は自前 testcase、public OS API、public
-  Mach-O / clang command、runner stdout の externally observable JSON の範囲に
-  留めた。
+- active_design_focus: none。今回の変更は B7 の actual observation 生成境界に
+  限定し、既存の decode / lift / ARM64 emit / native runner pipeline を CLI から
+  呼び出して `ObservedResult` JSON として保存するだけに留めた。
 - active_branch: `task/b7-x86_64-macho-fixture-generation`。base commit は
   `8d39a4a`。latest commit はこの小ステップの review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B7 の
-  Rosetta 実行で `expected.json` を生成する項目。
-- completed_work: `btbc-cli generate-x86_64-expected <case.json> <expected.json>` を
-  追加した。この command は一時 x86_64 oracle runner を生成し、arm64 macOS 上で
-  Rosetta 経由の x86_64 プロセスとして実行し、runner stdout の
-  `ObservedResult` JSON を parse / 正規化して指定 path に保存する。Rosetta 実行
-  不能 host は `RunError` の classified unsupported とした。
-- remaining_work: B7 は継続中。Bara 変換結果の `actual.json` 生成、expected /
-  actual 比較、compiled IR / PC map / fixup / helper metadata artifact 出力は
-  未実装。
-- next_action: Bara 変換結果を ARM64 native runner で実行し、同じ schema の
-  `actual.json` として保存する境界を追加する。
-- verification: `nix develop -c cargo test -p btbc-cli x86_64_mach_o_fixture` と
-  `nix develop -c cargo test -p btbc-cli generate_x86_64_expected` が通過した。
-  `nix develop -c ./scripts/check-domain-types` と
+  Bara 変換結果を ARM64 native runner で実行し、`actual.json` を生成する項目。
+- completed_work: `btbc-cli generate-arm64-actual <case.json> <actual.json>` を
+  追加した。この command は testcase を Bara の既存 pipeline に通し、対応 host
+  では ARM64 native runner で実行し、`ObservedResult` JSON を parse ではなく
+  直接正規化して指定 path に保存する。比較はまだ行わず、actual artifact 生成に
+  責務を限定している。
+- remaining_work: B7 は継続中。expected / actual 比較、compiled IR / PC map /
+  fixup / helper metadata artifact 出力は未実装。
+- next_action: `generate-x86_64-expected` と `generate-arm64-actual` が作る
+  `expected.json` / `actual.json` を比較する CLI 境界を追加する。
+- verification: `nix develop -c cargo test -p btbc-cli generate_arm64_actual` が
+  通過した。`nix develop -c ./scripts/check-domain-types` と
   `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
+
+- 2026-06-10 21:19 JST: B7 の 4 つ目の小ステップとして、
+  `generate-arm64-actual` CLI を追加した。testcase を Bara の decode / lift /
+  ARM64 emit / native runner pipeline に通し、`ObservedResult` JSON を
+  `actual.json` として保存する。比較は次ステップに残した。検証は snapshot の
+  targeted test と最終 `nix develop -c ./scripts/verify`。
 
 - 2026-06-10 21:00 JST: B7 の 3 つ目の小ステップとして、
   `generate-x86_64-expected` CLI を追加した。一時 x86_64 oracle runner を

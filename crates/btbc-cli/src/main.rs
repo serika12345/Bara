@@ -102,6 +102,9 @@ fn run_cli(args: Vec<String>) -> Result<String, CliError> {
         [command, case_path, expected_path] if command == "generate-x86_64-expected" => {
             run_generate_x86_64_expected(Path::new(case_path), Path::new(expected_path))
         }
+        [command, case_path, actual_path] if command == "generate-arm64-actual" => {
+            run_generate_arm64_actual(Path::new(case_path), Path::new(actual_path))
+        }
         [command, binary_path, output_path] if command == "link-mach-o-arm64-main" => {
             run_link_mach_o_arm64_main(Path::new(binary_path), Path::new(output_path))
         }
@@ -224,9 +227,21 @@ fn run_generate_x86_64_expected(
     let expected =
         observe_x86_64_oracle_expected(&test_case).map_err(CliError::X8664MachOFixture)?;
     let expected_json = observed_result_to_json(&expected).map_err(CliError::Json)?;
+    create_output_parent_dir(expected_path)?;
     write_text_file(expected_path, &expected_json)?;
 
     Ok(expected_json)
+}
+
+fn run_generate_arm64_actual(case_path: &Path, actual_path: &Path) -> Result<String, CliError> {
+    let case_json = read_text_file(case_path)?;
+    let test_case = test_case_from_json(&case_json).map_err(CliError::TestCase)?;
+    let actual = observe_test_case(&test_case)?;
+    let actual_json = observed_result_to_json(&actual).map_err(CliError::Json)?;
+    create_output_parent_dir(actual_path)?;
+    write_text_file(actual_path, &actual_json)?;
+
+    Ok(actual_json)
 }
 
 fn run_link_mach_o_arm64_main(binary_path: &Path, output_path: &Path) -> Result<String, CliError> {
@@ -699,6 +714,17 @@ fn create_dir(path: &Path) -> Result<(), CliError> {
     })
 }
 
+fn create_output_parent_dir(path: &Path) -> Result<(), CliError> {
+    if let Some(parent) = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        create_dir(parent)?;
+    }
+
+    Ok(())
+}
+
 fn read_text_file(path: &Path) -> Result<String, CliError> {
     fs::read_to_string(path).map_err(|source| CliError::ReadFile {
         path: path.to_path_buf(),
@@ -841,7 +867,7 @@ impl std::fmt::Display for CliError {
         match self {
             Self::Usage => write!(
                 formatter,
-                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | link-fixture-arm64-main <case.json> <out-exe> | build-x86_64-macho-fixture <case.json> <out-exe> | build-x86_64-oracle-runner <case.json> <out-exe> | generate-x86_64-expected <case.json> <expected.json> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
+                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | link-fixture-arm64-main <case.json> <out-exe> | build-x86_64-macho-fixture <case.json> <out-exe> | build-x86_64-oracle-runner <case.json> <out-exe> | generate-x86_64-expected <case.json> <expected.json> | generate-arm64-actual <case.json> <actual.json> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
             ),
             Self::ReadFile { path, source } => {
                 write!(formatter, "failed to read file {}: {source}", path.display())
@@ -1276,7 +1302,7 @@ mod tests {
             "return_42.json",
             include_str!("../../../tests/cases/return_42.json"),
         );
-        let expected_path = temp_dir.path.join("return_42_expected.json");
+        let expected_path = temp_dir.path.join("expected").join("return_42.json");
 
         let output = run_cli(vec![
             String::from("generate-x86_64-expected"),
@@ -1291,6 +1317,31 @@ mod tests {
 
         assert_eq!(output, expected);
         assert_eq!(read_file(&expected_path), expected);
+    }
+
+    #[cfg(all(unix, target_arch = "aarch64"))]
+    #[test]
+    fn generate_arm64_actual_writes_return_42_actual_json() {
+        let temp_dir = TestTempDir::new("generate_arm64_actual_writes_return_42_actual_json");
+        let case_path = temp_dir.write_file(
+            "return_42.json",
+            include_str!("../../../tests/cases/return_42.json"),
+        );
+        let actual_path = temp_dir.path.join("actual").join("return_42.json");
+
+        let output = run_cli(vec![
+            String::from("generate-arm64-actual"),
+            case_path.to_string_lossy().into_owned(),
+            actual_path.to_string_lossy().into_owned(),
+        ])
+        .expect("return_42 actual JSON is generated by the ARM64 native runner");
+        let expected =
+            observed_result_from_json(include_str!("../../../tests/expected/return_42.json"))
+                .and_then(|result| observed_result_to_json(&result))
+                .expect("return_42 expected fixture normalizes to output json");
+
+        assert_eq!(output, expected);
+        assert_eq!(read_file(&actual_path), expected);
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -1375,6 +1426,34 @@ mod tests {
         assert!(!expected_path.exists());
     }
 
+    #[cfg(not(all(unix, target_arch = "aarch64")))]
+    #[test]
+    fn generate_arm64_actual_reports_unsupported_native_runner_host() {
+        let temp_dir =
+            TestTempDir::new("generate_arm64_actual_reports_unsupported_native_runner_host");
+        let case_path = temp_dir.write_file(
+            "return_42.json",
+            include_str!("../../../tests/cases/return_42.json"),
+        );
+        let actual_path = temp_dir.path.join("return_42_actual.json");
+
+        let error = run_cli(vec![
+            String::from("generate-arm64-actual"),
+            case_path.to_string_lossy().into_owned(),
+            actual_path.to_string_lossy().into_owned(),
+        ])
+        .expect_err("ARM64 actual generation requires an aarch64 Unix runner host");
+
+        assert!(matches!(
+            error,
+            CliError::FunctionRun(super::function_run::FunctionRunError::Run(
+                bara_runtime::RunError::UnsupportedHost
+            ))
+        ));
+        assert_eq!(error.failure_kind(), FailureKind::RunError);
+        assert!(!actual_path.exists());
+    }
+
     #[test]
     fn probe_binary_reports_short_input_as_classified_error() {
         let temp_dir = TestTempDir::new("probe_binary_reports_short_input_as_classified_error");
@@ -1446,6 +1525,9 @@ mod tests {
         assert!(error
             .to_string()
             .contains("generate-x86_64-expected <case.json> <expected.json>"));
+        assert!(error
+            .to_string()
+            .contains("generate-arm64-actual <case.json> <actual.json>"));
         assert!(error
             .to_string()
             .contains("link-fixture-arm64-stdout-main <case.json> <out-exe>"));

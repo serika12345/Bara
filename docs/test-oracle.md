@@ -122,6 +122,7 @@ M1 では以下だけを比較する。
 btbc-cli build-x86_64-macho-fixture tests/cases/return_42.json target/bara-oracle/x86_64/return_42
 btbc-cli build-x86_64-oracle-runner tests/cases/return_42.json target/bara-oracle/x86_64/return_42-oracle
 btbc-cli generate-x86_64-expected tests/cases/return_42.json tests/expected/return_42.json
+btbc-cli generate-arm64-actual tests/cases/return_42.json target/bara-oracle/actual/return_42.json
 btbc-cli check-fixture tests/cases/return_42.json tests/expected/return_42.json
 btbc-cli check-corpus tests/cases tests/expected --out target/bara-blackbox
 ./scripts/verify-blackbox
@@ -142,6 +143,11 @@ arm64 macOS 上で Rosetta 経由の x86_64 プロセスとして実行する。
 だけを `ObservedResult` として parse し、正規化した JSON を指定された
 `expected.json` path に保存する。Rosetta は testcase の外部観測結果を得る
 black-box oracle としてだけ使い、runner の構造や内部情報は実装根拠にしない。
+
+`generate-arm64-actual` は、同じ testcase を Bara の decode / lift / ARM64 emit
+経路に通し、対応 host では ARM64 native runner で実行する。実行結果は
+`ObservedResult` として正規化し、指定された `actual.json` path に保存する。
+この command は expected との比較は行わず、actual artifact の生成だけを担当する。
 
 `check-corpus` は全 testcase を走査し、成功時は case 単位の JSON report
 を出す。失敗がある場合も最後まで走査し、同じ JSON report を出して非ゼロ終了
