@@ -9,40 +9,47 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-09 22:22 JST
+最終更新: 2026-06-10 20:40 JST
 
 状態:
 
-- project_state: completed。B7 の先頭小ステップとして、`clang -target
-  x86_64-apple-macos13` で x86_64 Mach-O testcase executable を生成する
-  CLI 境界を追加した。
+- project_state: completed。B7 の 2 つ目の小ステップとして、x86_64 oracle
+  runner executable を生成する CLI 境界を追加した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B7:
   Oracle / Regression 基盤。
-- active_design_focus: none。今回の変更は B7 の入力 fixture 生成境界に限定し、
-  clean-room ルール上は自前 testcase と public Mach-O / clang command の範囲に
-  留めた。
+- active_design_focus: none。今回の変更は B7 の oracle runner 生成境界に限定し、
+  clean-room ルール上は自前 testcase、public OS API、public Mach-O / clang
+  command の範囲に留めた。
 - active_branch: `task/b7-x86_64-macho-fixture-generation`。base commit は
   `8d39a4a`。latest commit はこの小ステップの review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B7 の
-  `clang -target x86_64-apple-macos...` で x86_64 テスト Mach-O を生成する項目。
-- completed_work: `btbc-cli build-x86_64-macho-fixture <case.json> <out-exe>` を
-  追加した。初期 generator は no-args / `u64` return かつ host trap なしの
-  testcase bytes を x86_64 Mach-O `_main` として assembly source にし、
-  `clang -target x86_64-apple-macos13 -x assembler` で link する。出力は
-  `mach_o_executable`、`case_id`、`target_triple`、`toolchain`、`output_path` を
-  含む stable metadata JSON とした。引数 ABI と stdout host trap は、後続の
-  x86_64 oracle runner harness の責務として classified unsupported にしている。
-- remaining_work: B7 は継続中。x86_64 oracle runner、Rosetta 実行による
-  `expected.json` 生成、Bara 変換結果の `actual.json` 生成、比較と metadata
-  artifact 出力は未実装。
-- next_action: x86_64 oracle runner を作り、生成した Mach-O を Rosetta 上で
-  実行して stable JSON を得る境界を追加する。
+  x86_64 oracle runner を作る項目。
+- completed_work: `btbc-cli build-x86_64-oracle-runner <case.json> <out-exe>` を
+  追加した。初期 runner は no-args / `u64` return かつ host trap なしの
+  testcase bytes を C harness に埋め込み、x86_64 プロセス内で `mmap` /
+  `mprotect` した executable memory から function pointer として呼び出す。
+  runner stdout は `case_id`、`exit_status`、`return_value`、`stdout`、
+  `stderr` を持つ `ObservedResult` 互換 JSON とした。出力 metadata は
+  `oracle_runner_executable`、`case_id`、`target_triple`、`toolchain`、
+  `output_path` を含む stable JSON とした。Rosetta 実行と `expected.json`
+  保存は次ステップに分離している。
+- remaining_work: B7 は継続中。Rosetta 実行による `expected.json` 生成、
+  Bara 変換結果の `actual.json` 生成、比較と metadata artifact 出力は未実装。
+- next_action: 生成した x86_64 oracle runner を Rosetta 上で実行し、
+  stdout の stable JSON を `expected.json` として保存する境界を追加する。
 - verification: `nix develop -c cargo test -p btbc-cli x86_64_mach_o_fixture` と
-  `nix develop -c cargo test -p btbc-cli build_x86_64_macho_fixture` が通過した。
+  `nix develop -c cargo test -p btbc-cli build_x86_64_oracle_runner` が通過した。
   `nix develop -c ./scripts/check-domain-types` と
   `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
+
+- 2026-06-10 20:40 JST: B7 の 2 つ目の小ステップとして、
+  `build-x86_64-oracle-runner` CLI を追加した。runner は testcase bytes を
+  executable memory に配置して no-args / `u64` function として呼び出し、
+  `ObservedResult` 互換 JSON を stdout に出す x86_64 Mach-O executable として
+  build される。Rosetta 実行と `expected.json` 保存は次ステップに残した。検証は
+  snapshot の targeted tests と最終 `nix develop -c ./scripts/verify`。
 
 - 2026-06-09 22:22 JST: B7 の先頭小ステップとして、
   `build-x86_64-macho-fixture` CLI を追加した。`return_42` testcase は

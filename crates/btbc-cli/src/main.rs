@@ -39,7 +39,9 @@ use native_artifact::{
     native_artifact_metadata_to_json, observe_native_executable_artifact, NativeArtifactError,
     NativeSourceImageMetadata, NativeSourceImageMetadataError,
 };
-use x86_64_mach_o_fixture::{build_x86_64_mach_o_fixture, X8664MachOFixtureError};
+use x86_64_mach_o_fixture::{
+    build_x86_64_mach_o_fixture, build_x86_64_oracle_runner, X8664MachOFixtureError,
+};
 
 fn main() -> ExitCode {
     match run_cli(env::args().skip(1).collect()) {
@@ -92,6 +94,9 @@ fn run_cli(args: Vec<String>) -> Result<String, CliError> {
         }
         [command, case_path, output_path] if command == "build-x86_64-macho-fixture" => {
             run_build_x86_64_mach_o_fixture(Path::new(case_path), Path::new(output_path))
+        }
+        [command, case_path, output_path] if command == "build-x86_64-oracle-runner" => {
+            run_build_x86_64_oracle_runner(Path::new(case_path), Path::new(output_path))
         }
         [command, binary_path, output_path] if command == "link-mach-o-arm64-main" => {
             run_link_mach_o_arm64_main(Path::new(binary_path), Path::new(output_path))
@@ -188,6 +193,20 @@ fn run_build_x86_64_mach_o_fixture(
         .map_err(CliError::X8664MachOFixture)?;
 
     serde_json::to_string(fixture.metadata())
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)
+}
+
+fn run_build_x86_64_oracle_runner(
+    case_path: &Path,
+    output_path: &Path,
+) -> Result<String, CliError> {
+    let case_json = read_text_file(case_path)?;
+    let test_case = test_case_from_json(&case_json).map_err(CliError::TestCase)?;
+    let runner =
+        build_x86_64_oracle_runner(&test_case, output_path).map_err(CliError::X8664MachOFixture)?;
+
+    serde_json::to_string(runner.metadata())
         .map_err(JsonError::new)
         .map_err(CliError::Json)
 }
@@ -804,7 +823,7 @@ impl std::fmt::Display for CliError {
         match self {
             Self::Usage => write!(
                 formatter,
-                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | link-fixture-arm64-main <case.json> <out-exe> | build-x86_64-macho-fixture <case.json> <out-exe> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
+                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | link-fixture-arm64-main <case.json> <out-exe> | build-x86_64-macho-fixture <case.json> <out-exe> | build-x86_64-oracle-runner <case.json> <out-exe> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
             ),
             Self::ReadFile { path, source } => {
                 write!(formatter, "failed to read file {}: {source}", path.display())
@@ -1193,6 +1212,44 @@ mod tests {
         assert!(probe_output.contains("\"format\":\"mach_o_64_little_endian\""));
     }
 
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn build_x86_64_oracle_runner_writes_return_42_runner_executable() {
+        let temp_dir =
+            TestTempDir::new("build_x86_64_oracle_runner_writes_return_42_runner_executable");
+        let case_path = temp_dir.write_file(
+            "return_42.json",
+            include_str!("../../../tests/cases/return_42.json"),
+        );
+        let output_path = temp_dir.path.join("return_42_oracle");
+
+        let output = run_cli(vec![
+            String::from("build-x86_64-oracle-runner"),
+            case_path.to_string_lossy().into_owned(),
+            output_path.to_string_lossy().into_owned(),
+        ])
+        .expect("return_42 builds as an x86_64 oracle runner");
+
+        assert!(output_path.exists());
+        assert_eq!(
+            output,
+            format!(
+                "{{\"artifact_kind\":\"oracle_runner_executable\",\"case_id\":\"return_42\",\"target_triple\":\"x86_64-apple-macos13\",\"toolchain\":\"clang\",\"output_path\":\"{}\"}}",
+                output_path.display()
+            )
+        );
+
+        let binary = fs::read(&output_path).expect("generated x86_64 oracle runner is readable");
+        assert_eq!(&binary[..4], &[0xcf, 0xfa, 0xed, 0xfe]);
+        assert_eq!(&binary[4..8], &[0x07, 0x00, 0x00, 0x01]);
+        let probe_output = run_cli(vec![
+            String::from("probe-binary"),
+            output_path.to_string_lossy().into_owned(),
+        ])
+        .expect("generated x86_64 oracle runner probes as public Mach-O");
+        assert!(probe_output.contains("\"format\":\"mach_o_64_little_endian\""));
+    }
+
     #[cfg(not(target_os = "macos"))]
     #[test]
     fn build_x86_64_macho_fixture_reports_unsupported_host() {
@@ -1209,6 +1266,33 @@ mod tests {
             output_path.to_string_lossy().into_owned(),
         ])
         .expect_err("non-macOS hosts cannot build x86_64 Mach-O fixtures");
+
+        assert!(matches!(
+            error,
+            CliError::X8664MachOFixture(
+                super::x86_64_mach_o_fixture::X8664MachOFixtureError::UnsupportedHost { .. }
+            )
+        ));
+        assert_eq!(error.failure_kind(), FailureKind::EmitError);
+        assert!(!output_path.exists());
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn build_x86_64_oracle_runner_reports_unsupported_host() {
+        let temp_dir = TestTempDir::new("build_x86_64_oracle_runner_reports_unsupported_host");
+        let case_path = temp_dir.write_file(
+            "return_42.json",
+            include_str!("../../../tests/cases/return_42.json"),
+        );
+        let output_path = temp_dir.path.join("return_42_oracle");
+
+        let error = run_cli(vec![
+            String::from("build-x86_64-oracle-runner"),
+            case_path.to_string_lossy().into_owned(),
+            output_path.to_string_lossy().into_owned(),
+        ])
+        .expect_err("non-macOS hosts cannot build x86_64 oracle runners");
 
         assert!(matches!(
             error,
@@ -1285,6 +1369,9 @@ mod tests {
         assert!(error
             .to_string()
             .contains("build-x86_64-macho-fixture <case.json> <out-exe>"));
+        assert!(error
+            .to_string()
+            .contains("build-x86_64-oracle-runner <case.json> <out-exe>"));
         assert!(error
             .to_string()
             .contains("link-fixture-arm64-stdout-main <case.json> <out-exe>"));

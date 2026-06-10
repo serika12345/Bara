@@ -120,6 +120,7 @@ M1 では以下だけを比較する。
 
 ```text
 btbc-cli build-x86_64-macho-fixture tests/cases/return_42.json target/bara-oracle/x86_64/return_42
+btbc-cli build-x86_64-oracle-runner tests/cases/return_42.json target/bara-oracle/x86_64/return_42-oracle
 btbc-cli check-fixture tests/cases/return_42.json tests/expected/return_42.json
 btbc-cli check-corpus tests/cases tests/expected --out target/bara-blackbox
 ./scripts/verify-blackbox
@@ -129,6 +130,12 @@ btbc-cli check-corpus tests/cases tests/expected --out target/bara-blackbox
 host trap なしの testcase bytes を x86_64 Mach-O `_main` として assemble /
 link する。引数 ABI、stdout host trap、JSON を出す oracle harness は後続の
 x86_64 oracle runner で扱う。
+
+`build-x86_64-oracle-runner` は、同じ初期 scope の testcase bytes を
+x86_64 Mach-O runner に埋め込む。runner は x86_64 プロセス内で executable
+memory を確保して testcase function を呼び出し、`ObservedResult` 互換 JSON を
+stdout に出す。Rosetta 上で runner を実行して `expected.json` として保存する
+経路は次の段階で扱う。
 
 `check-corpus` は全 testcase を走査し、成功時は case 単位の JSON report
 を出す。失敗がある場合も最後まで走査し、同じ JSON report を出して非ゼロ終了

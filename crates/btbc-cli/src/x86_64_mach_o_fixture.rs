@@ -21,10 +21,10 @@ pub(crate) enum X8664MachOFixtureError {
     UnsupportedHostTrapPlan {
         case_id: CaseId,
     },
-    TempAssemblyPath {
+    TempSourcePath {
         source: std::time::SystemTimeError,
     },
-    WriteAssembly {
+    WriteSource {
         path: PathBuf,
         source: io::Error,
     },
@@ -47,8 +47,8 @@ impl X8664MachOFixtureError {
                 FailureKind::InvalidTestCase
             }
             Self::UnsupportedHost { .. }
-            | Self::TempAssemblyPath { .. }
-            | Self::WriteAssembly { .. }
+            | Self::TempSourcePath { .. }
+            | Self::WriteSource { .. }
             | Self::ClangSpawn { .. }
             | Self::ClangFailed { .. }
             | Self::MissingOutput { .. } => FailureKind::EmitError,
@@ -61,28 +61,28 @@ impl fmt::Display for X8664MachOFixtureError {
         match self {
             Self::UnsupportedHost { os, arch } => write!(
                 formatter,
-                "x86_64 Mach-O fixture generation is unsupported on host os={os} arch={arch}"
+                "x86_64 Mach-O artifact generation is unsupported on host os={os} arch={arch}"
             ),
             Self::UnsupportedAbi { case_id } => write!(
                 formatter,
-                "x86_64 Mach-O fixture generation supports only no-args u64 testcases: {}",
+                "x86_64 Mach-O artifact generation supports only no-args u64 testcases: {}",
                 case_id.as_str()
             ),
             Self::UnsupportedHostTrapPlan { case_id } => write!(
                 formatter,
-                "x86_64 Mach-O fixture generation does not support host trap testcases yet: {}",
+                "x86_64 Mach-O artifact generation does not support host trap testcases yet: {}",
                 case_id.as_str()
             ),
-            Self::TempAssemblyPath { source } => {
+            Self::TempSourcePath { source } => {
                 write!(
                     formatter,
-                    "failed to build temporary x86_64 assembly path: {source}"
+                    "failed to build temporary x86_64 source path: {source}"
                 )
             }
-            Self::WriteAssembly { path, source } => {
+            Self::WriteSource { path, source } => {
                 write!(
                     formatter,
-                    "failed to write temporary x86_64 assembly {}: {source}",
+                    "failed to write temporary x86_64 source {}: {source}",
                     path.display()
                 )
             }
@@ -114,7 +114,32 @@ pub(crate) struct GeneratedX8664MachOFixture {
 impl GeneratedX8664MachOFixture {
     fn from_request(request: X8664MachOFixtureBuildRequest) -> Self {
         Self {
-            metadata: X8664MachOFixtureMetadata::new(request.case_id, request.output_path),
+            metadata: X8664MachOFixtureMetadata::new(
+                X8664MachOFixtureArtifactKind::MachOExecutable,
+                request.case_id,
+                request.output_path,
+            ),
+        }
+    }
+
+    pub(crate) const fn metadata(&self) -> &X8664MachOFixtureMetadata {
+        &self.metadata
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct GeneratedX8664OracleRunner {
+    metadata: X8664MachOFixtureMetadata,
+}
+
+impl GeneratedX8664OracleRunner {
+    fn from_request(request: X8664OracleRunnerBuildRequest) -> Self {
+        Self {
+            metadata: X8664MachOFixtureMetadata::new(
+                X8664MachOFixtureArtifactKind::OracleRunnerExecutable,
+                request.case_id,
+                request.output_path,
+            ),
         }
     }
 
@@ -133,9 +158,13 @@ pub(crate) struct X8664MachOFixtureMetadata {
 }
 
 impl X8664MachOFixtureMetadata {
-    fn new(case_id: CaseId, output_path: X8664MachOFixtureOutputPath) -> Self {
+    fn new(
+        artifact_kind: X8664MachOFixtureArtifactKind,
+        case_id: CaseId,
+        output_path: X8664MachOFixtureOutputPath,
+    ) -> Self {
         Self {
-            artifact_kind: X8664MachOFixtureArtifactKind::MachOExecutable,
+            artifact_kind,
             case_id,
             target_triple: X8664MachOFixtureTargetTriple::X8664AppleMacos13,
             toolchain: X8664MachOFixtureToolchain::Clang,
@@ -148,6 +177,7 @@ impl X8664MachOFixtureMetadata {
 #[serde(rename_all = "snake_case")]
 enum X8664MachOFixtureArtifactKind {
     MachOExecutable,
+    OracleRunnerExecutable,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -203,19 +233,65 @@ struct X8664MachOAssemblySource {
 
 impl X8664MachOAssemblySource {
     fn from_test_case(test_case: &TestCase) -> Result<Self, X8664MachOFixtureError> {
-        if !matches!(test_case.abi(), TestCaseAbi::NoArgsU64) {
-            return Err(X8664MachOFixtureError::UnsupportedAbi {
-                case_id: test_case.case_id().clone(),
-            });
-        }
-        if test_case.host_trap_plan().stdout_trap().is_some() {
-            return Err(X8664MachOFixtureError::UnsupportedHostTrapPlan {
-                case_id: test_case.case_id().clone(),
-            });
-        }
+        ensure_initial_no_args_oracle_scope(test_case)?;
 
         let mut source = String::from(".text\n.globl _main\n.p2align 4\n_main:\n");
         push_byte_directives(&mut source, test_case.x86_bytes().bytes());
+        Ok(Self { source })
+    }
+
+    fn as_str(&self) -> &str {
+        &self.source
+    }
+
+    #[cfg(test)]
+    fn into_string(self) -> String {
+        self.source
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct X8664OracleRunnerSource {
+    source: String,
+}
+
+impl X8664OracleRunnerSource {
+    fn from_test_case(test_case: &TestCase) -> Result<Self, X8664MachOFixtureError> {
+        ensure_initial_no_args_oracle_scope(test_case)?;
+
+        let mut source = String::new();
+        source.push_str("#include <stdint.h>\n");
+        source.push_str("#include <stdio.h>\n");
+        source.push_str("#include <string.h>\n");
+        source.push_str("#include <sys/mman.h>\n\n");
+        source.push_str("typedef uint64_t (*bara_no_args_u64_fn)(void);\n\n");
+        source.push_str("static const unsigned char BARA_TESTCASE_BYTES[] = {\n");
+        push_c_byte_initializer(&mut source, test_case.x86_bytes().bytes());
+        source.push_str("};\n");
+        source.push_str("static const char BARA_CASE_ID_JSON[] = ");
+        push_c_string_literal(
+            &mut source,
+            &json_string_literal(test_case.case_id().as_str()),
+        );
+        source.push_str(";\n\n");
+        source.push_str("int main(void) {\n");
+        source.push_str("    void *code = mmap(0, sizeof(BARA_TESTCASE_BYTES), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);\n");
+        source.push_str("    if (code == MAP_FAILED) {\n");
+        source.push_str("        fputs(\"mmap failed\\n\", stderr);\n");
+        source.push_str("        return 1;\n");
+        source.push_str("    }\n");
+        source.push_str("    memcpy(code, BARA_TESTCASE_BYTES, sizeof(BARA_TESTCASE_BYTES));\n");
+        source.push_str(
+            "    if (mprotect(code, sizeof(BARA_TESTCASE_BYTES), PROT_READ | PROT_EXEC) != 0) {\n",
+        );
+        source.push_str("        fputs(\"mprotect failed\\n\", stderr);\n");
+        source.push_str("        return 1;\n");
+        source.push_str("    }\n");
+        source.push_str("    uint64_t return_value = ((bara_no_args_u64_fn)code)();\n");
+        source.push_str("    (void)munmap(code, sizeof(BARA_TESTCASE_BYTES));\n");
+        source.push_str("    printf(\"{\\\"case_id\\\":%s,\\\"exit_status\\\":0,\\\"return_value\\\":%llu,\\\"stdout\\\":\\\"\\\",\\\"stderr\\\":\\\"\\\"}\\n\", BARA_CASE_ID_JSON, (unsigned long long)return_value);\n");
+        source.push_str("    return 0;\n");
+        source.push_str("}\n");
         Ok(Self { source })
     }
 
@@ -257,6 +333,34 @@ impl X8664MachOFixtureBuildRequest {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct X8664OracleRunnerBuildRequest {
+    case_id: CaseId,
+    source: X8664OracleRunnerSource,
+    output_path: X8664MachOFixtureOutputPath,
+}
+
+impl X8664OracleRunnerBuildRequest {
+    fn from_test_case(
+        test_case: &TestCase,
+        output_path: &Path,
+    ) -> Result<Self, X8664MachOFixtureError> {
+        Ok(Self {
+            case_id: test_case.case_id().clone(),
+            source: X8664OracleRunnerSource::from_test_case(test_case)?,
+            output_path: X8664MachOFixtureOutputPath::from_path(output_path),
+        })
+    }
+
+    fn source(&self) -> &X8664OracleRunnerSource {
+        &self.source
+    }
+
+    fn output_path(&self) -> &X8664MachOFixtureOutputPath {
+        &self.output_path
+    }
+}
+
 pub(crate) trait X8664MachOFixturePackager {
     fn package(
         &self,
@@ -271,6 +375,20 @@ pub(crate) fn package_x86_64_mach_o_fixture(
     packager.package(request)
 }
 
+pub(crate) trait X8664OracleRunnerPackager {
+    fn package(
+        &self,
+        request: X8664OracleRunnerBuildRequest,
+    ) -> Result<GeneratedX8664OracleRunner, X8664MachOFixtureError>;
+}
+
+pub(crate) fn package_x86_64_oracle_runner(
+    packager: &impl X8664OracleRunnerPackager,
+    request: X8664OracleRunnerBuildRequest,
+) -> Result<GeneratedX8664OracleRunner, X8664MachOFixtureError> {
+    packager.package(request)
+}
+
 struct ClangX8664MachOFixturePackager;
 
 impl X8664MachOFixturePackager for ClangX8664MachOFixturePackager {
@@ -278,22 +396,25 @@ impl X8664MachOFixturePackager for ClangX8664MachOFixturePackager {
         &self,
         request: X8664MachOFixtureBuildRequest,
     ) -> Result<GeneratedX8664MachOFixture, X8664MachOFixtureError> {
-        let assembly_path = temporary_assembly_path()?;
-        fs::write(&assembly_path, request.source().as_str()).map_err(|source| {
-            X8664MachOFixtureError::WriteAssembly {
-                path: assembly_path.clone(),
+        let source_path = temporary_source_path("bara-x86-64-macho", "s")?;
+        fs::write(&source_path, request.source().as_str()).map_err(|source| {
+            X8664MachOFixtureError::WriteSource {
+                path: source_path.clone(),
                 source,
             }
         })?;
 
-        let toolchain_command =
-            X8664MachOFixtureToolchainCommand::clang_build(&assembly_path, request.output_path());
+        let toolchain_command = X8664MachOFixtureToolchainCommand::clang_build(
+            &source_path,
+            X8664MachOFixtureSourceLanguage::Assembler,
+            request.output_path(),
+        );
         let output = toolchain_command
             .to_command()
             .output()
             .map_err(|source| X8664MachOFixtureError::ClangSpawn { source });
 
-        let _ = fs::remove_file(&assembly_path);
+        let _ = fs::remove_file(&source_path);
 
         let output = output?;
         if !output.status.success() {
@@ -312,6 +433,50 @@ impl X8664MachOFixturePackager for ClangX8664MachOFixturePackager {
     }
 }
 
+struct ClangX8664OracleRunnerPackager;
+
+impl X8664OracleRunnerPackager for ClangX8664OracleRunnerPackager {
+    fn package(
+        &self,
+        request: X8664OracleRunnerBuildRequest,
+    ) -> Result<GeneratedX8664OracleRunner, X8664MachOFixtureError> {
+        let source_path = temporary_source_path("bara-x86-64-oracle-runner", "c")?;
+        fs::write(&source_path, request.source().as_str()).map_err(|source| {
+            X8664MachOFixtureError::WriteSource {
+                path: source_path.clone(),
+                source,
+            }
+        })?;
+
+        let toolchain_command = X8664MachOFixtureToolchainCommand::clang_build(
+            &source_path,
+            X8664MachOFixtureSourceLanguage::C,
+            request.output_path(),
+        );
+        let output = toolchain_command
+            .to_command()
+            .output()
+            .map_err(|source| X8664MachOFixtureError::ClangSpawn { source });
+
+        let _ = fs::remove_file(&source_path);
+
+        let output = output?;
+        if !output.status.success() {
+            return Err(X8664MachOFixtureError::ClangFailed {
+                status: output.status.to_string(),
+                stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+            });
+        }
+        if !request.output_path().as_path().exists() {
+            return Err(X8664MachOFixtureError::MissingOutput {
+                path: request.output_path().to_path_buf(),
+            });
+        }
+
+        Ok(GeneratedX8664OracleRunner::from_request(request))
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct X8664MachOFixtureToolchainCommand {
     program: &'static str,
@@ -319,7 +484,11 @@ struct X8664MachOFixtureToolchainCommand {
 }
 
 impl X8664MachOFixtureToolchainCommand {
-    fn clang_build(assembly_path: &Path, output_path: &X8664MachOFixtureOutputPath) -> Self {
+    fn clang_build(
+        source_path: &Path,
+        source_language: X8664MachOFixtureSourceLanguage,
+        output_path: &X8664MachOFixtureOutputPath,
+    ) -> Self {
         Self {
             program: "clang",
             args: vec![
@@ -328,8 +497,8 @@ impl X8664MachOFixtureToolchainCommand {
                     .as_str()
                     .to_owned(),
                 String::from("-x"),
-                String::from("assembler"),
-                assembly_path.to_string_lossy().into_owned(),
+                source_language.as_clang_arg().to_owned(),
+                source_path.to_string_lossy().into_owned(),
                 String::from("-o"),
                 output_path.as_path().to_string_lossy().into_owned(),
             ],
@@ -353,6 +522,21 @@ impl X8664MachOFixtureToolchainCommand {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum X8664MachOFixtureSourceLanguage {
+    Assembler,
+    C,
+}
+
+impl X8664MachOFixtureSourceLanguage {
+    const fn as_clang_arg(self) -> &'static str {
+        match self {
+            Self::Assembler => "assembler",
+            Self::C => "c",
+        }
+    }
+}
+
 pub(crate) fn build_x86_64_mach_o_fixture(
     test_case: &TestCase,
     output_path: &Path,
@@ -361,6 +545,16 @@ pub(crate) fn build_x86_64_mach_o_fixture(
 
     let request = X8664MachOFixtureBuildRequest::from_test_case(test_case, output_path)?;
     package_x86_64_mach_o_fixture(&ClangX8664MachOFixturePackager, request)
+}
+
+pub(crate) fn build_x86_64_oracle_runner(
+    test_case: &TestCase,
+    output_path: &Path,
+) -> Result<GeneratedX8664OracleRunner, X8664MachOFixtureError> {
+    ensure_supported_host()?;
+
+    let request = X8664OracleRunnerBuildRequest::from_test_case(test_case, output_path)?;
+    package_x86_64_oracle_runner(&ClangX8664OracleRunnerPackager, request)
 }
 
 fn ensure_supported_host() -> Result<(), X8664MachOFixtureError> {
@@ -374,12 +568,27 @@ fn ensure_supported_host() -> Result<(), X8664MachOFixtureError> {
     }
 }
 
-fn temporary_assembly_path() -> Result<PathBuf, X8664MachOFixtureError> {
+fn temporary_source_path(prefix: &str, extension: &str) -> Result<PathBuf, X8664MachOFixtureError> {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_err(|source| X8664MachOFixtureError::TempAssemblyPath { source })?
+        .map_err(|source| X8664MachOFixtureError::TempSourcePath { source })?
         .as_nanos();
-    Ok(std::env::temp_dir().join(format!("bara-x86-64-macho-{nanos}.s")))
+    Ok(std::env::temp_dir().join(format!("{prefix}-{nanos}.{extension}")))
+}
+
+fn ensure_initial_no_args_oracle_scope(test_case: &TestCase) -> Result<(), X8664MachOFixtureError> {
+    if !matches!(test_case.abi(), TestCaseAbi::NoArgsU64) {
+        return Err(X8664MachOFixtureError::UnsupportedAbi {
+            case_id: test_case.case_id().clone(),
+        });
+    }
+    if test_case.host_trap_plan().stdout_trap().is_some() {
+        return Err(X8664MachOFixtureError::UnsupportedHostTrapPlan {
+            case_id: test_case.case_id().clone(),
+        });
+    }
+
+    Ok(())
 }
 
 fn push_byte_directives(source: &mut String, bytes: &[u8]) {
@@ -395,6 +604,53 @@ fn push_byte_directives(source: &mut String, bytes: &[u8]) {
     }
 }
 
+fn push_c_byte_initializer(source: &mut String, bytes: &[u8]) {
+    for chunk in bytes.chunks(12) {
+        source.push_str("    ");
+        for (index, byte) in chunk.iter().enumerate() {
+            if index > 0 {
+                source.push_str(", ");
+            }
+            source.push_str(&format!("0x{byte:02x}"));
+        }
+        source.push_str(",\n");
+    }
+}
+
+fn json_string_literal(value: &str) -> String {
+    let mut escaped = String::from("\"");
+    for character in value.chars() {
+        match character {
+            '"' => escaped.push_str("\\\""),
+            '\\' => escaped.push_str("\\\\"),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            character if character.is_control() => {
+                escaped.push_str(&format!("\\u{:04x}", character as u32));
+            }
+            character => escaped.push(character),
+        }
+    }
+    escaped.push('"');
+    escaped
+}
+
+fn push_c_string_literal(source: &mut String, value: &str) {
+    source.push('"');
+    for character in value.chars() {
+        match character {
+            '"' => source.push_str("\\\""),
+            '\\' => source.push_str("\\\\"),
+            '\n' => source.push_str("\\n"),
+            '\r' => source.push_str("\\r"),
+            '\t' => source.push_str("\\t"),
+            character => source.push(character),
+        }
+    }
+    source.push('"');
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -406,9 +662,12 @@ mod tests {
     use bara_oracle::test_case_from_json;
 
     use super::{
-        package_x86_64_mach_o_fixture, GeneratedX8664MachOFixture, X8664MachOAssemblySource,
+        json_string_literal, package_x86_64_mach_o_fixture, package_x86_64_oracle_runner,
+        GeneratedX8664MachOFixture, GeneratedX8664OracleRunner, X8664MachOAssemblySource,
         X8664MachOFixtureBuildRequest, X8664MachOFixtureError, X8664MachOFixtureOutputPath,
-        X8664MachOFixturePackager, X8664MachOFixtureToolchainCommand,
+        X8664MachOFixturePackager, X8664MachOFixtureSourceLanguage,
+        X8664MachOFixtureToolchainCommand, X8664OracleRunnerBuildRequest,
+        X8664OracleRunnerPackager, X8664OracleRunnerSource,
     };
 
     #[test]
@@ -465,10 +724,34 @@ mod tests {
     }
 
     #[test]
-    fn clang_command_targets_x86_64_apple_macos() {
+    fn oracle_runner_source_embeds_testcase_bytes_and_json_output() {
+        let test_case = test_case_from_json(include_str!("../../../tests/cases/return_42.json"))
+            .expect("return_42 testcase parses");
+
+        let source = X8664OracleRunnerSource::from_test_case(&test_case)
+            .expect("return_42 can be used as x86_64 oracle runner")
+            .into_string();
+
+        assert!(source.contains("typedef uint64_t (*bara_no_args_u64_fn)(void);"));
+        assert!(source.contains("static const unsigned char BARA_TESTCASE_BYTES[] = {\n    0xb8, 0x2a, 0x00, 0x00, 0x00, 0xc3,\n};"));
+        assert!(source.contains("static const char BARA_CASE_ID_JSON[] = \"\\\"return_42\\\"\";"));
+        assert!(source.contains("printf(\"{\\\"case_id\\\":%s,\\\"exit_status\\\":0,\\\"return_value\\\":%llu,\\\"stdout\\\":\\\"\\\",\\\"stderr\\\":\\\"\\\"}\\n\""));
+    }
+
+    #[test]
+    fn json_string_literal_escapes_case_id_for_runner_json() {
+        assert_eq!(
+            json_string_literal("quote\"slash\\newline\n"),
+            "\"quote\\\"slash\\\\newline\\n\""
+        );
+    }
+
+    #[test]
+    fn clang_assembler_command_targets_x86_64_apple_macos() {
         let output_path = X8664MachOFixtureOutputPath::from_path(Path::new("/tmp/return_42"));
         let command = X8664MachOFixtureToolchainCommand::clang_build(
             Path::new("/tmp/return_42.s"),
+            X8664MachOFixtureSourceLanguage::Assembler,
             &output_path,
         );
 
@@ -483,6 +766,31 @@ mod tests {
                 String::from("/tmp/return_42.s"),
                 String::from("-o"),
                 String::from("/tmp/return_42"),
+            ]
+        );
+    }
+
+    #[test]
+    fn clang_c_command_targets_x86_64_apple_macos() {
+        let output_path =
+            X8664MachOFixtureOutputPath::from_path(Path::new("/tmp/return_42_oracle"));
+        let command = X8664MachOFixtureToolchainCommand::clang_build(
+            Path::new("/tmp/return_42_oracle.c"),
+            X8664MachOFixtureSourceLanguage::C,
+            &output_path,
+        );
+
+        assert_eq!(command.program(), "clang");
+        assert_eq!(
+            command.args(),
+            &[
+                String::from("-target"),
+                String::from("x86_64-apple-macos13"),
+                String::from("-x"),
+                String::from("c"),
+                String::from("/tmp/return_42_oracle.c"),
+                String::from("-o"),
+                String::from("/tmp/return_42_oracle"),
             ]
         );
     }
@@ -508,6 +816,28 @@ mod tests {
         );
     }
 
+    #[test]
+    fn oracle_runner_packaging_boundary_accepts_non_clang_packager() {
+        let temp_dir =
+            TestTempDir::new("oracle_runner_packaging_boundary_accepts_non_clang_packager");
+        let output_path = temp_dir.path.join("return_42_oracle");
+        let test_case = test_case_from_json(include_str!("../../../tests/cases/return_42.json"))
+            .expect("return_42 testcase parses");
+        let request = X8664OracleRunnerBuildRequest::from_test_case(&test_case, &output_path)
+            .expect("request builds from return_42");
+
+        let runner = package_x86_64_oracle_runner(&FakeOracleRunnerPackager, request)
+            .expect("fake packager can produce an oracle runner artifact");
+
+        assert_eq!(
+            serde_json::to_string(runner.metadata()).expect("metadata serializes"),
+            format!(
+                "{{\"artifact_kind\":\"oracle_runner_executable\",\"case_id\":\"return_42\",\"target_triple\":\"x86_64-apple-macos13\",\"toolchain\":\"clang\",\"output_path\":\"{}\"}}",
+                output_path.display()
+            )
+        );
+    }
+
     struct FakePackager;
 
     impl X8664MachOFixturePackager for FakePackager {
@@ -516,12 +846,29 @@ mod tests {
             request: X8664MachOFixtureBuildRequest,
         ) -> Result<GeneratedX8664MachOFixture, X8664MachOFixtureError> {
             fs::write(request.output_path().as_path(), b"fake mach-o").map_err(|source| {
-                X8664MachOFixtureError::WriteAssembly {
+                X8664MachOFixtureError::WriteSource {
                     path: request.output_path().to_path_buf(),
                     source,
                 }
             })?;
             Ok(GeneratedX8664MachOFixture::from_request(request))
+        }
+    }
+
+    struct FakeOracleRunnerPackager;
+
+    impl X8664OracleRunnerPackager for FakeOracleRunnerPackager {
+        fn package(
+            &self,
+            request: X8664OracleRunnerBuildRequest,
+        ) -> Result<GeneratedX8664OracleRunner, X8664MachOFixtureError> {
+            fs::write(request.output_path().as_path(), b"fake oracle runner").map_err(
+                |source| X8664MachOFixtureError::WriteSource {
+                    path: request.output_path().to_path_buf(),
+                    source,
+                },
+            )?;
+            Ok(GeneratedX8664OracleRunner::from_request(request))
         }
     }
 
