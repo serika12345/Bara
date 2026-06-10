@@ -9,40 +9,45 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-10 20:40 JST
+最終更新: 2026-06-10 21:00 JST
 
 状態:
 
-- project_state: completed。B7 の 2 つ目の小ステップとして、x86_64 oracle
-  runner executable を生成する CLI 境界を追加した。
+- project_state: completed。B7 の 3 つ目の小ステップとして、Rosetta 実行で
+  `expected.json` を生成する CLI 境界を追加した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B7:
   Oracle / Regression 基盤。
-- active_design_focus: none。今回の変更は B7 の oracle runner 生成境界に限定し、
-  clean-room ルール上は自前 testcase、public OS API、public Mach-O / clang
-  command の範囲に留めた。
+- active_design_focus: none。今回の変更は B7 の Rosetta black-box oracle
+  実行境界に限定し、clean-room ルール上は自前 testcase、public OS API、public
+  Mach-O / clang command、runner stdout の externally observable JSON の範囲に
+  留めた。
 - active_branch: `task/b7-x86_64-macho-fixture-generation`。base commit は
   `8d39a4a`。latest commit はこの小ステップの review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B7 の
-  x86_64 oracle runner を作る項目。
-- completed_work: `btbc-cli build-x86_64-oracle-runner <case.json> <out-exe>` を
-  追加した。初期 runner は no-args / `u64` return かつ host trap なしの
-  testcase bytes を C harness に埋め込み、x86_64 プロセス内で `mmap` /
-  `mprotect` した executable memory から function pointer として呼び出す。
-  runner stdout は `case_id`、`exit_status`、`return_value`、`stdout`、
-  `stderr` を持つ `ObservedResult` 互換 JSON とした。出力 metadata は
-  `oracle_runner_executable`、`case_id`、`target_triple`、`toolchain`、
-  `output_path` を含む stable JSON とした。Rosetta 実行と `expected.json`
-  保存は次ステップに分離している。
-- remaining_work: B7 は継続中。Rosetta 実行による `expected.json` 生成、
-  Bara 変換結果の `actual.json` 生成、比較と metadata artifact 出力は未実装。
-- next_action: 生成した x86_64 oracle runner を Rosetta 上で実行し、
-  stdout の stable JSON を `expected.json` として保存する境界を追加する。
+  Rosetta 実行で `expected.json` を生成する項目。
+- completed_work: `btbc-cli generate-x86_64-expected <case.json> <expected.json>` を
+  追加した。この command は一時 x86_64 oracle runner を生成し、arm64 macOS 上で
+  Rosetta 経由の x86_64 プロセスとして実行し、runner stdout の
+  `ObservedResult` JSON を parse / 正規化して指定 path に保存する。Rosetta 実行
+  不能 host は `RunError` の classified unsupported とした。
+- remaining_work: B7 は継続中。Bara 変換結果の `actual.json` 生成、expected /
+  actual 比較、compiled IR / PC map / fixup / helper metadata artifact 出力は
+  未実装。
+- next_action: Bara 変換結果を ARM64 native runner で実行し、同じ schema の
+  `actual.json` として保存する境界を追加する。
 - verification: `nix develop -c cargo test -p btbc-cli x86_64_mach_o_fixture` と
-  `nix develop -c cargo test -p btbc-cli build_x86_64_oracle_runner` が通過した。
+  `nix develop -c cargo test -p btbc-cli generate_x86_64_expected` が通過した。
   `nix develop -c ./scripts/check-domain-types` と
   `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
+
+- 2026-06-10 21:00 JST: B7 の 3 つ目の小ステップとして、
+  `generate-x86_64-expected` CLI を追加した。一時 x86_64 oracle runner を
+  build して Rosetta 上で実行し、stdout の `ObservedResult` JSON を
+  `expected.json` として保存する。Rosetta host 非対応時は `RunError` として
+  分類する。検証は snapshot の targeted tests と最終
+  `nix develop -c ./scripts/verify`。
 
 - 2026-06-10 20:40 JST: B7 の 2 つ目の小ステップとして、
   `build-x86_64-oracle-runner` CLI を追加した。runner は testcase bytes を

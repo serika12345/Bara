@@ -40,7 +40,8 @@ use native_artifact::{
     NativeSourceImageMetadata, NativeSourceImageMetadataError,
 };
 use x86_64_mach_o_fixture::{
-    build_x86_64_mach_o_fixture, build_x86_64_oracle_runner, X8664MachOFixtureError,
+    build_x86_64_mach_o_fixture, build_x86_64_oracle_runner, observe_x86_64_oracle_expected,
+    X8664MachOFixtureError,
 };
 
 fn main() -> ExitCode {
@@ -97,6 +98,9 @@ fn run_cli(args: Vec<String>) -> Result<String, CliError> {
         }
         [command, case_path, output_path] if command == "build-x86_64-oracle-runner" => {
             run_build_x86_64_oracle_runner(Path::new(case_path), Path::new(output_path))
+        }
+        [command, case_path, expected_path] if command == "generate-x86_64-expected" => {
+            run_generate_x86_64_expected(Path::new(case_path), Path::new(expected_path))
         }
         [command, binary_path, output_path] if command == "link-mach-o-arm64-main" => {
             run_link_mach_o_arm64_main(Path::new(binary_path), Path::new(output_path))
@@ -209,6 +213,20 @@ fn run_build_x86_64_oracle_runner(
     serde_json::to_string(runner.metadata())
         .map_err(JsonError::new)
         .map_err(CliError::Json)
+}
+
+fn run_generate_x86_64_expected(
+    case_path: &Path,
+    expected_path: &Path,
+) -> Result<String, CliError> {
+    let case_json = read_text_file(case_path)?;
+    let test_case = test_case_from_json(&case_json).map_err(CliError::TestCase)?;
+    let expected =
+        observe_x86_64_oracle_expected(&test_case).map_err(CliError::X8664MachOFixture)?;
+    let expected_json = observed_result_to_json(&expected).map_err(CliError::Json)?;
+    write_text_file(expected_path, &expected_json)?;
+
+    Ok(expected_json)
 }
 
 fn run_link_mach_o_arm64_main(binary_path: &Path, output_path: &Path) -> Result<String, CliError> {
@@ -823,7 +841,7 @@ impl std::fmt::Display for CliError {
         match self {
             Self::Usage => write!(
                 formatter,
-                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | link-fixture-arm64-main <case.json> <out-exe> | build-x86_64-macho-fixture <case.json> <out-exe> | build-x86_64-oracle-runner <case.json> <out-exe> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
+                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | link-fixture-arm64-main <case.json> <out-exe> | build-x86_64-macho-fixture <case.json> <out-exe> | build-x86_64-oracle-runner <case.json> <out-exe> | generate-x86_64-expected <case.json> <expected.json> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
             ),
             Self::ReadFile { path, source } => {
                 write!(formatter, "failed to read file {}: {source}", path.display())
@@ -1250,6 +1268,31 @@ mod tests {
         assert!(probe_output.contains("\"format\":\"mach_o_64_little_endian\""));
     }
 
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    #[test]
+    fn generate_x86_64_expected_writes_return_42_expected_json() {
+        let temp_dir = TestTempDir::new("generate_x86_64_expected_writes_return_42_expected_json");
+        let case_path = temp_dir.write_file(
+            "return_42.json",
+            include_str!("../../../tests/cases/return_42.json"),
+        );
+        let expected_path = temp_dir.path.join("return_42_expected.json");
+
+        let output = run_cli(vec![
+            String::from("generate-x86_64-expected"),
+            case_path.to_string_lossy().into_owned(),
+            expected_path.to_string_lossy().into_owned(),
+        ])
+        .expect("return_42 expected JSON is generated under Rosetta");
+        let expected =
+            observed_result_from_json(include_str!("../../../tests/expected/return_42.json"))
+                .and_then(|result| observed_result_to_json(&result))
+                .expect("return_42 expected fixture normalizes to output json");
+
+        assert_eq!(output, expected);
+        assert_eq!(read_file(&expected_path), expected);
+    }
+
     #[cfg(not(target_os = "macos"))]
     #[test]
     fn build_x86_64_macho_fixture_reports_unsupported_host() {
@@ -1302,6 +1345,34 @@ mod tests {
         ));
         assert_eq!(error.failure_kind(), FailureKind::EmitError);
         assert!(!output_path.exists());
+    }
+
+    #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
+    #[test]
+    fn generate_x86_64_expected_reports_unsupported_rosetta_host() {
+        let temp_dir =
+            TestTempDir::new("generate_x86_64_expected_reports_unsupported_rosetta_host");
+        let case_path = temp_dir.write_file(
+            "return_42.json",
+            include_str!("../../../tests/cases/return_42.json"),
+        );
+        let expected_path = temp_dir.path.join("return_42_expected.json");
+
+        let error = run_cli(vec![
+            String::from("generate-x86_64-expected"),
+            case_path.to_string_lossy().into_owned(),
+            expected_path.to_string_lossy().into_owned(),
+        ])
+        .expect_err("Rosetta expected generation requires arm64 macOS");
+
+        assert!(matches!(
+            error,
+            CliError::X8664MachOFixture(
+                super::x86_64_mach_o_fixture::X8664MachOFixtureError::UnsupportedRosettaHost { .. }
+            )
+        ));
+        assert_eq!(error.failure_kind(), FailureKind::RunError);
+        assert!(!expected_path.exists());
     }
 
     #[test]
@@ -1372,6 +1443,9 @@ mod tests {
         assert!(error
             .to_string()
             .contains("build-x86_64-oracle-runner <case.json> <out-exe>"));
+        assert!(error
+            .to_string()
+            .contains("generate-x86_64-expected <case.json> <expected.json>"));
         assert!(error
             .to_string()
             .contains("link-fixture-arm64-stdout-main <case.json> <out-exe>"));

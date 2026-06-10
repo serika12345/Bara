@@ -6,12 +6,18 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use bara_oracle::{CaseId, FailureKind, TestCase, TestCaseAbi};
+use bara_oracle::{
+    observed_result_from_json, CaseId, FailureKind, ObservedResult, TestCase, TestCaseAbi,
+};
 use serde::{Serialize, Serializer};
 
 #[derive(Debug)]
 pub(crate) enum X8664MachOFixtureError {
     UnsupportedHost {
+        os: &'static str,
+        arch: &'static str,
+    },
+    UnsupportedRosettaHost {
         os: &'static str,
         arch: &'static str,
     },
@@ -21,7 +27,7 @@ pub(crate) enum X8664MachOFixtureError {
     UnsupportedHostTrapPlan {
         case_id: CaseId,
     },
-    TempSourcePath {
+    TempPath {
         source: std::time::SystemTimeError,
     },
     WriteSource {
@@ -38,6 +44,21 @@ pub(crate) enum X8664MachOFixtureError {
     MissingOutput {
         path: PathBuf,
     },
+    RunnerSpawn {
+        path: PathBuf,
+        source: io::Error,
+    },
+    RunnerFailed {
+        path: PathBuf,
+        status: String,
+        stdout: String,
+        stderr: String,
+    },
+    InvalidRunnerStdout {
+        path: PathBuf,
+        stdout: String,
+        source: String,
+    },
 }
 
 impl X8664MachOFixtureError {
@@ -47,11 +68,15 @@ impl X8664MachOFixtureError {
                 FailureKind::InvalidTestCase
             }
             Self::UnsupportedHost { .. }
-            | Self::TempSourcePath { .. }
+            | Self::TempPath { .. }
             | Self::WriteSource { .. }
             | Self::ClangSpawn { .. }
             | Self::ClangFailed { .. }
             | Self::MissingOutput { .. } => FailureKind::EmitError,
+            Self::UnsupportedRosettaHost { .. }
+            | Self::RunnerSpawn { .. }
+            | Self::RunnerFailed { .. }
+            | Self::InvalidRunnerStdout { .. } => FailureKind::RunError,
         }
     }
 }
@@ -63,6 +88,10 @@ impl fmt::Display for X8664MachOFixtureError {
                 formatter,
                 "x86_64 Mach-O artifact generation is unsupported on host os={os} arch={arch}"
             ),
+            Self::UnsupportedRosettaHost { os, arch } => write!(
+                formatter,
+                "x86_64 Rosetta oracle execution is unsupported on host os={os} arch={arch}"
+            ),
             Self::UnsupportedAbi { case_id } => write!(
                 formatter,
                 "x86_64 Mach-O artifact generation supports only no-args u64 testcases: {}",
@@ -73,11 +102,8 @@ impl fmt::Display for X8664MachOFixtureError {
                 "x86_64 Mach-O artifact generation does not support host trap testcases yet: {}",
                 case_id.as_str()
             ),
-            Self::TempSourcePath { source } => {
-                write!(
-                    formatter,
-                    "failed to build temporary x86_64 source path: {source}"
-                )
+            Self::TempPath { source } => {
+                write!(formatter, "failed to build temporary x86_64 path: {source}")
             }
             Self::WriteSource { path, source } => {
                 write!(
@@ -98,6 +124,30 @@ impl fmt::Display for X8664MachOFixtureError {
             Self::MissingOutput { path } => write!(
                 formatter,
                 "clang completed but x86_64 Mach-O output does not exist: {}",
+                path.display()
+            ),
+            Self::RunnerSpawn { path, source } => write!(
+                formatter,
+                "failed to run x86_64 oracle runner {}: {source}",
+                path.display()
+            ),
+            Self::RunnerFailed {
+                path,
+                status,
+                stdout,
+                stderr,
+            } => write!(
+                formatter,
+                "x86_64 oracle runner {} failed with {status}: stdout={stdout:?} stderr={stderr:?}",
+                path.display()
+            ),
+            Self::InvalidRunnerStdout {
+                path,
+                stdout,
+                source,
+            } => write!(
+                formatter,
+                "x86_64 oracle runner {} emitted invalid expected JSON: {source}; stdout={stdout:?}",
                 path.display()
             ),
         }
@@ -396,7 +446,7 @@ impl X8664MachOFixturePackager for ClangX8664MachOFixturePackager {
         &self,
         request: X8664MachOFixtureBuildRequest,
     ) -> Result<GeneratedX8664MachOFixture, X8664MachOFixtureError> {
-        let source_path = temporary_source_path("bara-x86-64-macho", "s")?;
+        let source_path = temporary_path("bara-x86-64-macho", "s")?;
         fs::write(&source_path, request.source().as_str()).map_err(|source| {
             X8664MachOFixtureError::WriteSource {
                 path: source_path.clone(),
@@ -440,7 +490,7 @@ impl X8664OracleRunnerPackager for ClangX8664OracleRunnerPackager {
         &self,
         request: X8664OracleRunnerBuildRequest,
     ) -> Result<GeneratedX8664OracleRunner, X8664MachOFixtureError> {
-        let source_path = temporary_source_path("bara-x86-64-oracle-runner", "c")?;
+        let source_path = temporary_path("bara-x86-64-oracle-runner", "c")?;
         fs::write(&source_path, request.source().as_str()).map_err(|source| {
             X8664MachOFixtureError::WriteSource {
                 path: source_path.clone(),
@@ -557,6 +607,47 @@ pub(crate) fn build_x86_64_oracle_runner(
     package_x86_64_oracle_runner(&ClangX8664OracleRunnerPackager, request)
 }
 
+pub(crate) fn observe_x86_64_oracle_expected(
+    test_case: &TestCase,
+) -> Result<ObservedResult, X8664MachOFixtureError> {
+    ensure_supported_rosetta_host()?;
+
+    let runner_path = temporary_path("bara-x86-64-oracle-runner", "exe")?;
+    if let Err(error) = build_x86_64_oracle_runner(test_case, &runner_path) {
+        let _ = fs::remove_file(&runner_path);
+        return Err(error);
+    }
+
+    let output =
+        Command::new(&runner_path)
+            .output()
+            .map_err(|source| X8664MachOFixtureError::RunnerSpawn {
+                path: runner_path.clone(),
+                source,
+            });
+    let _ = fs::remove_file(&runner_path);
+
+    let output = output?;
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    if !output.status.success() {
+        return Err(X8664MachOFixtureError::RunnerFailed {
+            path: runner_path,
+            status: output.status.to_string(),
+            stdout,
+            stderr,
+        });
+    }
+
+    observed_result_from_json(&stdout).map_err(|source| {
+        X8664MachOFixtureError::InvalidRunnerStdout {
+            path: runner_path,
+            stdout,
+            source: source.to_string(),
+        }
+    })
+}
+
 fn ensure_supported_host() -> Result<(), X8664MachOFixtureError> {
     if cfg!(target_os = "macos") {
         Ok(())
@@ -568,10 +659,21 @@ fn ensure_supported_host() -> Result<(), X8664MachOFixtureError> {
     }
 }
 
-fn temporary_source_path(prefix: &str, extension: &str) -> Result<PathBuf, X8664MachOFixtureError> {
+fn ensure_supported_rosetta_host() -> Result<(), X8664MachOFixtureError> {
+    if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+        Ok(())
+    } else {
+        Err(X8664MachOFixtureError::UnsupportedRosettaHost {
+            os: std::env::consts::OS,
+            arch: std::env::consts::ARCH,
+        })
+    }
+}
+
+fn temporary_path(prefix: &str, extension: &str) -> Result<PathBuf, X8664MachOFixtureError> {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_err(|source| X8664MachOFixtureError::TempSourcePath { source })?
+        .map_err(|source| X8664MachOFixtureError::TempPath { source })?
         .as_nanos();
     Ok(std::env::temp_dir().join(format!("{prefix}-{nanos}.{extension}")))
 }
@@ -659,13 +761,13 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
-    use bara_oracle::test_case_from_json;
+    use bara_oracle::{test_case_from_json, CaseId, ObservedResult};
 
     use super::{
-        json_string_literal, package_x86_64_mach_o_fixture, package_x86_64_oracle_runner,
-        GeneratedX8664MachOFixture, GeneratedX8664OracleRunner, X8664MachOAssemblySource,
-        X8664MachOFixtureBuildRequest, X8664MachOFixtureError, X8664MachOFixtureOutputPath,
-        X8664MachOFixturePackager, X8664MachOFixtureSourceLanguage,
+        json_string_literal, observe_x86_64_oracle_expected, package_x86_64_mach_o_fixture,
+        package_x86_64_oracle_runner, GeneratedX8664MachOFixture, GeneratedX8664OracleRunner,
+        X8664MachOAssemblySource, X8664MachOFixtureBuildRequest, X8664MachOFixtureError,
+        X8664MachOFixtureOutputPath, X8664MachOFixturePackager, X8664MachOFixtureSourceLanguage,
         X8664MachOFixtureToolchainCommand, X8664OracleRunnerBuildRequest,
         X8664OracleRunnerPackager, X8664OracleRunnerSource,
     };
@@ -836,6 +938,43 @@ mod tests {
                 output_path.display()
             )
         );
+    }
+
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    #[test]
+    fn observe_x86_64_oracle_expected_runs_return_42_under_rosetta() {
+        let test_case = test_case_from_json(include_str!("../../../tests/cases/return_42.json"))
+            .expect("return_42 testcase parses");
+
+        let expected = observe_x86_64_oracle_expected(&test_case)
+            .expect("return_42 x86_64 oracle runner runs under Rosetta");
+
+        assert_eq!(
+            expected,
+            ObservedResult::new(
+                CaseId::new("return_42").expect("case id is non-empty"),
+                0,
+                42,
+                String::new(),
+                String::new()
+            )
+        );
+    }
+
+    #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
+    #[test]
+    fn observe_x86_64_oracle_expected_reports_unsupported_rosetta_host() {
+        let test_case = test_case_from_json(include_str!("../../../tests/cases/return_42.json"))
+            .expect("return_42 testcase parses");
+
+        let error = observe_x86_64_oracle_expected(&test_case)
+            .expect_err("Rosetta oracle execution requires arm64 macOS");
+
+        assert!(matches!(
+            error,
+            X8664MachOFixtureError::UnsupportedRosettaHost { .. }
+        ));
+        assert_eq!(error.failure_kind(), bara_oracle::FailureKind::RunError);
     }
 
     struct FakePackager;
