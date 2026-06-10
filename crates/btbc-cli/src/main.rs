@@ -105,6 +105,9 @@ fn run_cli(args: Vec<String>) -> Result<String, CliError> {
         [command, case_path, actual_path] if command == "generate-arm64-actual" => {
             run_generate_arm64_actual(Path::new(case_path), Path::new(actual_path))
         }
+        [command, expected_path, actual_path] if command == "compare-expected-actual" => {
+            run_compare_expected_actual(Path::new(expected_path), Path::new(actual_path))
+        }
         [command, binary_path, output_path] if command == "link-mach-o-arm64-main" => {
             run_link_mach_o_arm64_main(Path::new(binary_path), Path::new(output_path))
         }
@@ -242,6 +245,24 @@ fn run_generate_arm64_actual(case_path: &Path, actual_path: &Path) -> Result<Str
     write_text_file(actual_path, &actual_json)?;
 
     Ok(actual_json)
+}
+
+fn run_compare_expected_actual(
+    expected_path: &Path,
+    actual_path: &Path,
+) -> Result<String, CliError> {
+    let expected_json = read_text_file(expected_path)?;
+    let actual_json = read_text_file(actual_path)?;
+    let expected = observed_result_from_json(&expected_json).map_err(CliError::ExpectedJson)?;
+    let actual = observed_result_from_json(&actual_json).map_err(CliError::ExpectedJson)?;
+    let comparison = compare_observed_results(&expected, &actual);
+    if !comparison.is_match() {
+        return Err(CliError::Comparison(comparison));
+    }
+
+    serde_json::to_string(&comparison)
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)
 }
 
 fn run_link_mach_o_arm64_main(binary_path: &Path, output_path: &Path) -> Result<String, CliError> {
@@ -867,7 +888,7 @@ impl std::fmt::Display for CliError {
         match self {
             Self::Usage => write!(
                 formatter,
-                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | link-fixture-arm64-main <case.json> <out-exe> | build-x86_64-macho-fixture <case.json> <out-exe> | build-x86_64-oracle-runner <case.json> <out-exe> | generate-x86_64-expected <case.json> <expected.json> | generate-arm64-actual <case.json> <actual.json> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
+                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | link-fixture-arm64-main <case.json> <out-exe> | build-x86_64-macho-fixture <case.json> <out-exe> | build-x86_64-oracle-runner <case.json> <out-exe> | generate-x86_64-expected <case.json> <expected.json> | generate-arm64-actual <case.json> <actual.json> | compare-expected-actual <expected.json> <actual.json> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
             ),
             Self::ReadFile { path, source } => {
                 write!(formatter, "failed to read file {}: {source}", path.display())
@@ -1344,6 +1365,62 @@ mod tests {
         assert_eq!(read_file(&actual_path), expected);
     }
 
+    #[test]
+    fn compare_expected_actual_reports_matching_observations() {
+        let temp_dir = TestTempDir::new("compare_expected_actual_reports_matching_observations");
+        let expected_path = temp_dir.write_file(
+            "expected.json",
+            include_str!("../../../tests/expected/return_42.json"),
+        );
+        let actual_path = temp_dir.write_file(
+            "actual.json",
+            include_str!("../../../tests/expected/return_42.json"),
+        );
+
+        let output = run_cli(vec![
+            String::from("compare-expected-actual"),
+            expected_path.to_string_lossy().into_owned(),
+            actual_path.to_string_lossy().into_owned(),
+        ])
+        .expect("matching expected and actual JSON compare successfully");
+
+        assert_eq!(output, "{\"issues\":[]}");
+    }
+
+    #[test]
+    fn compare_expected_actual_reports_return_value_mismatch() -> Result<(), String> {
+        let temp_dir = TestTempDir::new("compare_expected_actual_reports_return_value_mismatch");
+        let expected_path = temp_dir.write_file(
+            "expected.json",
+            include_str!("../../../tests/expected/return_42.json"),
+        );
+        let actual_path = temp_dir.write_file(
+            "actual.json",
+            "{\"case_id\":\"return_42\",\"exit_status\":0,\"return_value\":41,\"stdout\":\"\",\"stderr\":\"\"}",
+        );
+
+        let error = run_cli(vec![
+            String::from("compare-expected-actual"),
+            expected_path.to_string_lossy().into_owned(),
+            actual_path.to_string_lossy().into_owned(),
+        ])
+        .expect_err("mismatched expected and actual JSON fail comparison");
+
+        let report = match error {
+            CliError::Comparison(report) => report,
+            other => return Err(format!("unexpected error: {other:?}")),
+        };
+        assert_eq!(
+            report.issues(),
+            &[bara_oracle::ComparisonIssue::ReturnValueMismatch {
+                expected: 42,
+                actual: 41,
+            }]
+        );
+
+        Ok(())
+    }
+
     #[cfg(not(target_os = "macos"))]
     #[test]
     fn build_x86_64_macho_fixture_reports_unsupported_host() {
@@ -1528,6 +1605,9 @@ mod tests {
         assert!(error
             .to_string()
             .contains("generate-arm64-actual <case.json> <actual.json>"));
+        assert!(error
+            .to_string()
+            .contains("compare-expected-actual <expected.json> <actual.json>"));
         assert!(error
             .to_string()
             .contains("link-fixture-arm64-stdout-main <case.json> <out-exe>"));
