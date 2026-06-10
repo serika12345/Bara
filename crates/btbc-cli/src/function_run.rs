@@ -6,7 +6,9 @@ use bara_ir::{
     SyscallAbi, UnsupportedReason,
 };
 use bara_isa_x86::{decode_function, lift_decoded_function_with_image_metadata};
-use bara_oracle::{FailureKind, MachOEntryFunctionInput, ObservedResult, TestCase, TestCaseAbi};
+use bara_oracle::{
+    FailureKind, MachOEntryFunctionInput, ObservedResult, TestCase, TestCaseAbi, TestCaseStackState,
+};
 use bara_runtime::{
     run_no_args_u64_with_host_traps, run_one_input_memory_ptr, run_one_u64, HostTrapPlan,
     InputMemory, InputMemoryError, RunArgumentU64, RunError, RunStdout, RunStdoutError,
@@ -36,8 +38,8 @@ impl FunctionCompileResult {
         FunctionStdoutHostTrapRequest::new(self.emitted.host_trap_requests().stdout_requested())
     }
 
-    pub(crate) fn artifact_metadata(&self) -> FunctionArtifactMetadata {
-        FunctionArtifactMetadata::from_compile_result(self)
+    pub(crate) fn artifact_metadata(&self, source: &TestCase) -> FunctionArtifactMetadata {
+        FunctionArtifactMetadata::from_compile_result(source, self)
     }
 }
 
@@ -75,15 +77,17 @@ pub(crate) struct FunctionArtifactMetadata {
     pcmap: FunctionPcMapArtifact,
     fixups: FunctionFixupsArtifact,
     helpers: FunctionHelpersArtifact,
+    artifact_report: FunctionArtifactReport,
 }
 
 impl FunctionArtifactMetadata {
-    fn from_compile_result(result: &FunctionCompileResult) -> Self {
+    fn from_compile_result(source: &TestCase, result: &FunctionCompileResult) -> Self {
         Self {
             compiled_ir: FunctionCompiledIrArtifact::from_program(&result.program),
             pcmap: FunctionPcMapArtifact::from_entries(result.emitted.pc_map()),
             fixups: FunctionFixupsArtifact::from_fixups(result.emitted.branch_fixups()),
             helpers: FunctionHelpersArtifact::from_requests(result.emitted.host_trap_requests()),
+            artifact_report: FunctionArtifactReport::from_source_and_compile_result(source, result),
         }
     }
 
@@ -101,6 +105,10 @@ impl FunctionArtifactMetadata {
 
     pub(crate) const fn helpers(&self) -> &FunctionHelpersArtifact {
         &self.helpers
+    }
+
+    pub(crate) const fn artifact_report(&self) -> &FunctionArtifactReport {
+        &self.artifact_report
     }
 }
 
@@ -516,6 +524,217 @@ impl FunctionHelpersArtifact {
 #[serde(tag = "kind", rename_all = "snake_case")]
 enum FunctionHelperArtifact {
     WriteStdout,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub(crate) struct FunctionArtifactReport {
+    state_layout: FunctionStateLayoutArtifact,
+    cache_validation_identity: FunctionCacheValidationIdentityArtifact,
+    helper_requirements: Vec<FunctionHelperRequirementArtifact>,
+}
+
+impl FunctionArtifactReport {
+    fn from_source_and_compile_result(source: &TestCase, result: &FunctionCompileResult) -> Self {
+        Self {
+            state_layout: FunctionStateLayoutArtifact::from_source(source),
+            cache_validation_identity: FunctionCacheValidationIdentityArtifact::from_source(source),
+            helper_requirements: FunctionHelperRequirementsArtifact::from_requests(
+                result.emitted.host_trap_requests(),
+            )
+            .into_values(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct FunctionStateLayoutArtifact {
+    kind: FunctionStateLayoutKindArtifact,
+    source_isa: FunctionSourceIsaArtifact,
+    target_isa: FunctionTargetIsaArtifact,
+    abi: FunctionAbiArtifact,
+    return_register: FunctionRegisterArtifact,
+    stack: FunctionStackLayoutArtifact,
+}
+
+impl FunctionStateLayoutArtifact {
+    fn from_source(source: &TestCase) -> Self {
+        Self {
+            kind: FunctionStateLayoutKindArtifact::FunctionLevelV0,
+            source_isa: FunctionSourceIsaArtifact::X8664,
+            target_isa: FunctionTargetIsaArtifact::Arm64,
+            abi: FunctionAbiArtifact::from_test_case_abi(source.abi()),
+            return_register: FunctionRegisterArtifact::Rax,
+            stack: FunctionStackLayoutArtifact::from_stack_state(source.stack_state()),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FunctionStateLayoutKindArtifact {
+    FunctionLevelV0,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum FunctionSourceIsaArtifact {
+    #[serde(rename = "x86_64")]
+    X8664,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FunctionTargetIsaArtifact {
+    Arm64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct FunctionAbiArtifact {
+    args: Vec<FunctionAbiArgumentArtifact>,
+    #[serde(rename = "return")]
+    return_value: FunctionAbiReturnArtifact,
+}
+
+impl FunctionAbiArtifact {
+    fn from_test_case_abi(abi: &TestCaseAbi) -> Self {
+        let args = match abi {
+            TestCaseAbi::NoArgsU64 => Vec::new(),
+            TestCaseAbi::OneU64ArgReturnsU64 { .. } => {
+                vec![FunctionAbiArgumentArtifact::U64]
+            }
+            TestCaseAbi::OneInputMemoryPtrReturnsU64 { .. } => {
+                vec![FunctionAbiArgumentArtifact::Ptr]
+            }
+        };
+
+        Self {
+            args,
+            return_value: FunctionAbiReturnArtifact::U64,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FunctionAbiArgumentArtifact {
+    U64,
+    Ptr,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FunctionAbiReturnArtifact {
+    U64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum FunctionStackLayoutArtifact {
+    None,
+    Fixed { size: u64 },
+}
+
+impl FunctionStackLayoutArtifact {
+    fn from_stack_state(stack_state: &TestCaseStackState) -> Self {
+        match stack_state.size() {
+            Some(size) => Self::Fixed {
+                size: size.byte_count().get(),
+            },
+            None => Self::None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct FunctionCacheValidationIdentityArtifact {
+    kind: FunctionCacheValidationIdentityKindArtifact,
+    case_id: String,
+    source_entry: u64,
+    source_bytes: String,
+    source_abi: FunctionAbiArtifact,
+    target_backend: FunctionTargetBackendArtifact,
+}
+
+impl FunctionCacheValidationIdentityArtifact {
+    fn from_source(source: &TestCase) -> Self {
+        Self {
+            kind: FunctionCacheValidationIdentityKindArtifact::FixtureFunctionV0,
+            case_id: source.case_id().as_str().to_owned(),
+            source_entry: source.x86_bytes().entry().value(),
+            source_bytes: encode_lower_hex(source.x86_bytes().bytes()),
+            source_abi: FunctionAbiArtifact::from_test_case_abi(source.abi()),
+            target_backend: FunctionTargetBackendArtifact::BaraArm64,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FunctionCacheValidationIdentityKindArtifact {
+    FixtureFunctionV0,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum FunctionTargetBackendArtifact {
+    #[serde(rename = "bara-arm64")]
+    BaraArm64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct FunctionHelperRequirementsArtifact {
+    values: Vec<FunctionHelperRequirementArtifact>,
+}
+
+impl FunctionHelperRequirementsArtifact {
+    fn from_requests(requests: &EmittedHostTrapRequests) -> Self {
+        let mut values = Vec::new();
+        if requests.stdout_requested() {
+            values.push(FunctionHelperRequirementArtifact::write_stdout());
+        }
+
+        Self { values }
+    }
+
+    fn into_values(self) -> Vec<FunctionHelperRequirementArtifact> {
+        self.values
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct FunctionHelperRequirementArtifact {
+    name: FunctionHelperNameArtifact,
+    signature: FunctionHelperSignatureArtifact,
+}
+
+impl FunctionHelperRequirementArtifact {
+    const fn write_stdout() -> Self {
+        Self {
+            name: FunctionHelperNameArtifact::WriteStdout,
+            signature: FunctionHelperSignatureArtifact::PtrLenToUnit,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FunctionHelperNameArtifact {
+    WriteStdout,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FunctionHelperSignatureArtifact {
+    PtrLenToUnit,
+}
+
+fn encode_lower_hex(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        output.push(char::from(HEX[usize::from(byte >> 4)]));
+        output.push(char::from(HEX[usize::from(byte & 0x0f)]));
+    }
+    output
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
