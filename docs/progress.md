@@ -9,35 +9,47 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-10 21:36 JST
+最終更新: 2026-06-10 22:35 JST
 
 状態:
 
-- project_state: completed。B7 の 5 つ目の小ステップとして、保存済みの
-  `expected.json` と `actual.json` を比較する CLI 境界を追加した。
+- project_state: completed。B7 の 6 つ目の小ステップとして、fixture compile
+  artifact metadata を JSON ファイルとして出力する CLI 境界を追加した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B7:
   Oracle / Regression 基盤。
-- active_design_focus: none。今回の変更は B7 の expected / actual comparison
-  境界に限定し、既存の `ObservedResult` parser と `ComparisonReport` を CLI から
-  呼び出すだけに留めた。
+- active_design_focus: B7 artifact metadata output。既存 decode / lift / emit
+  pipeline の `Program`、PC map、branch fixup、host helper request を stable
+  JSON DTO に写す境界に限定した。
 - active_branch: `task/b7-x86_64-macho-fixture-generation`。base commit は
   `8d39a4a`。latest commit はこの小ステップの review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B7 の
-  `expected.json` と `actual.json` を比較する項目。
-- completed_work: `btbc-cli compare-expected-actual <expected.json> <actual.json>` を
-  追加した。この command は両ファイルを `ObservedResult` として parse し、M1 の
-  comparison fields を比較する。一致時は `{"issues":[]}` を返し、不一致時は
-  `ComparisonMismatch` として非ゼロ終了する。
-- remaining_work: B7 は継続中。compiled IR / PC map / fixup / helper metadata
-  artifact 出力は未実装。
-- next_action: `compiled.ir.json`、`pcmap.json`、`fixups.json`、`helpers.json`
-  を artifact metadata として出せるようにする最小境界を設計・実装する。
-- verification: `nix develop -c cargo test -p btbc-cli compare_expected_actual` と
-  `nix develop -c cargo test -p btbc-cli usage_includes_probe_binary_command` が
-  通過した。`nix develop -c ./scripts/check-domain-types` と
-  `nix develop -c ./scripts/verify` も通過した。
+  `compiled.ir.json`、`pcmap.json`、`fixups.json`、`helpers.json` を artifact
+  metadata として出せるようにする項目。
+- completed_work: `btbc-cli emit-fixture-artifacts <case.json> <out-dir>` を追加した。
+  この command は testcase を Bara の decode / lift / ARM64 emit 経路に通し、
+  `compiled.ir.json`、`pcmap.json`、`fixups.json`、`helpers.json` を指定 directory
+  に保存する。ARM64 emitter は適用済み branch fixup metadata を
+  `EmittedFunction` に保持するようになった。
+- remaining_work: B7 は継続中。state layout description、cache validation
+  identity、helper requirements を artifact report に含める作業と、generated
+  executable の実プロセス regression gate、expected / actual artifact metadata
+  の統合は未実装。
+- next_action: state layout description、cache validation identity、helper
+  requirements を artifact report に含める最小 schema と CLI 出力境界を追加する。
+- verification: `nix develop -c cargo test -p btbc-cli emit_fixture_artifacts` と
+  `nix develop -c cargo test -p btbc-cli usage_includes_probe_binary_command` が通過した。
+  `nix develop -c ./scripts/check-domain-types` と `nix develop -c ./scripts/verify` も
+  通過した。
 
 直近で完了した作業:
+
+- 2026-06-10 22:35 JST: B7 の 6 つ目の小ステップとして、
+  `emit-fixture-artifacts` CLI を追加した。testcase を Bara の decode / lift /
+  ARM64 emit pipeline に通し、`compiled.ir.json`、`pcmap.json`、`fixups.json`、
+  `helpers.json` を指定 directory に保存する。ARM64 emitter は branch lowering で
+  適用した fixup の offset / source / target / kind を `EmittedFunction` に保持し、
+  CLI 側の stable JSON DTO へ写す。検証は snapshot の targeted tests と最終
+  `nix develop -c ./scripts/verify`。
 
 - 2026-06-10 21:36 JST: B7 の 5 つ目の小ステップとして、
   `compare-expected-actual` CLI を追加した。保存済みの `expected.json` と

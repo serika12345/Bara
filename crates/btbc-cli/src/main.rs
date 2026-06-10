@@ -105,6 +105,9 @@ fn run_cli(args: Vec<String>) -> Result<String, CliError> {
         [command, case_path, actual_path] if command == "generate-arm64-actual" => {
             run_generate_arm64_actual(Path::new(case_path), Path::new(actual_path))
         }
+        [command, case_path, output_dir] if command == "emit-fixture-artifacts" => {
+            run_emit_fixture_artifacts(Path::new(case_path), Path::new(output_dir))
+        }
         [command, expected_path, actual_path] if command == "compare-expected-actual" => {
             run_compare_expected_actual(Path::new(expected_path), Path::new(actual_path))
         }
@@ -247,6 +250,36 @@ fn run_generate_arm64_actual(case_path: &Path, actual_path: &Path) -> Result<Str
     Ok(actual_json)
 }
 
+fn run_emit_fixture_artifacts(case_path: &Path, output_dir: &Path) -> Result<String, CliError> {
+    let case_json = read_text_file(case_path)?;
+    let test_case = test_case_from_json(&case_json).map_err(CliError::TestCase)?;
+    let compiled = compile_test_case_function(&test_case).map_err(CliError::FunctionRun)?;
+    let artifacts = compiled.artifact_metadata();
+    let output_paths = FixtureArtifactOutputPaths::from_dir(output_dir);
+    let compiled_ir_json = serde_json::to_string(artifacts.compiled_ir())
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)?;
+    let pcmap_json = serde_json::to_string(artifacts.pcmap())
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)?;
+    let fixups_json = serde_json::to_string(artifacts.fixups())
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)?;
+    let helpers_json = serde_json::to_string(artifacts.helpers())
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)?;
+
+    create_dir(output_dir)?;
+    write_text_file(&output_paths.compiled_ir_path(), &compiled_ir_json)?;
+    write_text_file(&output_paths.pcmap_path(), &pcmap_json)?;
+    write_text_file(&output_paths.fixups_path(), &fixups_json)?;
+    write_text_file(&output_paths.helpers_path(), &helpers_json)?;
+
+    serde_json::to_string(&output_paths)
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)
+}
+
 fn run_compare_expected_actual(
     expected_path: &Path,
     actual_path: &Path,
@@ -263,6 +296,50 @@ fn run_compare_expected_actual(
     serde_json::to_string(&comparison)
         .map_err(JsonError::new)
         .map_err(CliError::Json)
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize)]
+struct FixtureArtifactOutputPaths {
+    compiled_ir: String,
+    pcmap: String,
+    fixups: String,
+    helpers: String,
+}
+
+impl FixtureArtifactOutputPaths {
+    fn from_dir(output_dir: &Path) -> Self {
+        Self {
+            compiled_ir: output_dir
+                .join("compiled.ir.json")
+                .to_string_lossy()
+                .into_owned(),
+            pcmap: output_dir.join("pcmap.json").to_string_lossy().into_owned(),
+            fixups: output_dir
+                .join("fixups.json")
+                .to_string_lossy()
+                .into_owned(),
+            helpers: output_dir
+                .join("helpers.json")
+                .to_string_lossy()
+                .into_owned(),
+        }
+    }
+
+    fn compiled_ir_path(&self) -> PathBuf {
+        PathBuf::from(&self.compiled_ir)
+    }
+
+    fn pcmap_path(&self) -> PathBuf {
+        PathBuf::from(&self.pcmap)
+    }
+
+    fn fixups_path(&self) -> PathBuf {
+        PathBuf::from(&self.fixups)
+    }
+
+    fn helpers_path(&self) -> PathBuf {
+        PathBuf::from(&self.helpers)
+    }
 }
 
 fn run_link_mach_o_arm64_main(binary_path: &Path, output_path: &Path) -> Result<String, CliError> {
@@ -888,7 +965,7 @@ impl std::fmt::Display for CliError {
         match self {
             Self::Usage => write!(
                 formatter,
-                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | link-fixture-arm64-main <case.json> <out-exe> | build-x86_64-macho-fixture <case.json> <out-exe> | build-x86_64-oracle-runner <case.json> <out-exe> | generate-x86_64-expected <case.json> <expected.json> | generate-arm64-actual <case.json> <actual.json> | compare-expected-actual <expected.json> <actual.json> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
+                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | emit-fixture-artifacts <case.json> <out-dir> | link-fixture-arm64-main <case.json> <out-exe> | build-x86_64-macho-fixture <case.json> <out-exe> | build-x86_64-oracle-runner <case.json> <out-exe> | generate-x86_64-expected <case.json> <expected.json> | generate-arm64-actual <case.json> <actual.json> | compare-expected-actual <expected.json> <actual.json> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
             ),
             Self::ReadFile { path, source } => {
                 write!(formatter, "failed to read file {}: {source}", path.display())
@@ -1421,6 +1498,50 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn emit_fixture_artifacts_writes_compilation_metadata_files() {
+        let temp_dir = TestTempDir::new("emit_fixture_artifacts_writes_compilation_metadata_files");
+        let case_path = temp_dir.write_file(
+            "branch_eq_return_42.json",
+            include_str!("../../../tests/cases/branch_eq_return_42.json"),
+        );
+        let output_dir = temp_dir.path.join("artifacts");
+
+        let output = run_cli(vec![
+            String::from("emit-fixture-artifacts"),
+            case_path.to_string_lossy().into_owned(),
+            output_dir.to_string_lossy().into_owned(),
+        ])
+        .expect("fixture artifact metadata is emitted");
+
+        assert_eq!(
+            output,
+            format!(
+                "{{\"compiled_ir\":\"{}\",\"pcmap\":\"{}\",\"fixups\":\"{}\",\"helpers\":\"{}\"}}",
+                output_dir.join("compiled.ir.json").display(),
+                output_dir.join("pcmap.json").display(),
+                output_dir.join("fixups.json").display(),
+                output_dir.join("helpers.json").display(),
+            )
+        );
+        assert_eq!(
+            read_file(&output_dir.join("compiled.ir.json")),
+            "{\"entry\":0,\"blocks\":[{\"id\":0,\"start\":0,\"end\":9,\"ops\":[{\"kind\":\"mov\",\"dst\":{\"kind\":\"reg\",\"reg\":\"rax\"},\"src\":{\"kind\":\"imm_u64\",\"value\":0}},{\"kind\":\"test\",\"lhs\":{\"kind\":\"reg\",\"reg\":\"rax\"},\"rhs\":{\"kind\":\"reg\",\"reg\":\"rax\"}}],\"terminator\":{\"kind\":\"cond_jump\",\"condition\":\"equal\",\"taken\":15,\"fallthrough\":9}},{\"id\":1,\"start\":9,\"end\":15,\"ops\":[{\"kind\":\"mov\",\"dst\":{\"kind\":\"reg\",\"reg\":\"rax\"},\"src\":{\"kind\":\"imm_u64\",\"value\":7}}],\"terminator\":{\"kind\":\"return\"}},{\"id\":2,\"start\":15,\"end\":21,\"ops\":[{\"kind\":\"mov\",\"dst\":{\"kind\":\"reg\",\"reg\":\"rax\"},\"src\":{\"kind\":\"imm_u64\",\"value\":42}}],\"terminator\":{\"kind\":\"return\"}}]}"
+        );
+        assert_eq!(
+            read_file(&output_dir.join("pcmap.json")),
+            "{\"entries\":[{\"source\":0,\"target\":0},{\"source\":9,\"target\":16},{\"source\":15,\"target\":24}]}"
+        );
+        assert_eq!(
+            read_file(&output_dir.join("fixups.json")),
+            "{\"fixups\":[{\"offset\":8,\"source\":8,\"target\":15,\"kind\":{\"kind\":\"conditional\",\"condition\":\"equal\"}},{\"offset\":12,\"source\":12,\"target\":9,\"kind\":{\"kind\":\"unconditional\"}}]}"
+        );
+        assert_eq!(
+            read_file(&output_dir.join("helpers.json")),
+            "{\"helpers\":[]}"
+        );
+    }
+
     #[cfg(not(target_os = "macos"))]
     #[test]
     fn build_x86_64_macho_fixture_reports_unsupported_host() {
@@ -1608,6 +1729,9 @@ mod tests {
         assert!(error
             .to_string()
             .contains("compare-expected-actual <expected.json> <actual.json>"));
+        assert!(error
+            .to_string()
+            .contains("emit-fixture-artifacts <case.json> <out-dir>"));
         assert!(error
             .to_string()
             .contains("link-fixture-arm64-stdout-main <case.json> <out-exe>"));

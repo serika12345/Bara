@@ -1,9 +1,9 @@
 use std::{error::Error, fmt};
 
-use bara_arm64::{emit_program, EmittedHostTrapRequests};
+use bara_arm64::{emit_program, BranchFixup, BranchFixupKind, EmittedHostTrapRequests, PcMapEntry};
 use bara_ir::{
-    ExternalImportTarget, PublicDyldSymbol, PublicLibcSymbol, PublicSymbolImport, SyscallAbi,
-    UnsupportedReason,
+    ExternalImportTarget, Program, PublicDyldSymbol, PublicLibcSymbol, PublicSymbolImport,
+    SyscallAbi, UnsupportedReason,
 };
 use bara_isa_x86::{decode_function, lift_decoded_function_with_image_metadata};
 use bara_oracle::{FailureKind, MachOEntryFunctionInput, ObservedResult, TestCase, TestCaseAbi};
@@ -15,12 +15,13 @@ use serde::Serialize;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct FunctionCompileResult {
+    program: Program,
     emitted: bara_arm64::EmittedFunction,
 }
 
 impl FunctionCompileResult {
-    fn new(emitted: bara_arm64::EmittedFunction) -> Self {
-        Self { emitted }
+    fn new(program: Program, emitted: bara_arm64::EmittedFunction) -> Self {
+        Self { program, emitted }
     }
 
     pub(crate) fn arm64_bytes(&self) -> FunctionArm64Bytes<'_> {
@@ -33,6 +34,10 @@ impl FunctionCompileResult {
 
     pub(crate) fn stdout_host_trap_request(&self) -> FunctionStdoutHostTrapRequest {
         FunctionStdoutHostTrapRequest::new(self.emitted.host_trap_requests().stdout_requested())
+    }
+
+    pub(crate) fn artifact_metadata(&self) -> FunctionArtifactMetadata {
+        FunctionArtifactMetadata::from_compile_result(self)
     }
 }
 
@@ -62,6 +67,455 @@ impl FunctionStdoutHostTrapRequest {
     pub(crate) const fn is_requested(self) -> bool {
         self.requested
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub(crate) struct FunctionArtifactMetadata {
+    compiled_ir: FunctionCompiledIrArtifact,
+    pcmap: FunctionPcMapArtifact,
+    fixups: FunctionFixupsArtifact,
+    helpers: FunctionHelpersArtifact,
+}
+
+impl FunctionArtifactMetadata {
+    fn from_compile_result(result: &FunctionCompileResult) -> Self {
+        Self {
+            compiled_ir: FunctionCompiledIrArtifact::from_program(&result.program),
+            pcmap: FunctionPcMapArtifact::from_entries(result.emitted.pc_map()),
+            fixups: FunctionFixupsArtifact::from_fixups(result.emitted.branch_fixups()),
+            helpers: FunctionHelpersArtifact::from_requests(result.emitted.host_trap_requests()),
+        }
+    }
+
+    pub(crate) const fn compiled_ir(&self) -> &FunctionCompiledIrArtifact {
+        &self.compiled_ir
+    }
+
+    pub(crate) const fn pcmap(&self) -> &FunctionPcMapArtifact {
+        &self.pcmap
+    }
+
+    pub(crate) const fn fixups(&self) -> &FunctionFixupsArtifact {
+        &self.fixups
+    }
+
+    pub(crate) const fn helpers(&self) -> &FunctionHelpersArtifact {
+        &self.helpers
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub(crate) struct FunctionCompiledIrArtifact {
+    entry: u64,
+    blocks: Vec<FunctionIrBlockArtifact>,
+}
+
+impl FunctionCompiledIrArtifact {
+    fn from_program(program: &Program) -> Self {
+        Self {
+            entry: program.entry().value(),
+            blocks: program
+                .blocks()
+                .iter()
+                .map(FunctionIrBlockArtifact::from_block)
+                .collect(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct FunctionIrBlockArtifact {
+    id: u32,
+    start: u64,
+    end: u64,
+    ops: Vec<FunctionIrOpArtifact>,
+    terminator: FunctionTerminatorArtifact,
+}
+
+impl FunctionIrBlockArtifact {
+    fn from_block(block: &bara_ir::BasicBlock) -> Self {
+        Self {
+            id: block.id().value(),
+            start: block.start().value(),
+            end: block.end().value(),
+            ops: block
+                .ops()
+                .iter()
+                .map(FunctionIrOpArtifact::from_op)
+                .collect(),
+            terminator: FunctionTerminatorArtifact::from_terminator(block.terminator()),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum FunctionIrOpArtifact {
+    Mov {
+        dst: FunctionOperandArtifact,
+        src: FunctionOperandArtifact,
+    },
+    Add {
+        dst: FunctionOperandArtifact,
+        src: FunctionOperandArtifact,
+    },
+    Sub {
+        dst: FunctionOperandArtifact,
+        src: FunctionOperandArtifact,
+    },
+    Cmp {
+        lhs: FunctionOperandArtifact,
+        rhs: FunctionOperandArtifact,
+    },
+    Test {
+        lhs: FunctionOperandArtifact,
+        rhs: FunctionOperandArtifact,
+    },
+    Push {
+        src: FunctionOperandArtifact,
+    },
+    Pop {
+        dst: FunctionOperandArtifact,
+    },
+    HostTrap {
+        trap: FunctionHostTrapArtifact,
+    },
+    Unsupported {
+        reason: FunctionUnsupportedReasonArtifact,
+    },
+}
+
+impl FunctionIrOpArtifact {
+    fn from_op(op: &bara_ir::IrOp) -> Self {
+        match op {
+            bara_ir::IrOp::Mov { dst, src } => Self::Mov {
+                dst: FunctionOperandArtifact::from_operand(dst),
+                src: FunctionOperandArtifact::from_operand(src),
+            },
+            bara_ir::IrOp::Add { dst, src } => Self::Add {
+                dst: FunctionOperandArtifact::from_operand(dst),
+                src: FunctionOperandArtifact::from_operand(src),
+            },
+            bara_ir::IrOp::Sub { dst, src } => Self::Sub {
+                dst: FunctionOperandArtifact::from_operand(dst),
+                src: FunctionOperandArtifact::from_operand(src),
+            },
+            bara_ir::IrOp::Cmp { lhs, rhs } => Self::Cmp {
+                lhs: FunctionOperandArtifact::from_operand(lhs),
+                rhs: FunctionOperandArtifact::from_operand(rhs),
+            },
+            bara_ir::IrOp::Test { lhs, rhs } => Self::Test {
+                lhs: FunctionOperandArtifact::from_operand(lhs),
+                rhs: FunctionOperandArtifact::from_operand(rhs),
+            },
+            bara_ir::IrOp::Push { src } => Self::Push {
+                src: FunctionOperandArtifact::from_operand(src),
+            },
+            bara_ir::IrOp::Pop { dst } => Self::Pop {
+                dst: FunctionOperandArtifact::from_operand(dst),
+            },
+            bara_ir::IrOp::HostTrap { kind } => Self::HostTrap {
+                trap: FunctionHostTrapArtifact::from_ir(*kind),
+            },
+            bara_ir::IrOp::Unsupported { reason } => Self::Unsupported {
+                reason: FunctionUnsupportedReasonArtifact::from_ir(reason),
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum FunctionOperandArtifact {
+    Reg { reg: FunctionRegisterArtifact },
+    ImmU64 { value: u64 },
+    Mem8 { base: FunctionRegisterArtifact },
+}
+
+impl FunctionOperandArtifact {
+    fn from_operand(operand: &bara_ir::Operand) -> Self {
+        match operand {
+            bara_ir::Operand::Reg(reg) => Self::Reg {
+                reg: FunctionRegisterArtifact::from_ir(*reg),
+            },
+            bara_ir::Operand::ImmU64(value) => Self::ImmU64 { value: *value },
+            bara_ir::Operand::Mem8 { base } => Self::Mem8 {
+                base: FunctionRegisterArtifact::from_ir(*base),
+            },
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FunctionRegisterArtifact {
+    Rax,
+    Rdi,
+}
+
+impl FunctionRegisterArtifact {
+    const fn from_ir(reg: bara_ir::X86Reg) -> Self {
+        match reg {
+            bara_ir::X86Reg::Rax => Self::Rax,
+            bara_ir::X86Reg::Rdi => Self::Rdi,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum FunctionTerminatorArtifact {
+    Return,
+    Fallthrough {
+        target: u64,
+    },
+    DirectJump {
+        target: u64,
+    },
+    DirectCall {
+        target: u64,
+        return_to: u64,
+    },
+    CondJump {
+        condition: FunctionConditionArtifact,
+        taken: u64,
+        fallthrough: u64,
+    },
+    BoundaryRequest {
+        request: FunctionBoundaryRequestArtifact,
+    },
+    Unsupported {
+        reason: FunctionUnsupportedReasonArtifact,
+    },
+}
+
+impl FunctionTerminatorArtifact {
+    fn from_terminator(terminator: &bara_ir::Terminator) -> Self {
+        match terminator {
+            bara_ir::Terminator::Return => Self::Return,
+            bara_ir::Terminator::Fallthrough { target } => Self::Fallthrough {
+                target: target.value(),
+            },
+            bara_ir::Terminator::DirectJump { target } => Self::DirectJump {
+                target: target.value(),
+            },
+            bara_ir::Terminator::DirectCall { target, return_to } => Self::DirectCall {
+                target: target.value(),
+                return_to: return_to.value(),
+            },
+            bara_ir::Terminator::CondJump {
+                condition,
+                taken,
+                fallthrough,
+            } => Self::CondJump {
+                condition: FunctionConditionArtifact::from_ir(*condition),
+                taken: taken.value(),
+                fallthrough: fallthrough.value(),
+            },
+            bara_ir::Terminator::BoundaryRequest { request } => Self::BoundaryRequest {
+                request: FunctionBoundaryRequestArtifact::from_ir(request),
+            },
+            bara_ir::Terminator::Unsupported { reason } => Self::Unsupported {
+                reason: FunctionUnsupportedReasonArtifact::from_ir(reason),
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum FunctionBoundaryRequestArtifact {
+    Syscall,
+    Helper,
+}
+
+impl FunctionBoundaryRequestArtifact {
+    const fn from_ir(request: &bara_ir::BoundaryRequest) -> Self {
+        match request {
+            bara_ir::BoundaryRequest::Syscall(_) => Self::Syscall,
+            bara_ir::BoundaryRequest::Helper(_) => Self::Helper,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum FunctionUnsupportedReasonArtifact {
+    Unsupported,
+}
+
+impl FunctionUnsupportedReasonArtifact {
+    const fn from_ir(_reason: &UnsupportedReason) -> Self {
+        Self::Unsupported
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FunctionHostTrapArtifact {
+    Stdout,
+}
+
+impl FunctionHostTrapArtifact {
+    const fn from_ir(kind: bara_ir::HostTrapKind) -> Self {
+        match kind {
+            bara_ir::HostTrapKind::Stdout => Self::Stdout,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FunctionConditionArtifact {
+    Overflow,
+    NotOverflow,
+    Below,
+    AboveOrEqual,
+    Equal,
+    NotEqual,
+    BelowOrEqual,
+    Above,
+    Sign,
+    NotSign,
+    Parity,
+    NotParity,
+    Less,
+    GreaterOrEqual,
+    LessOrEqual,
+    Greater,
+}
+
+impl FunctionConditionArtifact {
+    const fn from_ir(condition: bara_ir::X86Cond) -> Self {
+        match condition {
+            bara_ir::X86Cond::Overflow => Self::Overflow,
+            bara_ir::X86Cond::NotOverflow => Self::NotOverflow,
+            bara_ir::X86Cond::Below => Self::Below,
+            bara_ir::X86Cond::AboveOrEqual => Self::AboveOrEqual,
+            bara_ir::X86Cond::Equal => Self::Equal,
+            bara_ir::X86Cond::NotEqual => Self::NotEqual,
+            bara_ir::X86Cond::BelowOrEqual => Self::BelowOrEqual,
+            bara_ir::X86Cond::Above => Self::Above,
+            bara_ir::X86Cond::Sign => Self::Sign,
+            bara_ir::X86Cond::NotSign => Self::NotSign,
+            bara_ir::X86Cond::Parity => Self::Parity,
+            bara_ir::X86Cond::NotParity => Self::NotParity,
+            bara_ir::X86Cond::Less => Self::Less,
+            bara_ir::X86Cond::GreaterOrEqual => Self::GreaterOrEqual,
+            bara_ir::X86Cond::LessOrEqual => Self::LessOrEqual,
+            bara_ir::X86Cond::Greater => Self::Greater,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub(crate) struct FunctionPcMapArtifact {
+    entries: Vec<FunctionPcMapEntryArtifact>,
+}
+
+impl FunctionPcMapArtifact {
+    fn from_entries(entries: &[PcMapEntry]) -> Self {
+        Self {
+            entries: entries
+                .iter()
+                .map(FunctionPcMapEntryArtifact::from_entry)
+                .collect(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct FunctionPcMapEntryArtifact {
+    source: u64,
+    target: u64,
+}
+
+impl FunctionPcMapEntryArtifact {
+    const fn from_entry(entry: &PcMapEntry) -> Self {
+        Self {
+            source: entry.source().value(),
+            target: entry.target().value(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub(crate) struct FunctionFixupsArtifact {
+    fixups: Vec<FunctionFixupArtifact>,
+}
+
+impl FunctionFixupsArtifact {
+    fn from_fixups(fixups: &[BranchFixup]) -> Self {
+        Self {
+            fixups: fixups
+                .iter()
+                .map(FunctionFixupArtifact::from_fixup)
+                .collect(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct FunctionFixupArtifact {
+    offset: u64,
+    source: u64,
+    target: u64,
+    kind: FunctionFixupKindArtifact,
+}
+
+impl FunctionFixupArtifact {
+    const fn from_fixup(fixup: &BranchFixup) -> Self {
+        Self {
+            offset: fixup.offset().value(),
+            source: fixup.source().value(),
+            target: fixup.target().value(),
+            kind: FunctionFixupKindArtifact::from_kind(fixup.kind()),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum FunctionFixupKindArtifact {
+    Unconditional,
+    Call,
+    Conditional {
+        condition: FunctionConditionArtifact,
+    },
+}
+
+impl FunctionFixupKindArtifact {
+    const fn from_kind(kind: BranchFixupKind) -> Self {
+        match kind {
+            BranchFixupKind::Unconditional => Self::Unconditional,
+            BranchFixupKind::Call => Self::Call,
+            BranchFixupKind::Conditional { condition } => Self::Conditional {
+                condition: FunctionConditionArtifact::from_ir(condition),
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub(crate) struct FunctionHelpersArtifact {
+    helpers: Vec<FunctionHelperArtifact>,
+}
+
+impl FunctionHelpersArtifact {
+    fn from_requests(requests: &EmittedHostTrapRequests) -> Self {
+        let mut helpers = Vec::new();
+        if requests.stdout_requested() {
+            helpers.push(FunctionHelperArtifact::WriteStdout);
+        }
+
+        Self { helpers }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum FunctionHelperArtifact {
+    WriteStdout,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -349,7 +803,7 @@ pub(crate) fn compile_test_case_function(
             .map_err(FunctionRunError::Lift)?;
     let emitted = emit_program(&program).map_err(FunctionRunError::Emit)?;
 
-    Ok(FunctionCompileResult::new(emitted))
+    Ok(FunctionCompileResult::new(program, emitted))
 }
 
 pub(crate) fn compile_mach_o_entry_function(
@@ -364,7 +818,7 @@ pub(crate) fn compile_mach_o_entry_function(
     .map_err(FunctionRunError::Lift)?;
     let emitted = emit_program(&program).map_err(FunctionRunError::Emit)?;
 
-    Ok(FunctionCompileResult::new(emitted))
+    Ok(FunctionCompileResult::new(program, emitted))
 }
 
 pub(crate) fn compile_test_case_function_standalone_artifact(
