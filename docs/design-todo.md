@@ -144,6 +144,11 @@
   `execution_strategy` を追加した。JIT、AOT、fallback interpreter は同じ
   `user_space_runtime` boundary から selectable として report する。これは
   各 strategy の実装、selection policy、fallback engine 接続の追加ではない。
+- 2026-06-11 の B8 小ステップとして、`UserSpaceLaunchPlan` に
+  `bridge_boundary` を追加した。syscall bridge と OS API bridge は
+  helper boundary の責務として report し、bridge 実装は core IR / ARM64 emit に
+  埋め込まない。これは syscall 実行、OS API mapping、または helper 実装の追加
+  ではない。
 
 ## D7: Binary format input/output の分離
 

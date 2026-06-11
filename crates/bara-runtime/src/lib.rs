@@ -6,14 +6,16 @@ pub mod runner;
 pub use executable_memory::{ExecutableMemory, ExecutableMemoryError};
 pub use host_trap::{HostTrapPlan, RunStdout, RunStdoutError};
 pub use launch::{
-    UserSpaceEntryTrampolinePlan, UserSpaceEntryTrampolineTarget,
-    UserSpaceExecutableMemoryAllocationApi, UserSpaceExecutableMemoryPlan,
-    UserSpaceExecutableMemoryProtectionTransition, UserSpaceExecutableMemoryReleaseApi,
-    UserSpaceExecutionStrategyAvailability, UserSpaceExecutionStrategyBoundary,
-    UserSpaceExecutionStrategyPlan, UserSpaceExecutionStrategySet, UserSpaceHelperBoundaryContract,
-    UserSpaceHelperBoundaryPlan, UserSpaceImageMappingPlan, UserSpaceImageMappingSource,
-    UserSpaceInitialStackContract, UserSpaceInitialStackPlan, UserSpaceIntegrationPolicy,
-    UserSpaceLaunchPlan, UserSpaceLaunchResponsibility, UserSpaceMemoryProtectionModel,
+    UserSpaceBridgeBoundaryPlacement, UserSpaceBridgeBoundaryPlan,
+    UserSpaceBridgeCoreImplementation, UserSpaceEntryTrampolinePlan,
+    UserSpaceEntryTrampolineTarget, UserSpaceExecutableMemoryAllocationApi,
+    UserSpaceExecutableMemoryPlan, UserSpaceExecutableMemoryProtectionTransition,
+    UserSpaceExecutableMemoryReleaseApi, UserSpaceExecutionStrategyAvailability,
+    UserSpaceExecutionStrategyBoundary, UserSpaceExecutionStrategyPlan,
+    UserSpaceExecutionStrategySet, UserSpaceHelperBoundaryContract, UserSpaceHelperBoundaryPlan,
+    UserSpaceImageMappingPlan, UserSpaceImageMappingSource, UserSpaceInitialStackContract,
+    UserSpaceInitialStackPlan, UserSpaceIntegrationPolicy, UserSpaceLaunchPlan,
+    UserSpaceLaunchResponsibility, UserSpaceMemoryProtectionModel,
     UserSpacePrivateIntegrationRequirement, UserSpaceProcessBoundary, UserSpaceProcessScope,
 };
 pub use runner::{

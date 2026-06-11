@@ -9,30 +9,32 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 13:25 JST
+最終更新: 2026-06-11 13:34 JST
 
 状態:
 
-- project_state: completed。B8 の execution strategy selection boundary step
-  として、JIT / AOT / fallback interpreter を同じ user-space runtime boundary
-  から selectable として user-space launch plan と actual launch report に載せた。
+- project_state: completed。B8 の syscall / OS API bridge boundary step として、
+  syscall bridge と OS API bridge を helper boundary の責務として user-space
+  launch plan と actual launch report に載せた。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8:
   実 x86_64 macOS アプリ起動。
-- active_design_focus: B8 execution strategy selection boundary。self-authored
-  AppKit fixture の launch preparation で JIT / AOT / fallback interpreter が
-  同じ `user_space_runtime` boundary から選択可能であることを report 境界へ残す。
+- active_design_focus: B8 syscall / OS API bridge boundary。self-authored
+  AppKit fixture の launch preparation で syscall bridge と OS API bridge が
+  helper boundary にあり、bridge 実装が core IR / ARM64 emit に埋め込まれないことを
+  report 境界へ残す。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
   latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B8 の「JIT / AOT / fallback interpreter を
-  同じ user-space runtime 境界から選べる設計にする」。
-- completed_work: `bara-runtime::UserSpaceLaunchPlan` は `execution_strategy` を
-  持ち、boundary を `user_space_runtime`、JIT / AOT / fallback interpreter を
-  それぞれ `selectable` として保持する。B8 actual launch report は
-  `runtime_preparation.execution_strategy` として同じ selection boundary を保存する。
-- remaining_work: 次の小ステップは syscall / OS API bridge を helper boundary
-  として明示し、core IR / emit へ混ぜないこと。
-- next_action: commit / push 後、次の B8 小ステップで syscall / OS API bridge
-  boundary を report / runtime model に固定する。
+- related_todo: [TODO.md](../TODO.md) B8 の「syscall / OS API bridge は
+  helper boundary として明示し、core IR / emit へ混ぜない」。
+- completed_work: `bara-runtime::UserSpaceLaunchPlan` は `bridge_boundary` を
+  持ち、syscall bridge と OS API bridge を `helper_boundary`、core IR /
+  ARM64 emit の bridge 実装を `not_embedded` として保持する。B8 actual launch
+  report は `runtime_preparation.bridge_boundary` として同じ boundary policy を
+  保存する。
+- remaining_work: 次の小ステップは source ISA mode、address size、operand size、
+  stack width を型で表し、B9 の x86_32 対応の妨げにしないこと。
+- next_action: commit / push 後、次の B8 小ステップで source ISA / mode /
+  width model を report / runtime 境界に固定する。
 - verification: targeted tests として
   `nix develop -c cargo test -p bara-runtime user_space_launch_plan -- --nocapture`、
   `nix develop -c cargo test -p btbc-cli gui_hello_world_actual -- --nocapture`
@@ -41,6 +43,12 @@
 
 直近で完了した作業:
 
+- 2026-06-11 13:34 JST: B8 の syscall / OS API bridge boundary step として、
+  `bara-runtime::UserSpaceLaunchPlan` に `bridge_boundary` を追加した。
+  syscall bridge と OS API bridge は helper boundary の責務として B8 actual
+  launch report に保存され、core IR / ARM64 emit の bridge 実装は
+  `not_embedded` として保存される。targeted tests、`bara-runtime` / `btbc-cli`
+  clippy、full `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-11 13:25 JST: B8 の execution strategy selection boundary step
   として、`bara-runtime::UserSpaceLaunchPlan` に `execution_strategy` を追加した。
   JIT、AOT、fallback interpreter は同じ `user_space_runtime` boundary から

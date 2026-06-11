@@ -4,6 +4,7 @@ pub struct UserSpaceLaunchPlan {
     entry_trampoline: UserSpaceEntryTrampolinePlan,
     initial_stack: UserSpaceInitialStackPlan,
     helper_boundary: UserSpaceHelperBoundaryPlan,
+    bridge_boundary: UserSpaceBridgeBoundaryPlan,
     executable_memory: UserSpaceExecutableMemoryPlan,
     execution_strategy: UserSpaceExecutionStrategyPlan,
     integration_policy: UserSpaceIntegrationPolicy,
@@ -17,6 +18,7 @@ impl UserSpaceLaunchPlan {
             entry_trampoline: UserSpaceEntryTrampolinePlan::mach_o_entry_point(),
             initial_stack: UserSpaceInitialStackPlan::argv_envp_initial_stack(),
             helper_boundary: UserSpaceHelperBoundaryPlan::imports_objc_os_api_requests(),
+            bridge_boundary: UserSpaceBridgeBoundaryPlan::syscall_and_os_api_helpers(),
             executable_memory: UserSpaceExecutableMemoryPlan::public_os_api(),
             execution_strategy: UserSpaceExecutionStrategyPlan::user_space_runtime_selectable(),
             integration_policy: UserSpaceIntegrationPolicy::current_user_space_process(),
@@ -38,6 +40,10 @@ impl UserSpaceLaunchPlan {
 
     pub const fn helper_boundary(&self) -> &UserSpaceHelperBoundaryPlan {
         &self.helper_boundary
+    }
+
+    pub const fn bridge_boundary(&self) -> &UserSpaceBridgeBoundaryPlan {
+        &self.bridge_boundary
     }
 
     pub const fn executable_memory(&self) -> &UserSpaceExecutableMemoryPlan {
@@ -185,6 +191,57 @@ pub enum UserSpaceInitialStackContract {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum UserSpaceHelperBoundaryContract {
     ImportsObjcOsApiRequests,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UserSpaceBridgeBoundaryPlan {
+    responsibility: UserSpaceLaunchResponsibility,
+    syscall_bridge: UserSpaceBridgeBoundaryPlacement,
+    os_api_bridge: UserSpaceBridgeBoundaryPlacement,
+    core_ir_implementation: UserSpaceBridgeCoreImplementation,
+    arm64_emit_implementation: UserSpaceBridgeCoreImplementation,
+}
+
+impl UserSpaceBridgeBoundaryPlan {
+    const fn syscall_and_os_api_helpers() -> Self {
+        Self {
+            responsibility: UserSpaceLaunchResponsibility::HelperBoundary,
+            syscall_bridge: UserSpaceBridgeBoundaryPlacement::HelperBoundary,
+            os_api_bridge: UserSpaceBridgeBoundaryPlacement::HelperBoundary,
+            core_ir_implementation: UserSpaceBridgeCoreImplementation::NotEmbedded,
+            arm64_emit_implementation: UserSpaceBridgeCoreImplementation::NotEmbedded,
+        }
+    }
+
+    pub const fn responsibility(self) -> UserSpaceLaunchResponsibility {
+        self.responsibility
+    }
+
+    pub const fn syscall_bridge(self) -> UserSpaceBridgeBoundaryPlacement {
+        self.syscall_bridge
+    }
+
+    pub const fn os_api_bridge(self) -> UserSpaceBridgeBoundaryPlacement {
+        self.os_api_bridge
+    }
+
+    pub const fn core_ir_implementation(self) -> UserSpaceBridgeCoreImplementation {
+        self.core_ir_implementation
+    }
+
+    pub const fn arm64_emit_implementation(self) -> UserSpaceBridgeCoreImplementation {
+        self.arm64_emit_implementation
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceBridgeBoundaryPlacement {
+    HelperBoundary,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceBridgeCoreImplementation {
+    NotEmbedded,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -389,6 +446,7 @@ impl UserSpaceProcessBoundary {
 #[cfg(test)]
 mod tests {
     use super::{
+        UserSpaceBridgeBoundaryPlacement, UserSpaceBridgeCoreImplementation,
         UserSpaceEntryTrampolineTarget, UserSpaceExecutableMemoryAllocationApi,
         UserSpaceExecutableMemoryProtectionTransition, UserSpaceExecutableMemoryReleaseApi,
         UserSpaceExecutionStrategyAvailability, UserSpaceExecutionStrategyBoundary,
@@ -531,6 +589,32 @@ mod tests {
         assert_eq!(
             strategies.fallback_interpreter(),
             UserSpaceExecutionStrategyAvailability::Selectable
+        );
+    }
+
+    #[test]
+    fn user_space_launch_plan_keeps_syscall_and_os_api_bridges_at_helper_boundary() {
+        let bridge_boundary = *UserSpaceLaunchPlan::mach_o_executable_image().bridge_boundary();
+
+        assert_eq!(
+            bridge_boundary.responsibility(),
+            UserSpaceLaunchResponsibility::HelperBoundary
+        );
+        assert_eq!(
+            bridge_boundary.syscall_bridge(),
+            UserSpaceBridgeBoundaryPlacement::HelperBoundary
+        );
+        assert_eq!(
+            bridge_boundary.os_api_bridge(),
+            UserSpaceBridgeBoundaryPlacement::HelperBoundary
+        );
+        assert_eq!(
+            bridge_boundary.core_ir_implementation(),
+            UserSpaceBridgeCoreImplementation::NotEmbedded
+        );
+        assert_eq!(
+            bridge_boundary.arm64_emit_implementation(),
+            UserSpaceBridgeCoreImplementation::NotEmbedded
         );
     }
 }
