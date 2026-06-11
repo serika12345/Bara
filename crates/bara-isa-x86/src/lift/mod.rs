@@ -139,6 +139,9 @@ fn lift_instruction(
         DecodedInstructionKind::PushRbp => Ok(LiftedInstruction::Op(IrOp::Push {
             src: Operand::Reg(X86Reg::Rbp),
         })),
+        DecodedInstructionKind::PushR15 => Ok(LiftedInstruction::Op(IrOp::Push {
+            src: Operand::Reg(X86Reg::R15),
+        })),
         DecodedInstructionKind::PopRax => Ok(LiftedInstruction::Op(IrOp::Pop {
             dst: Operand::Reg(X86Reg::Rax),
         })),
@@ -818,7 +821,7 @@ mod tests {
     }
 
     #[test]
-    fn lifts_push_rbp_mov_rbp_rsp_before_next_unsupported_prologue_byte() {
+    fn lifts_push_rbp_mov_rbp_rsp_push_r15_before_next_unsupported_prologue_byte() {
         let decoded = DecodedFunction::new(
             X86Va::new(0x1600),
             vec![
@@ -834,11 +837,16 @@ mod tests {
                 ),
                 DecodedInstruction::new(
                     X86Va::new(0x1604),
-                    X86Va::new(0x1605),
+                    X86Va::new(0x1606),
+                    DecodedInstructionKind::PushR15,
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(0x1606),
+                    X86Va::new(0x1607),
                     DecodedInstructionKind::Unsupported {
                         reason: UnsupportedReason::DecodeUnsupportedOpcode {
                             opcode: 0x41,
-                            at: X86Va::new(0x1604),
+                            at: X86Va::new(0x1606),
                         },
                     },
                 ),
@@ -857,6 +865,9 @@ mod tests {
                 IrOp::Mov {
                     dst: Operand::Reg(X86Reg::Rbp),
                     src: Operand::Reg(X86Reg::Rsp)
+                },
+                IrOp::Push {
+                    src: Operand::Reg(X86Reg::R15)
                 }
             ]
         );
@@ -865,7 +876,7 @@ mod tests {
             &Terminator::Unsupported {
                 reason: UnsupportedReason::DecodeUnsupportedOpcode {
                     opcode: 0x41,
-                    at: X86Va::new(0x1604),
+                    at: X86Va::new(0x1606),
                 }
             }
         );

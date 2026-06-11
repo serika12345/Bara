@@ -217,6 +217,13 @@
   実装ではない。現在の source of truth は `blocker.json` の
   `DecodeUnsupportedOpcode { opcode: 65 }` (`41 57`, `push r15`) であり、次の
   PR Gate はこの REX.B extended-register push を扱う。
+- 2026-06-11 の B8-G3c completion step として、`41 57` (`push r15`) だけを
+  prologue slice として追加した。IR register model は R15 family を持ち、
+  decode は `PushR15`、lift は `IrOp::Push { src: R15 }`、ARM64 emit は
+  `str x15, [sp, #-16]!` として扱う。これは extended register push の一般化や
+  prologue 全体の lowering ではない。現在の source of truth は `blocker.json` の
+  `DecodeUnsupportedOpcode { opcode: 65 }` (`41 56`, `push r14`) であり、次の
+  PR Gate は R14 の REX.B extended-register push を扱う。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、
