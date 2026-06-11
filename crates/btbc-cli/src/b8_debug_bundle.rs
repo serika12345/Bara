@@ -590,6 +590,7 @@ enum B8DebugDecodedInstructionKindReport {
     },
     TestEaxEax,
     PushRax,
+    PushRbp,
     PopRax,
     XorEaxEax,
     JccRel8 {
@@ -644,6 +645,7 @@ impl B8DebugDecodedInstructionKindReport {
             },
             DecodedInstructionKind::TestEaxEax => Self::TestEaxEax,
             DecodedInstructionKind::PushRax => Self::PushRax,
+            DecodedInstructionKind::PushRbp => Self::PushRbp,
             DecodedInstructionKind::PopRax => Self::PopRax,
             DecodedInstructionKind::XorEaxEax => Self::XorEaxEax,
             DecodedInstructionKind::JccRel8 {
@@ -818,7 +820,7 @@ impl B8DebugBlockerReport {
             failure_kind: Some(FailureKind::UnsupportedInstruction),
             unsupported_instruction: Some(instruction.clone()),
             message: Some(format!("{:?}", instruction.kind)),
-            next_action: B8DebugNextAction::AdvanceToB8G3FirstIsaBlocker,
+            next_action: B8DebugNextAction::AdvanceToNextIsaBlocker,
         }
     }
 
@@ -842,7 +844,7 @@ impl B8DebugBlockerReport {
             failure_kind: Some(failure_kind),
             unsupported_instruction: None,
             message: Some(message),
-            next_action: B8DebugNextAction::AdvanceToB8G3FirstIsaBlocker,
+            next_action: B8DebugNextAction::AdvanceToNextIsaBlocker,
         }
     }
 
@@ -897,7 +899,7 @@ impl B8DebugBlocker {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum B8DebugNextAction {
-    AdvanceToB8G3FirstIsaBlocker,
+    AdvanceToNextIsaBlocker,
     InspectNextDebugBundleBlocker,
 }
 

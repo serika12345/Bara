@@ -406,15 +406,15 @@ review gate:
 
 - 完了したら commit / push / draft PR 作成で停止し、B8-G3 へは自動で進まない。
 
-- [ ] B8-G3: self-authored GUI fixture の compiler output に必要な x86_64
-  ISA subset を corpus-driven に拡張する。
-  - [ ] B8-G2 の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 85 }`
-    (`push rbp`) を最初の ISA blocker として regression corpus に固定する。
-  - [ ] prologue / epilogue、stack frame、RIP-relative addressing、`lea`、
-    `mov` variants、memory operands、direct / indirect call or jump stubs を
-    public ISA 仕様に基づいて decode / lift / emit へ追加する。
-  - [ ] fixture 由来の最小 bytes を regression corpus に保存し、未対応命令は
-    `UnsupportedInstruction` として安定分類する。
+- [x] B8-G3: self-authored GUI fixture の compiler output に必要な x86_64
+  ISA subset を、最初の blocker slice から corpus-driven に拡張する。
+  - [x] B8-G2 の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 85 }`
+    (`push rbp`) を最初の ISA blocker として focused fixture に固定する。
+  - [x] `push rbp` (`0x55`) の decode / lift / emit に必要な最小範囲だけを
+    public ISA 仕様に基づいて追加する。
+  - [x] B8-G3 の debug bundle は `push_rbp` を通過し、次 blocker として
+    `DecodeUnsupportedOpcode { opcode: 72 }` (`48 89 e5`, 次の prologue 命令) を
+    stable `UnsupportedInstruction` として返す。
 
 #### PR Gate: B8-G3 First ISA Blocker Slice
 
@@ -422,13 +422,13 @@ branch: `task/b8-g3-first-isa-blocker`
 
 完了条件:
 
-- B8-G2 の debug bundle / blocker report から、最初に潰す x86_64 ISA blocker を
+- [x] B8-G2 の debug bundle / blocker report から、最初に潰す x86_64 ISA blocker を
   1 つ選んでいる。
-- 選んだ blocker の最小 bytes が regression corpus または focused fixture として
+- [x] 選んだ blocker の最小 bytes が regression corpus または focused fixture として
   保存されている。
-- decode / lift / emit / validation / runtime attempt のうち、その blocker に必要な
+- [x] decode / lift / emit / validation / runtime attempt のうち、その blocker に必要な
   最小範囲だけを実装している。
-- 同じ blocker が `UnsupportedInstruction` ではなく、次の blocker まで進むことを
+- [x] 同じ blocker が `UnsupportedInstruction` ではなく、次の blocker まで進むことを
   debug bundle または launch report で確認できる。
 
 PR に含めない:
@@ -436,6 +436,43 @@ PR に含めない:
 - B8-G3 全体の ISA coverage を一括で増やす作業。
 - loader mapping、import resolution、Objective-C / AppKit bridge の本実装。
 - 選んだ blocker と理由が違う命令・ABI・runtime service の便乗実装。
+
+検証:
+
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止する。残りの ISA blocker は
+  debug bundle の結果を見て次の `PR Gate` として追加する。
+
+- [ ] B8-G3b: 実 prologue の `REX.W mov rbp,rsp` slice を追加する。
+  - [ ] B8-G3 の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 72 }`
+    (`48 89 e5`, `mov rbp,rsp`) を次の ISA blocker として focused fixture に固定する。
+  - [ ] `mov rbp,rsp` に必要な register model、decode、lift、emit planning を
+    最小範囲で追加する。
+  - [ ] debug bundle が同じ blocker を越えて次の unsupported boundary を返すことを
+    確認する。
+
+#### PR Gate: B8-G3b REX Mov RBP/RSP Prologue Slice
+
+branch: `task/b8-g3b-mov-rbp-rsp`
+
+完了条件:
+
+- B8-G3 の debug bundle / blocker report から、次に潰す x86_64 ISA blocker として
+  `48 89 e5` (`mov rbp,rsp`) を選んでいる。
+- 選んだ blocker の最小 bytes が focused fixture として保存されている。
+- decode / lift / emit のうち、その blocker に必要な最小範囲だけを実装している。
+- debug bundle または launch report で `opcode 72` blocker を越えて次の blocker が
+  stable に report される。
+
+PR に含めない:
+
+- prologue / epilogue 全体、RIP-relative addressing、`lea`、memory operands、
+  call/jump stubs の一括実装。
+- loader mapping、import resolution、Objective-C / AppKit bridge の本実装。
+- RSP/RBP 以外の register move の便乗一般化。
 
 検証:
 

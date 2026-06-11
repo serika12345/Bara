@@ -81,6 +81,7 @@ pub enum DecodedInstructionKind {
     },
     TestEaxEax,
     PushRax,
+    PushRbp,
     PopRax,
     XorEaxEax,
     JccRel8 {

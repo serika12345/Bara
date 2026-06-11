@@ -202,6 +202,14 @@
   `blocker.json` の `unsupported_instruction` /
   `DecodeUnsupportedOpcode { opcode: 85 }` であり、B8-G3 は x86_64 `push rbp`
   prologue slice から進める。
+- 2026-06-11 の B8-G3 completion step として、x86_64 `push rbp` (`0x55`) だけを
+  first ISA blocker slice として追加した。IR register model は base pointer family
+  を持ち、decode は `PushRbp`、lift は `IrOp::Push { src: Rbp }`、ARM64 emit は
+  `str x29, [sp, #-16]!` として扱う。これは prologue 全体や一般 stack frame
+  lowering の実装ではなく、debug bundle が最初の blocker を越えるための最小 slice
+  である。現在の source of truth は `blocker.json` の
+  `DecodeUnsupportedOpcode { opcode: 72 }` (`48 89 e5`, `mov rbp,rsp`) であり、次の
+  PR Gate はこの REX.W register move を扱う。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、
