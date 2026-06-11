@@ -9,28 +9,29 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 19:01 JST
+最終更新: 2026-06-11 19:36 JST
 
 状態:
 
 - project_state: in_progress。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
-  reviewable GUI 起動 slice の積み上げとして扱う。B8-G3e までで、self-authored
+  reviewable GUI 起動 slice の積み上げとして扱う。B8-G3f までで、self-authored
   x86_64 GUI fixture の実 `LC_MAIN` entry から
-  `push rbp; mov rbp,rsp; push r15; push r14; push rbx; push rax; call rel32; mov rbx,rax`
-  までを decode / lift / emit または既存 call terminator として扱える。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G3e Opcode-Only Blocker Batch:
-  B8-G3d の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 83 }`
-  (`53`, `push rbx`) を起点に、opcode-only 差分として `PushRbx` / `Rbx` /
-  ARM64 `str x19, [sp, #-16]!` emit と `MovRbxRax` / ARM64 `mov x19,x0` emit を
-  最小実装した。
+  `push rbp; mov rbp,rsp; push r15; push r14; push rbx; push rax; call rel32;
+  mov rbx,rax; mov rax,qword ptr [rip+disp32]` までを decode / lift / emit または
+  既存 call terminator として扱える。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G3f RIP-Relative MOV Load Slice:
+  B8-G3e の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 72 }`
+  (`48 8b 05 ff 19 00 00`) を、RIP-relative source address、64-bit read width、
+  mapped image bytes を持つ typed memory load boundary として最小実装した。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
   Objective-C runtime / dyld の private behavior は使わず、public metadata、
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
-- active_branch: `task/b8-g3e-opcode-batch`。base branch は最新 `main`。
-  latest commit は B8-G3e review package で報告する。
-- related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c / B8-G3d / B8-G3e / B8-G3f。
+- active_branch: `task/b8-g3f-rip-relative-mov-load`。base branch は最新 `main`。
+  latest commit は B8-G3f review package で報告する。
+- related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
+  B8-G3d / B8-G3e / B8-G3f / B8-G3g。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -45,26 +46,41 @@
   (`0x55`) を通過できるようにし、B8-G3b として `mov rbp,rsp` (`48 89 e5`) を
   通過できるようにし、B8-G3c として `push r15` (`41 57`) を通過できるようにし、
   B8-G3d として `push r14` (`41 56`) を通過できるようにし、B8-G3e batch として
-  `push rbx` (`53`) と `mov rbx,rax` (`48 89 c3`) を通過できるようにした。
+  `push rbx` (`53`) と `mov rbx,rax` (`48 89 c3`) を通過できるようにし、B8-G3f として
+  `mov rax, qword ptr [rip+disp32]` (`48 8b 05 ff 19 00 00`) を通過できるようにした。
   現在の generated `blocker.json` は `unsupported_instruction` /
-  `DecodeUnsupportedOpcode { opcode: 72 }` を `X86Va(5650)` で返し、
+  `DecodeUnsupportedOpcode { opcode: 72 }` を `X86Va(5657)` で返し、
   `decode.report.json` は `push_rbp`、`mov_rbp_rsp`、`push_r15`、`push_r14`、
-  `push_rbx`、`push_rax`、`call_rel32`、`mov_rbx_rax`、次の unsupported `48` を
-  保存する。`entry.bytes.bin` の次 bytes は `48 8b 05 ff 19 00 00`
-  (`mov rax, qword ptr [rip+disp32]`) で、`launch.report.json` の processed
-  source PC range は `5632..5653` である。
-- remaining_work: B8-G3f。B8-G3e の blocker report に基づき、次の boundary である
-  `48 8b 05 disp32` RIP-relative memory load を focused fixture から実装し、
-  次 blocker まで進むことを debug bundle で確認する。
-- next_action: B8-G3e branch を commit / push し、draft PR を開いて review gate で
-  停止する。レビュー後の次 PR Gate は B8-G3f RIP-Relative MOV Load Slice。
-- verification: targeted check として `nix develop -c cargo test push_rbx -- --nocapture`
-  と `nix develop -c cargo test mov_rbx_rax -- --nocapture` が通過した。manual debug
-  bundle generation で `push_rbx` / `mov_rbx_rax` 通過と次 blocker
-  `48 8b 05 disp32` を確認した。full `nix develop -c ./scripts/verify` も通過した。
+  `push_rbx`、`push_rax`、`call_rel32`、`mov_rbx_rax`、
+  `mov_rax_qword_ptr_rip_relative`、次の unsupported `48` を保存する。
+  `entry.bytes.bin` の次 bytes は `48 8b 10`
+  (`mov rdx, qword ptr [rax]`) で、`launch.report.json` の processed source PC range は
+  `5632..5660` である。
+- remaining_work: B8-G3g。B8-G3f の blocker report に基づき、次の boundary である
+  `48 8b 10` register-indirect memory load を focused fixture から扱う。ただしこれは
+  `rdx` register、register-indirect memory、loader / mapped runtime memory boundary を
+  含むため、opcode-only batch としては扱わない。
+- next_action: B8-G3f branch を commit / push し、draft PR を開いて review gate で
+  停止する。レビュー後の次 PR Gate は B8-G3g RAX-Indirect MOV RDX Load Boundary。
+- verification: targeted check として `nix develop -c cargo test rip_relative -- --nocapture`、
+  `nix develop -c cargo test mapped_image -- --nocapture`、
+  `nix develop -c cargo test builds_entry_function_input_from_full_mach_o_executable_image -- --nocapture`
+  が通過した。manual debug bundle generation で `mov_rax_qword_ptr_rip_relative` 通過と
+  次 blocker `48 8b 10` を確認した。full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-11 19:36 JST: B8-G3f RIP-Relative MOV Load Slice を実装した。
+  x86_64 `48 8b 05 ff 19 00 00` (`mov rax, qword ptr [rip+disp32]`) を
+  `MovRaxQwordPtrRipRelative` として decode し、RIP-relative target
+  `X86Va(12312)` と 64-bit read width を持つ `MemRipRelative` operand へ lift する。
+  Mach-O entry pipeline は materialized executable segment bytes を
+  `ProgramImageMetadata` の mapped bytes として渡し、ARM64 emit はこの slice では
+  raw mapped qword を `x0` immediate として materialize する。debug bundle は
+  `mov_rax_qword_ptr_rip_relative` を通過し、次 blocker として
+  `DecodeUnsupportedOpcode { opcode: 72 }` (`48 8b 10`, `mov rdx, qword ptr [rax]`) を
+  `X86Va(5657)` で保存する。targeted checks と manual debug bundle generation が
+  通過し、full `nix develop -c ./scripts/verify` も通過した。
 - 2026-06-11 19:01 JST: B8-G3e Opcode-Only Blocker Batch を実装した。
   `53` (`push rbx`) を `PushRbx` として decode し、`IrOp::Push { src: Rbx }` へ
   lift し、ARM64 emit では `str x19, [sp, #-16]!` を生成する。続けて

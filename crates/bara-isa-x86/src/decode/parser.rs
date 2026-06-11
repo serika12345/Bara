@@ -181,13 +181,28 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                 }
             }
             0x48 => {
-                let end_offset = offset + 3;
                 let opcode2 = read_u8(input, offset + 1, at, opcode)?;
                 let operand = read_u8(input, offset + 2, at, opcode)?;
-                let end = instruction_end(input, at, end_offset, 3)?;
 
                 match (opcode2, operand) {
+                    (0x8b, 0x05) => {
+                        let end_offset = offset + 7;
+                        let displacement = read_i32_at(input, offset + 3, at, opcode)?;
+                        let end = instruction_end(input, at, end_offset, 7)?;
+                        let address = relative_target(end, displacement, at)?;
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::MovRaxQwordPtrRipRelative {
+                                displacement: X86Imm32::new(displacement),
+                                address,
+                            },
+                        ));
+                        offset = end_offset;
+                    }
                     (0x89, 0xf8) => {
+                        let end_offset = offset + 3;
+                        let end = instruction_end(input, at, end_offset, 3)?;
                         instructions.push(DecodedInstruction::new(
                             at,
                             end,
@@ -196,6 +211,8 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                         offset = end_offset;
                     }
                     (0x89, 0xc3) => {
+                        let end_offset = offset + 3;
+                        let end = instruction_end(input, at, end_offset, 3)?;
                         instructions.push(DecodedInstruction::new(
                             at,
                             end,
@@ -204,6 +221,8 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                         offset = end_offset;
                     }
                     (0x89, 0xe5) => {
+                        let end_offset = offset + 3;
+                        let end = instruction_end(input, at, end_offset, 3)?;
                         instructions.push(DecodedInstruction::new(
                             at,
                             end,
@@ -212,6 +231,7 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                         offset = end_offset;
                     }
                     _ => {
+                        let end = instruction_end(input, at, offset + 3, 3)?;
                         instructions.push(unsupported_instruction(at, end, opcode));
                         return DecodedFunction::new(input.entry(), instructions);
                     }

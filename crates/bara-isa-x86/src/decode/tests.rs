@@ -437,12 +437,12 @@ fn decodes_push_rax_pop_rax_between_mov_and_ret() {
 }
 
 #[test]
-fn decodes_prologue_pushes_and_mov_rbx_rax_before_next_unsupported_opcode() {
+fn decodes_prologue_and_rip_relative_load_before_next_unsupported_opcode() {
     let input = X86Bytes::new(
         X86Va::new(0x1600),
         vec![
             0x55, 0x48, 0x89, 0xe5, 0x41, 0x57, 0x41, 0x56, 0x53, 0x48, 0x89, 0xc3, 0x48, 0x8b,
-            0x05,
+            0x05, 0xff, 0x19, 0x00, 0x00, 0x48, 0x8b, 0x10,
         ],
     )
     .expect("test bytes are non-empty");
@@ -484,15 +484,111 @@ fn decodes_prologue_pushes_and_mov_rbx_rax_before_next_unsupported_opcode() {
             ),
             DecodedInstruction::new(
                 X86Va::new(0x160c),
-                X86Va::new(0x160f),
+                X86Va::new(0x1613),
+                DecodedInstructionKind::MovRaxQwordPtrRipRelative {
+                    displacement: crate::decode::X86Imm32::new(0x19ff),
+                    address: X86Va::new(0x3012),
+                }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x1613),
+                X86Va::new(0x1616),
                 DecodedInstructionKind::Unsupported {
                     reason: UnsupportedReason::DecodeUnsupportedOpcode {
                         opcode: 0x48,
-                        at: X86Va::new(0x160c),
+                        at: X86Va::new(0x1613),
                     }
                 }
             )
         ]
+    );
+}
+
+#[test]
+fn decodes_mov_rax_qword_ptr_rip_relative_then_ret() {
+    let input = X86Bytes::new(
+        X86Va::new(0x2000),
+        vec![0x48, 0x8b, 0x05, 0xf9, 0xff, 0xff, 0xff, 0xc3],
+    )
+    .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0x2000),
+                X86Va::new(0x2007),
+                DecodedInstructionKind::MovRaxQwordPtrRipRelative {
+                    displacement: crate::decode::X86Imm32::new(-7),
+                    address: X86Va::new(0x2000),
+                }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x2007),
+                X86Va::new(0x2008),
+                DecodedInstructionKind::Ret
+            )
+        ]
+    );
+}
+
+#[test]
+fn truncated_mov_rax_qword_ptr_rip_relative_is_reported() {
+    let input = X86Bytes::new(X86Va::new(0x160c), vec![0x48, 0x8b, 0x05])
+        .expect("test bytes are non-empty");
+
+    assert_eq!(
+        decode_function(&input),
+        Err(DecodeError::TruncatedInstruction {
+            at: X86Va::new(0x160c),
+            opcode: 0x48
+        })
+    );
+}
+
+#[test]
+fn decodes_rex_mov_unsupported_after_rip_relative_load() {
+    let input = X86Bytes::new(X86Va::new(0x1613), vec![0x48, 0x8b, 0x10])
+        .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("unsupported opcode decodes as instruction");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[DecodedInstruction::new(
+            X86Va::new(0x1613),
+            X86Va::new(0x1616),
+            DecodedInstructionKind::Unsupported {
+                reason: UnsupportedReason::DecodeUnsupportedOpcode {
+                    opcode: 0x48,
+                    at: X86Va::new(0x1613),
+                }
+            }
+        )]
+    );
+}
+
+#[test]
+fn decodes_rex_mov_unsupported_when_rip_relative_operand_does_not_match() {
+    let input = X86Bytes::new(X86Va::new(0x160c), vec![0x48, 0x8b, 0x10, 0xc3])
+        .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("unsupported opcode decodes as instruction");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[DecodedInstruction::new(
+            X86Va::new(0x160c),
+            X86Va::new(0x160f),
+            DecodedInstructionKind::Unsupported {
+                reason: UnsupportedReason::DecodeUnsupportedOpcode {
+                    opcode: 0x48,
+                    at: X86Va::new(0x160c),
+                }
+            }
+        )]
     );
 }
 

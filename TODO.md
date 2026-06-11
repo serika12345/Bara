@@ -607,13 +607,13 @@ review gate:
   進めなくなったら commit / push / draft PR 作成で停止し、次の non-opcode 境界または
   次 batch を `PR Gate` として追加する。
 
-- [ ] B8-G3f: RIP-relative `mov rax,[rip+disp32]` load slice を追加する。
-  - [ ] B8-G3e の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 72 }`
+- [x] B8-G3f: RIP-relative `mov rax,[rip+disp32]` load slice を追加する。
+  - [x] B8-G3e の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 72 }`
     (`48 8b 05 ff 19 00 00`) を RIP-relative memory load blocker として focused fixture
     に固定する。
-  - [ ] RIP-relative source address、read width、image metadata / mapped bytes との境界を
+  - [x] RIP-relative source address、read width、image metadata / mapped bytes との境界を
     typed model として最小範囲で追加する。
-  - [ ] debug bundle が同じ blocker を越えて次の unsupported boundary を返すことを
+  - [x] debug bundle が同じ blocker を越えて次の unsupported boundary を返すことを
     確認する。
 
 #### PR Gate: B8-G3f RIP-Relative MOV Load Slice
@@ -622,12 +622,12 @@ branch: `task/b8-g3f-rip-relative-mov-load`
 
 完了条件:
 
-- B8-G3e の debug bundle / blocker report から、次に潰す boundary として
+- [x] B8-G3e の debug bundle / blocker report から、次に潰す boundary として
   `48 8b 05 disp32` (`mov rax, qword ptr [rip+disp32]`) を選んでいる。
-- 選んだ blocker の最小 bytes が focused fixture として保存されている。
-- RIP-relative address calculation と memory load operand を decode / lift / emit の
+- [x] 選んだ blocker の最小 bytes が focused fixture として保存されている。
+- [x] RIP-relative address calculation と memory load operand を decode / lift / emit の
   最小範囲で表現している。
-- debug bundle または launch report で `48 8b 05` blocker を越えて次の blocker が
+- [x] debug bundle または launch report で `48 8b 05` blocker を越えて次の blocker が
   stable に report される。
 
 PR に含めない:
@@ -636,6 +636,44 @@ PR に含めない:
 - general memory subsystem、full x86 addressing modes、RIP-relative store、
   arbitrary-width memory operations の一括実装。
 - Objective-C / AppKit bridge や helper ABI の本実装。
+
+検証:
+
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止する。次の blocker は debug bundle の
+  結果を見て次の `PR Gate` として追加する。
+
+- [ ] B8-G3g: register-indirect `mov rdx,[rax]` load boundary を追加する。
+  - [ ] B8-G3f の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 72 }`
+    (`48 8b 10`) を register-indirect memory load blocker として focused fixture に固定する。
+  - [ ] `rdx` register model、register-indirect 64-bit load operand、mapped image /
+    runtime memory boundary のどこまでをこの slice で扱えるかを typed model として
+    最小範囲で決める。
+  - [ ] loader mapping、rebase / bind、import resolution が必要な場合は silent fallback
+    せず stable blocker として report する。
+
+#### PR Gate: B8-G3g RAX-Indirect MOV RDX Load Boundary
+
+branch: `task/b8-g3g-rax-indirect-mov-load`
+
+完了条件:
+
+- B8-G3f の debug bundle / blocker report から、次に潰す boundary として
+  `48 8b 10` (`mov rdx, qword ptr [rax]`) を選んでいる。
+- 選んだ blocker の最小 bytes が focused fixture として保存されている。
+- `rdx` register model と register-indirect 64-bit memory load operand を、実行可能な
+  最小範囲または stable loader/memory blocker として表現している。
+- debug bundle または launch report で `48 8b 10` blocker を越えるか、必要な
+  loader / mapped memory boundary が stable に report される。
+
+PR に含めない:
+
+- full x86 addressing modes、store、arbitrary-width memory operations の一括実装。
+- relocation / rebase / bind、import resolution、Objective-C / AppKit bridge の本実装。
+- 汎用 register allocation や JIT/on-demand translation cache の本実装。
 
 検証:
 

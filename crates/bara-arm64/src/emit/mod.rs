@@ -1,6 +1,6 @@
 use bara_ir::{
-    validate_program, BoundaryRequest, HelperRequest, HostTrapKind, IrOp, Operand, Program,
-    Terminator, UnsupportedReason, X86Cond, X86Reg, X86Va,
+    validate_program, BoundaryRequest, HelperRequest, HostTrapKind, IrOp, MemoryReadWidth, Operand,
+    Program, Terminator, UnsupportedReason, X86Cond, X86Reg, X86Va,
 };
 
 use crate::{ArmPc, PcMapEntry};
@@ -240,6 +240,24 @@ pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
                     src: Operand::Mem8 { base: X86Reg::Rdi },
                 } => {
                     emit_ldrb_w0_x0(&mut code);
+                    has_rax_value = true;
+                }
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src:
+                        Operand::MemRipRelative {
+                            address,
+                            width: MemoryReadWidth::Bits64,
+                        },
+                } => {
+                    let Some(value) = program
+                        .image_metadata()
+                        .mapped_bytes()
+                        .read_u64_le(*address)
+                    else {
+                        return Err(EmitError::UnsupportedShape);
+                    };
+                    emit_mov_x0_u64(&mut code, value);
                     has_rax_value = true;
                 }
                 IrOp::Mov {
@@ -772,8 +790,9 @@ fn emit_u32_le(code: &mut Vec<u8>, instruction: u32) -> usize {
 mod tests {
     use bara_ir::{
         BasicBlock, BlockId, BoundaryRequest, ExternalCallRequest, ExternalSymbolId, HelperRequest,
-        HostTrapKind, IrOp, Operand, Program, SyscallAbi, SyscallRequest, Terminator,
-        UnsupportedReason, X86Cond, X86Reg, X86Va,
+        HostTrapKind, IrOp, MemoryReadWidth, Operand, Program, ProgramImageMappedByteSegment,
+        ProgramImageMappedBytes, ProgramImageMetadata, ProgramImageRange, SyscallAbi,
+        SyscallRequest, Terminator, UnsupportedReason, X86Cond, X86Reg, X86Va,
     };
 
     use crate::{emit_program, Arm64MachineCode, ArmPc, EmitError};
@@ -788,6 +807,23 @@ mod tests {
         )
         .expect("test block range is valid");
         Program::new(X86Va::new(0), vec![block]).expect("program has entry block")
+    }
+
+    fn program_with_ops_and_metadata(
+        ops: Vec<IrOp>,
+        terminator: Terminator,
+        metadata: ProgramImageMetadata,
+    ) -> Program {
+        let block = BasicBlock::new(
+            BlockId::new(0),
+            X86Va::new(0),
+            X86Va::new(1),
+            ops,
+            terminator,
+        )
+        .expect("test block range is valid");
+        Program::with_image_metadata(X86Va::new(0), vec![block], metadata)
+            .expect("program has entry block")
     }
 
     #[test]
@@ -846,6 +882,62 @@ mod tests {
             emitted.code().bytes(),
             &[0x00, 0x00, 0x40, 0x39, 0xc0, 0x03, 0x5f, 0xd6]
         );
+    }
+
+    #[test]
+    fn emits_static_mapped_qword_for_rax_from_rip_relative_memory() {
+        let range = ProgramImageRange::new(X86Va::new(0x3000), X86Va::new(0x3008))
+            .expect("mapped range is non-empty");
+        let segment = ProgramImageMappedByteSegment::new(
+            range,
+            vec![0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11],
+        )
+        .expect("mapped bytes match range");
+        let metadata = ProgramImageMetadata::new_with_mapped_bytes(
+            bara_ir::ProgramImageSections::empty(),
+            ProgramImageMappedBytes::from_segments([segment]),
+            bara_ir::ProgramImageSymbols::empty(),
+            bara_ir::ProgramImageRelocations::empty(),
+            bara_ir::ProgramImageImports::empty(),
+            bara_ir::ProgramUnwindMetadata::empty(),
+        );
+        let program = program_with_ops_and_metadata(
+            vec![IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::MemRipRelative {
+                    address: X86Va::new(0x3000),
+                    width: MemoryReadWidth::Bits64,
+                },
+            }],
+            Terminator::Return,
+            metadata,
+        );
+
+        let emitted = emit_program(&program).expect("RIP-relative mapped qword IR emits");
+
+        assert_eq!(
+            emitted.code().bytes(),
+            &[
+                0x00, 0xf1, 0x8e, 0xd2, 0xc0, 0xac, 0xaa, 0xf2, 0x80, 0x68, 0xc6, 0xf2, 0x40, 0x24,
+                0xe2, 0xf2, 0xc0, 0x03, 0x5f, 0xd6
+            ]
+        );
+    }
+
+    #[test]
+    fn rejects_rip_relative_memory_when_mapped_bytes_are_absent() {
+        let program = program_with_ops(
+            vec![IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::MemRipRelative {
+                    address: X86Va::new(0x3000),
+                    width: MemoryReadWidth::Bits64,
+                },
+            }],
+            Terminator::Return,
+        );
+
+        assert_eq!(emit_program(&program), Err(EmitError::UnsupportedShape));
     }
 
     #[test]

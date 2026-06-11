@@ -96,6 +96,13 @@ fn builds_entry_function_input_from_full_mach_o_executable_image() {
             .end(),
         X86Va::new(8)
     );
+    assert_eq!(
+        entry_input
+            .program_image_metadata()
+            .mapped_bytes()
+            .read_u64_le(X86Va::new(0)),
+        Some(0xc300_0000_2ab8_9090)
+    );
     assert!(entry_input.program_image_metadata().symbols().is_empty());
     assert!(entry_input
         .program_image_metadata()

@@ -61,6 +61,10 @@ pub enum DecodedInstructionKind {
     },
     MovRaxRdi,
     MovRbxRax,
+    MovRaxQwordPtrRipRelative {
+        displacement: X86Imm32,
+        address: X86Va,
+    },
     MovzxEaxBytePtrRdi,
     AddEaxImm32 {
         imm: X86Imm32,

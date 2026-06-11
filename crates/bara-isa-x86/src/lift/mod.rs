@@ -1,7 +1,7 @@
 use bara_ir::{
-    BasicBlock, BasicBlockError, BlockId, BoundaryRequest, HostTrapKind, IrOp, Operand, Program,
-    ProgramError, ProgramImageMetadata, SyscallAbi, SyscallRequest, SyscallRequestError,
-    Terminator, UnsupportedReason, X86Reg,
+    BasicBlock, BasicBlockError, BlockId, BoundaryRequest, HostTrapKind, IrOp, MemoryReadWidth,
+    Operand, Program, ProgramError, ProgramImageMetadata, SyscallAbi, SyscallRequest,
+    SyscallRequestError, Terminator, UnsupportedReason, X86Reg,
 };
 
 use crate::{DecodeError, DecodedFunction, DecodedInstruction, DecodedInstructionKind};
@@ -101,6 +101,15 @@ fn lift_instruction(
             dst: Operand::Reg(X86Reg::Rbx),
             src: Operand::Reg(X86Reg::Rax),
         })),
+        DecodedInstructionKind::MovRaxQwordPtrRipRelative { address, .. } => {
+            Ok(LiftedInstruction::Op(IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::MemRipRelative {
+                    address: *address,
+                    width: MemoryReadWidth::Bits64,
+                },
+            }))
+        }
         DecodedInstructionKind::MovRbpRsp => Ok(LiftedInstruction::Op(IrOp::Mov {
             dst: Operand::Reg(X86Reg::Rbp),
             src: Operand::Reg(X86Reg::Rsp),
@@ -222,10 +231,11 @@ fn lift_instruction(
 #[cfg(test)]
 mod tests {
     use bara_ir::{
-        BlockId, BoundaryRequest, HostTrapKind, IrOp, Operand, ProgramImageImports,
-        ProgramImageMetadata, ProgramImageRange, ProgramImageRelocations, ProgramImageSection,
-        ProgramImageSectionKind, ProgramImageSections, ProgramImageSymbols, ProgramUnwindMetadata,
-        SyscallAbi, SyscallRequest, Terminator, UnsupportedReason, X86Cond, X86Reg, X86Va,
+        BlockId, BoundaryRequest, HostTrapKind, IrOp, MemoryReadWidth, Operand,
+        ProgramImageImports, ProgramImageMetadata, ProgramImageRange, ProgramImageRelocations,
+        ProgramImageSection, ProgramImageSectionKind, ProgramImageSections, ProgramImageSymbols,
+        ProgramUnwindMetadata, SyscallAbi, SyscallRequest, Terminator, UnsupportedReason, X86Cond,
+        X86Reg, X86Va,
     };
 
     use crate::{
@@ -831,7 +841,7 @@ mod tests {
     }
 
     #[test]
-    fn lifts_prologue_pushes_and_mov_rbx_rax_before_next_unsupported_opcode() {
+    fn lifts_prologue_and_rip_relative_load_before_next_unsupported_opcode() {
         let decoded = DecodedFunction::new(
             X86Va::new(0x1600),
             vec![
@@ -867,11 +877,19 @@ mod tests {
                 ),
                 DecodedInstruction::new(
                     X86Va::new(0x160c),
-                    X86Va::new(0x160f),
+                    X86Va::new(0x1613),
+                    DecodedInstructionKind::MovRaxQwordPtrRipRelative {
+                        displacement: crate::decode::X86Imm32::new(0x19ff),
+                        address: X86Va::new(0x3012),
+                    },
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(0x1613),
+                    X86Va::new(0x1616),
                     DecodedInstructionKind::Unsupported {
                         reason: UnsupportedReason::DecodeUnsupportedOpcode {
                             opcode: 0x48,
-                            at: X86Va::new(0x160c),
+                            at: X86Va::new(0x1613),
                         },
                     },
                 ),
@@ -903,6 +921,13 @@ mod tests {
                 IrOp::Mov {
                     dst: Operand::Reg(X86Reg::Rbx),
                     src: Operand::Reg(X86Reg::Rax)
+                },
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::MemRipRelative {
+                        address: X86Va::new(0x3012),
+                        width: MemoryReadWidth::Bits64,
+                    }
                 }
             ]
         );
@@ -911,7 +936,7 @@ mod tests {
             &Terminator::Unsupported {
                 reason: UnsupportedReason::DecodeUnsupportedOpcode {
                     opcode: 0x48,
-                    at: X86Va::new(0x160c),
+                    at: X86Va::new(0x1613),
                 }
             }
         );
