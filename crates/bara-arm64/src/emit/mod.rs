@@ -293,6 +293,14 @@ pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
                     emit_mov_x2_u64(&mut code, value);
                 }
                 IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rdi),
+                    src: Operand::AddressRipRelative { address },
+                } => {
+                    emit_mov_x0_u64(&mut code, address.value());
+                    has_rax_value = false;
+                    rax_known_value = None;
+                }
+                IrOp::Mov {
                     dst: Operand::Reg(X86Reg::Rbx),
                     src: Operand::Reg(X86Reg::Rax),
                 } => {
@@ -1011,6 +1019,53 @@ mod tests {
                 0xc6, 0xf2, 0x42, 0x24, 0xe2, 0xf2, 0xc0, 0x03, 0x5f, 0xd6
             ]
         );
+    }
+
+    #[test]
+    fn emits_rdi_rip_relative_address_as_x0_immediate() {
+        let program = program_with_ops(
+            vec![
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rdi),
+                    src: Operand::AddressRipRelative {
+                        address: X86Va::new(0x26d0),
+                    },
+                },
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(1),
+                },
+            ],
+            Terminator::Return,
+        );
+
+        let emitted = emit_program(&program).expect("RIP-relative LEA IR emits");
+
+        assert_eq!(
+            emitted.code().bytes(),
+            &[0x00, 0xda, 0x84, 0xd2, 0x20, 0x00, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]
+        );
+    }
+
+    #[test]
+    fn rdi_address_materialization_does_not_leave_rax_available() {
+        let program = program_with_ops(
+            vec![
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(42),
+                },
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rdi),
+                    src: Operand::AddressRipRelative {
+                        address: X86Va::new(0x26d0),
+                    },
+                },
+            ],
+            Terminator::Return,
+        );
+
+        assert_eq!(emit_program(&program), Err(EmitError::UnsupportedShape));
     }
 
     #[test]

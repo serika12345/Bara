@@ -144,6 +144,9 @@ pub enum Operand {
         address: X86Va,
         width: MemoryReadWidth,
     },
+    AddressRipRelative {
+        address: X86Va,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

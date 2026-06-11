@@ -684,12 +684,12 @@ review gate:
 - 完了したら commit / push / draft PR 作成で停止する。次の blocker は debug bundle の
   結果を見て次の `PR Gate` として追加する。
 
-- [ ] B8-G3h: RIP-relative `lea rdi,[rip+disp32]` address materialization boundary を追加する。
-  - [ ] B8-G3g の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 72 }`
+- [x] B8-G3h: RIP-relative `lea rdi,[rip+disp32]` address materialization boundary を追加する。
+  - [x] B8-G3g の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 72 }`
     (`48 8d 3d b3 10 00 00`) を RIP-relative LEA blocker として focused fixture に固定する。
-  - [ ] `rdi` destination の RIP-relative address materialization を、memory read ではない
+  - [x] `rdi` destination の RIP-relative address materialization を、memory read ではない
     typed address operand または最小 IR op として表現する。
-  - [ ] general LEA addressing modes が必要な場合は silent fallback せず stable blocker として
+  - [x] general LEA addressing modes が必要な場合は silent fallback せず stable blocker として
     report する。
 
 #### PR Gate: B8-G3h RIP-Relative LEA RDI Address Boundary
@@ -698,12 +698,50 @@ branch: `task/b8-g3h-rip-relative-lea-rdi`
 
 完了条件:
 
-- B8-G3g の debug bundle / blocker report から、次に潰す boundary として
+- [x] B8-G3g の debug bundle / blocker report から、次に潰す boundary として
   `48 8d 3d disp32` (`lea rdi, [rip+disp32]`) を選んでいる。
-- 選んだ blocker の最小 bytes が focused fixture として保存されている。
-- memory load と区別して、RIP-relative effective address materialization を decode /
+- [x] 選んだ blocker の最小 bytes が focused fixture として保存されている。
+- [x] memory load と区別して、RIP-relative effective address materialization を decode /
   lift / emit の最小範囲または stable blocker として表現している。
-- debug bundle または launch report で `48 8d 3d` blocker を越えるか、次に必要な
+- [x] debug bundle または launch report で `48 8d 3d` blocker を越えるか、次に必要な
+  ISA / loader / metadata boundary が stable に report される。
+
+PR に含めない:
+
+- full LEA addressing modes、scaled-index addressing、arbitrary destination registers の
+  一括実装。
+- relocation / rebase / bind、import resolution、Objective-C / AppKit bridge の本実装。
+- 汎用 register allocation や JIT/on-demand translation cache の本実装。
+
+検証:
+
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止する。次の blocker は debug bundle の
+  結果を見て次の `PR Gate` として追加する。
+
+- [ ] B8-G3i: RIP-relative `lea rsi,[rip+disp32]` address materialization boundary を追加する。
+  - [ ] B8-G3h の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 72 }`
+    (`48 8d 35 b6 10 00 00`) を RIP-relative LEA RSI blocker として focused fixture に固定する。
+  - [ ] `rsi` register model と RIP-relative address materialization を、memory read ではない
+    typed address operand として表現する。
+  - [ ] general LEA addressing modes や arbitrary destination registers が必要な場合は
+    silent fallback せず stable blocker として report する。
+
+#### PR Gate: B8-G3i RIP-Relative LEA RSI Address Boundary
+
+branch: `task/b8-g3i-rip-relative-lea-rsi`
+
+完了条件:
+
+- B8-G3h の debug bundle / blocker report から、次に潰す boundary として
+  `48 8d 35 disp32` (`lea rsi, [rip+disp32]`) を選んでいる。
+- 選んだ blocker の最小 bytes が focused fixture として保存されている。
+- `rsi` register model と、memory load ではない RIP-relative effective address
+  materialization を decode / lift / emit の最小範囲または stable blocker として表現している。
+- debug bundle または launch report で `48 8d 35` blocker を越えるか、次に必要な
   ISA / loader / metadata boundary が stable に report される。
 
 PR に含めない:
