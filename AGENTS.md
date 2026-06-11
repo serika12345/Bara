@@ -312,6 +312,22 @@ Review package at a milestone stop:
 - remaining risks or review points
 - recommended next milestone
 
+PR Gate workflow:
+
+- `TODO.md` may define explicit `PR Gate` blocks for application-launch work
+  and other long-running milestones.
+- A `PR Gate` is the review boundary for one pull request. It should state the
+  branch name, completion criteria, excluded work, verification expectation,
+  and stop condition.
+- When a `PR Gate` exists, do not advance past it during automated milestone
+  work unless the user explicitly asks to continue beyond that review point.
+- For B8 and later application-launch work, do not treat “general app launch”
+  as a single PR completion condition. Split work into reviewable slices that
+  each stabilize one debug bundle, entry execution step, unsupported
+  instruction, loader boundary, import/helper boundary, or runtime service.
+- Use debug bundle blocker reports as the source of truth for selecting the
+  next small implementation step once B8-D0 is available.
+
 ## Agent Action Commands
 
 These short commands are stable aliases for common agent workflows. They are
@@ -324,6 +340,11 @@ intended to let the user select an action without typing the full instruction.
 - `/advance-small`: Create or continue a dedicated work branch and advance the
   next small TODO-backed step. Commit and push the verified step on the work
   branch, then stop with a concise review package.
+- `/advance-pr`: Create or continue the dedicated branch for the next
+  unfinished `PR Gate` in `TODO.md`. Advance only until that gate's completion
+  criteria are met. Commit coherent verified steps, push the branch, open a
+  draft pull request, then stop with a review package. Do not continue into the
+  next `PR Gate` automatically.
 - `/continue-branch`: Continue work on the current dedicated task branch using
   the default implementation cycle. Commit and push coherent verified steps.
 - `/review-gate`: Do not implement more work. Summarize the current branch,
@@ -340,10 +361,10 @@ intended to let the user select an action without typing the full instruction.
 
 For Codex IDE / VSCode UI selection, repo-scoped skills in `.agents/skills/bara-*`
 mirror these actions. Invoking `$bara-advance-small`, `$bara-advance-large`,
-`$bara-continue-branch`, `$bara-review-gate`, `$bara-merge-reviewed`,
-`$bara-docs-only`, or `$bara-status` is equivalent to the corresponding Bara
-action command. Use `$bara-status` for the repository status workflow because
-the IDE also has a built-in `/status` command.
+`$bara-advance-pr`, `$bara-continue-branch`, `$bara-review-gate`,
+`$bara-merge-reviewed`, `$bara-docs-only`, or `$bara-status` is equivalent to
+the corresponding Bara action command. Use `$bara-status` for the repository
+status workflow because the IDE also has a built-in `/status` command.
 
 ## Architecture Rules
 

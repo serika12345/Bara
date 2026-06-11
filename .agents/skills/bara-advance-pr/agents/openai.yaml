@@ -1,0 +1,8 @@
+interface:
+  display_name: "Bara /advance-pr"
+  short_description: "Advance to the next Bara PR gate"
+  brand_color: "#2563EB"
+  default_prompt: "Use $bara-advance-pr to run Bara's /advance-pr workflow."
+
+policy:
+  allow_implicit_invocation: false

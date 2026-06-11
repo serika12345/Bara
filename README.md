@@ -175,6 +175,7 @@ direnv を使う場合は `.envrc` の `use flake` を有効にします。
 
 - `/advance-large`: 大マイルストーン完了まで進める。作業ブランチを切り、小ステップごとに commit / push し、大マイルストーン到達時にレビュー待ちで停止する。
 - `/advance-small`: 次の小マイルストーンまで進める。作業ブランチ上で検証済みの小ステップを commit / push して停止する。
+- `/advance-pr`: `TODO.md` の次の未完了 `PR Gate` まで進める。専用ブランチで検証済みステップを commit / push し、draft PR を開いて停止する。
 - `/continue-branch`: 現在の作業ブランチで続きを進める。
 - `/review-gate`: 追加実装せず、現在のブランチの成果物レビュー用サマリを出す。
 - `/merge-reviewed`: レビュー済みの作業ブランチを `main` に取り込み、必要に応じてブランチを掃除する。
@@ -183,9 +184,9 @@ direnv を使う場合は `.envrc` の `use flake` を有効にします。
 
 VSCode の Codex 拡張で UI から選びたい場合は、repo-scoped skill として
 同じ操作を `.agents/skills/bara-*` に置いています。チャット入力で `$` を
-入力し、`Bara /advance-small` や `Bara /status` を選んでください。Codex
-IDE には組み込みの `/status` もあるため、Bara 用の状態確認は
-`$bara-status` から呼び出すのが確実です。
+入力し、`Bara /advance-pr`、`Bara /advance-small`、`Bara /status` などを
+選んでください。Codex IDE には組み込みの `/status` もあるため、Bara 用の
+状態確認は `$bara-status` から呼び出すのが確実です。
 
 基本方針:
 
@@ -193,3 +194,4 @@ IDE には組み込みの `/status` もあるため、Bara 用の状態確認は
 - 作業ブランチではエージェントが commit / push まで自律的に行ってよい。
 - `main` ではエージェントは自律的に commit / push しない。
 - 大マイルストーン完了時はレビュー待ちで停止し、レビュー後に問題なければ `main` へ merge する。
+- B8 以降のアプリ起動フェーズでは、`TODO.md` の `PR Gate` を提出地点として扱い、1 つの PR で一般アプリ対応全体を完了条件にしない。

@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 16:42 JST
+最終更新: 2026-06-11 16:57 JST
 
 状態:
 
@@ -17,19 +17,20 @@
   reviewable GUI 起動 slice の積み上げとして扱う。B8-G1 は到達済みで、B8 全体は
   B8-G2 以降で self-authored fixture から一般の x86_64 macOS GUI application に
   近づける長期拡張として継続する。
-- active_milestone: planned。[TODO.md](../TODO.md) の B8-D0:
+- active_milestone: planned。[TODO.md](../TODO.md) の B8-D0 PR Gate:
   一般アプリ化に入る前の debug bundle foundation を作る。実 Mach-O entry、
   decode / lift / emit / runtime attempt、loader plan、helper request、blocker、
   再現手順を 1 directory に保存し、後続の unsupported boundary 修正サイクルで
-  同じ材料を読み直せるようにする。
+  同じ材料を読み直せるようにする。次の提出地点は
+  `task/b8-d0-debug-bundle` の draft PR として明示された。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
   Objective-C runtime / dyld の private behavior は使わず、public metadata、
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
-- active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
-  latest commit は `54a3e3f`。
-- related_todo: [TODO.md](../TODO.md) B8-G1 / B8-G2。
+- active_branch: `main`。latest commit は `59bf032`。次の実装ブランチは
+  `task/b8-d0-debug-bundle` として計画済み。
+- related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -49,13 +50,21 @@
   B8-G2 として B8-G1 専用 sentinel ではなく、Rosetta 確認済み self-authored
   x86_64 GUI binary の実 `LC_MAIN` entry から first-block translation attempt を
   行い、次の unsupported boundary を report する。
-- next_action: B8-D0 の最初の小ステップとして、debug bundle schema と出力 directory
-  layout を固定する。
-- verification: documentation-only update のため、code verification は未実行。
-  `git diff --check` と `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
+- next_action: `/advance-pr` で B8-D0 PR Gate へ進む。まず
+  `task/b8-d0-debug-bundle` を作成または継続し、debug bundle schema と出力
+  directory layout を固定する。
+- verification: documentation-only policy / roadmap update のため、code verification
+  は未実行。`git diff --check` と
+  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-11 16:57 JST: B8 以降のアプリ起動フェーズで、計画時点から PR 提出地点を
+  明確にするため、`TODO.md` に B8-D0 / B8-G2 / B8-G3 の `PR Gate` を追加した。
+  `AGENTS.md` と `README.md` には `/advance-pr` を追加し、repo-scoped skill
+  `$bara-advance-pr` からも次の未完了 PR Gate まで進められるようにした。
+  documentation-only policy / roadmap update のため code verification は未実行で、
+  `git diff --check` と `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 - 2026-06-11 16:42 JST: B8-D0 以降でぶつかりそうな大きな壁を、想定順で
   TODO / scope / design TODO に記録した。現状は AOT 的 pipeline を主軸にし、
   JIT / on-demand translation は unknown indirect target、callback、lazy binding、

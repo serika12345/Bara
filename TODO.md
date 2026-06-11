@@ -259,6 +259,16 @@ B8-G2 以降の長期ゴール:
   `expected.json` / `actual.json` / launch report / blocker report が安定し、
   次の unsupported boundary が明確になることとする。
 
+PR 提出地点の運用:
+
+- B8-D0 以降は、実装計画の中に `PR Gate` を明示する。
+- `/advance-pr` は `TODO.md` の最初の未完了 `PR Gate` だけを対象にし、完了条件を
+  満たしたら branch を push して draft PR を開き、次の `PR Gate` へは進まない。
+- `PR Gate` は branch 名、完了条件、PR に含めない作業、検証、停止条件を持つ。
+- debug bundle が利用可能になった後は、次の PR Gate を debug bundle の blocker
+  report から選ぶ。計画にない作業が必要になった場合は、先に TODO へ PR Gate を
+  追加または修正する。
+
 実行計画:
 
 - [ ] B8-D0: 一般アプリ化に入る前の debug bundle foundation を作る。
@@ -274,6 +284,38 @@ B8-G2 以降の長期ゴール:
   - [ ] debug bundle の保存は通常の actual / launch report と分け、失敗分析用の
     sidecar として扱う。core decode / lift / emit は I/O を持たず、debug 情報は
     report value または明示 collector から作る。
+
+#### PR Gate: B8-D0 Debug Bundle Foundation
+
+branch: `task/b8-d0-debug-bundle`
+
+完了条件:
+
+- `target/b8-debug/<case_id>/` の directory layout が固定されている。
+- `input.probe.json`、`entry.bytes.bin`、`entry.bytes.json`、
+  `decode.report.json`、`lift.ir.json`、`emit.report.json`、`pcmap.json`、
+  `fixups.json`、`helpers.json`、`loader.plan.json`、`runtime-attempt.json`、
+  `blocker.json`、`repro.sh` が CLI 境界から保存される。
+- debug bundle は通常の actual / launch / feedback report を置き換えず、
+  failure analysis 用 sidecar として扱われる。
+- core decode / lift / emit / validation に I/O が混ざっていない。
+- regression test または host-specific fixture test が追加されている。
+- `docs/progress.md` の現在の作業スナップショットが B8-D0 完了状態へ更新されている。
+
+PR に含めない:
+
+- 新しい x86_64 命令実装。
+- 実 `LC_MAIN` entry からの first-block translation attempt。
+- import / Objective-C / AppKit helper bridge の拡張。
+- JIT / on-demand translation / fallback interpreter の実装。
+
+検証:
+
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止し、B8-G2 へは自動で進まない。
 
 B8-D0 以降でぶつかりそうな大きな壁:
 
@@ -324,6 +366,38 @@ runtime-generated target が stable blocker として頻出し始めた段階で
     JSON report に保存する。
   - [ ] GUI 表示は要求せず、実 x86_64 entry に到達した事実、処理した PC range、
     次 blocker、B8-G1 host trap path との差分を launch report に保存する。
+
+#### PR Gate: B8-G2 Real LC_MAIN First-Block Report
+
+branch: `task/b8-g2-entry-first-block`
+
+完了条件:
+
+- B8-G1 専用 sentinel / host trap entry とは別に、public `LC_MAIN` entryoff と
+  executable segment metadata から実 entry bytes を切り出している。
+- 実 entry bytes の decode / lift / emit / runtime attempt が debug bundle と
+  launch report に保存される。
+- 最初の unsupported instruction / terminator / helper boundary が stable
+  `blocker.json` と launch report に保存される。
+- GUI 表示を完了条件にせず、処理した source PC range と B8-G1 host trap path
+  との差分が report される。
+- B8-D0 の debug bundle 出力を使い、次の B8-G3 以降で潰すべき blocker が
+  具体的に分かる。
+
+PR に含めない:
+
+- blocker として見つかった新規命令群の広範な実装。
+- Mach-O image mapping / rebase / bind の本実装。
+- import / Objective-C / AppKit helper bridge の一般化。
+
+検証:
+
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止し、B8-G3 へは自動で進まない。
+
 - [ ] B8-G3: self-authored GUI fixture の compiler output に必要な x86_64
   ISA subset を corpus-driven に拡張する。
   - [ ] prologue / epilogue、stack frame、RIP-relative addressing、`lea`、
@@ -331,6 +405,37 @@ runtime-generated target が stable blocker として頻出し始めた段階で
     public ISA 仕様に基づいて decode / lift / emit へ追加する。
   - [ ] fixture 由来の最小 bytes を regression corpus に保存し、未対応命令は
     `UnsupportedInstruction` として安定分類する。
+
+#### PR Gate: B8-G3 First ISA Blocker Slice
+
+branch: `task/b8-g3-first-isa-blocker`
+
+完了条件:
+
+- B8-G2 の debug bundle / blocker report から、最初に潰す x86_64 ISA blocker を
+  1 つ選んでいる。
+- 選んだ blocker の最小 bytes が regression corpus または focused fixture として
+  保存されている。
+- decode / lift / emit / validation / runtime attempt のうち、その blocker に必要な
+  最小範囲だけを実装している。
+- 同じ blocker が `UnsupportedInstruction` ではなく、次の blocker まで進むことを
+  debug bundle または launch report で確認できる。
+
+PR に含めない:
+
+- B8-G3 全体の ISA coverage を一括で増やす作業。
+- loader mapping、import resolution、Objective-C / AppKit bridge の本実装。
+- 選んだ blocker と理由が違う命令・ABI・runtime service の便乗実装。
+
+検証:
+
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止する。残りの ISA blocker は
+  debug bundle の結果を見て次の `PR Gate` として追加する。
+
 - [ ] B8-G4: user-space Mach-O image mapping と relocation / rebase / bind 適用を
   実行可能な loader step にする。
   - [ ] `LC_SEGMENT_64` file ranges から executable image / const data / data
