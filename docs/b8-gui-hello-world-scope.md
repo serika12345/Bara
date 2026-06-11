@@ -55,6 +55,22 @@ Rosetta black-box oracle から生成する初期 sidecar は
   GUI framework
 - `observed_events`: GUI surface creation を表す deterministic lifecycle event
 
+## 初期 actual launch report schema
+
+Bara 側の初期 sidecar は `b8_gui_hello_world_actual_launch_report_v0` とする。
+保存された fixture は `tests/expected/b8_gui_hello_world.bara.launch-report.json`
+である。
+
+初期 schema は次を含む。
+
+- `case_id`: `b8_gui_hello_world`
+- `actual_runtime`: `bara_arm64_user_space`
+- `status`: `blocked`
+- `input`: single Mach-O executable、source ISA、binary format、target triple、
+  GUI framework
+- `blocker`: 初期分類と説明。現時点では complete x86_64 Mach-O GUI executable
+  の loader 境界が未実装であるため `unsupported_loader_feature` とする。
+
 ## 初期 non-goals
 
 次は B8 の最初の GUI Hello World target では扱わない。

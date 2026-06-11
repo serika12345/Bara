@@ -1108,7 +1108,7 @@ fn ensure_supported_rosetta_host() -> Result<(), X8664MachOFixtureError> {
     }
 }
 
-fn b8_gui_hello_world_case_id() -> Result<CaseId, X8664MachOFixtureError> {
+pub(crate) fn b8_gui_hello_world_case_id() -> Result<CaseId, X8664MachOFixtureError> {
     CaseId::new(B8_GUI_HELLO_WORLD_CASE_ID).map_err(|source| {
         X8664MachOFixtureError::InvalidBuiltInCaseId {
             case_id: B8_GUI_HELLO_WORLD_CASE_ID,

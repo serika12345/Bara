@@ -22,6 +22,7 @@ use serde::Serialize;
 mod blackbox_run;
 mod executable_run;
 mod function_run;
+mod gui_hello_world_actual;
 mod native_artifact;
 #[cfg(test)]
 mod native_artifact_cli_tests;
@@ -34,6 +35,7 @@ use function_run::{
     compile_test_case_function, compile_test_case_function_standalone_artifact,
     run_test_case_function, FunctionArtifactMetadata, FunctionRunError,
 };
+use gui_hello_world_actual::b8_gui_hello_world_actual_launch_attempt;
 use native_artifact::{
     link_arm64_main_executable, link_arm64_main_executable_with_source_metadata,
     link_arm64_stdout_main_executable, link_arm64_stdout_main_executable_with_source_metadata,
@@ -117,6 +119,14 @@ fn run_cli(args: Vec<String>) -> Result<String, CliError> {
         }
         [command, case_path, actual_path] if command == "generate-arm64-actual" => {
             run_generate_arm64_actual(Path::new(case_path), Path::new(actual_path))
+        }
+        [command, actual_path, launch_report_path]
+            if command == "generate-arm64-gui-hello-world-actual" =>
+        {
+            run_generate_arm64_gui_hello_world_actual(
+                Path::new(actual_path),
+                Path::new(launch_report_path),
+            )
         }
         [command, case_path, output_dir] if command == "emit-fixture-artifacts" => {
             run_emit_fixture_artifacts(Path::new(case_path), Path::new(output_dir))
@@ -310,6 +320,45 @@ fn run_generate_arm64_actual(case_path: &Path, actual_path: &Path) -> Result<Str
     write_text_file(actual_path, &actual_json)?;
 
     Ok(actual_json)
+}
+
+fn run_generate_arm64_gui_hello_world_actual(
+    actual_path: &Path,
+    launch_report_path: &Path,
+) -> Result<String, CliError> {
+    let attempt =
+        b8_gui_hello_world_actual_launch_attempt().map_err(CliError::X8664MachOFixture)?;
+    let actual_json = observed_result_to_json(attempt.observed_result()).map_err(CliError::Json)?;
+    let launch_report_json = serde_json::to_string(attempt.launch_report())
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)?;
+
+    create_output_parent_dir(actual_path)?;
+    write_text_file(actual_path, &actual_json)?;
+    create_output_parent_dir(launch_report_path)?;
+    write_text_file(launch_report_path, &launch_report_json)?;
+
+    serde_json::to_string(&GuiHelloWorldActualOutputPaths::new(
+        actual_path,
+        launch_report_path,
+    ))
+    .map_err(JsonError::new)
+    .map_err(CliError::Json)
+}
+
+#[derive(Serialize)]
+struct GuiHelloWorldActualOutputPaths {
+    actual: String,
+    launch_report: String,
+}
+
+impl GuiHelloWorldActualOutputPaths {
+    fn new(actual_path: &Path, launch_report_path: &Path) -> Self {
+        Self {
+            actual: actual_path.to_string_lossy().into_owned(),
+            launch_report: launch_report_path.to_string_lossy().into_owned(),
+        }
+    }
 }
 
 fn run_emit_fixture_artifacts(case_path: &Path, output_dir: &Path) -> Result<String, CliError> {
@@ -1361,7 +1410,7 @@ impl std::fmt::Display for CliError {
         match self {
             Self::Usage => write!(
                 formatter,
-                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | emit-fixture-artifacts <case.json> <out-dir> | link-fixture-arm64-main <case.json> <out-exe> | build-x86_64-macho-fixture <case.json> <out-exe> | build-x86_64-gui-hello-world-fixture <out-exe> | build-x86_64-oracle-runner <case.json> <out-exe> | generate-x86_64-expected <case.json> <expected.json> | generate-x86_64-gui-hello-world-expected <expected.json> <launch-metadata.json> | generate-arm64-actual <case.json> <actual.json> | compare-expected-actual <expected.json> <actual.json> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
+                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | emit-fixture-artifacts <case.json> <out-dir> | link-fixture-arm64-main <case.json> <out-exe> | build-x86_64-macho-fixture <case.json> <out-exe> | build-x86_64-gui-hello-world-fixture <out-exe> | build-x86_64-oracle-runner <case.json> <out-exe> | generate-x86_64-expected <case.json> <expected.json> | generate-x86_64-gui-hello-world-expected <expected.json> <launch-metadata.json> | generate-arm64-actual <case.json> <actual.json> | generate-arm64-gui-hello-world-actual <actual.json> <launch-report.json> | compare-expected-actual <expected.json> <actual.json> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
             ),
             Self::ReadFile { path, source } => {
                 write!(formatter, "failed to read file {}: {source}", path.display())
@@ -1915,6 +1964,45 @@ mod tests {
     }
 
     #[test]
+    fn generate_arm64_gui_hello_world_actual_writes_actual_and_launch_report() {
+        let temp_dir = TestTempDir::new(
+            "generate_arm64_gui_hello_world_actual_writes_actual_and_launch_report",
+        );
+        let actual_path = temp_dir.path.join("actual").join("b8_gui_hello_world.json");
+        let launch_report_path = temp_dir
+            .path
+            .join("actual")
+            .join("b8_gui_hello_world.launch-report.json");
+
+        let output = run_cli(vec![
+            String::from("generate-arm64-gui-hello-world-actual"),
+            actual_path.to_string_lossy().into_owned(),
+            launch_report_path.to_string_lossy().into_owned(),
+        ])
+        .expect("B8 GUI Hello World actual blocker report is generated");
+
+        assert_eq!(
+            output,
+            format!(
+                "{{\"actual\":\"{}\",\"launch_report\":\"{}\"}}",
+                actual_path.display(),
+                launch_report_path.display()
+            )
+        );
+        let expected_actual = observed_result_from_json(include_str!(
+            "../../../tests/expected/b8_gui_hello_world.bara.actual.json"
+        ))
+        .and_then(|result| observed_result_to_json(&result))
+        .expect("B8 GUI actual blocker fixture normalizes to output json");
+        assert_eq!(read_file(&actual_path), expected_actual);
+        assert_eq!(
+            read_file(&launch_report_path),
+            include_str!("../../../tests/expected/b8_gui_hello_world.bara.launch-report.json")
+                .trim_end_matches('\n')
+        );
+    }
+
+    #[test]
     fn compare_expected_actual_reports_matching_observations() {
         let temp_dir = TestTempDir::new("compare_expected_actual_reports_matching_observations");
         let expected_path = temp_dir.write_file(
@@ -2320,6 +2408,9 @@ mod tests {
         assert!(error
             .to_string()
             .contains("generate-arm64-actual <case.json> <actual.json>"));
+        assert!(error
+            .to_string()
+            .contains("generate-arm64-gui-hello-world-actual <actual.json> <launch-report.json>"));
         assert!(error
             .to_string()
             .contains("compare-expected-actual <expected.json> <actual.json>"));

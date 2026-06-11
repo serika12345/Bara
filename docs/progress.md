@@ -9,44 +9,48 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 11:07 JST
+最終更新: 2026-06-11 11:21 JST
 
 状態:
 
-- project_state: completed。B8 の 3 つ目の小ステップとして、GUI Hello World
-  fixture を Rosetta black-box oracle で実行し、`expected.json` と launch
-  metadata の初期 schema を固定した。
+- project_state: completed。B8 の 4 つ目の小ステップとして、Bara 側の
+  GUI Hello World 起動 attempt を `actual.json` / launch report / blocker
+  classification として保存できる CLI 境界を追加した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8:
   実 x86_64 macOS アプリ起動。
-- active_design_focus: B8 GUI expected oracle。self-authored AppKit fixture を
-  x86_64 Mach-O executable として生成し、Rosetta black-box execution の
-  process observation と launch metadata sidecar を保存する。
+- active_design_focus: B8 GUI actual launch report。self-authored AppKit fixture
+  を Bara user-space runtime 側で扱おうとしたときの deterministic blocked
+  observation と launch report sidecar を保存する。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
   latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B8 の「GUI Hello World fixture を Rosetta
-  black-box oracle で実行し、`expected.json` と launch metadata の初期 schema
-  を固定する」。
-- completed_work: `btbc-cli generate-x86_64-gui-hello-world-expected <expected.json>
-  <launch-metadata.json>` を追加した。command は GUI fixture を一時 x86_64
-  Mach-O として build し、Rosetta 実行の stdout、stderr、exit status、
-  process-level return equivalent を `ObservedResult` として保存する。
-  `b8_gui_hello_world_launch_metadata_v0` sidecar は oracle、fixture identity、
-  deterministic GUI lifecycle event を含む。
-  self-authored fixture は host 環境由来の AppKit diagnostics が expected stderr
-  を不安定にしないよう、process stderr を `/dev/null` に向ける。
-- remaining_work: 次の小ステップは Bara 側の GUI Hello World 起動 attempt を
-  `actual.json` / launch report / blocker classification として保存できる CLI
-  境界を作ること。
-- next_action: commit / push 後、次の B8 小ステップで Bara actual launch report
-  境界を作る。
+- related_todo: [TODO.md](../TODO.md) B8 の「Bara 側の GUI Hello World 起動
+  attempt を `actual.json` / launch report / blocker classification として保存
+  できる CLI 境界を作る」。
+- completed_work: `btbc-cli generate-arm64-gui-hello-world-actual <actual.json>
+  <launch-report.json>` を追加した。command は現時点の Bara actual を
+  deterministic blocked observation として `ObservedResult` に保存し、
+  `b8_gui_hello_world_actual_launch_report_v0` sidecar に runtime、input identity、
+  `unsupported_loader_feature` blocker を保存する。
+- remaining_work: 次の小ステップは GUI Hello World の initial blocker を
+  unsupported import / unsupported loader feature / unsupported ObjC runtime
+  boundary のどれかに安定分類すること。
+- next_action: commit / push 後、次の B8 小ステップで blocker classification
+  を Mach-O / loader 境界の情報に基づいて安定化する。
 - verification: targeted tests として
-  `nix develop -c cargo test -p btbc-cli gui_hello_world_expected -- --nocapture`、
-  `nix develop -c cargo test -p btbc-cli rosetta_gui_hello_world_observation_builds_expected_and_launch_metadata -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli gui_hello_world_actual -- --nocapture`、
   `nix develop -c cargo test -p btbc-cli usage_includes_probe_binary_command -- --nocapture`
   が通過した。full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-11 11:17 JST: B8 の 4 つ目の小ステップとして、Bara 側の
+  GUI Hello World 起動 attempt を `actual.json` と launch report sidecar へ保存
+  する CLI 境界を追加した。`tests/expected/b8_gui_hello_world.bara.actual.json`
+  は現在の blocked process observation を保存し、
+  `tests/expected/b8_gui_hello_world.bara.launch-report.json` は
+  `b8_gui_hello_world_actual_launch_report_v0` として Bara runtime、input identity、
+  `unsupported_loader_feature` blocker を保存する。targeted tests と full
+  `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-11 11:03 JST: B8 の 3 つ目の小ステップとして、GUI Hello World
   fixture を Rosetta black-box oracle で実行し、`expected.json` と launch
   metadata の初期 schema を固定した。`tests/expected/b8_gui_hello_world.json`
