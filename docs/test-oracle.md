@@ -275,3 +275,11 @@ QuickCheck / Hedgehog 導入前の B7 では、Rust workspace 内の
 `bara_oracle::small_case` が deterministic な no-args/u64 小ケース集合と、
 `mov eax, imm32; ret` を `return 0` へ縮める最初の shrink candidate plan を
 提供する。この導線で JSON schema と failure package の形を先に固める。
+
+CI lane は repo-local scripts として分ける。`scripts/verify-quick` は format /
+security / domain type / cargo check / clippy / library unit tests を担当し、
+`scripts/verify-native` は host-specific native artifact tests を含む workspace
+tests を担当する。`scripts/verify-oracle` は `check-blackbox --out` 経路を通し、
+失敗時は `target/bara-blackbox/failures/<case_id>/` に failure package を残す。
+`scripts/verify-nightly` は deterministic small-case shrink tests と
+`check-blackbox --out` を `target/bara-nightly/` に保存する。

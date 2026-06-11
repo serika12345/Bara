@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+set -eu
+
+cd "$(dirname "$0")/.."
+
+output_dir="${BARA_NIGHTLY_OUTPUT_DIR:-target/bara-nightly}"
+
+rm -rf "$output_dir"
+
+cargo test -p bara-oracle small_case::tests
+cargo run -p btbc-cli -- check-blackbox --out "$output_dir"

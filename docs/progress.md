@@ -9,33 +9,41 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 10:04 JST
+最終更新: 2026-06-11 10:10 JST
 
 状態:
 
-- project_state: completed。B7 の 16 個目の小ステップとして、QuickCheck /
-  Hedgehog 導入前の Rust deterministic 小ケース生成と shrink candidate plan を
-  追加した。
+- project_state: completed。B7 の 17 個目の小ステップとして、quick / native /
+  oracle / nightly verification lane scripts を分離した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B7:
   Oracle / Regression 基盤。
-- active_design_focus: B7 verifier / generated small cases。emit metadata と
-  final state comparison の report に加えて、Rust workspace 内で deterministic な
-  no-args/u64 小ケース生成と shrink candidate plan を持つ。
+- active_design_focus: B7 verification lanes。quick checks、host-specific native
+  tests、oracle blackbox、nightly-style small-case/shrink + corpus output を
+  repo-local scripts として分離する。
 - active_branch: `task/b7-x86_64-macho-fixture-generation`。base commit は
   `8d39a4a`。latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B7 の QuickCheck / Hedgehog 導入前の
-  Rust deterministic 小ケース生成と failing case shrink 開始項目。
-- completed_work: `bara_oracle::small_case` が deterministic な no-args/u64
-  `SmallCaseSet` と、非ゼロ `mov eax, imm32; ret` を `return 0` 候補へ縮める
-  `SmallCaseShrinkPlan` を返す。
-- remaining_work: B7 は継続中。CI lane 分割と failure classification 拡張は未実装。
-- next_action: quick tests と host-specific native artifact tests を分ける。
-- verification: targeted test として
-  `nix develop -c cargo test -p bara-oracle small_case::tests` が通過した。
-  `nix develop -c ./scripts/check-domain-types` と
+- related_todo: [TODO.md](../TODO.md) B7 の CI lane 分割と failure corpus 保存項目。
+- completed_work: `scripts/verify` は `verify-quick`、`verify-native`、
+  `verify-oracle` を順に呼ぶ。`verify-nightly` は small-case shrink tests と
+  `check-blackbox --out` を `target/bara-nightly/` に保存する。
+- remaining_work: B7 は継続中。failure classification 拡張は未実装。
+- next_action: wrong register / flags / memory / branch target / call return /
+  external call を failure classification として扱う。
+- verification: lane scripts として
+  `nix develop -c ./scripts/verify-quick`、
+  `nix develop -c ./scripts/verify-native`、
+  `nix develop -c ./scripts/verify-oracle`、
+  `nix develop -c ./scripts/verify-nightly` が通過した。
   `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
+
+- 2026-06-11 10:10 JST: B7 の 17 個目の小ステップとして、
+  verification lane scripts を分離した。`verify-quick` は format / security /
+  domain / check / clippy / library unit tests、`verify-native` は workspace tests、
+  `verify-oracle` は blackbox oracle、`verify-nightly` は small-case shrink tests と
+  nightly output directory への failure package 保存を担当する。検証は snapshot の
+  lane scripts と commit 前の full verification。
 
 - 2026-06-11 10:04 JST: B7 の 16 個目の小ステップとして、
   Rust deterministic 小ケース生成と shrink candidate plan を追加した。

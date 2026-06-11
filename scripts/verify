@@ -3,12 +3,6 @@ set -eu
 
 cd "$(dirname "$0")/.."
 
-cargo fmt --all -- --check
-./scripts/check-no-invisible-chars
-./scripts/check-domain-types
-./scripts/verify-security
-./scripts/verify-nix-package
-cargo check --workspace --all-targets
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
-./scripts/verify-blackbox
+./scripts/verify-quick
+./scripts/verify-native
+./scripts/verify-oracle
