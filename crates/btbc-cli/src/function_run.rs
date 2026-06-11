@@ -369,6 +369,10 @@ enum FunctionRegisterArtifact {
     Edi,
     Di,
     Dil,
+    Rsi,
+    Esi,
+    Si,
+    Sil,
 }
 
 impl FunctionRegisterArtifact {
@@ -406,6 +410,10 @@ impl FunctionRegisterArtifact {
             bara_ir::X86Reg::Edi => Self::Edi,
             bara_ir::X86Reg::Di => Self::Di,
             bara_ir::X86Reg::Dil => Self::Dil,
+            bara_ir::X86Reg::Rsi => Self::Rsi,
+            bara_ir::X86Reg::Esi => Self::Esi,
+            bara_ir::X86Reg::Si => Self::Si,
+            bara_ir::X86Reg::Sil => Self::Sil,
         }
     }
 }
@@ -1582,7 +1590,7 @@ mod tests {
 
     #[test]
     fn function_register_artifact_serializes_partial_register_views() {
-        let registers = [
+        let registers = vec![
             FunctionRegisterArtifact::from_ir(X86Reg::Rax),
             FunctionRegisterArtifact::from_ir(X86Reg::Eax),
             FunctionRegisterArtifact::from_ir(X86Reg::Ax),
@@ -1615,11 +1623,15 @@ mod tests {
             FunctionRegisterArtifact::from_ir(X86Reg::Edi),
             FunctionRegisterArtifact::from_ir(X86Reg::Di),
             FunctionRegisterArtifact::from_ir(X86Reg::Dil),
+            FunctionRegisterArtifact::from_ir(X86Reg::Rsi),
+            FunctionRegisterArtifact::from_ir(X86Reg::Esi),
+            FunctionRegisterArtifact::from_ir(X86Reg::Si),
+            FunctionRegisterArtifact::from_ir(X86Reg::Sil),
         ];
 
         assert_eq!(
             serde_json::to_string(&registers).expect("register artifacts serialize"),
-            "[\"rax\",\"eax\",\"ax\",\"al\",\"rdx\",\"edx\",\"dx\",\"dl\",\"rbx\",\"ebx\",\"bx\",\"bl\",\"rbp\",\"ebp\",\"bp\",\"bpl\",\"rsp\",\"esp\",\"sp\",\"spl\",\"r14\",\"r14d\",\"r14w\",\"r14b\",\"r15\",\"r15d\",\"r15w\",\"r15b\",\"rdi\",\"edi\",\"di\",\"dil\"]"
+            "[\"rax\",\"eax\",\"ax\",\"al\",\"rdx\",\"edx\",\"dx\",\"dl\",\"rbx\",\"ebx\",\"bx\",\"bl\",\"rbp\",\"ebp\",\"bp\",\"bpl\",\"rsp\",\"esp\",\"sp\",\"spl\",\"r14\",\"r14d\",\"r14w\",\"r14b\",\"r15\",\"r15d\",\"r15w\",\"r15b\",\"rdi\",\"edi\",\"di\",\"dil\",\"rsi\",\"esi\",\"si\",\"sil\"]"
         );
     }
 

@@ -70,6 +70,10 @@ pub enum DecodedInstructionKind {
         displacement: X86Imm32,
         address: X86Va,
     },
+    LeaRsiRipRelative {
+        displacement: X86Imm32,
+        address: X86Va,
+    },
     MovzxEaxBytePtrRdi,
     AddEaxImm32 {
         imm: X86Imm32,
