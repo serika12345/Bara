@@ -274,6 +274,47 @@ B8-G2 以降の長期ゴール:
   - [ ] debug bundle の保存は通常の actual / launch report と分け、失敗分析用の
     sidecar として扱う。core decode / lift / emit は I/O を持たず、debug 情報は
     report value または明示 collector から作る。
+
+B8-D0 以降でぶつかりそうな大きな壁:
+
+1. Debug bundle / failure reproduction。実 Mach-O entry に入る前に、失敗時の
+   input、entry bytes、decode / lift / emit、loader plan、runtime attempt、
+   blocker、再現 command を保存できないと、後続の unsupported boundary を
+   安定して潰せない。
+2. 実 Mach-O entry extraction と first-block translation。B8-G1 専用 sentinel から
+   離れ、`LC_MAIN` entryoff と executable segment metadata から実 x86_64 bytes を
+   切り出して処理する必要がある。
+3. x86_64 ISA coverage。compiler output の prologue / epilogue、RIP-relative
+   addressing、memory operands、`lea`、call / jump stubs、flags、SSE などが順に
+   blocker になる。
+4. Mach-O image mapping と relocation / rebase / bind。`__TEXT` / `__DATA` /
+   `__LINKEDIT`、slide、page protection、rebase、bind、lazy bind を public
+   metadata から runtime image へ反映する必要がある。
+5. Dynamic library / import resolution。`LC_LOAD_DYLIB`、symbol stubs、public system
+   framework imports、libc / AppKit / Objective-C runtime symbol を helper
+   boundary へ接続する必要がある。
+6. Calling convention / helper marshaling。x86_64 macOS ABI の register arguments、
+   stack alignment、return value、variadic call、struct return、ObjC message send
+   ABI を helper request / return value と対応づける必要がある。
+7. Objective-C runtime / AppKit boundary。`objc_msgSend`、class / selector lookup、
+   autorelease pool、main run loop、window / view lifecycle、callbacks into translated
+   code が大きな境界になる。
+8. Process state。initial stack、argv / envp、heap / malloc、TLS、file descriptors、
+   current working directory、signals / exceptions、initial thread を user-space
+   runtime metadata と helper boundary で扱う必要がある。
+9. Indirect control flow と translation cache。function pointers、ObjC IMPs、callbacks、
+   lazy stubs、unknown indirect target が増えると、AOT だけでは到達先を事前確定
+   しにくくなり、on-demand translation / JIT / fallback interpreter の必要度が上がる。
+10. macOS 実行制約。executable memory、W^X、code signing、hardened runtime、
+    framework loading、bundle / resource を public API と documented behavior の
+    範囲で扱う必要がある。
+11. `.app` bundle / resource。single executable の限界が blocker になった時点で、
+    Info.plist、bundle identifier、resources、assets、nib/storyboard 相当を scope 化する。
+
+当面は AOT 的 pipeline を主軸にし、JIT は最初から実装前提にしない。JIT または
+on-demand translation は、unknown indirect target、callback、lazy binding、
+runtime-generated target が stable blocker として頻出し始めた段階で、必要な範囲から
+導入する。
 - [ ] B8-G2: 実 Mach-O entry からの first-block translation report を作る。
   - [ ] B8-G1 専用 `0f0b4238473131c0c3` entry とは別に、入力 Mach-O の
     public `LC_MAIN` entryoff と executable segment metadata から実 entry bytes を

@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 16:34 JST
+最終更新: 2026-06-11 16:42 JST
 
 状態:
 
@@ -38,7 +38,11 @@
   stable comparison が空 issue で一致する。manual visible mode は window close /
   `Command-Q` まで戻らず、GUI window 上の `hello world` label を目視確認できる。
   B8-G2 以降の一般アプリ化計画と、その前提になる B8-D0 debug bundle foundation を
-  TODO / scope / design TODO に明文化した。
+  TODO / scope / design TODO に明文化した。B8-D0 以降でぶつかりそうな壁の初期順序も
+  debug bundle、実 Mach-O entry、x86_64 ISA coverage、Mach-O loader execution、
+  dynamic library / import boundary、ABI / helper marshaling、Objective-C runtime /
+  AppKit lifecycle、process state、indirect control flow / translation cache、
+  macOS constraints / bundle resource として記録した。
 - remaining_work: B8-D0。`target/b8-debug/<case_id>/` に input probe、entry bytes、
   decode report、lift IR、emit report、PC map、fixups、helpers、loader plan、
   runtime attempt、blocker、repro command を保存する CLI 境界を作る。その後、
@@ -52,6 +56,13 @@
 
 直近で完了した作業:
 
+- 2026-06-11 16:42 JST: B8-D0 以降でぶつかりそうな大きな壁を、想定順で
+  TODO / scope / design TODO に記録した。現状は AOT 的 pipeline を主軸にし、
+  JIT / on-demand translation は unknown indirect target、callback、lazy binding、
+  runtime-generated target が stable blocker として頻出し始めた段階で、
+  translation cache、PC map、runtime helper boundary とセットで導入する判断を
+  明文化した。documentation-only update のため code verification は未実行で、
+  `git diff --check` と `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 - 2026-06-11 16:34 JST: B8-G2 の前提として B8-D0 debug bundle foundation を追加した。
   一般アプリ化では unsupported boundary を細かく潰す必要があるため、input probe、
   entry extraction、decode / lift / emit / runtime attempt、loader plan、helper

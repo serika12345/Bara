@@ -185,6 +185,44 @@ launch report / feedback report の代替ではない。decode / lift / emit の
 に I/O や global debug state を入れず、各段階の report value から CLI が bundle を
 保存する。
 
+## ぶつかりそうな大きな壁
+
+B8-G2 以降では、次の順で blocker にぶつかる可能性が高い。順序は固定契約ではなく、
+self-authored fixture と compiler output の形に応じて入れ替わり得るが、作業計画では
+この順を初期想定にする。
+
+1. Debug bundle と再現性。失敗時に input、entry bytes、各 pipeline report、
+   loader plan、runtime attempt、blocker、repro command を保存できないと、
+   以降の修正サイクルが成立しない。
+2. 実 Mach-O entry extraction。B8-G1 専用 sentinel ではなく、public `LC_MAIN`
+   entryoff と executable segment metadata から実 entry bytes を切り出す必要がある。
+3. x86_64 ISA coverage。prologue / epilogue、RIP-relative addressing、memory
+   operands、`lea`、call / jump stubs、flags、SSE が順に blocker になりやすい。
+4. Mach-O loader execution。image mapping、slide、page protection、rebase、bind、
+   lazy bind、`__LINKEDIT` metadata を public format から扱う必要がある。
+5. Dynamic library / import boundary。`LC_LOAD_DYLIB`、symbol stubs、libc、
+   Objective-C runtime、AppKit framework imports を helper request へ接続する。
+6. ABI / helper marshaling。x86_64 macOS calling convention の register arguments、
+   stack alignment、return value、variadic call、struct return、ObjC message send ABI
+   を helper boundary と対応づける。
+7. Objective-C runtime / AppKit lifecycle。`objc_msgSend`、class / selector lookup、
+   autorelease pool、main run loop、window / view lifecycle、callbacks into translated
+   code が大きな境界になる。
+8. Process state。initial stack、argv / envp、heap、TLS、file descriptors、
+   current working directory、signals / exceptions、initial thread が必要になる。
+9. Indirect control flow と translation cache。function pointers、ObjC IMPs、
+   callbacks、lazy stubs、unknown indirect target が増えると、AOT だけでは到達先を
+   事前確定しにくくなる。
+10. macOS 実行制約と bundle / resource。W^X、code signing、hardened runtime、
+    framework loading、`.app`、Info.plist、resources、assets を public API と
+    documented behavior の範囲で扱う。
+
+現状は AOT 的 pipeline が主軸である。短期の B8-D0 から B8-G4 では、AOT 的に
+entry から進めて blocker を保存する方針を優先する。JIT または on-demand translation は、
+unknown indirect target、callback、lazy binding、runtime-generated target が
+実際の blocker として頻出し始めた時点で、translation cache / PC map / runtime
+helper boundary とセットで導入する。
+
 ## 初期 launch metadata schema
 
 Rosetta black-box oracle から生成する初期 sidecar は

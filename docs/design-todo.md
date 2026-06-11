@@ -187,6 +187,16 @@
   actual / launch / feedback report を置き換えず、次の unsupported boundary を
   修正するための作業材料を保存する。core decode / lift / emit / validation は I/O を
   持たず、debug 情報は戻り値の report value または明示 collector から CLI が保存する。
+- B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
+  x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
+  ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、
+  indirect control flow / translation cache、macOS constraints / bundle resource とする。
+  この順序は実 fixture と compiler output によって入れ替わり得るため、各 step では
+  debug bundle の blocker report を source of truth にして次の作業を選ぶ。
+  現状は AOT 的 pipeline を主軸にし、JIT / on-demand translation は unknown indirect
+  target、callback、lazy binding、runtime-generated target が stable blocker として
+  頻出し始めた段階で、translation cache、PC map、runtime helper boundary とセットで
+  導入する。
 - wasm2c platform adapter / NDA target adapter は本流 TODO ではなく、
   [将来構想メモ](future-research-concepts.md) の未確立構想として扱う。
 
