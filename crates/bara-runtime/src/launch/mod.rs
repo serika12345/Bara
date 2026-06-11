@@ -5,6 +5,7 @@ pub struct UserSpaceLaunchPlan {
     initial_stack: UserSpaceInitialStackPlan,
     helper_boundary: UserSpaceHelperBoundaryPlan,
     integration_policy: UserSpaceIntegrationPolicy,
+    process_boundary: UserSpaceProcessBoundary,
 }
 
 impl UserSpaceLaunchPlan {
@@ -15,6 +16,7 @@ impl UserSpaceLaunchPlan {
             initial_stack: UserSpaceInitialStackPlan::argv_envp_initial_stack(),
             helper_boundary: UserSpaceHelperBoundaryPlan::imports_objc_os_api_requests(),
             integration_policy: UserSpaceIntegrationPolicy::current_user_space_process(),
+            process_boundary: UserSpaceProcessBoundary::current_user_space_process(),
         }
     }
 
@@ -36,6 +38,10 @@ impl UserSpaceLaunchPlan {
 
     pub const fn integration_policy(&self) -> &UserSpaceIntegrationPolicy {
         &self.integration_policy
+    }
+
+    pub const fn process_boundary(&self) -> &UserSpaceProcessBoundary {
+        &self.process_boundary
     }
 }
 
@@ -214,6 +220,41 @@ pub enum UserSpacePrivateIntegrationRequirement {
     NotRequired,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UserSpaceProcessBoundary {
+    loader: UserSpaceProcessScope,
+    translation_cache: UserSpaceProcessScope,
+    runtime_helper: UserSpaceProcessScope,
+    artifact_cache: UserSpaceProcessScope,
+}
+
+impl UserSpaceProcessBoundary {
+    const fn current_user_space_process() -> Self {
+        Self {
+            loader: UserSpaceProcessScope::CurrentUserSpaceProcess,
+            translation_cache: UserSpaceProcessScope::CurrentUserSpaceProcess,
+            runtime_helper: UserSpaceProcessScope::CurrentUserSpaceProcess,
+            artifact_cache: UserSpaceProcessScope::CurrentUserSpaceProcess,
+        }
+    }
+
+    pub const fn loader(self) -> UserSpaceProcessScope {
+        self.loader
+    }
+
+    pub const fn translation_cache(self) -> UserSpaceProcessScope {
+        self.translation_cache
+    }
+
+    pub const fn runtime_helper(self) -> UserSpaceProcessScope {
+        self.runtime_helper
+    }
+
+    pub const fn artifact_cache(self) -> UserSpaceProcessScope {
+        self.artifact_cache
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
@@ -284,6 +325,28 @@ mod tests {
         assert_eq!(
             policy.private_dyld_behavior(),
             UserSpacePrivateIntegrationRequirement::NotRequired
+        );
+    }
+
+    #[test]
+    fn user_space_launch_plan_keeps_loader_caches_and_helpers_in_process() {
+        let boundary = *UserSpaceLaunchPlan::mach_o_executable_image().process_boundary();
+
+        assert_eq!(
+            boundary.loader(),
+            UserSpaceProcessScope::CurrentUserSpaceProcess
+        );
+        assert_eq!(
+            boundary.translation_cache(),
+            UserSpaceProcessScope::CurrentUserSpaceProcess
+        );
+        assert_eq!(
+            boundary.runtime_helper(),
+            UserSpaceProcessScope::CurrentUserSpaceProcess
+        );
+        assert_eq!(
+            boundary.artifact_cache(),
+            UserSpaceProcessScope::CurrentUserSpaceProcess
         );
     }
 }

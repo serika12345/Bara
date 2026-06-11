@@ -104,6 +104,7 @@ struct GuiHelloWorldActualRuntimePreparation {
     initial_stack: GuiHelloWorldActualInitialStackPreparation,
     helper_boundary: GuiHelloWorldActualHelperBoundaryPreparation,
     integration_policy: GuiHelloWorldActualIntegrationPolicy,
+    process_boundary: GuiHelloWorldActualProcessBoundary,
 }
 
 impl GuiHelloWorldActualRuntimePreparation {
@@ -125,6 +126,9 @@ impl GuiHelloWorldActualRuntimePreparation {
             ),
             integration_policy: GuiHelloWorldActualIntegrationPolicy::from_policy(
                 plan.integration_policy(),
+            ),
+            process_boundary: GuiHelloWorldActualProcessBoundary::from_boundary(
+                plan.process_boundary(),
             ),
         }
     }
@@ -355,6 +359,31 @@ impl GuiHelloWorldActualPrivateIntegrationRequirement {
     const fn from_runtime(requirement: UserSpacePrivateIntegrationRequirement) -> Self {
         match requirement {
             UserSpacePrivateIntegrationRequirement::NotRequired => Self::NotRequired,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+struct GuiHelloWorldActualProcessBoundary {
+    loader: GuiHelloWorldActualProcessScope,
+    translation_cache: GuiHelloWorldActualProcessScope,
+    runtime_helper: GuiHelloWorldActualProcessScope,
+    artifact_cache: GuiHelloWorldActualProcessScope,
+}
+
+impl GuiHelloWorldActualProcessBoundary {
+    const fn from_boundary(boundary: &bara_runtime::UserSpaceProcessBoundary) -> Self {
+        Self {
+            loader: GuiHelloWorldActualProcessScope::from_runtime(boundary.loader()),
+            translation_cache: GuiHelloWorldActualProcessScope::from_runtime(
+                boundary.translation_cache(),
+            ),
+            runtime_helper: GuiHelloWorldActualProcessScope::from_runtime(
+                boundary.runtime_helper(),
+            ),
+            artifact_cache: GuiHelloWorldActualProcessScope::from_runtime(
+                boundary.artifact_cache(),
+            ),
         }
     }
 }
@@ -716,7 +745,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_string(attempt.launch_report()).expect("launch report serializes"),
-            "{\"schema\":\"b8_gui_hello_world_actual_launch_report_v0\",\"case_id\":\"b8_gui_hello_world\",\"actual_runtime\":\"bara_arm64_user_space\",\"status\":\"blocked\",\"input\":{\"kind\":\"mach_o_executable_image\",\"source_isa\":\"x86_64\",\"binary_format\":\"mach_o\",\"target_triple\":\"x86_64-apple-macos13\",\"gui_framework\":\"appkit\",\"probe\":{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\"},\"loader_metadata\":{\"source\":\"public_mach_o_probe\",\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":0,\"byte_size\":0,\"recognized_entry_points\":[],\"recognized_segments\":[],\"unsupported_commands\":[]},\"executable_image_conversion\":{\"status\":\"not_convertible\",\"blocker\":\"missing_entry_point\"}},\"sections\":{\"status\":\"modeled_from_lc_segment_64_section_table\"},\"imports\":{\"status\":\"modeled_from_dylib_load_commands\"},\"relocations\":{\"status\":\"modeled_from_linkedit_relocation_and_bind_commands\"}}},\"runtime_preparation\":{\"source\":\"bara_runtime_user_space_launch_plan\",\"status\":\"planned_not_executed\",\"image_mapping\":{\"responsibility\":\"loader\",\"source\":\"mach_o_executable_image\",\"memory_protection\":\"public_os_virtual_memory\"},\"entry_trampoline\":{\"responsibility\":\"runtime\",\"target\":\"mach_o_entry_point\"},\"initial_stack\":{\"responsibility\":\"runtime\",\"contract\":\"argv_envp_initial_stack\"},\"helper_boundary\":{\"responsibility\":\"helper_boundary\",\"contract\":\"imports_objc_os_api_requests\"},\"integration_policy\":{\"process_scope\":\"current_user_space_process\",\"kernel_extension\":\"not_required\",\"private_kernel_hook\":\"not_required\",\"private_dyld_behavior\":\"not_required\"}},\"blocker\":{\"classification\":\"unsupported_loader_feature\",\"boundary\":\"loader\",\"selected_by\":\"first_unsupported_launch_boundary\",\"candidate_boundaries\":[{\"boundary\":\"loader\",\"classification\":\"unsupported_loader_feature\"},{\"boundary\":\"import\",\"classification\":\"unsupported_import\"},{\"boundary\":\"objc_runtime\",\"classification\":\"unsupported_objc_runtime_boundary\"}],\"message\":\"Bara does not yet load a complete x86_64 Mach-O GUI executable with dynamic loader, AppKit import, and Objective-C runtime requirements.\"}}"
+            "{\"schema\":\"b8_gui_hello_world_actual_launch_report_v0\",\"case_id\":\"b8_gui_hello_world\",\"actual_runtime\":\"bara_arm64_user_space\",\"status\":\"blocked\",\"input\":{\"kind\":\"mach_o_executable_image\",\"source_isa\":\"x86_64\",\"binary_format\":\"mach_o\",\"target_triple\":\"x86_64-apple-macos13\",\"gui_framework\":\"appkit\",\"probe\":{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\"},\"loader_metadata\":{\"source\":\"public_mach_o_probe\",\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":0,\"byte_size\":0,\"recognized_entry_points\":[],\"recognized_segments\":[],\"unsupported_commands\":[]},\"executable_image_conversion\":{\"status\":\"not_convertible\",\"blocker\":\"missing_entry_point\"}},\"sections\":{\"status\":\"modeled_from_lc_segment_64_section_table\"},\"imports\":{\"status\":\"modeled_from_dylib_load_commands\"},\"relocations\":{\"status\":\"modeled_from_linkedit_relocation_and_bind_commands\"}}},\"runtime_preparation\":{\"source\":\"bara_runtime_user_space_launch_plan\",\"status\":\"planned_not_executed\",\"image_mapping\":{\"responsibility\":\"loader\",\"source\":\"mach_o_executable_image\",\"memory_protection\":\"public_os_virtual_memory\"},\"entry_trampoline\":{\"responsibility\":\"runtime\",\"target\":\"mach_o_entry_point\"},\"initial_stack\":{\"responsibility\":\"runtime\",\"contract\":\"argv_envp_initial_stack\"},\"helper_boundary\":{\"responsibility\":\"helper_boundary\",\"contract\":\"imports_objc_os_api_requests\"},\"integration_policy\":{\"process_scope\":\"current_user_space_process\",\"kernel_extension\":\"not_required\",\"private_kernel_hook\":\"not_required\",\"private_dyld_behavior\":\"not_required\"},\"process_boundary\":{\"loader\":\"current_user_space_process\",\"translation_cache\":\"current_user_space_process\",\"runtime_helper\":\"current_user_space_process\",\"artifact_cache\":\"current_user_space_process\"}},\"blocker\":{\"classification\":\"unsupported_loader_feature\",\"boundary\":\"loader\",\"selected_by\":\"first_unsupported_launch_boundary\",\"candidate_boundaries\":[{\"boundary\":\"loader\",\"classification\":\"unsupported_loader_feature\"},{\"boundary\":\"import\",\"classification\":\"unsupported_import\"},{\"boundary\":\"objc_runtime\",\"classification\":\"unsupported_objc_runtime_boundary\"}],\"message\":\"Bara does not yet load a complete x86_64 Mach-O GUI executable with dynamic loader, AppKit import, and Objective-C runtime requirements.\"}}"
         );
     }
 

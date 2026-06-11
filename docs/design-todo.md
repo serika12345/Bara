@@ -129,6 +129,11 @@
   process scope を current user-space process とし、kernel extension、
   private kernel hook、private dyld behavior をすべて `not_required` として
   記録する。
+- 2026-06-11 の B8 小ステップとして、`UserSpaceLaunchPlan` に
+  `process_boundary` を追加した。loader、translation cache、runtime helper、
+  artifact cache は current user-space process 内の責務として report する。
+  これは cache 実装、AOT/JIT/fallback interpreter 実装、または process 外
+  integration の追加ではない。
 
 ## D7: Binary format input/output の分離
 
