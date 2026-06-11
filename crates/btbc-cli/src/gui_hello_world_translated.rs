@@ -12,8 +12,8 @@ use crate::{
     x86_64_mach_o_fixture::{b8_gui_hello_world_case_id, X8664MachOFixtureError},
 };
 
-const B8_GUI_TRANSLATED_ENTRY_CASE_ID: &str = "b8_gui_hello_world_translated_entry";
-const B8_GUI_TRANSLATED_ENTRY_BYTES: &[u8] =
+pub(crate) const B8_GUI_TRANSLATED_ENTRY_CASE_ID: &str = "b8_gui_hello_world_translated_entry";
+pub(crate) const B8_GUI_TRANSLATED_ENTRY_BYTES: &[u8] =
     &[0x0f, 0x0b, b'B', b'8', b'G', b'1', 0x31, 0xc0, 0xc3];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -258,7 +258,7 @@ pub(crate) fn b8_gui_hello_world_translated_launch(
     })
 }
 
-fn translated_entry_test_case() -> Result<TestCase, GuiHelloWorldTranslatedLaunchError> {
+pub(crate) fn translated_entry_test_case() -> Result<TestCase, GuiHelloWorldTranslatedLaunchError> {
     let case_id = CaseId::new(B8_GUI_TRANSLATED_ENTRY_CASE_ID)
         .map_err(GuiHelloWorldTranslatedLaunchError::TranslatedEntryCaseId)?;
     let bytes = X86Bytes::new(X86Va::new(0), B8_GUI_TRANSLATED_ENTRY_BYTES.to_vec())

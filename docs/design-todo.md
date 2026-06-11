@@ -187,6 +187,12 @@
   actual / launch / feedback report を置き換えず、次の unsupported boundary を
   修正するための作業材料を保存する。core decode / lift / emit / validation は I/O を
   持たず、debug 情報は戻り値の report value または明示 collector から CLI が保存する。
+- 2026-06-11 の B8-D0 completion step として、`generate-b8-debug-bundle` CLI を
+  追加した。debug bundle は input Mach-O probe と、B8-G1 の translated host trap
+  entry に対する entry bytes、decode report、lift IR、emit report、PC map、fixups、
+  helper request、runtime attempt、loader plan、blocker、repro command を
+  `target/b8-debug/<case_id>/` 相当の directory に保存する。これは sidecar
+  foundation であり、実 `LC_MAIN` first-block translation attempt は B8-G2 に残す。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、

@@ -271,19 +271,24 @@ PR 提出地点の運用:
 
 実行計画:
 
-- [ ] B8-D0: 一般アプリ化に入る前の debug bundle foundation を作る。
-  - [ ] B8 GUI input binary から、probe、entry extraction、decode、lift、emit、
+- [x] B8-D0: 一般アプリ化に入る前の debug bundle foundation を作る。
+  - [x] B8 GUI input binary から、probe、entry extraction、decode、lift、emit、
     runtime attempt、loader plan、helper request、blocker を 1 directory に保存する
     debug bundle schema を定義する。
-  - [ ] `target/b8-debug/<case_id>/` に `input.probe.json`、`entry.bytes.bin`、
+  - [x] `target/b8-debug/<case_id>/` に `input.probe.json`、`entry.bytes.bin`、
     `entry.bytes.json`、`decode.report.json`、`lift.ir.json`、`emit.report.json`、
     `pcmap.json`、`fixups.json`、`helpers.json`、`loader.plan.json`、
     `runtime-attempt.json`、`blocker.json`、`repro.sh` を保存する CLI 境界を作る。
-  - [ ] debug bundle は clean-room 境界を守り、Rosetta から得る情報は
+  - [x] debug bundle は clean-room 境界を守り、Rosetta から得る情報は
     public process observation と expected JSON だけに限定する。
-  - [ ] debug bundle の保存は通常の actual / launch report と分け、失敗分析用の
+  - [x] debug bundle の保存は通常の actual / launch report と分け、失敗分析用の
     sidecar として扱う。core decode / lift / emit は I/O を持たず、debug 情報は
     report value または明示 collector から作る。
+
+B8-D0 で固定した debug bundle は、実 `LC_MAIN` first-block translation ではなく、
+B8-G1 の translated host trap entry を entry bytes / decode / lift / emit /
+runtime attempt の foundation として保存する。実 `LC_MAIN` entryoff と executable
+segment metadata から entry bytes を切り出す作業は、次の B8-G2 PR Gate に残す。
 
 #### PR Gate: B8-D0 Debug Bundle Foundation
 
