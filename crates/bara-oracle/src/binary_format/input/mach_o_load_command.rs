@@ -7,6 +7,15 @@ use super::{
         parse_entry_point_command_metadata, validate_entry_point_command_byte_size,
         MachOEntryPointCommandMetadata,
     },
+    mach_o_linkedit_command::{
+        parse_dyld_info_command_metadata, parse_dynamic_symbol_table_command_metadata,
+        parse_linkedit_data_command_metadata, parse_symbol_table_command_metadata,
+        validate_dyld_info_command_byte_size, validate_dynamic_symbol_table_command_byte_size,
+        validate_linkedit_data_command_byte_size, validate_symbol_table_command_byte_size,
+        MachODyldInfoCommandKind, MachOLinkeditDataCommandKind, RecognizedMachODyldInfoCommand,
+        RecognizedMachODynamicSymbolTableCommand, RecognizedMachOLinkeditDataCommand,
+        RecognizedMachOSymbolTableCommand,
+    },
     mach_o_section::{parse_segment_64_sections_metadata, MachOSectionMetadata},
     mach_o_segment_command::{
         parse_segment_64_header_metadata, validate_segment_64_command_byte_size,
@@ -57,6 +66,10 @@ pub struct MachOLoadCommandType {
 }
 
 impl MachOLoadCommandType {
+    const LC_DYSYMTAB: Self = Self { value: 0xb };
+    const LC_DYLD_CHAINED_FIXUPS: Self = Self { value: 0x80000034 };
+    const LC_DYLD_INFO: Self = Self { value: 0x22 };
+    const LC_DYLD_INFO_ONLY: Self = Self { value: 0x80000022 };
     const LC_LAZY_LOAD_DYLIB: Self = Self { value: 0x20 };
     const LC_LOAD_DYLIB: Self = Self { value: 0xc };
     const LC_MAIN: Self = Self { value: 0x80000028 };
@@ -64,6 +77,7 @@ impl MachOLoadCommandType {
     const LC_SEGMENT_64: Self = Self { value: 0x19 };
     const LC_LOAD_UPWARD_DYLIB: Self = Self { value: 0x80000023 };
     const LC_LOAD_WEAK_DYLIB: Self = Self { value: 0x80000018 };
+    const LC_SYMTAB: Self = Self { value: 0x2 };
 
     pub(crate) const fn from_public_command_value(value: u32) -> Self {
         Self { value }
@@ -89,8 +103,34 @@ impl MachOLoadCommandType {
         self.value == Self::LC_MAIN.value
     }
 
+    const fn dyld_info_kind(self) -> Option<MachODyldInfoCommandKind> {
+        if self.value == Self::LC_DYLD_INFO.value {
+            Some(MachODyldInfoCommandKind::DyldInfo)
+        } else if self.value == Self::LC_DYLD_INFO_ONLY.value {
+            Some(MachODyldInfoCommandKind::DyldInfoOnly)
+        } else {
+            None
+        }
+    }
+
+    const fn is_dynamic_symbol_table(self) -> bool {
+        self.value == Self::LC_DYSYMTAB.value
+    }
+
+    const fn linkedit_data_kind(self) -> Option<MachOLinkeditDataCommandKind> {
+        if self.value == Self::LC_DYLD_CHAINED_FIXUPS.value {
+            Some(MachOLinkeditDataCommandKind::DyldChainedFixups)
+        } else {
+            None
+        }
+    }
+
     const fn is_segment_64(self) -> bool {
         self.value == Self::LC_SEGMENT_64.value
+    }
+
+    const fn is_symbol_table(self) -> bool {
+        self.value == Self::LC_SYMTAB.value
     }
 }
 
@@ -102,6 +142,14 @@ pub struct MachOLoadCommandSummary {
     recognized_segments: Vec<RecognizedMachOSegmentCommand>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     recognized_dylib_imports: Vec<RecognizedMachODylibImportCommand>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    recognized_symbol_tables: Vec<RecognizedMachOSymbolTableCommand>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    recognized_dynamic_symbol_tables: Vec<RecognizedMachODynamicSymbolTableCommand>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    recognized_dyld_info: Vec<RecognizedMachODyldInfoCommand>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    recognized_linkedit_data: Vec<RecognizedMachOLinkeditDataCommand>,
     unsupported_commands: Vec<UnsupportedMachOLoadCommand>,
 }
 
@@ -111,6 +159,10 @@ impl MachOLoadCommandSummary {
             recognized_entry_points: Vec::new(),
             recognized_segments: Vec::new(),
             recognized_dylib_imports: Vec::new(),
+            recognized_symbol_tables: Vec::new(),
+            recognized_dynamic_symbol_tables: Vec::new(),
+            recognized_dyld_info: Vec::new(),
+            recognized_linkedit_data: Vec::new(),
             unsupported_commands: Vec::new(),
         }
     }
@@ -130,26 +182,43 @@ impl MachOLoadCommandSummary {
             recognized_entry_points: recognized_entry_points.into(),
             recognized_segments: recognized_segments.into(),
             recognized_dylib_imports: Vec::new(),
+            recognized_symbol_tables: Vec::new(),
+            recognized_dynamic_symbol_tables: Vec::new(),
+            recognized_dyld_info: Vec::new(),
+            recognized_linkedit_data: Vec::new(),
             unsupported_commands: unsupported_commands.into(),
         }
     }
 
-    pub(crate) fn with_dylib_imports<E, R, D, U>(
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn from_parsed_commands<E, R, D, S, Y, I, L, U>(
         recognized_entry_points: E,
         recognized_segments: R,
         recognized_dylib_imports: D,
+        recognized_symbol_tables: S,
+        recognized_dynamic_symbol_tables: Y,
+        recognized_dyld_info: I,
+        recognized_linkedit_data: L,
         unsupported_commands: U,
     ) -> Self
     where
         E: Into<Vec<RecognizedMachOEntryPointCommand>>,
         R: Into<Vec<RecognizedMachOSegmentCommand>>,
         D: Into<Vec<RecognizedMachODylibImportCommand>>,
+        S: Into<Vec<RecognizedMachOSymbolTableCommand>>,
+        Y: Into<Vec<RecognizedMachODynamicSymbolTableCommand>>,
+        I: Into<Vec<RecognizedMachODyldInfoCommand>>,
+        L: Into<Vec<RecognizedMachOLinkeditDataCommand>>,
         U: Into<Vec<UnsupportedMachOLoadCommand>>,
     {
         Self {
             recognized_entry_points: recognized_entry_points.into(),
             recognized_segments: recognized_segments.into(),
             recognized_dylib_imports: recognized_dylib_imports.into(),
+            recognized_symbol_tables: recognized_symbol_tables.into(),
+            recognized_dynamic_symbol_tables: recognized_dynamic_symbol_tables.into(),
+            recognized_dyld_info: recognized_dyld_info.into(),
+            recognized_linkedit_data: recognized_linkedit_data.into(),
             unsupported_commands: unsupported_commands.into(),
         }
     }
@@ -172,6 +241,22 @@ impl MachOLoadCommandSummary {
 
     pub fn recognized_dylib_imports(&self) -> &[RecognizedMachODylibImportCommand] {
         &self.recognized_dylib_imports
+    }
+
+    pub fn recognized_symbol_tables(&self) -> &[RecognizedMachOSymbolTableCommand] {
+        &self.recognized_symbol_tables
+    }
+
+    pub fn recognized_dynamic_symbol_tables(&self) -> &[RecognizedMachODynamicSymbolTableCommand] {
+        &self.recognized_dynamic_symbol_tables
+    }
+
+    pub fn recognized_dyld_info(&self) -> &[RecognizedMachODyldInfoCommand] {
+        &self.recognized_dyld_info
+    }
+
+    pub fn recognized_linkedit_data(&self) -> &[RecognizedMachOLinkeditDataCommand] {
+        &self.recognized_linkedit_data
     }
 
     pub fn unsupported_commands(&self) -> &[UnsupportedMachOLoadCommand] {
@@ -296,6 +381,10 @@ pub(crate) fn parse_mach_o_load_command_summary(
     let mut recognized_entry_points = Vec::new();
     let mut recognized_segments = Vec::new();
     let mut recognized_dylib_imports = Vec::new();
+    let mut recognized_symbol_tables = Vec::new();
+    let mut recognized_dynamic_symbol_tables = Vec::new();
+    let mut recognized_dyld_info = Vec::new();
+    let mut recognized_linkedit_data = Vec::new();
     let mut unsupported_commands = Vec::new();
     let mut command_offset = table_range.start;
 
@@ -341,6 +430,36 @@ pub(crate) fn parse_mach_o_load_command_summary(
                 dylib_import_kind,
                 byte_size,
             )?);
+        } else if command.is_symbol_table() {
+            validate_symbol_table_command_byte_size(byte_size.as_usize())?;
+            recognized_symbol_tables.push(parse_symbol_table_command_metadata(
+                input,
+                command_offset,
+                byte_size,
+            )?);
+        } else if command.is_dynamic_symbol_table() {
+            validate_dynamic_symbol_table_command_byte_size(byte_size.as_usize())?;
+            recognized_dynamic_symbol_tables.push(parse_dynamic_symbol_table_command_metadata(
+                input,
+                command_offset,
+                byte_size,
+            )?);
+        } else if let Some(dyld_info_kind) = command.dyld_info_kind() {
+            validate_dyld_info_command_byte_size(byte_size.as_usize())?;
+            recognized_dyld_info.push(parse_dyld_info_command_metadata(
+                input,
+                command_offset,
+                dyld_info_kind,
+                byte_size,
+            )?);
+        } else if let Some(linkedit_data_kind) = command.linkedit_data_kind() {
+            validate_linkedit_data_command_byte_size(byte_size.as_usize())?;
+            recognized_linkedit_data.push(parse_linkedit_data_command_metadata(
+                input,
+                command_offset,
+                linkedit_data_kind,
+                byte_size,
+            )?);
         } else if command.is_segment_64() {
             validate_segment_64_command_byte_size(byte_size.as_usize())?;
             recognized_segments.push(RecognizedMachOSegmentCommand::with_sections(
@@ -354,10 +473,14 @@ pub(crate) fn parse_mach_o_load_command_summary(
         command_offset = command_end;
     }
 
-    Ok(MachOLoadCommandSummary::with_dylib_imports(
+    Ok(MachOLoadCommandSummary::from_parsed_commands(
         recognized_entry_points,
         recognized_segments,
         recognized_dylib_imports,
+        recognized_symbol_tables,
+        recognized_dynamic_symbol_tables,
+        recognized_dyld_info,
+        recognized_linkedit_data,
         unsupported_commands,
     ))
 }

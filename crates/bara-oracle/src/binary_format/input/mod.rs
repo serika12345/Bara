@@ -2,6 +2,7 @@ mod mach_o;
 mod mach_o_dylib_command;
 mod mach_o_entry_point_command;
 mod mach_o_executable_image_conversion;
+mod mach_o_linkedit_command;
 mod mach_o_load_command;
 mod mach_o_section;
 mod mach_o_segment_command;
@@ -18,6 +19,12 @@ pub use mach_o_entry_point_command::{
 pub use mach_o_executable_image_conversion::{
     MachOExecutableImageConversion, MachOExecutableImageConversionBlocker,
     MachOExecutableImageConversionStatus,
+};
+pub use mach_o_linkedit_command::{
+    MachODyldInfoCommandKind, MachOLinkeditByteSize, MachOLinkeditDataCommandKind,
+    MachOLinkeditDataRange, MachOLinkeditEntryCount, MachOLinkeditFileOffset, MachOSymbolIndex,
+    RecognizedMachODyldInfoCommand, RecognizedMachODynamicSymbolTableCommand,
+    RecognizedMachOLinkeditDataCommand, RecognizedMachOSymbolTableCommand,
 };
 pub use mach_o_load_command::{
     MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommandSummary, MachOLoadCommandType,

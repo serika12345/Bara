@@ -9,33 +9,32 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 12:23 JST
+最終更新: 2026-06-11 12:39 JST
 
 状態:
 
-- project_state: completed。B8 の 9 つ目の小ステップとして、public dylib
-  load commands から Mach-O imports metadata を model 化した。
+- project_state: completed。B8 の loader metadata model 化ステップとして、
+  entry、segments、sections、imports、relocations、rebases、binds に必要な
+  public Mach-O metadata を parser/report 境界へ載せた。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8:
   実 x86_64 macOS アプリ起動。
-- active_design_focus: B8 Mach-O import metadata。self-authored AppKit fixture の
-  input Mach-O executable image から public dylib dependency metadata を parser/report
-  境界へ渡す。
+- active_design_focus: B8 Mach-O loader metadata model。self-authored AppKit fixture の
+  input Mach-O executable image から public loader metadata を parser/report 境界へ渡す。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
   latest commit はこの小ステップの review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B8 の「entry、segments、sections、imports、
   relocations、必要な loader metadata を public Mach-O 仕様ベースで model 化する」
-  のうち、imports metadata を public dynamic-link load commands から model 化する
-  小ステップ。
-- completed_work: `bara-oracle` の Mach-O input parser に recognized dylib import
-  metadata model を追加した。`LC_LOAD_DYLIB` 系 command は dependent dylib path、
-  timestamp、current version、compatibility version を typed metadata として保持する。
-  B8 actual launch report の `imports` status は
-  `modeled_from_dylib_load_commands` になった。
-- remaining_work: 次の小ステップは relocations / rebases / binds に必要な loader
-  metadata の扱いを分けること。
-- next_action: commit / push 後、次の B8 小ステップで public Mach-O relocation /
-  dyld bind metadata を parser/report 境界へ追加する。
-- verification: targeted test として
+  全体。
+- completed_work: `bara-oracle` の Mach-O input parser は `LC_MAIN`、`LC_SEGMENT_64`
+  header / section table、dylib load commands、`LC_SYMTAB`、`LC_DYSYMTAB`、
+  `LC_DYLD_INFO(_ONLY)`、`LC_DYLD_CHAINED_FIXUPS` の public command metadata を
+  typed summary として保持する。B8 actual launch report の `relocations` status は
+  `modeled_from_linkedit_relocation_and_bind_commands` になった。
+- remaining_work: 次の小ステップは user-space loader / runtime が image mapping、
+  entry trampoline、stack / argv / envp、helper boundary を準備する責務を分けること。
+- next_action: commit / push 後、次の B8 小ステップで user-space loader/runtime
+  responsibility split を設計・実装する。
+- verification: targeted tests として
   `nix develop -c cargo test -p bara-oracle probe_load_command -- --nocapture`、
   `nix develop -c cargo test -p btbc-cli gui_hello_world_actual -- --nocapture`
   が通過した。`nix develop -c cargo clippy -p bara-oracle -p btbc-cli --all-targets -- -D warnings`
@@ -43,6 +42,13 @@
 
 直近で完了した作業:
 
+- 2026-06-11 12:39 JST: B8 の loader metadata model 化ステップとして、
+  entry、segments、sections、imports、relocations、rebases、binds に必要な
+  public Mach-O metadata を parser/report 境界へ載せた。`LC_SYMTAB`、
+  `LC_DYSYMTAB`、`LC_DYLD_INFO(_ONLY)`、`LC_DYLD_CHAINED_FIXUPS` は symbol table、
+  dynamic symbol table、dyld rebase / bind blob、chained fixups metadata を typed
+  summary として保持する。targeted tests、`bara-oracle` / `btbc-cli` clippy、full
+  `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-11 12:23 JST: B8 の 9 つ目の小ステップとして、public dylib load
   commands から Mach-O imports metadata を model 化した。`LC_LOAD_DYLIB` 系 command
   は dependent dylib path、timestamp、current version、compatibility version を

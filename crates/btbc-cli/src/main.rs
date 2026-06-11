@@ -919,7 +919,7 @@ struct FixtureRun {
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum FixtureOutput {
     Observed(ObservedResult),
-    Probe(BinaryFormatProbeReport),
+    Probe(Box<BinaryFormatProbeReport>),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -971,7 +971,7 @@ impl FixtureRun {
     fn passed_probe(case_id: CaseId, actual: BinaryFormatProbeReport) -> Self {
         Self {
             report: FixtureReport::new(case_id, FixtureOutcome::Passed),
-            output: Some(FixtureOutput::Probe(actual)),
+            output: Some(FixtureOutput::Probe(Box::new(actual))),
             artifact_metadata: None,
             final_state_report: None,
             failure_artifacts: None,
