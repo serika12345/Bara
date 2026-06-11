@@ -266,6 +266,25 @@ pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
                     rax_known_value = Some(value);
                 }
                 IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rdi),
+                    src:
+                        Operand::MemRipRelative {
+                            address,
+                            width: MemoryReadWidth::Bits64,
+                        },
+                } => {
+                    let Some(value) = program
+                        .image_metadata()
+                        .mapped_bytes()
+                        .read_u64_le(*address)
+                    else {
+                        return Err(EmitError::UnsupportedShape);
+                    };
+                    emit_mov_x0_u64(&mut code, value);
+                    has_rax_value = false;
+                    rax_known_value = None;
+                }
+                IrOp::Mov {
                     dst: Operand::Reg(X86Reg::Rdx),
                     src:
                         Operand::MemRegIndirect {
@@ -983,6 +1002,90 @@ mod tests {
                 0xe2, 0xf2, 0xc0, 0x03, 0x5f, 0xd6
             ]
         );
+    }
+
+    #[test]
+    fn emits_static_mapped_qword_for_rdi_from_rip_relative_memory() {
+        let range = ProgramImageRange::new(X86Va::new(0x3000), X86Va::new(0x3008))
+            .expect("mapped range is non-empty");
+        let segment = ProgramImageMappedByteSegment::new(
+            range,
+            vec![0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11],
+        )
+        .expect("mapped bytes match range");
+        let metadata = ProgramImageMetadata::new_with_mapped_bytes(
+            bara_ir::ProgramImageSections::empty(),
+            ProgramImageMappedBytes::from_segments([segment]),
+            bara_ir::ProgramImageSymbols::empty(),
+            bara_ir::ProgramImageRelocations::empty(),
+            bara_ir::ProgramImageImports::empty(),
+            bara_ir::ProgramUnwindMetadata::empty(),
+        );
+        let program = program_with_ops_and_metadata(
+            vec![
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rdi),
+                    src: Operand::MemRipRelative {
+                        address: X86Va::new(0x3000),
+                        width: MemoryReadWidth::Bits64,
+                    },
+                },
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(1),
+                },
+            ],
+            Terminator::Return,
+            metadata,
+        );
+
+        let emitted = emit_program(&program).expect("RIP-relative mapped RDI qword IR emits");
+
+        assert_eq!(
+            emitted.code().bytes(),
+            &[
+                0x00, 0xf1, 0x8e, 0xd2, 0xc0, 0xac, 0xaa, 0xf2, 0x80, 0x68, 0xc6, 0xf2, 0x40, 0x24,
+                0xe2, 0xf2, 0x20, 0x00, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6
+            ]
+        );
+    }
+
+    #[test]
+    fn rdi_rip_relative_memory_does_not_leave_rax_available() {
+        let range = ProgramImageRange::new(X86Va::new(0x3000), X86Va::new(0x3008))
+            .expect("mapped range is non-empty");
+        let segment = ProgramImageMappedByteSegment::new(
+            range,
+            vec![0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11],
+        )
+        .expect("mapped bytes match range");
+        let metadata = ProgramImageMetadata::new_with_mapped_bytes(
+            bara_ir::ProgramImageSections::empty(),
+            ProgramImageMappedBytes::from_segments([segment]),
+            bara_ir::ProgramImageSymbols::empty(),
+            bara_ir::ProgramImageRelocations::empty(),
+            bara_ir::ProgramImageImports::empty(),
+            bara_ir::ProgramUnwindMetadata::empty(),
+        );
+        let program = program_with_ops_and_metadata(
+            vec![
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(42),
+                },
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rdi),
+                    src: Operand::MemRipRelative {
+                        address: X86Va::new(0x3000),
+                        width: MemoryReadWidth::Bits64,
+                    },
+                },
+            ],
+            Terminator::Return,
+            metadata,
+        );
+
+        assert_eq!(emit_program(&program), Err(EmitError::UnsupportedShape));
     }
 
     #[test]

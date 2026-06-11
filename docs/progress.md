@@ -9,30 +9,30 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 20:40 JST
+最終更新: 2026-06-11 20:53 JST
 
 状態:
 
 - project_state: in_progress。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
-  reviewable GUI 起動 slice の積み上げとして扱う。B8-G3i までで、self-authored
+  reviewable GUI 起動 slice の積み上げとして扱う。B8-G3j までで、self-authored
   x86_64 GUI fixture の実 `LC_MAIN` entry から
   `push rbp; mov rbp,rsp; push r15; push r14; push rbx; push rax; call rel32;
   mov rbx,rax; mov rax,qword ptr [rip+disp32]; mov rdx,qword ptr [rax];
-  lea rdi,[rip+disp32]; lea rsi,[rip+disp32]` までを decode / lift / emit または
-  既存 call terminator として扱える。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G3i RIP-Relative LEA RSI
-  Address Boundary: B8-G3h の `blocker.json` で見えた
-  `DecodeUnsupportedOpcode { opcode: 72 }` (`48 8d 35 b6 10 00 00`) を、memory read ではない
-  RIP-relative effective address materialization into `rsi` として最小実装した。
+  lea rdi,[rip+disp32]; lea rsi,[rip+disp32]; mov rdi,qword ptr [rip+disp32]`
+  までを decode / lift / emit または既存 call terminator として扱える。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G3j RIP-Relative MOV RDI
+  Load Boundary: B8-G3i の `blocker.json` で見えた
+  `DecodeUnsupportedOpcode { opcode: 72 }` (`48 8b 3d 22 3b 00 00`) を、RIP-relative
+  64-bit memory load into `rdi` として最小実装した。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
   Objective-C runtime / dyld の private behavior は使わず、public metadata、
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
-- active_branch: `task/b8-g3i-rip-relative-lea-rsi`。base branch は最新 `main`。
-  latest commit は B8-G3i review package で報告する。
+- active_branch: `task/b8-g3j-rip-relative-mov-rdi-load`。base branch は最新 `main`。
+  latest commit は B8-G3j review package で報告する。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
-  B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j。
+  B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -51,32 +51,43 @@
   `mov rax, qword ptr [rip+disp32]` (`48 8b 05 ff 19 00 00`) を通過できるようにし、
   B8-G3g として `mov rdx, qword ptr [rax]` (`48 8b 10`) を通過できるようにし、
   B8-G3h として `lea rdi, [rip+disp32]` (`48 8d 3d b3 10 00 00`) を通過できるようにし、
-  B8-G3i として `lea rsi, [rip+disp32]` (`48 8d 35 b6 10 00 00`) を通過できるようにした。
+  B8-G3i として `lea rsi, [rip+disp32]` (`48 8d 35 b6 10 00 00`) を通過できるようにし、
+  B8-G3j として `mov rdi, qword ptr [rip+disp32]` (`48 8b 3d 22 3b 00 00`) を通過できるようにした。
   現在の generated `blocker.json` は `unsupported_instruction` /
-  `DecodeUnsupportedOpcode { opcode: 72 }` を `X86Va(5679)` で返し、
+  `DecodeUnsupportedOpcode { opcode: 72 }` を `X86Va(5686)` で返し、
   `decode.report.json` は `push_rbp`、`mov_rbp_rsp`、`push_r15`、`push_r14`、
   `push_rbx`、`push_rax`、`call_rel32`、`mov_rbx_rax`、
   `mov_rax_qword_ptr_rip_relative`、`mov_rdx_qword_ptr_rax`、`lea_rdi_rip_relative`、
-  `lea_rsi_rip_relative`、次の `call_rel32`、次の unsupported `48` を保存する。
-  `entry.bytes.bin` の次 bytes は `48 8b 3d 22 3b 00 00`
-  (`mov rdi, qword ptr [rip+disp32]`) で、`launch.report.json` の processed source PC range は
-  `5632..5682` である。
-- remaining_work: B8-G3j。B8-G3i の blocker report に基づき、次の boundary である
-  `48 8b 3d 22 3b 00 00` RIP-relative 64-bit MOV load into RDI を focused fixture から扱う。
-  これは `lea` の address materialization ではなく memory read であり、B8-G3i とは別の
-  PR Gate として扱う。
-- next_action: B8-G3i branch を commit / push し、draft PR を開いて review gate で
-  停止する。レビュー後の次 PR Gate は B8-G3j RIP-Relative MOV RDI Load Boundary。
-- verification: targeted check として `nix develop -c cargo test lea_rsi -- --nocapture`、
-  `nix develop -c cargo test rip_relative_lea -- --nocapture`、
-  `nix develop -c cargo test rsi_rip_relative -- --nocapture`、
-  `nix develop -c cargo test function_register_artifact_serializes_partial_register_views -- --nocapture`
-  が通過した。manual debug bundle generation で `lea_rsi_rip_relative` 通過と次 blocker
-  `48 8b 3d 22 3b 00 00` を確認した。
-  full `nix develop -c ./scripts/verify` も通過した。
+  `lea_rsi_rip_relative`、次の `call_rel32`、`mov_rdi_qword_ptr_rip_relative`、次の
+  unsupported `48` を保存する。`entry.bytes.bin` の次 bytes は
+  `48 8b 35 eb 3a 00 00` (`mov rsi, qword ptr [rip+disp32]`) で、
+  `launch.report.json` の processed source PC range は `5632..5689` である。
+- remaining_work: B8-G3k。B8-G3j の blocker report に基づき、次の boundary である
+  `48 8b 35 eb 3a 00 00` RIP-relative 64-bit MOV load into RSI を focused fixture から扱う。
+  これは B8-G3j と同じ memory read だが、2 番目の argument register destination であり、
+  B8-G3j とは別の PR Gate として扱う。
+- next_action: B8-G3j branch を commit / push し、draft PR を開いて review gate で
+  停止する。レビュー後の次 PR Gate は B8-G3k RIP-Relative MOV RSI Load Boundary。
+- verification: targeted check として `nix develop -c cargo test mov_rdi -- --nocapture`、
+  `nix develop -c cargo test rip_relative_mov -- --nocapture`、
+  `nix develop -c cargo test rdi_rip_relative_memory -- --nocapture`、
+  `nix develop -c cargo test static_mapped_qword_for_rdi -- --nocapture` が通過した。
+  manual debug bundle generation で `mov_rdi_qword_ptr_rip_relative` 通過と次 blocker
+  `48 8b 35 eb 3a 00 00` を確認した。full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-11 20:53 JST: B8-G3j RIP-Relative MOV RDI Load Boundary を実装した。
+  x86_64 `48 8b 3d 22 3b 00 00` (`mov rdi, qword ptr [rip+disp32]`) を
+  `MovRdiQwordPtrRipRelative` として decode し、`MemRipRelative { width: Bits64 }`
+  operand から `Rdi` へ lift する。ARM64 emit は `ProgramImageMetadata` の mapped bytes
+  から qword を読み、現状の ABI-focused mapping である `x0` に immediate materialize する。
+  destination は `rdi` なので `rax` value availability は無効化する。debug bundle は
+  `mov_rdi_qword_ptr_rip_relative` を通過し、次 blocker として
+  `DecodeUnsupportedOpcode { opcode: 72 }`
+  (`48 8b 35 eb 3a 00 00`, `mov rsi, qword ptr [rip+disp32]`) を `X86Va(5686)` で保存する。
+  targeted checks と manual debug bundle generation が通過し、full
+  `nix develop -c ./scripts/verify` も通過した。
 - 2026-06-11 20:40 JST: B8-G3i RIP-Relative LEA RSI Address Boundary を実装した。
   x86_64 `48 8d 35 b6 10 00 00` (`lea rsi, [rip+disp32]`) を
   `LeaRsiRipRelative` として decode し、memory read と区別する
