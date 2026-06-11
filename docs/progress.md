@@ -9,26 +9,26 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 18:23 JST
+最終更新: 2026-06-11 18:36 JST
 
 状態:
 
 - project_state: in_progress。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
-  reviewable GUI 起動 slice の積み上げとして扱う。B8-G3b までで、self-authored
-  x86_64 GUI fixture の実 `LC_MAIN` entry から `push rbp; mov rbp,rsp` prologue
-  slice を decode / lift / emit でき、debug bundle が次の ISA blocker まで進む。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G3b PR Gate:
-  B8-G3 の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 72 }`
-  (`48 89 e5`, `mov rbp,rsp`) を focused fixture に固定し、`MovRbpRsp` / `Rsp`
-  IR / ARM64 frame-pointer assignment emit を最小実装した。
+  reviewable GUI 起動 slice の積み上げとして扱う。B8-G3c までで、self-authored
+  x86_64 GUI fixture の実 `LC_MAIN` entry から `push rbp; mov rbp,rsp; push r15`
+  prologue slice を decode / lift / emit でき、debug bundle が次の ISA blocker まで進む。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G3c PR Gate:
+  B8-G3b の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 65 }`
+  (`41 57`, `push r15`) を focused fixture に固定し、`PushR15` / `R15`
+  IR / ARM64 `str x15, [sp, #-16]!` emit を最小実装した。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
   Objective-C runtime / dyld の private behavior は使わず、public metadata、
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
-- active_branch: `task/b8-g3b-mov-rbp-rsp`。base branch は最新 `main`。
-  latest commit は B8-G3b review package で報告する。
-- related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c。
+- active_branch: `task/b8-g3c-push-r15`。base branch は最新 `main`。
+  latest commit は B8-G3c review package で報告する。
+- related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c / B8-G3d。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -41,20 +41,31 @@
   `generate-b8-debug-bundle <binary> <out-root>` を追加し、B8-G2 として同 bundle の
   entry source を public `LC_MAIN` entry に切り替えた。B8-G3 として `push rbp`
   (`0x55`) を通過できるようにし、B8-G3b として `mov rbp,rsp` (`48 89 e5`) を
-  通過できるようにした。現在の generated `blocker.json` は
-  `unsupported_instruction` / `DecodeUnsupportedOpcode { opcode: 65 }` を返し、
-  `decode.report.json` は `push_rbp`、`mov_rbp_rsp`、次の unsupported `41` を
-  保存する。`launch.report.json` の processed source PC range は `5632..5637` である。
-- remaining_work: B8-G3c。B8-G3b の blocker report に基づき、次の ISA blocker
-  である `41 57` (`push r15`) prologue slice を focused fixture から実装し、
+  通過できるようにし、B8-G3c として `push r15` (`41 57`) を通過できるようにした。
+  現在の generated `blocker.json` は `unsupported_instruction` /
+  `DecodeUnsupportedOpcode { opcode: 65 }` を `X86Va(5638)` で返し、
+  `decode.report.json` は `push_rbp`、`mov_rbp_rsp`、`push_r15`、次の unsupported
+  `41` を保存する。`entry.bytes.bin` の次 bytes は `41 56` (`push r14`) で、
+  `launch.report.json` の processed source PC range は `5632..5639` である。
+- remaining_work: B8-G3d。B8-G3c の blocker report に基づき、次の ISA blocker
+  である `41 56` (`push r14`) prologue slice を focused fixture から実装し、
   次 blocker まで進むことを debug bundle で確認する。
-- next_action: B8-G3b branch を commit / push し、draft PR を開いて review gate で
-  停止する。レビュー後の次 PR Gate は B8-G3c REX Push R15 Prologue Slice。
-- verification: targeted check として `nix develop -c cargo test mov_rbp_rsp -- --nocapture`
-  が通過した。full `nix develop -c ./scripts/verify` も通過した。
+- next_action: B8-G3c branch を commit / push し、draft PR を開いて review gate で
+  停止する。レビュー後の次 PR Gate は B8-G3d REX Push R14 Prologue Slice。
+- verification: targeted check として `nix develop -c cargo test push_r15 -- --nocapture`
+  が通過した。manual debug bundle generation で `push_r15` 通過と次 blocker
+  `41 56` (`push r14`) を確認した。full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-11 18:36 JST: B8-G3c REX Push R15 Prologue Slice を実装した。
+  x86_64 `41 57` (`push r15`) を `PushR15` として decode し、
+  `IrOp::Push { src: R15 }` へ lift し、ARM64 emit では `str x15, [sp, #-16]!` を
+  生成する。debug bundle は `push_r15` を通過し、次 blocker として
+  `DecodeUnsupportedOpcode { opcode: 65 }` (`41 56`, `push r14`) を
+  `blocker.json` と `launch.report.json` に保存する。targeted
+  `nix develop -c cargo test push_r15 -- --nocapture` と full
+  `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-11 18:23 JST: B8-G3b REX Mov RBP/RSP Prologue Slice を実装した。
   x86_64 `48 89 e5` (`mov rbp,rsp`) を `MovRbpRsp` として decode し、
   `IrOp::Mov { dst: Rbp, src: Rsp }` へ lift し、ARM64 emit では `mov x29, sp` を

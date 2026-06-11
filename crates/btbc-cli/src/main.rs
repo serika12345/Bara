@@ -2360,9 +2360,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn generate_b8_debug_bundle_advances_past_mov_rbp_rsp_blocker() {
-        let temp_dir =
-            TestTempDir::new("generate_b8_debug_bundle_advances_past_mov_rbp_rsp_blocker");
+    fn generate_b8_debug_bundle_advances_past_push_r15_blocker() {
+        let temp_dir = TestTempDir::new("generate_b8_debug_bundle_advances_past_push_r15_blocker");
         let binary_path = temp_dir.path.join("b8_gui_hello_world_x86_64");
         let output_root = temp_dir.path.join("b8-debug");
         let bundle_dir = output_root.join("b8_gui_hello_world");
@@ -2416,6 +2415,7 @@ mod tests {
         assert!(decode_report.contains("\"schema\":\"b8_debug_decode_report_v0\""));
         assert!(decode_report.contains("\"kind\":\"push_rbp\""));
         assert!(decode_report.contains("\"kind\":\"mov_rbp_rsp\""));
+        assert!(decode_report.contains("\"kind\":\"push_r15\""));
         assert!(decode_report.contains("DecodeUnsupportedOpcode { opcode: 65"));
         assert!(read_file(&bundle_dir.join("lift.ir.json")).contains("\"status\":"));
         assert!(read_file(&bundle_dir.join("emit.report.json")).contains("\"status\":"));

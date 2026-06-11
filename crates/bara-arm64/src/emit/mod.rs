@@ -312,6 +312,11 @@ pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
                 } => {
                     emit_push_x29(&mut code);
                 }
+                IrOp::Push {
+                    src: Operand::Reg(X86Reg::R15),
+                } => {
+                    emit_push_x15(&mut code);
+                }
                 IrOp::Push { .. } => {
                     return Err(unsupported_ir());
                 }
@@ -699,6 +704,10 @@ fn emit_push_x0(code: &mut Vec<u8>) -> usize {
     emit_u32_le(code, 0xf81f_0fe0)
 }
 
+fn emit_push_x15(code: &mut Vec<u8>) -> usize {
+    emit_u32_le(code, 0xf81f_0fef)
+}
+
 fn emit_push_x29(code: &mut Vec<u8>) -> usize {
     emit_u32_le(code, 0xf81f_0ffd)
 }
@@ -1016,6 +1025,29 @@ mod tests {
         assert_eq!(
             emitted.code().bytes(),
             &[0xfd, 0x0f, 0x1f, 0xf8, 0x40, 0x05, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]
+        );
+    }
+
+    #[test]
+    fn emits_push_r15_with_aligned_stack_slot() {
+        let program = program_with_ops(
+            vec![
+                IrOp::Push {
+                    src: Operand::Reg(X86Reg::R15),
+                },
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(42),
+                },
+            ],
+            Terminator::Return,
+        );
+
+        let emitted = emit_program(&program).expect("push r15 IR emits");
+
+        assert_eq!(
+            emitted.code().bytes(),
+            &[0xef, 0x0f, 0x1f, 0xf8, 0x40, 0x05, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]
         );
     }
 

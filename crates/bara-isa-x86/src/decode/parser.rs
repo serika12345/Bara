@@ -145,6 +145,31 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                     }
                 }
             }
+            0x41 => {
+                let Some(opcode2) = input.bytes().get(offset + 1).copied() else {
+                    let end = instruction_end(input, at, offset + 1, 1)?;
+                    instructions.push(unsupported_instruction(at, end, opcode));
+                    return DecodedFunction::new(input.entry(), instructions);
+                };
+
+                match opcode2 {
+                    0x57 => {
+                        let end_offset = offset + 2;
+                        let end = instruction_end(input, at, end_offset, 2)?;
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::PushR15,
+                        ));
+                        offset = end_offset;
+                    }
+                    _ => {
+                        let end = instruction_end(input, at, offset + 1, 1)?;
+                        instructions.push(unsupported_instruction(at, end, opcode));
+                        return DecodedFunction::new(input.entry(), instructions);
+                    }
+                }
+            }
             0x48 => {
                 let end_offset = offset + 3;
                 let opcode2 = read_u8(input, offset + 1, at, opcode)?;

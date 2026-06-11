@@ -592,6 +592,7 @@ enum B8DebugDecodedInstructionKindReport {
     MovRbpRsp,
     PushRax,
     PushRbp,
+    PushR15,
     PopRax,
     XorEaxEax,
     JccRel8 {
@@ -648,6 +649,7 @@ impl B8DebugDecodedInstructionKindReport {
             DecodedInstructionKind::MovRbpRsp => Self::MovRbpRsp,
             DecodedInstructionKind::PushRax => Self::PushRax,
             DecodedInstructionKind::PushRbp => Self::PushRbp,
+            DecodedInstructionKind::PushR15 => Self::PushR15,
             DecodedInstructionKind::PopRax => Self::PopRax,
             DecodedInstructionKind::XorEaxEax => Self::XorEaxEax,
             DecodedInstructionKind::JccRel8 {
