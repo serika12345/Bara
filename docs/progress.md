@@ -9,37 +9,44 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 09:27 JST
+最終更新: 2026-06-11 09:32 JST
 
 状態:
 
-- project_state: completed。B7 の 11 個目の小ステップとして、fixture shrink /
-  failure classification / corpus update の初期運用 package を追加した。
+- project_state: completed。B7 の 12 個目の小ステップとして、Haskell verifier
+  package / schema reader / small x86 semantics interpreter の導入可否を判断した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B7:
   Oracle / Regression 基盤。
-- active_design_focus: B7 failure package。`check-corpus --out` /
-  `check-blackbox --out` が失敗 fixture ごとに `failures/<case_id>/failure.json`
-  と保存可能な testcase / expected / actual を出し、後続の shrink と corpus
-  update の入力にできるようにした。
+- active_design_focus: B7 verifier introduction decision。Haskell は B7 では
+  導入せず、Rust workspace 内で IR invariant、PC map invariant、fixup
+  consistency、final state comparator を先に stable report 化する。
 - active_branch: `task/b7-x86_64-macho-fixture-generation`。base commit は
   `8d39a4a`。latest commit はこの小ステップの review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B7 の
-  fixture shrink / failure classification / corpus update の運用を作る項目。
-- completed_work: `FixtureRun` に failure package 用の保存データを持たせ、
-  `--out` 指定時に `failures/<case_id>/failure.json` を出すようにした。
-  comparison mismatch では `testcase.json`、`expected.json`、`actual.json` も同じ
-  directory に保存する。
-- remaining_work: B7 は継続中。Haskell verifier 導入可否、IR / PC map /
-  fixup / final state invariant 検査、property-based 小ケース生成、CI lane 分割は
-  未実装。
-- next_action: Haskell verifier 用 package / schema reader / small x86 semantics
-  interpreter の導入可否を決める。
-- verification: targeted test として
-  `nix develop -c cargo test -p btbc-cli check_corpus_writes_failure_package_for_comparison_mismatch`
-  が通過した。`nix develop -c ./scripts/check-domain-types` と
-  `nix develop -c ./scripts/verify` も通過した。
+  Haskell verifier 用 package / schema reader / small x86 semantics interpreter の
+  導入可否を決める項目。
+- completed_work: `TODO.md`、`docs/design-todo.md`、`docs/test-oracle.md` に、
+  B7 では Haskell package を追加しない判断を記録した。理由は、現時点の
+  verifier は既存 Rust metadata schema 上で進められ、Haskell toolchain は
+  Nix / supply-chain 境界を広げるため。
+- remaining_work: B7 は継続中。IR / PC map / fixup / final state invariant 検査、
+  property-based 小ケース生成、CI lane 分割は未実装。
+- next_action: IR invariant、PC map invariant、fixup consistency、final state
+  comparator を Rust verifier で検査できるようにする。
+- verification: documentation-only decision change として
+  `nix develop -c ./scripts/check-no-invisible-chars` と
+  `nix develop -c ./scripts/verify` が通過した。コード、dependency、lockfile、
+  `flake.nix` は変更していないため supply-chain 専用追加検証は不要。
 
 直近で完了した作業:
+
+- 2026-06-11 09:32 JST: B7 の 12 個目の小ステップとして、
+  Haskell verifier package / schema reader / small x86 semantics interpreter の
+  導入可否を判断した。B7 では Haskell を追加せず、既存 Rust workspace 内で
+  verifier report を先に整える。Haskell は schema が安定し、QuickCheck /
+  Hedgehog generator / shrinker または独立仕様モデルが必要になった時点で
+  `spec/` と Nix toolchain を同じ change で追加する。検証は snapshot の
+  documentation-only checks と最終 `nix develop -c ./scripts/verify`。
 
 - 2026-06-11 09:27 JST: B7 の 11 個目の小ステップとして、
   fixture shrink / failure classification / corpus update の初期運用 package を

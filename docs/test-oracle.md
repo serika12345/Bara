@@ -243,3 +243,20 @@ WrongExternalCall
 RunnerCrash
 OracleCrash
 ```
+
+## verifier 導入判断
+
+2026-06-11 時点では、B7 に Haskell package、schema reader、small x86 semantics
+interpreter は追加しない。Haskell toolchain を入れるには `flake.nix` と
+supply-chain 検証範囲が広がるため、まず既存 Rust workspace 内で verifier を
+進める。
+
+直近の verifier は、`compiled/<case_id>/compiled.ir.json`、`pcmap.json`、
+`fixups.json`、`artifact.report.json`、`actual/<case_id>.json`、必要に応じて
+`failures/<case_id>/failure.json` を読み、IR invariant、PC map invariant、
+fixup consistency、final state comparison を stable report として返す。
+
+Haskell は、JSON schema が安定し、QuickCheck / Hedgehog による generator と
+shrinker、または Rust 実装から独立した仕様モデルが必要になった時点で `spec/`
+配下に追加する。その change では Nix dev shell、package metadata、
+supply-chain 検証を同時に扱う。

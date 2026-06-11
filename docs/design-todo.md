@@ -61,6 +61,11 @@
 
 - 未確立な副出力研究は本流 TODO ではなく、
   [将来構想メモ](future-research-concepts.md) の構想として扱う。
+- 2026-06-11 の B7 判断として、Haskell verifier はまだ導入しない。
+  まず Rust 側で IR invariant、PC map invariant、fixup consistency、
+  final state comparator を stable report として整える。Haskell は
+  `spec/` 配下の独立仕様モデルと property/shrink が必要になり、schema と
+  Nix toolchain 追加の必要性がテストで示された時点で導入する。
 
 ## D5: Host helper / OS boundary
 
