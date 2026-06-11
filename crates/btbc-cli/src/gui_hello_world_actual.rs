@@ -1,6 +1,6 @@
 use bara_oracle::{
-    BinaryFormat, BinaryFormatProbeReport, BinaryFormatProbeStatus, CaseId, MachOMetadata,
-    ObservedResult,
+    compare_observed_results, BinaryFormat, BinaryFormatProbeReport, BinaryFormatProbeStatus,
+    CaseId, ComparisonReport, MachOMetadata, ObservedResult,
 };
 use bara_runtime::{
     UserSpaceBridgeBoundaryPlacement, UserSpaceBridgeCoreImplementation,
@@ -91,6 +91,60 @@ impl GuiHelloWorldActualLaunchReport {
             blocker: GuiHelloWorldActualBlocker::from_classification_plan(&classification_plan),
         }
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub(crate) struct GuiHelloWorldFeedbackReport {
+    schema: &'static str,
+    case_id: CaseId,
+    status: GuiHelloWorldFeedbackStatus,
+    comparison: ComparisonReport,
+    current_blocker: GuiHelloWorldActualBlocker,
+    next_action: GuiHelloWorldFeedbackNextAction,
+}
+
+impl GuiHelloWorldFeedbackReport {
+    fn from_expected_and_actual(
+        expected: &ObservedResult,
+        actual: &GuiHelloWorldActualLaunchBundle,
+    ) -> Self {
+        let comparison = compare_observed_results(expected, actual.observed_result());
+        let status = GuiHelloWorldFeedbackStatus::from_comparison(&comparison);
+
+        Self {
+            schema: "b8_gui_hello_world_feedback_report_v0",
+            case_id: expected.case_id().clone(),
+            status,
+            comparison,
+            current_blocker: actual.launch_report.blocker.clone(),
+            next_action:
+                GuiHelloWorldFeedbackNextAction::ImplementUserSpaceLoaderForMachOGuiExecutable,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldFeedbackStatus {
+    #[serde(rename = "blocked")]
+    Blocked,
+    #[serde(rename = "matched")]
+    Matched,
+}
+
+impl GuiHelloWorldFeedbackStatus {
+    fn from_comparison(comparison: &ComparisonReport) -> Self {
+        if comparison.is_match() {
+            Self::Matched
+        } else {
+            Self::Blocked
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldFeedbackNextAction {
+    #[serde(rename = "implement_user_space_loader_for_mach_o_gui_executable")]
+    ImplementUserSpaceLoaderForMachOGuiExecutable,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -1276,13 +1330,21 @@ pub(crate) fn b8_gui_hello_world_actual_launch_attempt(
     ))
 }
 
+pub(crate) fn b8_gui_hello_world_feedback_report(
+    expected: &ObservedResult,
+    actual: &GuiHelloWorldActualLaunchBundle,
+) -> GuiHelloWorldFeedbackReport {
+    GuiHelloWorldFeedbackReport::from_expected_and_actual(expected, actual)
+}
+
 #[cfg(test)]
 mod tests {
     use bara_oracle::{probe_public_binary_format, BinaryInput, CaseId, ObservedResult};
 
     use super::{
-        b8_gui_hello_world_actual_launch_attempt, GuiHelloWorldActualBlockerClassification,
-        GuiHelloWorldInitialBlockerPlan, GuiHelloWorldUnsupportedLaunchBoundary,
+        b8_gui_hello_world_actual_launch_attempt, b8_gui_hello_world_feedback_report,
+        GuiHelloWorldActualBlockerClassification, GuiHelloWorldInitialBlockerPlan,
+        GuiHelloWorldUnsupportedLaunchBoundary,
     };
 
     #[test]
@@ -1304,6 +1366,27 @@ mod tests {
         assert_eq!(
             serde_json::to_string(attempt.launch_report()).expect("launch report serializes"),
             "{\"schema\":\"b8_gui_hello_world_actual_launch_report_v0\",\"case_id\":\"b8_gui_hello_world\",\"actual_runtime\":\"bara_arm64_user_space\",\"status\":\"blocked\",\"input\":{\"kind\":\"mach_o_executable_image\",\"source_isa\":\"x86_64\",\"binary_format\":\"mach_o\",\"target_triple\":\"x86_64-apple-macos13\",\"gui_framework\":\"appkit\",\"probe\":{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\"},\"loader_metadata\":{\"source\":\"public_mach_o_probe\",\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":0,\"byte_size\":0,\"recognized_entry_points\":[],\"recognized_segments\":[],\"unsupported_commands\":[]},\"executable_image_conversion\":{\"status\":\"not_convertible\",\"blocker\":\"missing_entry_point\"}},\"sections\":{\"status\":\"modeled_from_lc_segment_64_section_table\"},\"imports\":{\"status\":\"modeled_from_dylib_load_commands\"},\"relocations\":{\"status\":\"modeled_from_linkedit_relocation_and_bind_commands\"}}},\"runtime_preparation\":{\"source\":\"bara_runtime_user_space_launch_plan\",\"status\":\"planned_not_executed\",\"source_isa_profile\":{\"mode\":\"x86_64_long_mode\",\"address_size\":\"bits_64\",\"default_operand_size\":\"bits_32\",\"stack_width\":\"bits_64\"},\"image_mapping\":{\"responsibility\":\"loader\",\"source\":\"mach_o_executable_image\",\"memory_protection\":\"public_os_virtual_memory\"},\"executable_memory\":{\"responsibility\":\"runtime\",\"allocation_api\":\"mmap_private_anonymous\",\"protection_transition\":\"mprotect_read_write_to_read_execute\",\"release_api\":\"munmap\"},\"execution_strategy\":{\"responsibility\":\"runtime\",\"boundary\":\"user_space_runtime\",\"jit\":\"selectable\",\"aot\":\"selectable\",\"fallback_interpreter\":\"selectable\"},\"entry_trampoline\":{\"responsibility\":\"runtime\",\"target\":\"mach_o_entry_point\"},\"initial_stack\":{\"responsibility\":\"runtime\",\"contract\":\"argv_envp_initial_stack\"},\"helper_boundary\":{\"responsibility\":\"helper_boundary\",\"contract\":\"imports_objc_os_api_requests\"},\"bridge_boundary\":{\"responsibility\":\"helper_boundary\",\"syscall_bridge\":\"helper_boundary\",\"os_api_bridge\":\"helper_boundary\",\"core_ir_implementation\":\"not_embedded\",\"arm64_emit_implementation\":\"not_embedded\"},\"integration_policy\":{\"process_scope\":\"current_user_space_process\",\"kernel_extension\":\"not_required\",\"private_kernel_hook\":\"not_required\",\"private_dyld_behavior\":\"not_required\"},\"process_boundary\":{\"loader\":\"current_user_space_process\",\"translation_cache\":\"current_user_space_process\",\"runtime_helper\":\"current_user_space_process\",\"artifact_cache\":\"current_user_space_process\"},\"platform_model\":{\"signal_model\":\"user_space_loader_boundary\",\"exception_model\":\"user_space_loader_boundary\",\"thread_model\":\"initial_thread_only\",\"tls_model\":\"deferred\",\"memory_protection\":\"public_os_virtual_memory\"},\"macos_constraints\":{\"code_signing\":\"no_private_signing_bypass\",\"write_xor_execute\":\"public_mmap_mprotect_transition\",\"hardened_runtime\":\"documented_host_policy_only\"},\"fallback_policy\":{\"unimplemented_instruction\":\"stable_blocker_classification\",\"unknown_indirect_target\":\"stable_blocker_classification\",\"unsupported_loader_feature\":\"stable_blocker_classification\",\"interpreter\":\"candidate_not_implemented\",\"external_engine\":\"candidate_not_connected\",\"feedback_cycle\":\"ready_not_started\"}},\"launch_result\":{\"exit_status\":1,\"return_value\":0,\"stdout\":\"\",\"stderr\":\"unsupported_boundary: unsupported_loader_feature\"},\"blocker\":{\"classification\":\"unsupported_loader_feature\",\"boundary\":\"loader\",\"selected_by\":\"first_unsupported_launch_boundary\",\"candidate_boundaries\":[{\"boundary\":\"loader\",\"classification\":\"unsupported_loader_feature\"},{\"boundary\":\"import\",\"classification\":\"unsupported_import\"},{\"boundary\":\"objc_runtime\",\"classification\":\"unsupported_objc_runtime_boundary\"}],\"message\":\"Bara does not yet load a complete x86_64 Mach-O GUI executable with dynamic loader, AppKit import, and Objective-C runtime requirements.\"}}"
+        );
+    }
+
+    #[test]
+    fn gui_hello_world_feedback_report_keeps_comparison_and_current_blocker() {
+        let probe_report = mach_o_execute_header_probe();
+        let attempt = b8_gui_hello_world_actual_launch_attempt(&probe_report)
+            .expect("built-in B8 GUI Hello World case id is valid");
+        let expected = ObservedResult::new(
+            CaseId::new("b8_gui_hello_world").expect("case id is non-empty"),
+            0,
+            0,
+            "{\"event\":\"gui_window_created\",\"title\":\"Bara GUI Hello World\",\"text\":\"hello world\"}\n".to_owned(),
+            String::new(),
+        );
+
+        let feedback = b8_gui_hello_world_feedback_report(&expected, &attempt);
+
+        assert_eq!(
+            serde_json::to_string(&feedback).expect("feedback report serializes"),
+            "{\"schema\":\"b8_gui_hello_world_feedback_report_v0\",\"case_id\":\"b8_gui_hello_world\",\"status\":\"blocked\",\"comparison\":{\"issues\":[{\"exit_status_mismatch\":{\"expected\":0,\"actual\":1}},{\"stdout_mismatch\":{\"expected\":\"{\\\"event\\\":\\\"gui_window_created\\\",\\\"title\\\":\\\"Bara GUI Hello World\\\",\\\"text\\\":\\\"hello world\\\"}\\n\",\"actual\":\"\"}},{\"stderr_mismatch\":{\"expected\":\"\",\"actual\":\"unsupported_boundary: unsupported_loader_feature\"}}]},\"current_blocker\":{\"classification\":\"unsupported_loader_feature\",\"boundary\":\"loader\",\"selected_by\":\"first_unsupported_launch_boundary\",\"candidate_boundaries\":[{\"boundary\":\"loader\",\"classification\":\"unsupported_loader_feature\"},{\"boundary\":\"import\",\"classification\":\"unsupported_import\"},{\"boundary\":\"objc_runtime\",\"classification\":\"unsupported_objc_runtime_boundary\"}],\"message\":\"Bara does not yet load a complete x86_64 Mach-O GUI executable with dynamic loader, AppKit import, and Objective-C runtime requirements.\"},\"next_action\":\"implement_user_space_loader_for_mach_o_gui_executable\"}"
         );
     }
 

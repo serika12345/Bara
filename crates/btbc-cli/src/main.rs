@@ -35,7 +35,9 @@ use function_run::{
     compile_test_case_function, compile_test_case_function_standalone_artifact,
     run_test_case_function, FunctionArtifactMetadata, FunctionRunError,
 };
-use gui_hello_world_actual::b8_gui_hello_world_actual_launch_attempt;
+use gui_hello_world_actual::{
+    b8_gui_hello_world_actual_launch_attempt, b8_gui_hello_world_feedback_report,
+};
 use native_artifact::{
     link_arm64_main_executable, link_arm64_main_executable_with_source_metadata,
     link_arm64_stdout_main_executable, link_arm64_stdout_main_executable_with_source_metadata,
@@ -127,6 +129,17 @@ fn run_cli(args: Vec<String>) -> Result<String, CliError> {
                 Path::new(binary_path),
                 Path::new(actual_path),
                 Path::new(launch_report_path),
+            )
+        }
+        [command, binary_path, expected_path, actual_path, launch_report_path, feedback_report_path]
+            if command == "generate-arm64-gui-hello-world-feedback" =>
+        {
+            run_generate_arm64_gui_hello_world_feedback(
+                Path::new(binary_path),
+                Path::new(expected_path),
+                Path::new(actual_path),
+                Path::new(launch_report_path),
+                Path::new(feedback_report_path),
             )
         }
         [command, case_path, output_dir] if command == "emit-fixture-artifacts" => {
@@ -328,11 +341,7 @@ fn run_generate_arm64_gui_hello_world_actual(
     actual_path: &Path,
     launch_report_path: &Path,
 ) -> Result<String, CliError> {
-    let bytes = read_binary_file(binary_path)?;
-    let input = BinaryInput::from_file_bytes(BinaryFileBytes::from_untrusted_file_contents(bytes));
-    let input_probe = probe_public_binary_format(&input).map_err(CliError::BinaryFormatProbe)?;
-    let attempt = b8_gui_hello_world_actual_launch_attempt(&input_probe)
-        .map_err(CliError::X8664MachOFixture)?;
+    let attempt = run_b8_gui_hello_world_actual_attempt(binary_path)?;
     let actual_json = observed_result_to_json(attempt.observed_result()).map_err(CliError::Json)?;
     let launch_report_json = serde_json::to_string(attempt.launch_report())
         .map_err(JsonError::new)
@@ -351,6 +360,50 @@ fn run_generate_arm64_gui_hello_world_actual(
     .map_err(CliError::Json)
 }
 
+fn run_generate_arm64_gui_hello_world_feedback(
+    binary_path: &Path,
+    expected_path: &Path,
+    actual_path: &Path,
+    launch_report_path: &Path,
+    feedback_report_path: &Path,
+) -> Result<String, CliError> {
+    let expected_json = read_text_file(expected_path)?;
+    let expected = observed_result_from_json(&expected_json).map_err(CliError::ExpectedJson)?;
+    let attempt = run_b8_gui_hello_world_actual_attempt(binary_path)?;
+    let actual_json = observed_result_to_json(attempt.observed_result()).map_err(CliError::Json)?;
+    let launch_report_json = serde_json::to_string(attempt.launch_report())
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)?;
+    let feedback_report = b8_gui_hello_world_feedback_report(&expected, &attempt);
+    let feedback_report_json = serde_json::to_string(&feedback_report)
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)?;
+
+    create_output_parent_dir(actual_path)?;
+    write_text_file(actual_path, &actual_json)?;
+    create_output_parent_dir(launch_report_path)?;
+    write_text_file(launch_report_path, &launch_report_json)?;
+    create_output_parent_dir(feedback_report_path)?;
+    write_text_file(feedback_report_path, &feedback_report_json)?;
+
+    serde_json::to_string(&GuiHelloWorldFeedbackOutputPaths::new(
+        actual_path,
+        launch_report_path,
+        feedback_report_path,
+    ))
+    .map_err(JsonError::new)
+    .map_err(CliError::Json)
+}
+
+fn run_b8_gui_hello_world_actual_attempt(
+    binary_path: &Path,
+) -> Result<gui_hello_world_actual::GuiHelloWorldActualLaunchBundle, CliError> {
+    let bytes = read_binary_file(binary_path)?;
+    let input = BinaryInput::from_file_bytes(BinaryFileBytes::from_untrusted_file_contents(bytes));
+    let input_probe = probe_public_binary_format(&input).map_err(CliError::BinaryFormatProbe)?;
+    b8_gui_hello_world_actual_launch_attempt(&input_probe).map_err(CliError::X8664MachOFixture)
+}
+
 #[derive(Serialize)]
 struct GuiHelloWorldActualOutputPaths {
     actual: String,
@@ -362,6 +415,23 @@ impl GuiHelloWorldActualOutputPaths {
         Self {
             actual: actual_path.to_string_lossy().into_owned(),
             launch_report: launch_report_path.to_string_lossy().into_owned(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct GuiHelloWorldFeedbackOutputPaths {
+    actual: String,
+    launch_report: String,
+    feedback_report: String,
+}
+
+impl GuiHelloWorldFeedbackOutputPaths {
+    fn new(actual_path: &Path, launch_report_path: &Path, feedback_report_path: &Path) -> Self {
+        Self {
+            actual: actual_path.to_string_lossy().into_owned(),
+            launch_report: launch_report_path.to_string_lossy().into_owned(),
+            feedback_report: feedback_report_path.to_string_lossy().into_owned(),
         }
     }
 }
@@ -1415,7 +1485,7 @@ impl std::fmt::Display for CliError {
         match self {
             Self::Usage => write!(
                 formatter,
-                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | emit-fixture-artifacts <case.json> <out-dir> | link-fixture-arm64-main <case.json> <out-exe> | build-x86_64-macho-fixture <case.json> <out-exe> | build-x86_64-gui-hello-world-fixture <out-exe> | build-x86_64-oracle-runner <case.json> <out-exe> | generate-x86_64-expected <case.json> <expected.json> | generate-x86_64-gui-hello-world-expected <expected.json> <launch-metadata.json> | generate-arm64-actual <case.json> <actual.json> | generate-arm64-gui-hello-world-actual <binary> <actual.json> <launch-report.json> | compare-expected-actual <expected.json> <actual.json> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
+                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | emit-fixture-artifacts <case.json> <out-dir> | link-fixture-arm64-main <case.json> <out-exe> | build-x86_64-macho-fixture <case.json> <out-exe> | build-x86_64-gui-hello-world-fixture <out-exe> | build-x86_64-oracle-runner <case.json> <out-exe> | generate-x86_64-expected <case.json> <expected.json> | generate-x86_64-gui-hello-world-expected <expected.json> <launch-metadata.json> | generate-arm64-actual <case.json> <actual.json> | generate-arm64-gui-hello-world-actual <binary> <actual.json> <launch-report.json> | generate-arm64-gui-hello-world-feedback <binary> <expected.json> <actual.json> <launch-report.json> <feedback-report.json> | compare-expected-actual <expected.json> <actual.json> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
             ),
             Self::ReadFile { path, source } => {
                 write!(formatter, "failed to read file {}: {source}", path.display())
@@ -2008,6 +2078,66 @@ mod tests {
         assert_eq!(
             read_file(&launch_report_path),
             include_str!("../../../tests/expected/b8_gui_hello_world.bara.launch-report.json")
+                .trim_end_matches('\n')
+        );
+    }
+
+    #[test]
+    fn generate_arm64_gui_hello_world_feedback_writes_current_blocker_report() {
+        let temp_dir = TestTempDir::new(
+            "generate_arm64_gui_hello_world_feedback_writes_current_blocker_report",
+        );
+        let binary_path = temp_dir.write_binary_file(
+            "b8_gui_hello_world",
+            include_bytes!("../../../tests/binaries/mach_o_execute_header.bin"),
+        );
+        let expected_path = temp_dir.write_file(
+            "b8_gui_hello_world.expected.json",
+            include_str!("../../../tests/expected/b8_gui_hello_world.json"),
+        );
+        let actual_path = temp_dir.path.join("actual").join("b8_gui_hello_world.json");
+        let launch_report_path = temp_dir
+            .path
+            .join("actual")
+            .join("b8_gui_hello_world.launch-report.json");
+        let feedback_report_path = temp_dir
+            .path
+            .join("actual")
+            .join("b8_gui_hello_world.feedback-report.json");
+
+        let output = run_cli(vec![
+            String::from("generate-arm64-gui-hello-world-feedback"),
+            binary_path.to_string_lossy().into_owned(),
+            expected_path.to_string_lossy().into_owned(),
+            actual_path.to_string_lossy().into_owned(),
+            launch_report_path.to_string_lossy().into_owned(),
+            feedback_report_path.to_string_lossy().into_owned(),
+        ])
+        .expect("B8 GUI Hello World feedback report is generated");
+
+        assert_eq!(
+            output,
+            format!(
+                "{{\"actual\":\"{}\",\"launch_report\":\"{}\",\"feedback_report\":\"{}\"}}",
+                actual_path.display(),
+                launch_report_path.display(),
+                feedback_report_path.display()
+            )
+        );
+        let expected_actual = observed_result_from_json(include_str!(
+            "../../../tests/expected/b8_gui_hello_world.bara.actual.json"
+        ))
+        .and_then(|result| observed_result_to_json(&result))
+        .expect("B8 GUI actual blocker fixture normalizes to output json");
+        assert_eq!(read_file(&actual_path), expected_actual);
+        assert_eq!(
+            read_file(&launch_report_path),
+            include_str!("../../../tests/expected/b8_gui_hello_world.bara.launch-report.json")
+                .trim_end_matches('\n')
+        );
+        assert_eq!(
+            read_file(&feedback_report_path),
+            include_str!("../../../tests/expected/b8_gui_hello_world.bara.feedback-report.json")
                 .trim_end_matches('\n')
         );
     }

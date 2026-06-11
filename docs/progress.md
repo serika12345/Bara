@@ -9,43 +9,54 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 14:05 JST
+最終更新: 2026-06-11 14:25 JST
 
 状態:
 
-- project_state: completed。B8 の Rosetta 比較フィードバックサイクル直前の
-  launch/report 境界として、platform model、macOS execution constraints、
-  fallback policy、process-level launch result を stable report に固定した。
+- project_state: completed。B8 の Rosetta 比較フィードバックサイクル開始点として、
+  Rosetta expected と Bara actual / launch report を feedback report に束ね、
+  current blocker と次の修正対象を stable JSON に固定した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8:
   実 x86_64 macOS アプリ起動。
-- active_design_focus: B8 pre-feedback launch boundary。user-space loader model、
-  public macOS constraint model、fallback decision、stable launch result を
-  actual launch report に保存し、次の step で Rosetta expected と Bara actual の
-  差分修正ループを始められる状態にする。
+- active_design_focus: B8 feedback report。Rosetta expected / Bara actual の
+  observed comparison issues と `unsupported_loader_feature` blocker を同じ report に
+  保存し、次の user-space loader 実行計画 step へ渡せるようにする。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
   latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B8 の signal / exception / thread / TLS /
-  memory protection model、macOS code signing / W^X / hardened runtime 制約、
-  fallback 方針、stable launch result report。
-- completed_work: `bara-runtime::UserSpaceLaunchPlan` は `platform_model`、
-  `macos_constraints`、`fallback_policy` を保持する。`btbc-cli` の
-  B8 actual launch report はこれらを `runtime_preparation` へ projection し、
-  top-level `launch_result` と `actual.json` の stdout / stderr / exit status /
-  return value を同じ blocker classification から生成する。
-- remaining_work: 次の小ステップは Rosetta black-box oracle の expected と
-  Bara actual の比較を実際に回し、差分を blocker / loader / helper / runtime
-  support へ戻すフィードバックサイクルを開始すること。
-- next_action: commit / push 後、次の B8 小ステップで Rosetta 実行との比較を
-  回し、最初の actual 差分修正対象を特定する。
+- related_todo: [TODO.md](../TODO.md) B8 の「Rosetta expected と Bara actual /
+  launch report を同じ feedback report に束ね、現状の blocker と次の修正対象を
+  stable JSON で出す」。
+- completed_work: `btbc-cli generate-arm64-gui-hello-world-feedback` を追加し、
+  x86_64 GUI binary、Rosetta expected JSON から Bara actual JSON、launch report、
+  feedback report をまとめて生成できるようにした。
+  `b8_gui_hello_world_feedback_report_v0` は comparison issues、current blocker、
+  next action を保存し、初期 next action を
+  `implement_user_space_loader_for_mach_o_gui_executable` とする。
+- remaining_work: 次の小ステップは feedback report の `unsupported_loader_feature`
+  に対して、public Mach-O loader metadata から最初の user-space loader 実行計画を
+  作ること。
+- next_action: commit / push 後、次の B8 小ステップで
+  `implement_user_space_loader_for_mach_o_gui_executable` に対応する loader 実行計画を
+  model 化する。
 - verification: targeted tests として
-  `nix develop -c cargo test -p bara-runtime user_space_launch_plan -- --nocapture`、
-  `nix develop -c cargo test -p btbc-cli gui_hello_world_actual -- --nocapture` が
-  通過した。`nix develop -c cargo fmt --all -- --check`、
-  `nix develop -c cargo clippy -p bara-runtime -p btbc-cli --all-targets -- -D warnings`、
+  `nix develop -c cargo test -p btbc-cli gui_hello_world -- --nocapture` が通過した。
+  `target/b8` 上で `build-x86_64-gui-hello-world-fixture` と
+  `generate-arm64-gui-hello-world-feedback` の手動確認も通過した。
+  `nix develop -c cargo fmt --all -- --check`、
+  `nix develop -c cargo clippy -p btbc-cli --all-targets -- -D warnings`、
   `git diff --check`、full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-11 14:25 JST: B8 の Rosetta 比較フィードバックサイクル開始点として、
+  `btbc-cli generate-arm64-gui-hello-world-feedback` を追加した。Rosetta expected
+  JSON と Bara actual / launch report から
+  `b8_gui_hello_world_feedback_report_v0` を生成し、observed result の
+  `exit_status` / `stdout` / `stderr` mismatch、current blocker
+  `unsupported_loader_feature`、next action
+  `implement_user_space_loader_for_mach_o_gui_executable` を stable JSON に保存する。
+  targeted tests、`target/b8` での手動 CLI 確認、`btbc-cli` clippy、full
+  `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-11 14:05 JST: B8 の Rosetta 比較フィードバックサイクル直前の
   boundary 固定として、`bara-runtime::UserSpaceLaunchPlan` に
   `platform_model`、`macos_constraints`、`fallback_policy` を追加した。
