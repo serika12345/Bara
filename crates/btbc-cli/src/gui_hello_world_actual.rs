@@ -126,8 +126,7 @@ impl GuiHelloWorldFeedbackReport {
             current_blocker: actual.launch_report.blocker.clone(),
             loader_execution_plan: actual.launch_report.runtime_preparation.loader_execution,
             helper_boundary_plan: actual.launch_report.runtime_preparation.helper_boundary,
-            next_action:
-                GuiHelloWorldFeedbackNextAction::ConnectAppKitImportObjcRuntimeHelperBoundary,
+            next_action: GuiHelloWorldFeedbackNextAction::ImplementObjcRuntimeHelperBoundary,
         }
     }
 }
@@ -152,8 +151,8 @@ impl GuiHelloWorldFeedbackStatus {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 enum GuiHelloWorldFeedbackNextAction {
-    #[serde(rename = "connect_appkit_import_objc_runtime_helper_boundary")]
-    ConnectAppKitImportObjcRuntimeHelperBoundary,
+    #[serde(rename = "implement_objc_runtime_helper_boundary")]
+    ImplementObjcRuntimeHelperBoundary,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -823,12 +822,17 @@ impl GuiHelloWorldActualHelperBoundaryResolution {
 enum GuiHelloWorldActualHelperBoundaryNextBlocker {
     #[serde(rename = "unsupported_import")]
     UnsupportedImport,
+    #[serde(rename = "unsupported_objc_runtime_boundary")]
+    UnsupportedObjcRuntimeBoundary,
 }
 
 impl GuiHelloWorldActualHelperBoundaryNextBlocker {
     const fn from_runtime(next_blocker: UserSpaceHelperBoundaryNextBlocker) -> Self {
         match next_blocker {
             UserSpaceHelperBoundaryNextBlocker::UnsupportedImport => Self::UnsupportedImport,
+            UserSpaceHelperBoundaryNextBlocker::UnsupportedObjcRuntimeBoundary => {
+                Self::UnsupportedObjcRuntimeBoundary
+            }
         }
     }
 }
@@ -1411,8 +1415,6 @@ impl GuiHelloWorldActualBlocker {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 enum GuiHelloWorldActualBlockerClassification {
-    #[serde(rename = "unsupported_import")]
-    Import,
     #[serde(rename = "unsupported_objc_runtime_boundary")]
     ObjcRuntimeBoundary,
 }
@@ -1420,7 +1422,6 @@ enum GuiHelloWorldActualBlockerClassification {
 impl GuiHelloWorldActualBlockerClassification {
     const fn stderr_message(self) -> &'static str {
         match self {
-            Self::Import => "unsupported_boundary: unsupported_import",
             Self::ObjcRuntimeBoundary => "unsupported_boundary: unsupported_objc_runtime_boundary",
         }
     }
@@ -1428,8 +1429,6 @@ impl GuiHelloWorldActualBlockerClassification {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 enum GuiHelloWorldUnsupportedLaunchBoundary {
-    #[serde(rename = "import")]
-    Import,
     #[serde(rename = "objc_runtime")]
     ObjcRuntime,
 }
@@ -1437,16 +1436,12 @@ enum GuiHelloWorldUnsupportedLaunchBoundary {
 impl GuiHelloWorldUnsupportedLaunchBoundary {
     const fn classification(self) -> GuiHelloWorldActualBlockerClassification {
         match self {
-            Self::Import => GuiHelloWorldActualBlockerClassification::Import,
             Self::ObjcRuntime => GuiHelloWorldActualBlockerClassification::ObjcRuntimeBoundary,
         }
     }
 
     const fn message(self) -> &'static str {
         match self {
-            Self::Import => {
-                "Bara does not yet resolve the GUI fixture's public AppKit import boundary."
-            }
             Self::ObjcRuntime => {
                 "Bara does not yet provide an Objective-C runtime helper boundary for the AppKit GUI fixture."
             }
@@ -1484,8 +1479,8 @@ impl GuiHelloWorldInitialBlockerPlan {
     fn current() -> Self {
         Self {
             unsupported_boundaries: NonEmptyGuiHelloWorldUnsupportedLaunchBoundaries::new(
-                GuiHelloWorldUnsupportedLaunchBoundary::Import,
-                vec![GuiHelloWorldUnsupportedLaunchBoundary::ObjcRuntime],
+                GuiHelloWorldUnsupportedLaunchBoundary::ObjcRuntime,
+                Vec::new(),
             ),
         }
     }
@@ -1570,7 +1565,7 @@ mod tests {
     };
 
     #[test]
-    fn gui_hello_world_actual_attempt_reports_import_blocker() {
+    fn gui_hello_world_actual_attempt_reports_objc_runtime_blocker() {
         let probe_report = mach_o_execute_header_probe();
         let attempt = b8_gui_hello_world_actual_launch_attempt(&probe_report)
             .expect("built-in B8 GUI Hello World case id is valid");
@@ -1582,7 +1577,7 @@ mod tests {
                 1,
                 0,
                 String::new(),
-                String::from("unsupported_boundary: unsupported_import"),
+                String::from("unsupported_boundary: unsupported_objc_runtime_boundary"),
             )
         );
         assert_eq!(
@@ -1615,39 +1610,27 @@ mod tests {
     }
 
     #[test]
-    fn initial_blocker_plan_promotes_helper_boundary_import_before_objc_runtime() {
+    fn initial_blocker_plan_promotes_helper_boundary_objc_runtime() {
         let plan = GuiHelloWorldInitialBlockerPlan::current();
 
         assert_eq!(
             plan.selected_classification(),
-            GuiHelloWorldActualBlockerClassification::Import
+            GuiHelloWorldActualBlockerClassification::ObjcRuntimeBoundary
         );
         assert_eq!(
             plan.candidate_boundaries(),
-            vec![
-                super::GuiHelloWorldActualBlockerCandidate::from_boundary(
-                    GuiHelloWorldUnsupportedLaunchBoundary::Import
-                ),
-                super::GuiHelloWorldActualBlockerCandidate::from_boundary(
-                    GuiHelloWorldUnsupportedLaunchBoundary::ObjcRuntime
-                ),
-            ]
+            vec![super::GuiHelloWorldActualBlockerCandidate::from_boundary(
+                GuiHelloWorldUnsupportedLaunchBoundary::ObjcRuntime
+            ),]
         );
     }
 
     #[test]
-    fn initial_blocker_plan_has_stable_import_and_objc_runtime_classifications() {
-        let import_plan = GuiHelloWorldInitialBlockerPlan::with_first_boundary(
-            GuiHelloWorldUnsupportedLaunchBoundary::Import,
-        );
+    fn initial_blocker_plan_has_stable_objc_runtime_classification() {
         let objc_runtime_plan = GuiHelloWorldInitialBlockerPlan::with_first_boundary(
             GuiHelloWorldUnsupportedLaunchBoundary::ObjcRuntime,
         );
 
-        assert_eq!(
-            import_plan.selected_classification(),
-            GuiHelloWorldActualBlockerClassification::Import
-        );
         assert_eq!(
             objc_runtime_plan.selected_classification(),
             GuiHelloWorldActualBlockerClassification::ObjcRuntimeBoundary

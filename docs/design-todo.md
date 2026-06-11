@@ -128,6 +128,12 @@
   これにより loader blocker は次の実装対象から外れ、current blocker は public
   AppKit import boundary になる。これは AppKit import 解決や Objective-C runtime
   bridge の実行ではなく、helper boundary の explicit blocker promotion である。
+- 2026-06-11 の B8 小ステップとして、`helper_boundary_plan.next_blocker` を
+  `unsupported_objc_runtime_boundary` に進め、B8 actual result と current blocker に
+  接続した。これにより public AppKit import blocker は次の実装対象から外れ、
+  current blocker は Objective-C runtime helper boundary になる。これは
+  Objective-C runtime bridge の実行ではなく、helper boundary の explicit blocker
+  promotion である。
 - wasm2c platform adapter / NDA target adapter は本流 TODO ではなく、
   [将来構想メモ](future-research-concepts.md) の未確立構想として扱う。
 

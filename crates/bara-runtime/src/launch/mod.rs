@@ -245,7 +245,7 @@ impl UserSpaceHelperBoundaryPlan {
             import_resolution: UserSpaceHelperBoundaryResolution::HelperCapabilityRequired,
             objc_runtime: UserSpaceHelperBoundaryResolution::HelperCapabilityRequired,
             os_api_requests: UserSpaceHelperBoundaryResolution::HelperCapabilityRequired,
-            next_blocker: UserSpaceHelperBoundaryNextBlocker::UnsupportedImport,
+            next_blocker: UserSpaceHelperBoundaryNextBlocker::UnsupportedObjcRuntimeBoundary,
             status: UserSpaceHelperBoundaryStatus::PlannedNotExecuted,
         }
     }
@@ -328,6 +328,7 @@ pub enum UserSpaceHelperBoundaryResolution {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum UserSpaceHelperBoundaryNextBlocker {
     UnsupportedImport,
+    UnsupportedObjcRuntimeBoundary,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -943,7 +944,7 @@ mod tests {
         );
         assert_eq!(
             helper_boundary.next_blocker(),
-            UserSpaceHelperBoundaryNextBlocker::UnsupportedImport
+            UserSpaceHelperBoundaryNextBlocker::UnsupportedObjcRuntimeBoundary
         );
         assert_eq!(
             helper_boundary.status(),
