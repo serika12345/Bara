@@ -1,5 +1,6 @@
 use bara_oracle::{
-    BinaryFormat, BinaryFormatProbeReport, BinaryFormatProbeStatus, CaseId, ObservedResult,
+    BinaryFormat, BinaryFormatProbeReport, BinaryFormatProbeStatus, CaseId, MachOMetadata,
+    ObservedResult,
 };
 use serde::Serialize;
 
@@ -14,7 +15,7 @@ pub(crate) struct GuiHelloWorldActualLaunchBundle {
 impl GuiHelloWorldActualLaunchBundle {
     fn blocked_by_initial_blocker(
         case_id: CaseId,
-        input_probe: GuiHelloWorldActualInputProbe,
+        input_metadata: GuiHelloWorldActualInputMetadata,
         classification_plan: GuiHelloWorldInitialBlockerPlan,
     ) -> Self {
         let classification = classification_plan.selected_classification();
@@ -27,7 +28,7 @@ impl GuiHelloWorldActualLaunchBundle {
         );
         let launch_report = GuiHelloWorldActualLaunchReport::blocked_by_initial_blocker(
             case_id,
-            input_probe,
+            input_metadata,
             classification_plan,
         );
 
@@ -59,7 +60,7 @@ pub(crate) struct GuiHelloWorldActualLaunchReport {
 impl GuiHelloWorldActualLaunchReport {
     fn blocked_by_initial_blocker(
         case_id: CaseId,
-        input_probe: GuiHelloWorldActualInputProbe,
+        input_metadata: GuiHelloWorldActualInputMetadata,
         classification_plan: GuiHelloWorldInitialBlockerPlan,
     ) -> Self {
         Self {
@@ -67,7 +68,7 @@ impl GuiHelloWorldActualLaunchReport {
             case_id,
             actual_runtime: GuiHelloWorldActualRuntime::BaraArm64UserSpace,
             status: GuiHelloWorldActualLaunchStatus::Blocked,
-            input: GuiHelloWorldActualInput::from_probe(input_probe),
+            input: GuiHelloWorldActualInput::from_metadata(input_metadata),
             blocker: GuiHelloWorldActualBlocker::from_classification_plan(&classification_plan),
         }
     }
@@ -93,17 +94,19 @@ struct GuiHelloWorldActualInput {
     target_triple: GuiHelloWorldActualTargetTriple,
     gui_framework: GuiHelloWorldActualFramework,
     probe: GuiHelloWorldActualInputProbe,
+    loader_metadata: GuiHelloWorldActualLoaderMetadata,
 }
 
 impl GuiHelloWorldActualInput {
-    const fn from_probe(probe: GuiHelloWorldActualInputProbe) -> Self {
+    fn from_metadata(metadata: GuiHelloWorldActualInputMetadata) -> Self {
         Self {
             kind: GuiHelloWorldActualInputKind::MachOExecutableImage,
             source_isa: GuiHelloWorldActualSourceIsa::X8664,
             binary_format: GuiHelloWorldActualBinaryFormat::MachO,
             target_triple: GuiHelloWorldActualTargetTriple::X8664AppleMacos13,
             gui_framework: GuiHelloWorldActualFramework::AppKit,
-            probe,
+            probe: metadata.probe,
+            loader_metadata: metadata.loader_metadata,
         }
     }
 }
@@ -151,6 +154,67 @@ impl GuiHelloWorldActualInputProbe {
             status: report.status(),
         }
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct GuiHelloWorldActualInputMetadata {
+    probe: GuiHelloWorldActualInputProbe,
+    loader_metadata: GuiHelloWorldActualLoaderMetadata,
+}
+
+impl GuiHelloWorldActualInputMetadata {
+    fn from_report(report: &BinaryFormatProbeReport) -> Self {
+        Self {
+            probe: GuiHelloWorldActualInputProbe::from_report(report),
+            loader_metadata: GuiHelloWorldActualLoaderMetadata::from_report(report),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct GuiHelloWorldActualLoaderMetadata {
+    source: GuiHelloWorldActualLoaderMetadataSource,
+    mach_o: MachOMetadata,
+    sections: GuiHelloWorldActualDeferredLoaderMetadata,
+    imports: GuiHelloWorldActualDeferredLoaderMetadata,
+    relocations: GuiHelloWorldActualDeferredLoaderMetadata,
+}
+
+impl GuiHelloWorldActualLoaderMetadata {
+    fn from_report(report: &BinaryFormatProbeReport) -> Self {
+        Self {
+            source: GuiHelloWorldActualLoaderMetadataSource::PublicMachOProbe,
+            mach_o: report.metadata().mach_o_metadata().clone(),
+            sections: GuiHelloWorldActualDeferredLoaderMetadata::not_modeled(),
+            imports: GuiHelloWorldActualDeferredLoaderMetadata::not_modeled(),
+            relocations: GuiHelloWorldActualDeferredLoaderMetadata::not_modeled(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualLoaderMetadataSource {
+    #[serde(rename = "public_mach_o_probe")]
+    PublicMachOProbe,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+struct GuiHelloWorldActualDeferredLoaderMetadata {
+    status: GuiHelloWorldActualDeferredLoaderMetadataStatus,
+}
+
+impl GuiHelloWorldActualDeferredLoaderMetadata {
+    const fn not_modeled() -> Self {
+        Self {
+            status: GuiHelloWorldActualDeferredLoaderMetadataStatus::NotModeled,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualDeferredLoaderMetadataStatus {
+    #[serde(rename = "not_modeled")]
+    NotModeled,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -325,7 +389,7 @@ pub(crate) fn b8_gui_hello_world_actual_launch_attempt(
 ) -> Result<GuiHelloWorldActualLaunchBundle, X8664MachOFixtureError> {
     Ok(GuiHelloWorldActualLaunchBundle::blocked_by_initial_blocker(
         b8_gui_hello_world_case_id()?,
-        GuiHelloWorldActualInputProbe::from_report(input_probe_report),
+        GuiHelloWorldActualInputMetadata::from_report(input_probe_report),
         GuiHelloWorldInitialBlockerPlan::current(),
     ))
 }
@@ -357,7 +421,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_string(attempt.launch_report()).expect("launch report serializes"),
-            "{\"schema\":\"b8_gui_hello_world_actual_launch_report_v0\",\"case_id\":\"b8_gui_hello_world\",\"actual_runtime\":\"bara_arm64_user_space\",\"status\":\"blocked\",\"input\":{\"kind\":\"mach_o_executable_image\",\"source_isa\":\"x86_64\",\"binary_format\":\"mach_o\",\"target_triple\":\"x86_64-apple-macos13\",\"gui_framework\":\"appkit\",\"probe\":{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\"}},\"blocker\":{\"classification\":\"unsupported_loader_feature\",\"boundary\":\"loader\",\"selected_by\":\"first_unsupported_launch_boundary\",\"candidate_boundaries\":[{\"boundary\":\"loader\",\"classification\":\"unsupported_loader_feature\"},{\"boundary\":\"import\",\"classification\":\"unsupported_import\"},{\"boundary\":\"objc_runtime\",\"classification\":\"unsupported_objc_runtime_boundary\"}],\"message\":\"Bara does not yet load a complete x86_64 Mach-O GUI executable with dynamic loader, AppKit import, and Objective-C runtime requirements.\"}}"
+            "{\"schema\":\"b8_gui_hello_world_actual_launch_report_v0\",\"case_id\":\"b8_gui_hello_world\",\"actual_runtime\":\"bara_arm64_user_space\",\"status\":\"blocked\",\"input\":{\"kind\":\"mach_o_executable_image\",\"source_isa\":\"x86_64\",\"binary_format\":\"mach_o\",\"target_triple\":\"x86_64-apple-macos13\",\"gui_framework\":\"appkit\",\"probe\":{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\"},\"loader_metadata\":{\"source\":\"public_mach_o_probe\",\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":0,\"byte_size\":0,\"recognized_entry_points\":[],\"recognized_segments\":[],\"unsupported_commands\":[]},\"executable_image_conversion\":{\"status\":\"not_convertible\",\"blocker\":\"missing_entry_point\"}},\"sections\":{\"status\":\"not_modeled\"},\"imports\":{\"status\":\"not_modeled\"},\"relocations\":{\"status\":\"not_modeled\"}}},\"blocker\":{\"classification\":\"unsupported_loader_feature\",\"boundary\":\"loader\",\"selected_by\":\"first_unsupported_launch_boundary\",\"candidate_boundaries\":[{\"boundary\":\"loader\",\"classification\":\"unsupported_loader_feature\"},{\"boundary\":\"import\",\"classification\":\"unsupported_import\"},{\"boundary\":\"objc_runtime\",\"classification\":\"unsupported_objc_runtime_boundary\"}],\"message\":\"Bara does not yet load a complete x86_64 Mach-O GUI executable with dynamic loader, AppKit import, and Objective-C runtime requirements.\"}}"
         );
     }
 
