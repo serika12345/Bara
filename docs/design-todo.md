@@ -134,6 +134,12 @@
   artifact cache は current user-space process 内の責務として report する。
   これは cache 実装、AOT/JIT/fallback interpreter 実装、または process 外
   integration の追加ではない。
+- 2026-06-11 の B8 小ステップとして、`UserSpaceLaunchPlan` に
+  `executable_memory` を追加した。allocation は `mmap` private anonymous
+  mapping、protection transition は `mprotect` read-write to read-execute、
+  release は `munmap` として report する。これは GUI executable launch の
+  実行ではなく、既存 runtime executable memory 境界を B8 launch plan に接続する
+  public OS API policy である。
 
 ## D7: Binary format input/output の分離
 

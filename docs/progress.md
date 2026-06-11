@@ -9,31 +9,32 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 13:10 JST
+最終更新: 2026-06-11 13:15 JST
 
 状態:
 
-- project_state: completed。B8 の user-space process boundary step として、
-  loader、translation cache、runtime helper、artifact cache の process scope を
-  user-space launch plan と actual launch report に載せた。
+- project_state: completed。B8 の executable memory public OS API boundary
+  step として、`mmap` / `mprotect` / `munmap` に限定した executable memory plan
+  を user-space launch plan と actual launch report に載せた。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8:
   実 x86_64 macOS アプリ起動。
-- active_design_focus: B8 user-space process boundary。self-authored AppKit
-  fixture の launch preparation で loader、translation cache、runtime helper、
-  artifact cache が current user-space process 内に閉じることを report 境界へ
-  残す。
+- active_design_focus: B8 executable memory public OS API boundary。
+  self-authored AppKit fixture の launch preparation で executable memory が
+  public OS virtual memory API (`mmap` / `mprotect` / `munmap`) に限定されることを
+  report 境界へ残す。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
   latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B8 の「loader、translation cache、
-  runtime helper、artifact cache を user-space process 内に閉じる」。
-- completed_work: `bara-runtime::UserSpaceLaunchPlan` は `process_boundary` を
-  持ち、loader、translation cache、runtime helper、artifact cache を current
-  user-space process scope として保持する。B8 actual launch report は
-  `runtime_preparation.process_boundary` として同じ scope を保存する。
-- remaining_work: 次の小ステップは executable memory を public OS API
-  (`mmap` / `mprotect` など) 経由に限定すること。
-- next_action: commit / push 後、次の B8 小ステップで executable memory の
-  public OS API boundary を report / runtime model に固定する。
+- related_todo: [TODO.md](../TODO.md) B8 の「executable memory は public OS API
+  (`mmap` / `mprotect` など) 経由に限定する」。
+- completed_work: `bara-runtime::UserSpaceLaunchPlan` は `executable_memory` を
+  持ち、allocation を `mmap_private_anonymous`、protection transition を
+  `mprotect_read_write_to_read_execute`、release を `munmap` として保持する。
+  B8 actual launch report は `runtime_preparation.executable_memory` として
+  同じ public OS API policy を保存する。
+- remaining_work: 次の小ステップは JIT / AOT / fallback interpreter を同じ
+  user-space runtime 境界から選べる設計にすること。
+- next_action: commit / push 後、次の B8 小ステップで execution strategy
+  selection を report / runtime model に固定する。
 - verification: targeted tests として
   `nix develop -c cargo test -p bara-runtime user_space_launch_plan -- --nocapture`、
   `nix develop -c cargo test -p btbc-cli gui_hello_world_actual -- --nocapture`
@@ -42,6 +43,12 @@
 
 直近で完了した作業:
 
+- 2026-06-11 13:15 JST: B8 の executable memory public OS API boundary step
+  として、`bara-runtime::UserSpaceLaunchPlan` に `executable_memory` を追加した。
+  allocation は `mmap_private_anonymous`、protection transition は
+  `mprotect_read_write_to_read_execute`、release は `munmap` として B8 actual
+  launch report に保存される。targeted tests、`bara-runtime` / `btbc-cli`
+  clippy、full `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-11 13:07 JST: B8 の user-space process boundary step として、
   `bara-runtime::UserSpaceLaunchPlan` に `process_boundary` を追加した。
   loader、translation cache、runtime helper、artifact cache は current

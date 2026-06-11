@@ -4,6 +4,7 @@ pub struct UserSpaceLaunchPlan {
     entry_trampoline: UserSpaceEntryTrampolinePlan,
     initial_stack: UserSpaceInitialStackPlan,
     helper_boundary: UserSpaceHelperBoundaryPlan,
+    executable_memory: UserSpaceExecutableMemoryPlan,
     integration_policy: UserSpaceIntegrationPolicy,
     process_boundary: UserSpaceProcessBoundary,
 }
@@ -15,6 +16,7 @@ impl UserSpaceLaunchPlan {
             entry_trampoline: UserSpaceEntryTrampolinePlan::mach_o_entry_point(),
             initial_stack: UserSpaceInitialStackPlan::argv_envp_initial_stack(),
             helper_boundary: UserSpaceHelperBoundaryPlan::imports_objc_os_api_requests(),
+            executable_memory: UserSpaceExecutableMemoryPlan::public_os_api(),
             integration_policy: UserSpaceIntegrationPolicy::current_user_space_process(),
             process_boundary: UserSpaceProcessBoundary::current_user_space_process(),
         }
@@ -34,6 +36,10 @@ impl UserSpaceLaunchPlan {
 
     pub const fn helper_boundary(&self) -> &UserSpaceHelperBoundaryPlan {
         &self.helper_boundary
+    }
+
+    pub const fn executable_memory(&self) -> &UserSpaceExecutableMemoryPlan {
+        &self.executable_memory
     }
 
     pub const fn integration_policy(&self) -> &UserSpaceIntegrationPolicy {
@@ -176,6 +182,57 @@ pub enum UserSpaceHelperBoundaryContract {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UserSpaceExecutableMemoryPlan {
+    responsibility: UserSpaceLaunchResponsibility,
+    allocation_api: UserSpaceExecutableMemoryAllocationApi,
+    protection_transition: UserSpaceExecutableMemoryProtectionTransition,
+    release_api: UserSpaceExecutableMemoryReleaseApi,
+}
+
+impl UserSpaceExecutableMemoryPlan {
+    const fn public_os_api() -> Self {
+        Self {
+            responsibility: UserSpaceLaunchResponsibility::Runtime,
+            allocation_api: UserSpaceExecutableMemoryAllocationApi::MmapPrivateAnonymous,
+            protection_transition:
+                UserSpaceExecutableMemoryProtectionTransition::MprotectReadWriteToReadExecute,
+            release_api: UserSpaceExecutableMemoryReleaseApi::Munmap,
+        }
+    }
+
+    pub const fn responsibility(self) -> UserSpaceLaunchResponsibility {
+        self.responsibility
+    }
+
+    pub const fn allocation_api(self) -> UserSpaceExecutableMemoryAllocationApi {
+        self.allocation_api
+    }
+
+    pub const fn protection_transition(self) -> UserSpaceExecutableMemoryProtectionTransition {
+        self.protection_transition
+    }
+
+    pub const fn release_api(self) -> UserSpaceExecutableMemoryReleaseApi {
+        self.release_api
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceExecutableMemoryAllocationApi {
+    MmapPrivateAnonymous,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceExecutableMemoryProtectionTransition {
+    MprotectReadWriteToReadExecute,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceExecutableMemoryReleaseApi {
+    Munmap,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct UserSpaceIntegrationPolicy {
     process_scope: UserSpaceProcessScope,
     kernel_extension: UserSpacePrivateIntegrationRequirement,
@@ -258,10 +315,12 @@ impl UserSpaceProcessBoundary {
 #[cfg(test)]
 mod tests {
     use super::{
-        UserSpaceEntryTrampolineTarget, UserSpaceHelperBoundaryContract,
-        UserSpaceImageMappingSource, UserSpaceInitialStackContract, UserSpaceLaunchPlan,
-        UserSpaceLaunchResponsibility, UserSpaceMemoryProtectionModel,
-        UserSpacePrivateIntegrationRequirement, UserSpaceProcessScope,
+        UserSpaceEntryTrampolineTarget, UserSpaceExecutableMemoryAllocationApi,
+        UserSpaceExecutableMemoryProtectionTransition, UserSpaceExecutableMemoryReleaseApi,
+        UserSpaceHelperBoundaryContract, UserSpaceImageMappingSource,
+        UserSpaceInitialStackContract, UserSpaceLaunchPlan, UserSpaceLaunchResponsibility,
+        UserSpaceMemoryProtectionModel, UserSpacePrivateIntegrationRequirement,
+        UserSpaceProcessScope,
     };
 
     #[test]
@@ -347,6 +406,28 @@ mod tests {
         assert_eq!(
             boundary.artifact_cache(),
             UserSpaceProcessScope::CurrentUserSpaceProcess
+        );
+    }
+
+    #[test]
+    fn user_space_launch_plan_limits_executable_memory_to_public_os_api() {
+        let executable_memory = *UserSpaceLaunchPlan::mach_o_executable_image().executable_memory();
+
+        assert_eq!(
+            executable_memory.responsibility(),
+            UserSpaceLaunchResponsibility::Runtime
+        );
+        assert_eq!(
+            executable_memory.allocation_api(),
+            UserSpaceExecutableMemoryAllocationApi::MmapPrivateAnonymous
+        );
+        assert_eq!(
+            executable_memory.protection_transition(),
+            UserSpaceExecutableMemoryProtectionTransition::MprotectReadWriteToReadExecute
+        );
+        assert_eq!(
+            executable_memory.release_api(),
+            UserSpaceExecutableMemoryReleaseApi::Munmap
         );
     }
 }
