@@ -31,16 +31,11 @@ impl CodeSegment {
     }
 
     fn contains_entry(&self, entry: ExecutableEntry) -> bool {
-        let Ok(offset) = usize::try_from(entry.offset().value()) else {
-            return false;
-        };
-
-        offset < self.bytes.bytes().len()
+        self.entry_byte_offset(entry).is_ok()
     }
 
     fn bytes_from_entry(&self, entry: ExecutableEntry) -> Result<X86Bytes, ExecutableImageError> {
-        let offset = usize::try_from(entry.offset().value())
-            .map_err(|_| ExecutableImageError::EntryOutOfCodeSegment)?;
+        let offset = self.entry_byte_offset(entry)?;
         let bytes = self
             .bytes
             .bytes()
@@ -49,6 +44,22 @@ impl CodeSegment {
             .to_vec();
 
         X86Bytes::new(entry.offset(), bytes).map_err(ExecutableImageError::DecodeInput)
+    }
+
+    fn entry_byte_offset(&self, entry: ExecutableEntry) -> Result<usize, ExecutableImageError> {
+        let relative_offset = entry
+            .offset()
+            .value()
+            .checked_sub(self.bytes.entry().value())
+            .ok_or(ExecutableImageError::EntryOutOfCodeSegment)?;
+        let offset = usize::try_from(relative_offset)
+            .map_err(|_| ExecutableImageError::EntryOutOfCodeSegment)?;
+
+        if offset < self.bytes.bytes().len() {
+            Ok(offset)
+        } else {
+            Err(ExecutableImageError::EntryOutOfCodeSegment)
+        }
     }
 }
 

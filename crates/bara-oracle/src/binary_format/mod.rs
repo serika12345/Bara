@@ -35,8 +35,9 @@ pub use mach_o_executable_image_entry_function::{
 };
 pub use output::{
     materialize_mach_o_executable_image, plan_mach_o_executable_image,
-    MachOEntryPointSegmentOffset, MachOExecutableImageMaterializationError,
-    MachOExecutableImagePlan, MachOExecutableImagePlanError, MachOSegmentFileRange,
+    MachOEntryPointSegmentOffset, MachOEntryPointVirtualAddress,
+    MachOExecutableImageMaterializationError, MachOExecutableImagePlan,
+    MachOExecutableImagePlanError, MachOSegmentFileRange,
 };
 
 #[cfg(test)]

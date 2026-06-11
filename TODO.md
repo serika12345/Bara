@@ -882,6 +882,48 @@ review gate:
     mapping を作り、entry PC と runtime address の関係を typed metadata にする。
   - [ ] public rebase / bind metadata を使い、import symbol identity と
     helper boundary request を解決する。private dyld behavior は使わない。
+  - [x] B8-G4a: `LC_SEGMENT_64` file range から materialize する executable image を
+    segment-relative offset ではなく Mach-O VM address space で map し、entry PC と
+    mapped bytes の関係を debug bundle / program image metadata に保存する。
+  - [ ] B8-G4b: public rebase / bind / import metadata を使い、`call r14` の target
+    identity と helper boundary request を stable blocker または解決済み import として
+    report する。
+
+#### PR Gate: B8-G4a User-Space Mach-O VM Image Mapping
+
+branch: `task/b8-g4-user-space-macho-image-mapping`
+
+完了条件:
+
+- [x] `MachOExecutableImagePlan` が selected `LC_SEGMENT_64` の file range だけでなく
+  segment `vmaddr` と entry virtual address を typed metadata として持つ。
+- [x] materialized `ExecutableImage` の code segment base と entry PC が
+  segment-relative offset ではなく Mach-O VM address になる。
+- [x] `ProgramImageMetadata` の mapped bytes / code / const-data range が同じ
+  Mach-O VM address space を使う。
+- [x] B8 debug bundle の `entry.bytes.json`、`decode.report.json`、`launch.report.json`、
+  `loader.plan.json`、`blocker.json` が VM-addressed source PC / call site を保存する。
+- [x] rebase / bind / import 解決は silent fallback せず、次の deferred loader/import
+  boundary として report される。
+
+PR に含めない:
+
+- public rebase / bind opcode stream の適用本体。
+- import symbol identity から helper request への解決本体。
+- arbitrary indirect call targets、translation cache、fallback JIT/interpreter の本実装。
+- `.app` bundle / resource、Objective-C / AppKit bridge の一般化。
+
+検証:
+
+- `nix develop -c cargo test -p bara-oracle mach_o_executable_image -- --nocapture`
+- `nix develop -c cargo test -p bara-oracle entry_function_pipeline -- --nocapture`
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止する。次の B8-G4b は debug bundle の
+  `relocation_binding` deferred report と `register_indirect_call` blocker を見て進める。
 - [ ] B8-G5: import stub / external symbol call を汎用 helper request に接続する。
   - [ ] symbol stubs、lazy bind 相当、`objc_msgSend`、public libc / AppKit symbol を
     core IR に直接埋め込まず、helper capability request と stable blocker に分ける。

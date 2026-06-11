@@ -166,10 +166,7 @@ fn program_image_metadata_from_executable_image(
     let code = image.code_segment().x86_bytes();
     let code_len = u64::try_from(code.bytes().len())
         .map_err(|_| ProgramImageMetadataError::AddressOverflow)?;
-    let code_start = code
-        .entry()
-        .checked_add(image.entry().offset().value())
-        .map_err(|_| ProgramImageMetadataError::AddressOverflow)?;
+    let code_start = image.entry().offset();
     let code_end = code
         .entry()
         .checked_add(code_len)
@@ -241,10 +238,18 @@ impl EmbeddedStdoutMetadata {
 fn embedded_stdout_metadata_from_image(
     image: &ExecutableImage,
 ) -> Result<Option<EmbeddedStdoutMetadata>, MachOEntryFunctionTestCaseError> {
-    let Ok(entry_offset) = usize::try_from(image.entry().offset().value()) else {
+    let code = image.code_segment().x86_bytes();
+    let Some(entry_offset) = image
+        .entry()
+        .offset()
+        .value()
+        .checked_sub(code.entry().value())
+    else {
         return Ok(None);
     };
-    let code = image.code_segment().x86_bytes();
+    let Ok(entry_offset) = usize::try_from(entry_offset) else {
+        return Ok(None);
+    };
     let Some(entry_prefix) = code.bytes().get(..entry_offset) else {
         return Ok(None);
     };

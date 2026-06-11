@@ -2439,6 +2439,13 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"entry_source_for_this_bundle\":\"public_lc_main_entryoff\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"segment_source\":\"lc_segment64_file_range\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"address_space\":\"mach_o_virtual_address\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"entry_pc\":4294972928"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_action\":\"resolve_public_rebase_bind_imports\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_entry_source\":\"first_unsupported_boundary\""));
         assert!(read_file(&bundle_dir.join("runtime-attempt.json"))
             .contains("\"run_scope\":\"real_lc_main_entry_first_block\""));
@@ -2458,10 +2465,11 @@ mod tests {
         assert!(blocker_report.contains("register_indirect_call"));
         assert!(blocker_report.contains("r14"));
         assert!(blocker_report.contains("call_site"));
-        assert!(blocker_report.contains("5700"));
+        assert!(blocker_report.contains("4294972996"));
         assert!(blocker_report.contains("return_to"));
-        assert!(blocker_report.contains("5703"));
-        assert!(blocker_report.contains("\"next_action\":\"advance_to_next_isa_blocker\""));
+        assert!(blocker_report.contains("4294972999"));
+        assert!(blocker_report
+            .contains("\"next_action\":\"connect_public_rebase_bind_import_boundary\""));
         assert!(read_file(&bundle_dir.join("repro.sh")).contains("generate-b8-debug-bundle"));
     }
 

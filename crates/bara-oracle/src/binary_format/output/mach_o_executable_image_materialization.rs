@@ -30,10 +30,10 @@ pub fn materialize_mach_o_executable_image(
         .to_vec();
 
     let code_segment = CodeSegment::from_x86_bytes(
-        X86Bytes::new(X86Va::new(0), bytes)
+        X86Bytes::new(X86Va::new(plan.segment_vmaddr().as_u64()), bytes)
             .map_err(MachOExecutableImageMaterializationError::DecodeInput)?,
     );
-    let entry = ExecutableEntry::new(X86Va::new(plan.entry_point_segment_offset().as_u64()));
+    let entry = ExecutableEntry::new(X86Va::new(plan.entry_point_virtual_address().as_u64()));
 
     ExecutableImage::new(code_segment, entry)
         .map_err(MachOExecutableImageMaterializationError::ExecutableImage)
