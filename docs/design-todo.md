@@ -123,6 +123,11 @@
   `unsupported_import` とする。これは AppKit / Objective-C runtime の内部構造や
   bridge 実行を実装するものではなく、public import identity を helper capability
   required と explicit blocker へ落とす境界固定である。
+- 2026-06-11 の B8 小ステップとして、`helper_boundary_plan.next_blocker` の
+  `unsupported_import` を B8 actual result と current blocker に接続した。
+  これにより loader blocker は次の実装対象から外れ、current blocker は public
+  AppKit import boundary になる。これは AppKit import 解決や Objective-C runtime
+  bridge の実行ではなく、helper boundary の explicit blocker promotion である。
 - wasm2c platform adapter / NDA target adapter は本流 TODO ではなく、
   [将来構想メモ](future-research-concepts.md) の未確立構想として扱う。
 

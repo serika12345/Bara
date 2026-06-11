@@ -9,42 +9,47 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 14:47 JST
+最終更新: 2026-06-11 14:54 JST
 
 状態:
 
-- project_state: completed。B8 の AppKit import / Objective-C runtime
-  boundary に対する最初の helper boundary plan と explicit next blocker を
-  stable JSON に固定した。
+- project_state: completed。B8 の helper boundary plan で固定した
+  `unsupported_import` next blocker を actual result と current blocker に接続した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8:
   実 x86_64 macOS アプリ起動。
 - active_design_focus: B8 AppKit / Objective-C helper boundary。public AppKit
-  framework import、Objective-C runtime、OS API request を helper capability
-  required として扱い、次の explicit blocker を `unsupported_import` とする。
+  framework import を current blocker として扱い、Objective-C runtime boundary は
+  次の helper boundary actual 接続対象として残す。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
   latest commit はこの小ステップの review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B8 の「AppKit import / Objective-C
   runtime boundary を helper boundary または明示 blocker として進め、
-  expected / actual 差分を縮める」配下の最初の小項目。
-- completed_work: `UserSpaceHelperBoundaryPlan` に public AppKit framework
-  import、import resolution、Objective-C runtime、OS API request、next blocker、
-  status を追加した。B8 actual launch report の `runtime_preparation.helper_boundary`
-  と feedback report の `helper_boundary_plan` は同じ plan を保存し、feedback
-  next action は `connect_appkit_import_objc_runtime_helper_boundary` になった。
-- remaining_work: AppKit import helper capability または explicit blocker
-  promotion を actual result に接続し、expected / actual 差分を縮めること。
-- next_action: commit / push 後、次の B8 小ステップで `unsupported_import` を
-  actual blocker / helper capability 接続へ進める。
+  expected / actual 差分を縮める」配下の explicit blocker promotion 小項目。
+- completed_work: `GuiHelloWorldInitialBlockerPlan::current()` を
+  helper boundary の `unsupported_import` next blocker に合わせ、B8 actual result の
+  `stderr`、launch report の `blocker`、feedback report の `current_blocker` を
+  `unsupported_import` に進めた。candidate boundary は import と Objective-C
+  runtime に絞った。
+- remaining_work: Objective-C runtime boundary を helper boundary または明示
+  blocker として actual result に接続すること。
+- next_action: commit / push 後、次の B8 小ステップで
+  `unsupported_objc_runtime_boundary` を actual blocker / helper capability 接続へ
+  進める。
 - verification: targeted tests として
-  `nix develop -c cargo test -p bara-runtime user_space_launch_plan -- --nocapture` と
   `nix develop -c cargo test -p btbc-cli gui_hello_world -- --nocapture` が通過した。
   `nix develop -c cargo fmt --all -- --check`、
-  `nix develop -c cargo clippy -p bara-runtime -p btbc-cli --all-targets -- -D warnings`、
-  `git diff --check`、`nix develop -c ./scripts/check-no-invisible-chars`、
-  full `nix develop -c ./scripts/verify` も通過した。
+  `nix develop -c cargo clippy -p btbc-cli --all-targets -- -D warnings`、
+  `git diff --check`、full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-11 14:54 JST: B8 の AppKit import helper boundary step として、
+  `helper_boundary_plan.next_blocker` の `unsupported_import` を actual result /
+  launch report / feedback report に接続した。B8 actual の `stderr` は
+  `unsupported_boundary: unsupported_import` になり、current blocker は public
+  AppKit import boundary、candidate boundary は import と Objective-C runtime に
+  絞られた。targeted tests、`btbc-cli` clippy、full
+  `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-11 14:47 JST: B8 の AppKit import / Objective-C runtime boundary
   の最初の小ステップとして、`UserSpaceHelperBoundaryPlan` を詳細化した。
   public AppKit framework import、import resolution、Objective-C runtime、

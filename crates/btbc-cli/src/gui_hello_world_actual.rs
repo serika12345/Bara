@@ -1413,8 +1413,6 @@ impl GuiHelloWorldActualBlocker {
 enum GuiHelloWorldActualBlockerClassification {
     #[serde(rename = "unsupported_import")]
     Import,
-    #[serde(rename = "unsupported_loader_feature")]
-    LoaderFeature,
     #[serde(rename = "unsupported_objc_runtime_boundary")]
     ObjcRuntimeBoundary,
 }
@@ -1423,7 +1421,6 @@ impl GuiHelloWorldActualBlockerClassification {
     const fn stderr_message(self) -> &'static str {
         match self {
             Self::Import => "unsupported_boundary: unsupported_import",
-            Self::LoaderFeature => "unsupported_boundary: unsupported_loader_feature",
             Self::ObjcRuntimeBoundary => "unsupported_boundary: unsupported_objc_runtime_boundary",
         }
     }
@@ -1433,8 +1430,6 @@ impl GuiHelloWorldActualBlockerClassification {
 enum GuiHelloWorldUnsupportedLaunchBoundary {
     #[serde(rename = "import")]
     Import,
-    #[serde(rename = "loader")]
-    Loader,
     #[serde(rename = "objc_runtime")]
     ObjcRuntime,
 }
@@ -1443,7 +1438,6 @@ impl GuiHelloWorldUnsupportedLaunchBoundary {
     const fn classification(self) -> GuiHelloWorldActualBlockerClassification {
         match self {
             Self::Import => GuiHelloWorldActualBlockerClassification::Import,
-            Self::Loader => GuiHelloWorldActualBlockerClassification::LoaderFeature,
             Self::ObjcRuntime => GuiHelloWorldActualBlockerClassification::ObjcRuntimeBoundary,
         }
     }
@@ -1452,9 +1446,6 @@ impl GuiHelloWorldUnsupportedLaunchBoundary {
         match self {
             Self::Import => {
                 "Bara does not yet resolve the GUI fixture's public AppKit import boundary."
-            }
-            Self::Loader => {
-                "Bara does not yet load a complete x86_64 Mach-O GUI executable with dynamic loader, AppKit import, and Objective-C runtime requirements."
             }
             Self::ObjcRuntime => {
                 "Bara does not yet provide an Objective-C runtime helper boundary for the AppKit GUI fixture."
@@ -1493,11 +1484,8 @@ impl GuiHelloWorldInitialBlockerPlan {
     fn current() -> Self {
         Self {
             unsupported_boundaries: NonEmptyGuiHelloWorldUnsupportedLaunchBoundaries::new(
-                GuiHelloWorldUnsupportedLaunchBoundary::Loader,
-                vec![
-                    GuiHelloWorldUnsupportedLaunchBoundary::Import,
-                    GuiHelloWorldUnsupportedLaunchBoundary::ObjcRuntime,
-                ],
+                GuiHelloWorldUnsupportedLaunchBoundary::Import,
+                vec![GuiHelloWorldUnsupportedLaunchBoundary::ObjcRuntime],
             ),
         }
     }
@@ -1582,7 +1570,7 @@ mod tests {
     };
 
     #[test]
-    fn gui_hello_world_actual_attempt_reports_loader_blocker() {
+    fn gui_hello_world_actual_attempt_reports_import_blocker() {
         let probe_report = mach_o_execute_header_probe();
         let attempt = b8_gui_hello_world_actual_launch_attempt(&probe_report)
             .expect("built-in B8 GUI Hello World case id is valid");
@@ -1594,7 +1582,7 @@ mod tests {
                 1,
                 0,
                 String::new(),
-                String::from("unsupported_boundary: unsupported_loader_feature"),
+                String::from("unsupported_boundary: unsupported_import"),
             )
         );
         assert_eq!(
@@ -1627,19 +1615,16 @@ mod tests {
     }
 
     #[test]
-    fn initial_blocker_plan_selects_loader_before_import_and_objc_runtime() {
+    fn initial_blocker_plan_promotes_helper_boundary_import_before_objc_runtime() {
         let plan = GuiHelloWorldInitialBlockerPlan::current();
 
         assert_eq!(
             plan.selected_classification(),
-            GuiHelloWorldActualBlockerClassification::LoaderFeature
+            GuiHelloWorldActualBlockerClassification::Import
         );
         assert_eq!(
             plan.candidate_boundaries(),
             vec![
-                super::GuiHelloWorldActualBlockerCandidate::from_boundary(
-                    GuiHelloWorldUnsupportedLaunchBoundary::Loader
-                ),
                 super::GuiHelloWorldActualBlockerCandidate::from_boundary(
                     GuiHelloWorldUnsupportedLaunchBoundary::Import
                 ),
