@@ -31,7 +31,7 @@ use executable_run::{run_executable_manifest, ExecutableRunError};
 use function_run::{
     compile_mach_o_entry_function, compile_mach_o_entry_function_standalone_artifact,
     compile_test_case_function, compile_test_case_function_standalone_artifact,
-    run_test_case_function, FunctionRunError,
+    run_test_case_function, FunctionArtifactMetadata, FunctionRunError,
 };
 use native_artifact::{
     link_arm64_main_executable, link_arm64_main_executable_with_source_metadata,
@@ -255,6 +255,17 @@ fn run_emit_fixture_artifacts(case_path: &Path, output_dir: &Path) -> Result<Str
     let test_case = test_case_from_json(&case_json).map_err(CliError::TestCase)?;
     let compiled = compile_test_case_function(&test_case).map_err(CliError::FunctionRun)?;
     let artifacts = compiled.artifact_metadata(&test_case);
+    let output_paths = write_fixture_artifacts(output_dir, &artifacts)?;
+
+    serde_json::to_string(&output_paths)
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)
+}
+
+fn write_fixture_artifacts(
+    output_dir: &Path,
+    artifacts: &FunctionArtifactMetadata,
+) -> Result<FixtureArtifactOutputPaths, CliError> {
     let output_paths = FixtureArtifactOutputPaths::from_dir(output_dir);
     let compiled_ir_json = serde_json::to_string(artifacts.compiled_ir())
         .map_err(JsonError::new)
@@ -279,9 +290,7 @@ fn run_emit_fixture_artifacts(case_path: &Path, output_dir: &Path) -> Result<Str
     write_text_file(&output_paths.helpers_path(), &helpers_json)?;
     write_text_file(&output_paths.artifact_report_path(), &artifact_report_json)?;
 
-    serde_json::to_string(&output_paths)
-        .map_err(JsonError::new)
-        .map_err(CliError::Json)
+    Ok(output_paths)
 }
 
 fn run_compare_expected_actual(
@@ -679,17 +688,24 @@ fn run_corpus_fixture(case_path: &Path, expected_dir: &Path) -> FixtureRun {
             return FixtureRun::failed(case_id, error.failure_kind(), error.to_string());
         }
     };
+    let artifact_metadata = match fixture_artifact_metadata(&test_case) {
+        Ok(artifact_metadata) => artifact_metadata,
+        Err(error) => {
+            return FixtureRun::failed(case_id, error.failure_kind(), error.to_string());
+        }
+    };
     let comparison = compare_observed_results(&expected, &actual);
     if !comparison.is_match() {
-        return FixtureRun::failed_with_actual(
+        return FixtureRun::failed_with_actual_and_artifacts(
             case_id,
             FailureKind::ComparisonMismatch,
             format!("comparison failed: {comparison:?}"),
             actual,
+            artifact_metadata,
         );
     }
 
-    FixtureRun::passed_observed(case_id, actual)
+    FixtureRun::passed_observed_with_artifacts(case_id, actual, artifact_metadata)
 }
 
 fn run_test_case(test_case: TestCase, expected: ExpectedResult) -> Result<String, CliError> {
@@ -706,6 +722,12 @@ fn observe_test_case(test_case: &TestCase) -> Result<ObservedResult, CliError> {
     run_test_case_function(test_case)
         .map_err(CliError::FunctionRun)
         .map(|result| result.into_observed_result(test_case.case_id().clone()))
+}
+
+fn fixture_artifact_metadata(test_case: &TestCase) -> Result<FunctionArtifactMetadata, CliError> {
+    compile_test_case_function(test_case)
+        .map_err(CliError::FunctionRun)
+        .map(|compiled| compiled.artifact_metadata(test_case))
 }
 
 fn run_executable(
@@ -727,6 +749,7 @@ fn run_executable(
 struct FixtureRun {
     report: FixtureReport,
     output: Option<FixtureOutput>,
+    artifact_metadata: Option<FunctionArtifactMetadata>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -740,6 +763,19 @@ impl FixtureRun {
         Self {
             report: FixtureReport::new(case_id, FixtureOutcome::Passed),
             output: Some(FixtureOutput::Observed(actual)),
+            artifact_metadata: None,
+        }
+    }
+
+    fn passed_observed_with_artifacts(
+        case_id: CaseId,
+        actual: ObservedResult,
+        artifact_metadata: FunctionArtifactMetadata,
+    ) -> Self {
+        Self {
+            report: FixtureReport::new(case_id, FixtureOutcome::Passed),
+            output: Some(FixtureOutput::Observed(actual)),
+            artifact_metadata: Some(artifact_metadata),
         }
     }
 
@@ -747,6 +783,7 @@ impl FixtureRun {
         Self {
             report: FixtureReport::new(case_id, FixtureOutcome::Passed),
             output: Some(FixtureOutput::Probe(actual)),
+            artifact_metadata: None,
         }
     }
 
@@ -754,6 +791,7 @@ impl FixtureRun {
         Self {
             report: failed_fixture_report(case_id, kind, message),
             output: None,
+            artifact_metadata: None,
         }
     }
 
@@ -766,6 +804,21 @@ impl FixtureRun {
         Self {
             report: failed_fixture_report(case_id, kind, message),
             output: Some(FixtureOutput::Observed(actual)),
+            artifact_metadata: None,
+        }
+    }
+
+    fn failed_with_actual_and_artifacts(
+        case_id: CaseId,
+        kind: FailureKind,
+        message: String,
+        actual: ObservedResult,
+        artifact_metadata: FunctionArtifactMetadata,
+    ) -> Self {
+        Self {
+            report: failed_fixture_report(case_id, kind, message),
+            output: Some(FixtureOutput::Observed(actual)),
+            artifact_metadata: Some(artifact_metadata),
         }
     }
 }
@@ -784,15 +837,21 @@ fn write_corpus_outputs(
 ) -> Result<(), CliError> {
     create_dir(output_dir)?;
     let actual_dir = output_dir.join("actual");
+    let compiled_dir = output_dir.join("compiled");
     create_dir(&actual_dir)?;
-    create_dir(&output_dir.join("compiled"))?;
-    create_dir(&output_dir.join("ir"))?;
-    create_dir(&output_dir.join("pcmap"))?;
+    create_dir(&compiled_dir)?;
 
     let report_json = corpus_report_to_json(report).map_err(CliError::Json)?;
     write_text_file(&output_dir.join("report.json"), &report_json)?;
 
     for run in fixture_runs {
+        if let Some(artifact_metadata) = &run.artifact_metadata {
+            write_fixture_artifacts(
+                &compiled_dir.join(run.report.case_id().as_str()),
+                artifact_metadata,
+            )?;
+        }
+
         if let Some(output) = &run.output {
             let (case_id, actual_json) = match output {
                 FixtureOutput::Observed(actual) => (
@@ -1856,9 +1915,24 @@ mod tests {
             read_file(&output_dir.join("actual").join("return_42.json")),
             "{\"case_id\":\"return_42\",\"exit_status\":0,\"return_value\":42,\"stdout\":\"\",\"stderr\":\"\"}"
         );
-        assert!(output_dir.join("compiled").is_dir());
-        assert!(output_dir.join("ir").is_dir());
-        assert!(output_dir.join("pcmap").is_dir());
+        assert_eq!(
+            read_file(
+                &output_dir
+                    .join("compiled")
+                    .join("return_42")
+                    .join("artifact.report.json")
+            ),
+            "{\"state_layout\":{\"kind\":\"function_level_v0\",\"source_isa\":\"x86_64\",\"target_isa\":\"arm64\",\"abi\":{\"args\":[],\"return\":\"u64\"},\"return_register\":\"rax\",\"stack\":{\"kind\":\"none\"}},\"cache_validation_identity\":{\"kind\":\"fixture_function_v0\",\"case_id\":\"return_42\",\"source_entry\":0,\"source_bytes\":\"b82a000000c3\",\"source_abi\":{\"args\":[],\"return\":\"u64\"},\"target_backend\":\"bara-arm64\"},\"helper_requirements\":[]}"
+        );
+        assert_eq!(
+            read_file(
+                &output_dir
+                    .join("compiled")
+                    .join("return_42")
+                    .join("compiled.ir.json")
+            ),
+            "{\"entry\":0,\"blocks\":[{\"id\":0,\"start\":0,\"end\":6,\"ops\":[{\"kind\":\"mov\",\"dst\":{\"kind\":\"reg\",\"reg\":\"rax\"},\"src\":{\"kind\":\"imm_u64\",\"value\":42}}],\"terminator\":{\"kind\":\"return\"}}]}"
+        );
     }
 
     #[test]
@@ -1926,6 +2000,15 @@ mod tests {
                     .join("mach_o_return_42_native_executable_smoke.json")
             ),
             "{\"case_id\":\"mach_o_return_42_native_executable_smoke\",\"exit_status\":42,\"return_value\":42,\"stdout\":\"\",\"stderr\":\"\"}"
+        );
+        assert_eq!(
+            read_file(
+                &output_dir
+                    .join("compiled")
+                    .join("stdout_trap_return_0")
+                    .join("artifact.report.json")
+            ),
+            "{\"state_layout\":{\"kind\":\"function_level_v0\",\"source_isa\":\"x86_64\",\"target_isa\":\"arm64\",\"abi\":{\"args\":[],\"return\":\"u64\"},\"return_register\":\"rax\",\"stack\":{\"kind\":\"none\"}},\"cache_validation_identity\":{\"kind\":\"fixture_function_v0\",\"case_id\":\"stdout_trap_return_0\",\"source_entry\":0,\"source_bytes\":\"0f0b31c0c3\",\"source_abi\":{\"args\":[],\"return\":\"u64\"},\"target_backend\":\"bara-arm64\"},\"helper_requirements\":[{\"name\":\"write_stdout\",\"signature\":\"ptr_len_to_unit\"}]}"
         );
         assert!(output_dir
             .join("native-artifacts")

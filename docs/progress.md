@@ -9,37 +9,46 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-10 23:01 JST
+最終更新: 2026-06-11 09:09 JST
 
 状態:
 
-- project_state: completed。B7 の 8 つ目の小ステップとして、generated
-  executable smoke を実プロセス実行の regression gate に昇格した。
+- project_state: completed。B7 の 9 つ目の小ステップとして、expected / actual
+  regression output bundle に behavior JSON と compile artifact metadata sidecar を
+  同居させた。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B7:
   Oracle / Regression 基盤。
-- active_design_focus: B7 generated executable regression gate。既存の
-  `check-blackbox` native executable smoke を `ObservedResult` 比較と
-  `actual/*.json` 保存に接続する境界に限定した。
+- active_design_focus: B7 expected / actual artifact bundle。`ObservedResult`
+  schema は外部観測結果に限定したまま、raw testcase fixture の compile artifact
+  metadata を `compiled/<case_id>/` sidecar として保存する境界に限定した。
 - active_branch: `task/b7-x86_64-macho-fixture-generation`。base commit は
   `8d39a4a`。latest commit はこの小ステップの review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B7 の
-  generated executable を実プロセスとして走らせる regression gate を追加する項目。
-- completed_work: `check-blackbox --out` の generated executable smoke が、linked
-  native executable を実プロセスとして実行し、process exit status、stdout、stderr
-  を `ObservedResult` として比較・保存するようになった。
-- remaining_work: B7 は継続中。expected / actual artifact metadata の統合、
-  Rosetta black-box oracle 経路の clean-room 再検討、fixture shrink / failure
-  classification / corpus update の運用は未実装。
-- next_action: expected / actual に stdout、stderr、exit status、return value、
-  artifact metadata を含める境界を追加する。
-- verification: targeted blackbox tests として
+  expected / actual に stdout、stderr、exit status、return value、artifact metadata
+  を含める項目。
+- completed_work: `check-corpus --out` と `check-blackbox --out` が、raw testcase
+  fixture の `actual/<case_id>.json` に stdout、stderr、exit status、return value
+  を保存し、同じ case id の `compiled/<case_id>/` に `compiled.ir.json`、
+  `pcmap.json`、`fixups.json`、`helpers.json`、`artifact.report.json` を保存する。
+- remaining_work: B7 は継続中。Rosetta black-box oracle 経路の clean-room
+  再検討、fixture shrink / failure classification / corpus update の運用は未実装。
+- next_action: Rosetta black-box oracle 経路を clean-room ルール内で再検討し、
+  現在の runner/output 境界が許可された外部観測だけを使っていることを文書化する。
+- verification: targeted tests として
+  `nix develop -c cargo test -p btbc-cli check_corpus_writes_report_and_actual_outputs` と
   `nix develop -c cargo test -p btbc-cli check_blackbox_writes_report_and_schema_specific_actual_outputs`
-  と
-  `nix develop -c cargo test -p btbc-cli check_blackbox_reports_raw_manifest_mach_o_and_probe_fixtures`
   が通過した。`nix develop -c ./scripts/check-domain-types` と
   `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
+
+- 2026-06-11 09:09 JST: B7 の 9 つ目の小ステップとして、
+  `check-corpus --out` / `check-blackbox --out` が raw testcase fixture の
+  compile artifact metadata を `compiled/<case_id>/` に保存するようにした。
+  `actual/<case_id>.json` は外部観測結果の stdout、stderr、exit status、
+  return value を保持し、artifact metadata は sidecar として同じ regression
+  output bundle に含める。検証は snapshot の targeted tests と最終
+  `nix develop -c ./scripts/verify`。
 
 - 2026-06-10 23:01 JST: B7 の 8 つ目の小ステップとして、
   generated executable smoke を `ObservedResult` regression gate に昇格した。

@@ -171,6 +171,9 @@ cache validation identity、helper requirements をまとめる。
 `check-blackbox --out` は generated executable smoke も実プロセスとして実行し、
 その process exit status、stdout、stderr を `ObservedResult` として
 `actual/<case_id>.json` に保存する。
+raw testcase fixture では、同じ case id の compile artifact metadata を
+`compiled/<case_id>/` に保存する。`actual/<case_id>.json` は外部観測結果を保持し、
+artifact metadata は sidecar として同じ regression output bundle に含める。
 
 ```text
 target/bara-blackbox/
