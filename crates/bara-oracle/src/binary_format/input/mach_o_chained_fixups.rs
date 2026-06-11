@@ -163,6 +163,12 @@ impl MachOChainedFixupsTargetReport {
     pub const fn status(&self) -> MachOChainedFixupsTargetStatus {
         self.status
     }
+
+    pub fn resolved_import_identity(&self) -> Option<MachOChainedImportIdentityReport> {
+        self.target_resolution
+            .as_ref()
+            .map(|resolution| MachOChainedImportIdentityReport::from_import(&resolution.import))
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -170,6 +176,39 @@ impl MachOChainedFixupsTargetReport {
 pub enum MachOChainedFixupsTargetStatus {
     Blocked,
     ResolvedImport,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct MachOChainedImportIdentityReport {
+    import_index: u32,
+    lib_ordinal: u32,
+    dylib_path: Option<String>,
+    weak_import: bool,
+    symbol_name: String,
+}
+
+impl MachOChainedImportIdentityReport {
+    fn from_import(import: &MachOChainedImportReport) -> Self {
+        Self {
+            import_index: import.import_index,
+            lib_ordinal: import.lib_ordinal,
+            dylib_path: import.dylib_path.clone(),
+            weak_import: import.weak_import,
+            symbol_name: import.symbol_name.clone(),
+        }
+    }
+
+    pub fn dylib_path(&self) -> Option<&str> {
+        self.dylib_path.as_deref()
+    }
+
+    pub fn symbol_name(&self) -> &str {
+        &self.symbol_name
+    }
+
+    pub const fn is_weak_import(&self) -> bool {
+        self.weak_import
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -853,6 +892,22 @@ mod tests {
         assert_eq!(
             chained.status(),
             MachOChainedFixupsTargetStatus::ResolvedImport
+        );
+        let identity = chained
+            .resolved_import_identity()
+            .expect("resolved import identity");
+        assert_eq!(identity.dylib_path(), Some("/usr/lib/libTest.dylib"));
+        assert_eq!(identity.symbol_name(), "_symbol");
+        assert!(!identity.is_weak_import());
+        assert_eq!(
+            serde_json::to_value(identity).expect("identity serializes"),
+            serde_json::json!({
+                "import_index": 0,
+                "lib_ordinal": 1,
+                "dylib_path": "/usr/lib/libTest.dylib",
+                "weak_import": false,
+                "symbol_name": "_symbol"
+            })
         );
         assert_eq!(
             serde_json::to_value(chained).expect("report serializes"),

@@ -2473,11 +2473,32 @@ mod tests {
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"helper_boundary_request\"")
         );
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"reason\":\"import_helper_boundary_unimplemented\""));
+            .contains("\"reason\":\"import_helper_marshaling_unimplemented\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"kind\":\"import_helper_call\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"public_dyld_chained_fixups_import\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"source_isa\":\"x86_64\"")
+        );
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"call_site\":4294972996")
+        );
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"return_to\":4294972999")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"argument_model\":\"x86_64_call_arguments\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"return_model\":\"x86_64_rax_return_value\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"x86_64_argument_marshaling_unimplemented\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"helper_return_marshaling_unimplemented\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"resolution\":\"resolved_public_dyld_chained_fixups_import\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"next_action\":\"connect_import_helper_boundary_request\""));
+            .contains("\"next_action\":\"define_import_helper_marshaling_contract\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_entry_source\":\"first_unsupported_boundary\""));
         assert!(read_file(&bundle_dir.join("runtime-attempt.json"))
@@ -2487,6 +2508,12 @@ mod tests {
         assert!(launch_report.contains("\"entry_source\":\"public_lc_main_entryoff\""));
         assert!(launch_report.contains("\"processed_source_pc_range\":{\"start\":"));
         assert!(launch_report.contains("\"b8_g1_host_trap_path\":\"not_used\""));
+        assert!(launch_report.contains("\"helper_boundary_request\""));
+        assert!(launch_report.contains("\"reason\":\"import_helper_marshaling_unimplemented\""));
+        assert!(launch_report.contains("\"symbol_name\":\"_objc_msgSend\""));
+        assert!(launch_report.contains("\"call_site\":4294972996"));
+        assert!(launch_report.contains("\"return_to\":4294972999"));
+        assert!(launch_report.contains("\"x86_64_argument_marshaling_unimplemented\""));
         let blocker_report = read_file(&bundle_dir.join("blocker.json"));
         assert!(blocker_report.contains("\"status\":\"blocked\""));
         assert!(blocker_report.contains("\"current_blocker\":\"unsupported_instruction\""));
