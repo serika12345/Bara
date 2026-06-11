@@ -195,6 +195,14 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                         ));
                         offset = end_offset;
                     }
+                    (0x89, 0xc3) => {
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::MovRbxRax,
+                        ));
+                        offset = end_offset;
+                    }
                     (0x89, 0xe5) => {
                         instructions.push(DecodedInstruction::new(
                             at,
@@ -215,6 +223,15 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                     at,
                     end,
                     DecodedInstructionKind::PushRax,
+                ));
+                offset += 1;
+            }
+            0x53 => {
+                let end = instruction_end(input, at, offset + 1, 1)?;
+                instructions.push(DecodedInstruction::new(
+                    at,
+                    end,
+                    DecodedInstructionKind::PushRbx,
                 ));
                 offset += 1;
             }

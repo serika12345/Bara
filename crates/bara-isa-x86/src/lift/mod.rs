@@ -97,6 +97,10 @@ fn lift_instruction(
             dst: Operand::Reg(X86Reg::Rax),
             src: Operand::Reg(X86Reg::Rdi),
         })),
+        DecodedInstructionKind::MovRbxRax => Ok(LiftedInstruction::Op(IrOp::Mov {
+            dst: Operand::Reg(X86Reg::Rbx),
+            src: Operand::Reg(X86Reg::Rax),
+        })),
         DecodedInstructionKind::MovRbpRsp => Ok(LiftedInstruction::Op(IrOp::Mov {
             dst: Operand::Reg(X86Reg::Rbp),
             src: Operand::Reg(X86Reg::Rsp),
@@ -135,6 +139,9 @@ fn lift_instruction(
         })),
         DecodedInstructionKind::PushRax => Ok(LiftedInstruction::Op(IrOp::Push {
             src: Operand::Reg(X86Reg::Rax),
+        })),
+        DecodedInstructionKind::PushRbx => Ok(LiftedInstruction::Op(IrOp::Push {
+            src: Operand::Reg(X86Reg::Rbx),
         })),
         DecodedInstructionKind::PushRbp => Ok(LiftedInstruction::Op(IrOp::Push {
             src: Operand::Reg(X86Reg::Rbp),
@@ -824,7 +831,7 @@ mod tests {
     }
 
     #[test]
-    fn lifts_push_rbp_mov_rbp_rsp_push_r15_push_r14_before_next_unsupported_prologue_byte() {
+    fn lifts_prologue_pushes_and_mov_rbx_rax_before_next_unsupported_opcode() {
         let decoded = DecodedFunction::new(
             X86Va::new(0x1600),
             vec![
@@ -851,10 +858,20 @@ mod tests {
                 DecodedInstruction::new(
                     X86Va::new(0x1608),
                     X86Va::new(0x1609),
+                    DecodedInstructionKind::PushRbx,
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(0x1609),
+                    X86Va::new(0x160c),
+                    DecodedInstructionKind::MovRbxRax,
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(0x160c),
+                    X86Va::new(0x160f),
                     DecodedInstructionKind::Unsupported {
                         reason: UnsupportedReason::DecodeUnsupportedOpcode {
-                            opcode: 0x53,
-                            at: X86Va::new(0x1608),
+                            opcode: 0x48,
+                            at: X86Va::new(0x160c),
                         },
                     },
                 ),
@@ -879,6 +896,13 @@ mod tests {
                 },
                 IrOp::Push {
                     src: Operand::Reg(X86Reg::R14)
+                },
+                IrOp::Push {
+                    src: Operand::Reg(X86Reg::Rbx)
+                },
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rbx),
+                    src: Operand::Reg(X86Reg::Rax)
                 }
             ]
         );
@@ -886,8 +910,8 @@ mod tests {
             program.blocks()[0].terminator(),
             &Terminator::Unsupported {
                 reason: UnsupportedReason::DecodeUnsupportedOpcode {
-                    opcode: 0x53,
-                    at: X86Va::new(0x1608),
+                    opcode: 0x48,
+                    at: X86Va::new(0x160c),
                 }
             }
         );

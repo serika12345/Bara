@@ -437,10 +437,13 @@ fn decodes_push_rax_pop_rax_between_mov_and_ret() {
 }
 
 #[test]
-fn decodes_push_rbp_mov_rbp_rsp_push_r15_push_r14_before_next_unsupported_prologue_byte() {
+fn decodes_prologue_pushes_and_mov_rbx_rax_before_next_unsupported_opcode() {
     let input = X86Bytes::new(
         X86Va::new(0x1600),
-        vec![0x55, 0x48, 0x89, 0xe5, 0x41, 0x57, 0x41, 0x56, 0x53],
+        vec![
+            0x55, 0x48, 0x89, 0xe5, 0x41, 0x57, 0x41, 0x56, 0x53, 0x48, 0x89, 0xc3, 0x48, 0x8b,
+            0x05,
+        ],
     )
     .expect("test bytes are non-empty");
 
@@ -472,10 +475,20 @@ fn decodes_push_rbp_mov_rbp_rsp_push_r15_push_r14_before_next_unsupported_prolog
             DecodedInstruction::new(
                 X86Va::new(0x1608),
                 X86Va::new(0x1609),
+                DecodedInstructionKind::PushRbx
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x1609),
+                X86Va::new(0x160c),
+                DecodedInstructionKind::MovRbxRax
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x160c),
+                X86Va::new(0x160f),
                 DecodedInstructionKind::Unsupported {
                     reason: UnsupportedReason::DecodeUnsupportedOpcode {
-                        opcode: 0x53,
-                        at: X86Va::new(0x1608),
+                        opcode: 0x48,
+                        at: X86Va::new(0x160c),
                     }
                 }
             )
