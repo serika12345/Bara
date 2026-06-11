@@ -115,6 +115,14 @@
   AppKit や Objective-C runtime の内部構造を core IR / emit へ混ぜない。
   public import identity、helper capability、または unsupported boundary として
   runtime 境界で扱う。
+- 2026-06-11 の B8 小ステップとして、`UserSpaceHelperBoundaryPlan` に
+  public AppKit framework import、import resolution、Objective-C runtime、
+  OS API request、次 blocker、status を追加した。B8 feedback report は
+  `helper_boundary_plan` を保存し、次 action を
+  `connect_appkit_import_objc_runtime_helper_boundary`、次 blocker を
+  `unsupported_import` とする。これは AppKit / Objective-C runtime の内部構造や
+  bridge 実行を実装するものではなく、public import identity を helper capability
+  required と explicit blocker へ落とす境界固定である。
 - wasm2c platform adapter / NDA target adapter は本流 TODO ではなく、
   [将来構想メモ](future-research-concepts.md) の未確立構想として扱う。
 

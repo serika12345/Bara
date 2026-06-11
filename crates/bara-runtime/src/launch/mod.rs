@@ -228,6 +228,12 @@ impl UserSpaceInitialStackPlan {
 pub struct UserSpaceHelperBoundaryPlan {
     responsibility: UserSpaceLaunchResponsibility,
     contract: UserSpaceHelperBoundaryContract,
+    public_import: UserSpaceHelperBoundaryPublicImport,
+    import_resolution: UserSpaceHelperBoundaryResolution,
+    objc_runtime: UserSpaceHelperBoundaryResolution,
+    os_api_requests: UserSpaceHelperBoundaryResolution,
+    next_blocker: UserSpaceHelperBoundaryNextBlocker,
+    status: UserSpaceHelperBoundaryStatus,
 }
 
 impl UserSpaceHelperBoundaryPlan {
@@ -235,6 +241,12 @@ impl UserSpaceHelperBoundaryPlan {
         Self {
             responsibility: UserSpaceLaunchResponsibility::HelperBoundary,
             contract: UserSpaceHelperBoundaryContract::ImportsObjcOsApiRequests,
+            public_import: UserSpaceHelperBoundaryPublicImport::AppKitFramework,
+            import_resolution: UserSpaceHelperBoundaryResolution::HelperCapabilityRequired,
+            objc_runtime: UserSpaceHelperBoundaryResolution::HelperCapabilityRequired,
+            os_api_requests: UserSpaceHelperBoundaryResolution::HelperCapabilityRequired,
+            next_blocker: UserSpaceHelperBoundaryNextBlocker::UnsupportedImport,
+            status: UserSpaceHelperBoundaryStatus::PlannedNotExecuted,
         }
     }
 
@@ -244,6 +256,30 @@ impl UserSpaceHelperBoundaryPlan {
 
     pub const fn contract(self) -> UserSpaceHelperBoundaryContract {
         self.contract
+    }
+
+    pub const fn public_import(self) -> UserSpaceHelperBoundaryPublicImport {
+        self.public_import
+    }
+
+    pub const fn import_resolution(self) -> UserSpaceHelperBoundaryResolution {
+        self.import_resolution
+    }
+
+    pub const fn objc_runtime(self) -> UserSpaceHelperBoundaryResolution {
+        self.objc_runtime
+    }
+
+    pub const fn os_api_requests(self) -> UserSpaceHelperBoundaryResolution {
+        self.os_api_requests
+    }
+
+    pub const fn next_blocker(self) -> UserSpaceHelperBoundaryNextBlocker {
+        self.next_blocker
+    }
+
+    pub const fn status(self) -> UserSpaceHelperBoundaryStatus {
+        self.status
     }
 }
 
@@ -277,6 +313,26 @@ pub enum UserSpaceInitialStackContract {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum UserSpaceHelperBoundaryContract {
     ImportsObjcOsApiRequests,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceHelperBoundaryPublicImport {
+    AppKitFramework,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceHelperBoundaryResolution {
+    HelperCapabilityRequired,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceHelperBoundaryNextBlocker {
+    UnsupportedImport,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceHelperBoundaryStatus {
+    PlannedNotExecuted,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -804,15 +860,17 @@ mod tests {
         UserSpaceExecutableMemoryProtectionTransition, UserSpaceExecutableMemoryReleaseApi,
         UserSpaceExecutionStrategyAvailability, UserSpaceExecutionStrategyBoundary,
         UserSpaceFallbackEngineStatus, UserSpaceFallbackPolicyAction, UserSpaceFeedbackCycleState,
-        UserSpaceHelperBoundaryContract, UserSpaceImageMappingSource,
-        UserSpaceInitialStackContract, UserSpaceLaunchPlan, UserSpaceLaunchResponsibility,
-        UserSpaceLoaderEntryPointPlan, UserSpaceLoaderExecutionStatus, UserSpaceLoaderImportPlan,
-        UserSpaceLoaderMetadataSource, UserSpaceLoaderObjcRuntimePlan,
-        UserSpaceLoaderRelocationPlan, UserSpaceLoaderSegmentMappingPlan,
-        UserSpaceMacosCodeSigningPolicy, UserSpaceMacosHardenedRuntimePolicy,
-        UserSpaceMacosWriteXorExecutePolicy, UserSpaceMemoryProtectionModel,
-        UserSpacePlatformExceptionModel, UserSpacePlatformMemoryProtectionModel,
-        UserSpacePlatformSignalModel, UserSpacePlatformThreadModel, UserSpacePlatformTlsModel,
+        UserSpaceHelperBoundaryContract, UserSpaceHelperBoundaryNextBlocker,
+        UserSpaceHelperBoundaryPublicImport, UserSpaceHelperBoundaryResolution,
+        UserSpaceHelperBoundaryStatus, UserSpaceImageMappingSource, UserSpaceInitialStackContract,
+        UserSpaceLaunchPlan, UserSpaceLaunchResponsibility, UserSpaceLoaderEntryPointPlan,
+        UserSpaceLoaderExecutionStatus, UserSpaceLoaderImportPlan, UserSpaceLoaderMetadataSource,
+        UserSpaceLoaderObjcRuntimePlan, UserSpaceLoaderRelocationPlan,
+        UserSpaceLoaderSegmentMappingPlan, UserSpaceMacosCodeSigningPolicy,
+        UserSpaceMacosHardenedRuntimePolicy, UserSpaceMacosWriteXorExecutePolicy,
+        UserSpaceMemoryProtectionModel, UserSpacePlatformExceptionModel,
+        UserSpacePlatformMemoryProtectionModel, UserSpacePlatformSignalModel,
+        UserSpacePlatformThreadModel, UserSpacePlatformTlsModel,
         UserSpacePrivateIntegrationRequirement, UserSpaceProcessScope, UserSpaceSourceIsaMode,
         UserSpaceSourceIsaProfile, UserSpaceSourceWidth,
     };
@@ -856,6 +914,40 @@ mod tests {
         assert_eq!(
             plan.helper_boundary().contract(),
             UserSpaceHelperBoundaryContract::ImportsObjcOsApiRequests
+        );
+    }
+
+    #[test]
+    fn user_space_launch_plan_models_appkit_objc_helper_boundary() {
+        let helper_boundary = *UserSpaceLaunchPlan::mach_o_executable_image().helper_boundary();
+
+        assert_eq!(
+            helper_boundary.responsibility(),
+            UserSpaceLaunchResponsibility::HelperBoundary
+        );
+        assert_eq!(
+            helper_boundary.public_import(),
+            UserSpaceHelperBoundaryPublicImport::AppKitFramework
+        );
+        assert_eq!(
+            helper_boundary.import_resolution(),
+            UserSpaceHelperBoundaryResolution::HelperCapabilityRequired
+        );
+        assert_eq!(
+            helper_boundary.objc_runtime(),
+            UserSpaceHelperBoundaryResolution::HelperCapabilityRequired
+        );
+        assert_eq!(
+            helper_boundary.os_api_requests(),
+            UserSpaceHelperBoundaryResolution::HelperCapabilityRequired
+        );
+        assert_eq!(
+            helper_boundary.next_blocker(),
+            UserSpaceHelperBoundaryNextBlocker::UnsupportedImport
+        );
+        assert_eq!(
+            helper_boundary.status(),
+            UserSpaceHelperBoundaryStatus::PlannedNotExecuted
         );
     }
 

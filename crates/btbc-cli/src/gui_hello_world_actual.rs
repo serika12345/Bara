@@ -8,7 +8,9 @@ use bara_runtime::{
     UserSpaceExecutableMemoryProtectionTransition, UserSpaceExecutableMemoryReleaseApi,
     UserSpaceExecutionStrategyAvailability, UserSpaceExecutionStrategyBoundary,
     UserSpaceFallbackEngineStatus, UserSpaceFallbackPolicyAction, UserSpaceFeedbackCycleState,
-    UserSpaceHelperBoundaryContract, UserSpaceImageMappingSource, UserSpaceInitialStackContract,
+    UserSpaceHelperBoundaryContract, UserSpaceHelperBoundaryNextBlocker,
+    UserSpaceHelperBoundaryPublicImport, UserSpaceHelperBoundaryResolution,
+    UserSpaceHelperBoundaryStatus, UserSpaceImageMappingSource, UserSpaceInitialStackContract,
     UserSpaceLaunchPlan, UserSpaceLaunchResponsibility, UserSpaceLoaderEntryPointPlan,
     UserSpaceLoaderExecutionStatus, UserSpaceLoaderImportPlan, UserSpaceLoaderMetadataSource,
     UserSpaceLoaderObjcRuntimePlan, UserSpaceLoaderRelocationPlan,
@@ -104,6 +106,7 @@ pub(crate) struct GuiHelloWorldFeedbackReport {
     comparison: ComparisonReport,
     current_blocker: GuiHelloWorldActualBlocker,
     loader_execution_plan: GuiHelloWorldActualLoaderExecutionPreparation,
+    helper_boundary_plan: GuiHelloWorldActualHelperBoundaryPreparation,
     next_action: GuiHelloWorldFeedbackNextAction,
 }
 
@@ -122,8 +125,9 @@ impl GuiHelloWorldFeedbackReport {
             comparison,
             current_blocker: actual.launch_report.blocker.clone(),
             loader_execution_plan: actual.launch_report.runtime_preparation.loader_execution,
+            helper_boundary_plan: actual.launch_report.runtime_preparation.helper_boundary,
             next_action:
-                GuiHelloWorldFeedbackNextAction::ImplementUserSpaceLoaderForMachOGuiExecutable,
+                GuiHelloWorldFeedbackNextAction::ConnectAppKitImportObjcRuntimeHelperBoundary,
         }
     }
 }
@@ -148,8 +152,8 @@ impl GuiHelloWorldFeedbackStatus {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 enum GuiHelloWorldFeedbackNextAction {
-    #[serde(rename = "implement_user_space_loader_for_mach_o_gui_executable")]
-    ImplementUserSpaceLoaderForMachOGuiExecutable,
+    #[serde(rename = "connect_appkit_import_objc_runtime_helper_boundary")]
+    ConnectAppKitImportObjcRuntimeHelperBoundary,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -443,6 +447,12 @@ impl GuiHelloWorldActualInitialStackPreparation {
 struct GuiHelloWorldActualHelperBoundaryPreparation {
     responsibility: GuiHelloWorldActualRuntimePreparationResponsibility,
     contract: GuiHelloWorldActualHelperBoundaryContract,
+    public_import: GuiHelloWorldActualHelperBoundaryPublicImport,
+    import_resolution: GuiHelloWorldActualHelperBoundaryResolution,
+    objc_runtime: GuiHelloWorldActualHelperBoundaryResolution,
+    os_api_requests: GuiHelloWorldActualHelperBoundaryResolution,
+    next_blocker: GuiHelloWorldActualHelperBoundaryNextBlocker,
+    status: GuiHelloWorldActualHelperBoundaryStatus,
 }
 
 impl GuiHelloWorldActualHelperBoundaryPreparation {
@@ -452,6 +462,22 @@ impl GuiHelloWorldActualHelperBoundaryPreparation {
                 plan.responsibility(),
             ),
             contract: GuiHelloWorldActualHelperBoundaryContract::from_runtime(plan.contract()),
+            public_import: GuiHelloWorldActualHelperBoundaryPublicImport::from_runtime(
+                plan.public_import(),
+            ),
+            import_resolution: GuiHelloWorldActualHelperBoundaryResolution::from_runtime(
+                plan.import_resolution(),
+            ),
+            objc_runtime: GuiHelloWorldActualHelperBoundaryResolution::from_runtime(
+                plan.objc_runtime(),
+            ),
+            os_api_requests: GuiHelloWorldActualHelperBoundaryResolution::from_runtime(
+                plan.os_api_requests(),
+            ),
+            next_blocker: GuiHelloWorldActualHelperBoundaryNextBlocker::from_runtime(
+                plan.next_blocker(),
+            ),
+            status: GuiHelloWorldActualHelperBoundaryStatus::from_runtime(plan.status()),
         }
     }
 }
@@ -759,6 +785,64 @@ impl GuiHelloWorldActualHelperBoundaryContract {
             UserSpaceHelperBoundaryContract::ImportsObjcOsApiRequests => {
                 Self::ImportsObjcOsApiRequests
             }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualHelperBoundaryPublicImport {
+    #[serde(rename = "appkit_framework")]
+    AppKitFramework,
+}
+
+impl GuiHelloWorldActualHelperBoundaryPublicImport {
+    const fn from_runtime(public_import: UserSpaceHelperBoundaryPublicImport) -> Self {
+        match public_import {
+            UserSpaceHelperBoundaryPublicImport::AppKitFramework => Self::AppKitFramework,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualHelperBoundaryResolution {
+    #[serde(rename = "helper_capability_required")]
+    HelperCapabilityRequired,
+}
+
+impl GuiHelloWorldActualHelperBoundaryResolution {
+    const fn from_runtime(resolution: UserSpaceHelperBoundaryResolution) -> Self {
+        match resolution {
+            UserSpaceHelperBoundaryResolution::HelperCapabilityRequired => {
+                Self::HelperCapabilityRequired
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualHelperBoundaryNextBlocker {
+    #[serde(rename = "unsupported_import")]
+    UnsupportedImport,
+}
+
+impl GuiHelloWorldActualHelperBoundaryNextBlocker {
+    const fn from_runtime(next_blocker: UserSpaceHelperBoundaryNextBlocker) -> Self {
+        match next_blocker {
+            UserSpaceHelperBoundaryNextBlocker::UnsupportedImport => Self::UnsupportedImport,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualHelperBoundaryStatus {
+    #[serde(rename = "planned_not_executed")]
+    PlannedNotExecuted,
+}
+
+impl GuiHelloWorldActualHelperBoundaryStatus {
+    const fn from_runtime(status: UserSpaceHelperBoundaryStatus) -> Self {
+        match status {
+            UserSpaceHelperBoundaryStatus::PlannedNotExecuted => Self::PlannedNotExecuted,
         }
     }
 }

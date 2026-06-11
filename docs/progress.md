@@ -9,44 +9,51 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 14:37 JST
+最終更新: 2026-06-11 14:47 JST
 
 状態:
 
-- project_state: completed。B8 の `unsupported_loader_feature` に対する
-  最初の user-space loader 実行計画として、public Mach-O metadata に基づく
-  loader execution plan を stable JSON に固定した。
+- project_state: completed。B8 の AppKit import / Objective-C runtime
+  boundary に対する最初の helper boundary plan と explicit next blocker を
+  stable JSON に固定した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8:
   実 x86_64 macOS アプリ起動。
-- active_design_focus: B8 loader execution plan。`UserSpaceLaunchPlan` の
-  `loader_execution` と B8 feedback report の `loader_execution_plan` に、
-  public Mach-O probe 由来の entry / segment / import / rebase / bind / ObjC
-  boundary 計画を保存する。
+- active_design_focus: B8 AppKit / Objective-C helper boundary。public AppKit
+  framework import、Objective-C runtime、OS API request を helper capability
+  required として扱い、次の explicit blocker を `unsupported_import` とする。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
   latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B8 の「feedback report の
-  `unsupported_loader_feature` に対して、public Mach-O loader metadata から
-  最初の user-space loader 実行計画を作る」。
-- completed_work: `bara-runtime::UserSpaceLaunchPlan` に `loader_execution` を
-  追加し、metadata source、`LC_MAIN` entryoff、`LC_SEGMENT_64` file ranges、
-  dylib load commands、link-edit rebase / bind metadata、Objective-C runtime
-  helper boundary、`planned_not_executed` status を typed plan として保持する。
-  B8 actual launch report と feedback report は同じ plan を
-  `runtime_preparation.loader_execution` / `loader_execution_plan` に projection する。
-- remaining_work: AppKit import / Objective-C runtime boundary を helper boundary
-  または明示 blocker として進め、expected / actual 差分を縮めること。
-- next_action: commit / push 後、次の B8 小ステップで AppKit import と
-  Objective-C runtime boundary を runtime helper 境界または stable blocker へ
-  接続する。
+- related_todo: [TODO.md](../TODO.md) B8 の「AppKit import / Objective-C
+  runtime boundary を helper boundary または明示 blocker として進め、
+  expected / actual 差分を縮める」配下の最初の小項目。
+- completed_work: `UserSpaceHelperBoundaryPlan` に public AppKit framework
+  import、import resolution、Objective-C runtime、OS API request、next blocker、
+  status を追加した。B8 actual launch report の `runtime_preparation.helper_boundary`
+  と feedback report の `helper_boundary_plan` は同じ plan を保存し、feedback
+  next action は `connect_appkit_import_objc_runtime_helper_boundary` になった。
+- remaining_work: AppKit import helper capability または explicit blocker
+  promotion を actual result に接続し、expected / actual 差分を縮めること。
+- next_action: commit / push 後、次の B8 小ステップで `unsupported_import` を
+  actual blocker / helper capability 接続へ進める。
 - verification: targeted tests として
   `nix develop -c cargo test -p bara-runtime user_space_launch_plan -- --nocapture` と
   `nix develop -c cargo test -p btbc-cli gui_hello_world -- --nocapture` が通過した。
   `nix develop -c cargo fmt --all -- --check`、
   `nix develop -c cargo clippy -p bara-runtime -p btbc-cli --all-targets -- -D warnings`、
-  `git diff --check`、full `nix develop -c ./scripts/verify` も通過した。
+  `git diff --check`、`nix develop -c ./scripts/check-no-invisible-chars`、
+  full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-11 14:47 JST: B8 の AppKit import / Objective-C runtime boundary
+  の最初の小ステップとして、`UserSpaceHelperBoundaryPlan` を詳細化した。
+  public AppKit framework import、import resolution、Objective-C runtime、
+  OS API request は helper capability required として report され、次 blocker は
+  `unsupported_import` として保存される。B8 feedback report は
+  `helper_boundary_plan` を含み、next action は
+  `connect_appkit_import_objc_runtime_helper_boundary` になった。targeted tests、
+  `bara-runtime` / `btbc-cli` clippy、full `nix develop -c ./scripts/verify` が
+  通過した。
 - 2026-06-11 14:37 JST: B8 の `unsupported_loader_feature` に対する
   最初の修正フィードバック対象として、public Mach-O metadata 由来の
   user-space loader 実行計画を model 化した。`UserSpaceLaunchPlan` は
