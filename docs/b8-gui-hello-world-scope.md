@@ -125,6 +125,66 @@ window close または `Command-Q` で終了すると launch report が保存さ
 full Objective-C runtime / AppKit call translation や任意 x86_64 GUI app 実行を
 意味しない。
 
+## B8-G2 以降の一般アプリ化計画
+
+B8-G1 後のゴールは、専用 sentinel `0f0b4238473131c0c3` で GUI helper を呼ぶ経路を
+固定したまま終わることではなく、同じ self-authored x86_64 GUI binary の実
+`LC_MAIN` entry から実行を開始し、未対応 boundary を 1 つずつ縮めることである。
+
+当面の成功条件は、任意の x86_64 GUI app を動かすことではない。次の順で、
+各 slice が stable JSON report と reviewable diff を持つことを成功条件にする。
+
+0. 一般アプリ化に入る前の debug bundle foundation を作る。
+   実 Mach-O entry、decode / lift / emit / runtime attempt、loader plan、
+   helper request、blocker、再現手順を 1 directory に保存し、後続の
+   unsupported boundary 修正サイクルで同じ材料を読み直せるようにする。
+1. 実 Mach-O entry の first-block translation report を作る。
+   GUI 表示は要求せず、実 entry bytes、処理した PC range、decode / lift / emit /
+   runtime attempt、最初の blocker を保存する。
+2. self-authored GUI fixture の compiler output に現れる最小 x86_64 ISA subset を
+   corpus-driven に追加する。未対応命令は必ず stable blocker として分類する。
+3. public Mach-O metadata から user-space image mapping、rebase、bind、import
+   helper request を実行可能な loader step にする。
+4. import stub、external symbol call、`objc_msgSend` を core IR / emit に直接混ぜず、
+   helper capability request と argument marshaling boundary へ接続する。
+5. Objective-C runtime / AppKit helper bridge を lifecycle event 専用から、
+   public class lookup、selector lookup、message send、autorelease pool、run loop
+   lifecycle を扱える形へ広げる。
+6. initial stack、argv / envp、heap、TLS、thread、signals / exceptions、
+   file descriptors など、最小 GUI app に必要な process state を user-space runtime
+   metadata と helper boundary として増やす。
+7. single executable の限界が blocker になった時点で、`.app` bundle、
+   `Info.plist`、resources、assets、nib/storyboard 相当を別 scope として追加する。
+
+この計画でも、Rosetta は black-box oracle としてだけ使う。AppKit / Objective-C
+runtime / dyld の private behavior、内部 symbol、内部 metadata、既存変換レイヤーの
+実装構造は実装根拠にしない。一般アプリ対応へ進むたびに、次の unsupported boundary を
+stable report に残し、実装対象を小さく切る。
+
+B8 debug bundle の初期出力は次を想定する。
+
+```text
+target/b8-debug/<case_id>/
+  input.probe.json
+  entry.bytes.bin
+  entry.bytes.json
+  decode.report.json
+  lift.ir.json
+  emit.report.json
+  pcmap.json
+  fixups.json
+  helpers.json
+  loader.plan.json
+  runtime-attempt.json
+  blocker.json
+  repro.sh
+```
+
+debug bundle は failure analysis 用 sidecar であり、通常の `actual.json` /
+launch report / feedback report の代替ではない。decode / lift / emit の core logic
+に I/O や global debug state を入れず、各段階の report value から CLI が bundle を
+保存する。
+
 ## 初期 launch metadata schema
 
 Rosetta black-box oracle から生成する初期 sidecar は

@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 16:18 JST
+最終更新: 2026-06-11 16:34 JST
 
 状態:
 
@@ -17,17 +17,18 @@
   reviewable GUI 起動 slice の積み上げとして扱う。B8-G1 は到達済みで、B8 全体は
   B8-G2 以降で self-authored fixture から一般の x86_64 macOS GUI application に
   近づける長期拡張として継続する。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G1:
-  GUI window に Hello World のフォント描画を行う最小アプリを、実際の変換レイヤーを
-  通して GUI 上で確認できるようにした。
-- active_design_focus: B8 translated GUI entry path。Rosetta 確認済みの
-  self-authored x86_64 GUI binary を input probe 対象にし、Bara-defined
-  `appkit_gui_hello_world` host trap を要求する x86_64 entry
-  `0f0b4238473131c0c3` を decode / lift / emit / runtime execution に通す。
-  host AppKit helper は public AppKit API boundary として呼ぶが、helper 単独実行
-  ではなく translated entry path からの request として launch report に保存する。
+- active_milestone: planned。[TODO.md](../TODO.md) の B8-D0:
+  一般アプリ化に入る前の debug bundle foundation を作る。実 Mach-O entry、
+  decode / lift / emit / runtime attempt、loader plan、helper request、blocker、
+  再現手順を 1 directory に保存し、後続の unsupported boundary 修正サイクルで
+  同じ材料を読み直せるようにする。
+- active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
+  実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
+  Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
+  Objective-C runtime / dyld の private behavior は使わず、public metadata、
+  public API、自前 fixture、Rosetta black-box observable result を根拠にする。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
-  latest commit はこの B8-G1 completion step の review package で確認する。
+  latest commit は `54a3e3f`。
 - related_todo: [TODO.md](../TODO.md) B8-G1 / B8-G2。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
@@ -36,16 +37,34 @@
   の両方から呼べるようにした。automated mode は Rosetta expected と actual の
   stable comparison が空 issue で一致する。manual visible mode は window close /
   `Command-Q` まで戻らず、GUI window 上の `hello world` label を目視確認できる。
-- remaining_work: B8-G2 以降。B8-G1 専用 host trap contract から、self-authored
-  fixture を少しずつ一般の x86_64 macOS GUI application に近づける。full
-  Objective-C runtime / AppKit call translation や任意 GUI app 対応は未完了である。
-- next_action: B8-G1 の review package を確認したうえで、B8-G2 の最小 slice を
-  再文化する。
-- verification: targeted tests、automated translated actual / comparison、full
-  `nix develop -c ./scripts/verify` が通過した。
+  B8-G2 以降の一般アプリ化計画と、その前提になる B8-D0 debug bundle foundation を
+  TODO / scope / design TODO に明文化した。
+- remaining_work: B8-D0。`target/b8-debug/<case_id>/` に input probe、entry bytes、
+  decode report、lift IR、emit report、PC map、fixups、helpers、loader plan、
+  runtime attempt、blocker、repro command を保存する CLI 境界を作る。その後、
+  B8-G2 として B8-G1 専用 sentinel ではなく、Rosetta 確認済み self-authored
+  x86_64 GUI binary の実 `LC_MAIN` entry から first-block translation attempt を
+  行い、次の unsupported boundary を report する。
+- next_action: B8-D0 の最初の小ステップとして、debug bundle schema と出力 directory
+  layout を固定する。
+- verification: documentation-only update のため、code verification は未実行。
+  `git diff --check` と `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-11 16:34 JST: B8-G2 の前提として B8-D0 debug bundle foundation を追加した。
+  一般アプリ化では unsupported boundary を細かく潰す必要があるため、input probe、
+  entry extraction、decode / lift / emit / runtime attempt、loader plan、helper
+  request、blocker、repro command を 1 directory に保存する。debug bundle は
+  failure analysis 用 sidecar であり、通常の actual / launch / feedback report の
+  代替ではない。documentation-only update のため code verification は未実行で、
+  `git diff --check` と `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
+- 2026-06-11 16:27 JST: B8-G1 後の一般アプリ化ゴールと B8-G2 以降の線形計画を
+  `TODO.md`、`docs/b8-gui-hello-world-scope.md`、`docs/design-todo.md` に明文化した。
+  当面の次 step は、専用 sentinel ではなく実 Mach-O `LC_MAIN` entry から
+  first-block translation attempt を行い、最初の unsupported boundary を stable
+  report に残すこと。documentation-only update のため code verification は未実行で、
+  `git diff --check` と `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 - 2026-06-11 16:18 JST: B8-G1 を完了した。self-authored x86_64 GUI binary の
   Rosetta manual visible check はユーザー確認済み。Bara 側には
   `appkit_gui_hello_world` host trap contract を追加し、専用 x86_64 entry

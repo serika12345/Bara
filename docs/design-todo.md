@@ -173,6 +173,20 @@
   helper capability invocation を保存する。これは B8-G1 専用 host trap 経由の
   最小 GUI launch であり、Objective-C runtime / AppKit call translation や
   任意 GUI app 実行を意味しない。
+- B8-G2 以降は、B8-G1 専用 host trap を肥大化させるのではなく、実 Mach-O entry
+  から進んだ結果として helper boundary が必要になる箇所を特定し、public import
+  identity、call site、argument / return marshaling、helper capability request を
+  分けて model 化する。Objective-C runtime / AppKit helper bridge は
+  lifecycle event 専用から class lookup、selector lookup、message send、
+  autorelease pool、run loop lifecycle へ広げるが、core IR / ARM64 emit に
+  AppKit 固有処理を混ぜない。
+- B8-D0 として、一般アプリ化の前に debug bundle foundation を置く。debug bundle は
+  input probe、entry extraction、decode report、lift IR、emit report、PC map、
+  fixups、helper requests、loader plan、runtime attempt、blocker、repro command を
+  1 directory に集める failure analysis 用 sidecar とする。これは通常の
+  actual / launch / feedback report を置き換えず、次の unsupported boundary を
+  修正するための作業材料を保存する。core decode / lift / emit / validation は I/O を
+  持たず、debug 情報は戻り値の report value または明示 collector から CLI が保存する。
 - wasm2c platform adapter / NDA target adapter は本流 TODO ではなく、
   [将来構想メモ](future-research-concepts.md) の未確立構想として扱う。
 
@@ -241,6 +255,15 @@
   これは `unsupported_loader_feature` に対する最初の修正フィードバック対象を
   stable plan にするための model 化であり、実 image mapping、import 解決、
   rebase / bind 適用、Objective-C runtime bridge 実行の追加ではない。
+- B8-G2 以降の runtime design は、次の順で現在の plan を実行可能な boundary へ
+  変える。まず B8-D0 で debug bundle を整え、次に `LC_MAIN` entry から実 entry
+  bytes を切り出し、first-block translation attempt と最初の blocker を保存する。
+  次に必要な x86_64 ISA subset を corpus-driven に追加し、image mapping / rebase /
+  bind / import helper request を public Mach-O metadata から解決する。その後、
+  process state として initial stack、argv / envp、heap、TLS、initial thread、
+  signals / exceptions、file descriptors を user-space runtime metadata と
+  helper boundary に載せる。`.app` bundle や resource は single executable の限界が
+  blocker になるまで scope に入れない。
 
 ## D7: Binary format input/output の分離
 
