@@ -60,6 +60,7 @@ pub enum DecodedInstructionKind {
         imm: u32,
     },
     MovRaxRdi,
+    MovRbxRax,
     MovzxEaxBytePtrRdi,
     AddEaxImm32 {
         imm: X86Imm32,
@@ -82,6 +83,7 @@ pub enum DecodedInstructionKind {
     TestEaxEax,
     MovRbpRsp,
     PushRax,
+    PushRbx,
     PushRbp,
     PushR14,
     PushR15,

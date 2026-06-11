@@ -563,33 +563,39 @@ review gate:
 - 完了したら commit / push / draft PR 作成で停止する。残りの ISA blocker は
   debug bundle の結果を見て次の `PR Gate` として追加する。
 
-- [ ] B8-G3e: 実 prologue の `push rbx` slice を追加する。
-  - [ ] B8-G3d の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 83 }`
-    (`53`, `push rbx`) を次の ISA blocker として focused fixture に固定する。
-  - [ ] `push rbx` に必要な register model、decode、lift、emit planning を
-    最小範囲で追加する。
-  - [ ] debug bundle が同じ blocker を越えて次の unsupported boundary を返すことを
-    確認する。
+- [x] B8-G3e: opcode-only blocker batch を追加する。
+  - [x] B8-G3d の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 83 }`
+    (`53`, `push rbx`) を batch の最初の ISA blocker として focused fixture に固定する。
+  - [x] debug bundle が次に返す blocker が opcode 追加だけで解ける間は、同じ PR で
+    連続して decode / lift / emit / JSON projection を追加する。
+  - [x] opcode 追加だけで解けない loader / import / helper ABI / runtime service /
+    broad refactor が必要になったら、そこで batch を止めて次の PR Gate として記録する。
+  - [x] B8-G3e batch は `push_rbx` (`53`) と `mov_rbx_rax` (`48 89 c3`) を通過し、
+    `DecodeUnsupportedOpcode { opcode: 72 }` (`48 8b 05 disp32`, RIP-relative load)
+    で停止する。
 
-#### PR Gate: B8-G3e Push RBX Prologue Slice
+#### PR Gate: B8-G3e Opcode-Only Blocker Batch
 
-branch: `task/b8-g3e-push-rbx`
+branch: `task/b8-g3e-opcode-batch`
 
 完了条件:
 
-- B8-G3d の debug bundle / blocker report から、次に潰す x86_64 ISA blocker として
+- [x] B8-G3d の debug bundle / blocker report から、次に潰す x86_64 ISA blocker として
   `53` (`push rbx`) を選んでいる。
-- 選んだ blocker の最小 bytes が focused fixture として保存されている。
-- decode / lift / emit のうち、その blocker に必要な最小範囲だけを実装している。
-- debug bundle または launch report で `opcode 83` blocker を越えて次の blocker が
-  stable に report される。
+- [x] 各追加 opcode の最小 bytes が focused fixture または debug bundle regression として
+  保存されている。
+- [x] 各 step は decode / lift / emit / artifact JSON projection の最小追加に収まっている。
+- [x] debug bundle または launch report で、batch 最後の opcode blocker を越えた次の
+  blocker が stable に report される。
+- [x] batch 停止理由を TODO / progress / design note に記録している。
 
 PR に含めない:
 
 - prologue / epilogue 全体、RIP-relative addressing、`lea`、memory operands、
   call/jump stubs の一括実装。
 - loader mapping、import resolution、Objective-C / AppKit bridge の本実装。
-- RBX 以外の callee-saved register 命令の便乗一般化。
+- opcode 追加だけで説明できない loader / import / helper ABI / runtime service の実装。
+- opcode 追加を超える broad refactor や register allocator / full ABI model の導入。
 
 検証:
 
@@ -597,8 +603,48 @@ PR に含めない:
 
 review gate:
 
-- 完了したら commit / push / draft PR 作成で停止する。残りの ISA blocker は
-  debug bundle の結果を見て次の `PR Gate` として追加する。
+- opcode-only blocker が続く間は同じ branch で作業を続ける。opcode 追加だけで
+  進めなくなったら commit / push / draft PR 作成で停止し、次の non-opcode 境界または
+  次 batch を `PR Gate` として追加する。
+
+- [ ] B8-G3f: RIP-relative `mov rax,[rip+disp32]` load slice を追加する。
+  - [ ] B8-G3e の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 72 }`
+    (`48 8b 05 ff 19 00 00`) を RIP-relative memory load blocker として focused fixture
+    に固定する。
+  - [ ] RIP-relative source address、read width、image metadata / mapped bytes との境界を
+    typed model として最小範囲で追加する。
+  - [ ] debug bundle が同じ blocker を越えて次の unsupported boundary を返すことを
+    確認する。
+
+#### PR Gate: B8-G3f RIP-Relative MOV Load Slice
+
+branch: `task/b8-g3f-rip-relative-mov-load`
+
+完了条件:
+
+- B8-G3e の debug bundle / blocker report から、次に潰す boundary として
+  `48 8b 05 disp32` (`mov rax, qword ptr [rip+disp32]`) を選んでいる。
+- 選んだ blocker の最小 bytes が focused fixture として保存されている。
+- RIP-relative address calculation と memory load operand を decode / lift / emit の
+  最小範囲で表現している。
+- debug bundle または launch report で `48 8b 05` blocker を越えて次の blocker が
+  stable に report される。
+
+PR に含めない:
+
+- loader mapping、relocation / rebase / bind 適用、import resolution の本実装。
+- general memory subsystem、full x86 addressing modes、RIP-relative store、
+  arbitrary-width memory operations の一括実装。
+- Objective-C / AppKit bridge や helper ABI の本実装。
+
+検証:
+
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止する。次の blocker は debug bundle の
+  結果を見て次の `PR Gate` として追加する。
 
 - [ ] B8-G4: user-space Mach-O image mapping と relocation / rebase / bind 適用を
   実行可能な loader step にする。

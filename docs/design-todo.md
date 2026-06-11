@@ -231,6 +231,12 @@
   prologue 全体の一般実装ではない。現在の source of truth は `blocker.json` の
   `DecodeUnsupportedOpcode { opcode: 83 }` (`53`, `push rbx`) であり、次の
   PR Gate は RBX push を扱う。
+- 2026-06-11 の B8-G3e opcode-only batch として、`53` (`push rbx`) と
+  `48 89 c3` (`mov rbx,rax`) を追加した。RBX は IR register family として追加し、
+  ARM64 emit では `x19` に対応させる。batch は debug bundle の次 blocker が
+  `48 8b 05 disp32` の RIP-relative memory load になった時点で停止する。これは
+  単なる opcode 追加を超えて image-relative address calculation、read width、
+  mapped bytes / loader metadata 境界を要求するため、次の focused PR Gate として扱う。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、

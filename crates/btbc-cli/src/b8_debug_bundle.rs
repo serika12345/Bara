@@ -569,6 +569,7 @@ enum B8DebugDecodedInstructionKindReport {
         imm: u32,
     },
     MovRaxRdi,
+    MovRbxRax,
     MovzxEaxBytePtrRdi,
     AddEaxImm32 {
         imm: String,
@@ -591,6 +592,7 @@ enum B8DebugDecodedInstructionKindReport {
     TestEaxEax,
     MovRbpRsp,
     PushRax,
+    PushRbx,
     PushRbp,
     PushR14,
     PushR15,
@@ -627,6 +629,7 @@ impl B8DebugDecodedInstructionKindReport {
         match kind {
             DecodedInstructionKind::MovEaxImm32 { imm } => Self::MovEaxImm32 { imm: *imm },
             DecodedInstructionKind::MovRaxRdi => Self::MovRaxRdi,
+            DecodedInstructionKind::MovRbxRax => Self::MovRbxRax,
             DecodedInstructionKind::MovzxEaxBytePtrRdi => Self::MovzxEaxBytePtrRdi,
             DecodedInstructionKind::AddEaxImm32 { imm } => Self::AddEaxImm32 {
                 imm: format!("{imm:?}"),
@@ -649,6 +652,7 @@ impl B8DebugDecodedInstructionKindReport {
             DecodedInstructionKind::TestEaxEax => Self::TestEaxEax,
             DecodedInstructionKind::MovRbpRsp => Self::MovRbpRsp,
             DecodedInstructionKind::PushRax => Self::PushRax,
+            DecodedInstructionKind::PushRbx => Self::PushRbx,
             DecodedInstructionKind::PushRbp => Self::PushRbp,
             DecodedInstructionKind::PushR14 => Self::PushR14,
             DecodedInstructionKind::PushR15 => Self::PushR15,

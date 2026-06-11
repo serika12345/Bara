@@ -142,6 +142,10 @@ pub enum X86Reg {
     Eax,
     Ax,
     Al,
+    Rbx,
+    Ebx,
+    Bx,
+    Bl,
     Rbp,
     Ebp,
     Bp,
@@ -168,6 +172,7 @@ impl X86Reg {
     pub const fn family(self) -> X86RegFamily {
         match self {
             Self::Rax | Self::Eax | Self::Ax | Self::Al => X86RegFamily::Accumulator,
+            Self::Rbx | Self::Ebx | Self::Bx | Self::Bl => X86RegFamily::Base,
             Self::Rbp | Self::Ebp | Self::Bp | Self::Bpl => X86RegFamily::BasePointer,
             Self::Rsp | Self::Esp | Self::Sp | Self::Spl => X86RegFamily::StackPointer,
             Self::R14 | Self::R14d | Self::R14w | Self::R14b => X86RegFamily::Extended14,
@@ -178,16 +183,16 @@ impl X86Reg {
 
     pub const fn width(self) -> X86RegWidth {
         match self {
-            Self::Al | Self::Bpl | Self::Spl | Self::R14b | Self::R15b | Self::Dil => {
+            Self::Al | Self::Bl | Self::Bpl | Self::Spl | Self::R14b | Self::R15b | Self::Dil => {
                 X86RegWidth::Bits8
             }
-            Self::Ax | Self::Bp | Self::Sp | Self::R14w | Self::R15w | Self::Di => {
+            Self::Ax | Self::Bx | Self::Bp | Self::Sp | Self::R14w | Self::R15w | Self::Di => {
                 X86RegWidth::Bits16
             }
-            Self::Eax | Self::Ebp | Self::Esp | Self::R14d | Self::R15d | Self::Edi => {
+            Self::Eax | Self::Ebx | Self::Ebp | Self::Esp | Self::R14d | Self::R15d | Self::Edi => {
                 X86RegWidth::Bits32
             }
-            Self::Rax | Self::Rbp | Self::Rsp | Self::R14 | Self::R15 | Self::Rdi => {
+            Self::Rax | Self::Rbx | Self::Rbp | Self::Rsp | Self::R14 | Self::R15 | Self::Rdi => {
                 X86RegWidth::Bits64
             }
         }
@@ -196,6 +201,7 @@ impl X86Reg {
     pub const fn full_width(self) -> Self {
         match self.family() {
             X86RegFamily::Accumulator => Self::Rax,
+            X86RegFamily::Base => Self::Rbx,
             X86RegFamily::BasePointer => Self::Rbp,
             X86RegFamily::StackPointer => Self::Rsp,
             X86RegFamily::Extended14 => Self::R14,
@@ -212,6 +218,7 @@ impl X86Reg {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum X86RegFamily {
     Accumulator,
+    Base,
     BasePointer,
     StackPointer,
     Extended14,
@@ -425,6 +432,19 @@ mod tests {
         assert_eq!(X86Reg::Ax.full_width(), X86Reg::Rax);
         assert_eq!(X86Reg::Al.full_width(), X86Reg::Rax);
         assert!(X86Reg::Eax.is_partial_view());
+
+        assert_eq!(X86Reg::Rbx.family(), X86RegFamily::Base);
+        assert_eq!(X86Reg::Ebx.family(), X86RegFamily::Base);
+        assert_eq!(X86Reg::Bx.family(), X86RegFamily::Base);
+        assert_eq!(X86Reg::Bl.family(), X86RegFamily::Base);
+        assert_eq!(X86Reg::Rbx.width(), X86RegWidth::Bits64);
+        assert_eq!(X86Reg::Ebx.width(), X86RegWidth::Bits32);
+        assert_eq!(X86Reg::Bx.width(), X86RegWidth::Bits16);
+        assert_eq!(X86Reg::Bl.width(), X86RegWidth::Bits8);
+        assert_eq!(X86Reg::Ebx.full_width(), X86Reg::Rbx);
+        assert_eq!(X86Reg::Bx.full_width(), X86Reg::Rbx);
+        assert_eq!(X86Reg::Bl.full_width(), X86Reg::Rbx);
+        assert!(X86Reg::Ebx.is_partial_view());
 
         assert_eq!(X86Reg::Rbp.family(), X86RegFamily::BasePointer);
         assert_eq!(X86Reg::Ebp.family(), X86RegFamily::BasePointer);
