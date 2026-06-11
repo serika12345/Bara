@@ -43,7 +43,8 @@
 - active_branch: `task/b8-g5-import-helper-boundary-request`。base branch は
   `origin/task/b8-g4b-public-bind-import-boundary` の `c1b82f0`
   (`Merge pull request #24 from serika12345/task/b8-g4c-public-chained-fixups-import-decoder`)
-  で、B8-G4c を含む stacked branch として扱う。latest commit は B8-G5 review
+  で、B8-G4c を含む stacked branch として扱う。draft PR は
+  <https://github.com/serika12345/Bara/pull/25>。latest commit は B8-G5 review
   package で報告する。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
@@ -103,8 +104,8 @@
   `_objc_msgSend` host execution、Objective-C / AppKit helper bridge、
   arbitrary indirect call target execution、translation cache、fallback JIT/interpreter
   は行わない。
-- next_action: B8-G5 branch を commit / push し、draft PR を開いて review gate で
-  停止する。レビュー後の次 PR Gate は B8-G5a Import Helper Marshaling Contract。
+- next_action: B8-G5 draft PR #25 の review gate で停止する。レビュー後の次 PR Gate は
+  B8-G5a Import Helper Marshaling Contract。
 - verification: targeted checks として
   `nix develop -c cargo test -p bara-oracle chained_fixups -- --nocapture` と
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
@@ -123,6 +124,8 @@
   `x86_64_argument_marshaling_unimplemented` /
   `helper_return_marshaling_unimplemented` で停止する。targeted checks と
   `check-domain-types`、full `nix develop -c ./scripts/verify` が通過した。
+  branch `task/b8-g5-import-helper-boundary-request` を push し、draft PR
+  <https://github.com/serika12345/Bara/pull/25> を開いて review gate で停止した。
 - 2026-06-12 08:02 JST: B8-G4c Public Chained Fixups Import Decoder を実装した。
   `bara-oracle` に public `LC_DYLD_CHAINED_FIXUPS` payload parser を追加し、header、
   starts-in-image / starts-in-segment、`DYLD_CHAINED_IMPORT` table、uncompressed symbol
