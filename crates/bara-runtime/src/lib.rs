@@ -9,11 +9,12 @@ pub use launch::{
     UserSpaceEntryTrampolinePlan, UserSpaceEntryTrampolineTarget,
     UserSpaceExecutableMemoryAllocationApi, UserSpaceExecutableMemoryPlan,
     UserSpaceExecutableMemoryProtectionTransition, UserSpaceExecutableMemoryReleaseApi,
-    UserSpaceHelperBoundaryContract, UserSpaceHelperBoundaryPlan, UserSpaceImageMappingPlan,
-    UserSpaceImageMappingSource, UserSpaceInitialStackContract, UserSpaceInitialStackPlan,
-    UserSpaceIntegrationPolicy, UserSpaceLaunchPlan, UserSpaceLaunchResponsibility,
-    UserSpaceMemoryProtectionModel, UserSpacePrivateIntegrationRequirement,
-    UserSpaceProcessBoundary, UserSpaceProcessScope,
+    UserSpaceExecutionStrategyAvailability, UserSpaceExecutionStrategyBoundary,
+    UserSpaceExecutionStrategyPlan, UserSpaceExecutionStrategySet, UserSpaceHelperBoundaryContract,
+    UserSpaceHelperBoundaryPlan, UserSpaceImageMappingPlan, UserSpaceImageMappingSource,
+    UserSpaceInitialStackContract, UserSpaceInitialStackPlan, UserSpaceIntegrationPolicy,
+    UserSpaceLaunchPlan, UserSpaceLaunchResponsibility, UserSpaceMemoryProtectionModel,
+    UserSpacePrivateIntegrationRequirement, UserSpaceProcessBoundary, UserSpaceProcessScope,
 };
 pub use runner::{
     run_no_args_u64, run_no_args_u64_with_host_traps, run_one_input_memory_ptr, run_one_u64,

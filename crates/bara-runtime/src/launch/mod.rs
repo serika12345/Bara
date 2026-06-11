@@ -5,6 +5,7 @@ pub struct UserSpaceLaunchPlan {
     initial_stack: UserSpaceInitialStackPlan,
     helper_boundary: UserSpaceHelperBoundaryPlan,
     executable_memory: UserSpaceExecutableMemoryPlan,
+    execution_strategy: UserSpaceExecutionStrategyPlan,
     integration_policy: UserSpaceIntegrationPolicy,
     process_boundary: UserSpaceProcessBoundary,
 }
@@ -17,6 +18,7 @@ impl UserSpaceLaunchPlan {
             initial_stack: UserSpaceInitialStackPlan::argv_envp_initial_stack(),
             helper_boundary: UserSpaceHelperBoundaryPlan::imports_objc_os_api_requests(),
             executable_memory: UserSpaceExecutableMemoryPlan::public_os_api(),
+            execution_strategy: UserSpaceExecutionStrategyPlan::user_space_runtime_selectable(),
             integration_policy: UserSpaceIntegrationPolicy::current_user_space_process(),
             process_boundary: UserSpaceProcessBoundary::current_user_space_process(),
         }
@@ -40,6 +42,10 @@ impl UserSpaceLaunchPlan {
 
     pub const fn executable_memory(&self) -> &UserSpaceExecutableMemoryPlan {
         &self.executable_memory
+    }
+
+    pub const fn execution_strategy(&self) -> &UserSpaceExecutionStrategyPlan {
+        &self.execution_strategy
     }
 
     pub const fn integration_policy(&self) -> &UserSpaceIntegrationPolicy {
@@ -233,6 +239,74 @@ pub enum UserSpaceExecutableMemoryReleaseApi {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UserSpaceExecutionStrategyPlan {
+    responsibility: UserSpaceLaunchResponsibility,
+    boundary: UserSpaceExecutionStrategyBoundary,
+    strategies: UserSpaceExecutionStrategySet,
+}
+
+impl UserSpaceExecutionStrategyPlan {
+    const fn user_space_runtime_selectable() -> Self {
+        Self {
+            responsibility: UserSpaceLaunchResponsibility::Runtime,
+            boundary: UserSpaceExecutionStrategyBoundary::UserSpaceRuntime,
+            strategies: UserSpaceExecutionStrategySet::all_selectable(),
+        }
+    }
+
+    pub const fn responsibility(self) -> UserSpaceLaunchResponsibility {
+        self.responsibility
+    }
+
+    pub const fn boundary(self) -> UserSpaceExecutionStrategyBoundary {
+        self.boundary
+    }
+
+    pub const fn strategies(self) -> UserSpaceExecutionStrategySet {
+        self.strategies
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceExecutionStrategyBoundary {
+    UserSpaceRuntime,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UserSpaceExecutionStrategySet {
+    jit: UserSpaceExecutionStrategyAvailability,
+    aot: UserSpaceExecutionStrategyAvailability,
+    fallback_interpreter: UserSpaceExecutionStrategyAvailability,
+}
+
+impl UserSpaceExecutionStrategySet {
+    const fn all_selectable() -> Self {
+        Self {
+            jit: UserSpaceExecutionStrategyAvailability::Selectable,
+            aot: UserSpaceExecutionStrategyAvailability::Selectable,
+            fallback_interpreter: UserSpaceExecutionStrategyAvailability::Selectable,
+        }
+    }
+
+    pub const fn jit(self) -> UserSpaceExecutionStrategyAvailability {
+        self.jit
+    }
+
+    pub const fn aot(self) -> UserSpaceExecutionStrategyAvailability {
+        self.aot
+    }
+
+    pub const fn fallback_interpreter(self) -> UserSpaceExecutionStrategyAvailability {
+        self.fallback_interpreter
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceExecutionStrategyAvailability {
+    Selectable,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct UserSpaceIntegrationPolicy {
     process_scope: UserSpaceProcessScope,
     kernel_extension: UserSpacePrivateIntegrationRequirement,
@@ -317,6 +391,7 @@ mod tests {
     use super::{
         UserSpaceEntryTrampolineTarget, UserSpaceExecutableMemoryAllocationApi,
         UserSpaceExecutableMemoryProtectionTransition, UserSpaceExecutableMemoryReleaseApi,
+        UserSpaceExecutionStrategyAvailability, UserSpaceExecutionStrategyBoundary,
         UserSpaceHelperBoundaryContract, UserSpaceImageMappingSource,
         UserSpaceInitialStackContract, UserSpaceLaunchPlan, UserSpaceLaunchResponsibility,
         UserSpaceMemoryProtectionModel, UserSpacePrivateIntegrationRequirement,
@@ -428,6 +503,34 @@ mod tests {
         assert_eq!(
             executable_memory.release_api(),
             UserSpaceExecutableMemoryReleaseApi::Munmap
+        );
+    }
+
+    #[test]
+    fn user_space_launch_plan_selects_execution_strategies_from_runtime_boundary() {
+        let execution_strategy =
+            *UserSpaceLaunchPlan::mach_o_executable_image().execution_strategy();
+        let strategies = execution_strategy.strategies();
+
+        assert_eq!(
+            execution_strategy.responsibility(),
+            UserSpaceLaunchResponsibility::Runtime
+        );
+        assert_eq!(
+            execution_strategy.boundary(),
+            UserSpaceExecutionStrategyBoundary::UserSpaceRuntime
+        );
+        assert_eq!(
+            strategies.jit(),
+            UserSpaceExecutionStrategyAvailability::Selectable
+        );
+        assert_eq!(
+            strategies.aot(),
+            UserSpaceExecutionStrategyAvailability::Selectable
+        );
+        assert_eq!(
+            strategies.fallback_interpreter(),
+            UserSpaceExecutionStrategyAvailability::Selectable
         );
     }
 }

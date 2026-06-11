@@ -5,6 +5,7 @@ use bara_oracle::{
 use bara_runtime::{
     UserSpaceEntryTrampolineTarget, UserSpaceExecutableMemoryAllocationApi,
     UserSpaceExecutableMemoryProtectionTransition, UserSpaceExecutableMemoryReleaseApi,
+    UserSpaceExecutionStrategyAvailability, UserSpaceExecutionStrategyBoundary,
     UserSpaceHelperBoundaryContract, UserSpaceImageMappingSource, UserSpaceInitialStackContract,
     UserSpaceLaunchPlan, UserSpaceLaunchResponsibility, UserSpaceMemoryProtectionModel,
     UserSpacePrivateIntegrationRequirement, UserSpaceProcessScope,
@@ -103,6 +104,7 @@ struct GuiHelloWorldActualRuntimePreparation {
     status: GuiHelloWorldActualRuntimePreparationStatus,
     image_mapping: GuiHelloWorldActualImageMappingPreparation,
     executable_memory: GuiHelloWorldActualExecutableMemoryPreparation,
+    execution_strategy: GuiHelloWorldActualExecutionStrategyPreparation,
     entry_trampoline: GuiHelloWorldActualEntryTrampolinePreparation,
     initial_stack: GuiHelloWorldActualInitialStackPreparation,
     helper_boundary: GuiHelloWorldActualHelperBoundaryPreparation,
@@ -120,6 +122,9 @@ impl GuiHelloWorldActualRuntimePreparation {
             ),
             executable_memory: GuiHelloWorldActualExecutableMemoryPreparation::from_plan(
                 plan.executable_memory(),
+            ),
+            execution_strategy: GuiHelloWorldActualExecutionStrategyPreparation::from_plan(
+                plan.execution_strategy(),
             ),
             entry_trampoline: GuiHelloWorldActualEntryTrampolinePreparation::from_plan(
                 plan.entry_trampoline(),
@@ -196,6 +201,33 @@ impl GuiHelloWorldActualExecutableMemoryPreparation {
                 ),
             release_api: GuiHelloWorldActualExecutableMemoryReleaseApi::from_runtime(
                 plan.release_api(),
+            ),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+struct GuiHelloWorldActualExecutionStrategyPreparation {
+    responsibility: GuiHelloWorldActualRuntimePreparationResponsibility,
+    boundary: GuiHelloWorldActualExecutionStrategyBoundary,
+    jit: GuiHelloWorldActualExecutionStrategyAvailability,
+    aot: GuiHelloWorldActualExecutionStrategyAvailability,
+    fallback_interpreter: GuiHelloWorldActualExecutionStrategyAvailability,
+}
+
+impl GuiHelloWorldActualExecutionStrategyPreparation {
+    const fn from_plan(plan: &bara_runtime::UserSpaceExecutionStrategyPlan) -> Self {
+        let strategies = plan.strategies();
+
+        Self {
+            responsibility: GuiHelloWorldActualRuntimePreparationResponsibility::from_runtime(
+                plan.responsibility(),
+            ),
+            boundary: GuiHelloWorldActualExecutionStrategyBoundary::from_runtime(plan.boundary()),
+            jit: GuiHelloWorldActualExecutionStrategyAvailability::from_runtime(strategies.jit()),
+            aot: GuiHelloWorldActualExecutionStrategyAvailability::from_runtime(strategies.aot()),
+            fallback_interpreter: GuiHelloWorldActualExecutionStrategyAvailability::from_runtime(
+                strategies.fallback_interpreter(),
             ),
         }
     }
@@ -342,6 +374,34 @@ impl GuiHelloWorldActualExecutableMemoryReleaseApi {
     const fn from_runtime(api: UserSpaceExecutableMemoryReleaseApi) -> Self {
         match api {
             UserSpaceExecutableMemoryReleaseApi::Munmap => Self::Munmap,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualExecutionStrategyBoundary {
+    #[serde(rename = "user_space_runtime")]
+    UserSpaceRuntime,
+}
+
+impl GuiHelloWorldActualExecutionStrategyBoundary {
+    const fn from_runtime(boundary: UserSpaceExecutionStrategyBoundary) -> Self {
+        match boundary {
+            UserSpaceExecutionStrategyBoundary::UserSpaceRuntime => Self::UserSpaceRuntime,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualExecutionStrategyAvailability {
+    #[serde(rename = "selectable")]
+    Selectable,
+}
+
+impl GuiHelloWorldActualExecutionStrategyAvailability {
+    const fn from_runtime(availability: UserSpaceExecutionStrategyAvailability) -> Self {
+        match availability {
+            UserSpaceExecutionStrategyAvailability::Selectable => Self::Selectable,
         }
     }
 }
@@ -825,7 +885,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_string(attempt.launch_report()).expect("launch report serializes"),
-            "{\"schema\":\"b8_gui_hello_world_actual_launch_report_v0\",\"case_id\":\"b8_gui_hello_world\",\"actual_runtime\":\"bara_arm64_user_space\",\"status\":\"blocked\",\"input\":{\"kind\":\"mach_o_executable_image\",\"source_isa\":\"x86_64\",\"binary_format\":\"mach_o\",\"target_triple\":\"x86_64-apple-macos13\",\"gui_framework\":\"appkit\",\"probe\":{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\"},\"loader_metadata\":{\"source\":\"public_mach_o_probe\",\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":0,\"byte_size\":0,\"recognized_entry_points\":[],\"recognized_segments\":[],\"unsupported_commands\":[]},\"executable_image_conversion\":{\"status\":\"not_convertible\",\"blocker\":\"missing_entry_point\"}},\"sections\":{\"status\":\"modeled_from_lc_segment_64_section_table\"},\"imports\":{\"status\":\"modeled_from_dylib_load_commands\"},\"relocations\":{\"status\":\"modeled_from_linkedit_relocation_and_bind_commands\"}}},\"runtime_preparation\":{\"source\":\"bara_runtime_user_space_launch_plan\",\"status\":\"planned_not_executed\",\"image_mapping\":{\"responsibility\":\"loader\",\"source\":\"mach_o_executable_image\",\"memory_protection\":\"public_os_virtual_memory\"},\"executable_memory\":{\"responsibility\":\"runtime\",\"allocation_api\":\"mmap_private_anonymous\",\"protection_transition\":\"mprotect_read_write_to_read_execute\",\"release_api\":\"munmap\"},\"entry_trampoline\":{\"responsibility\":\"runtime\",\"target\":\"mach_o_entry_point\"},\"initial_stack\":{\"responsibility\":\"runtime\",\"contract\":\"argv_envp_initial_stack\"},\"helper_boundary\":{\"responsibility\":\"helper_boundary\",\"contract\":\"imports_objc_os_api_requests\"},\"integration_policy\":{\"process_scope\":\"current_user_space_process\",\"kernel_extension\":\"not_required\",\"private_kernel_hook\":\"not_required\",\"private_dyld_behavior\":\"not_required\"},\"process_boundary\":{\"loader\":\"current_user_space_process\",\"translation_cache\":\"current_user_space_process\",\"runtime_helper\":\"current_user_space_process\",\"artifact_cache\":\"current_user_space_process\"}},\"blocker\":{\"classification\":\"unsupported_loader_feature\",\"boundary\":\"loader\",\"selected_by\":\"first_unsupported_launch_boundary\",\"candidate_boundaries\":[{\"boundary\":\"loader\",\"classification\":\"unsupported_loader_feature\"},{\"boundary\":\"import\",\"classification\":\"unsupported_import\"},{\"boundary\":\"objc_runtime\",\"classification\":\"unsupported_objc_runtime_boundary\"}],\"message\":\"Bara does not yet load a complete x86_64 Mach-O GUI executable with dynamic loader, AppKit import, and Objective-C runtime requirements.\"}}"
+            "{\"schema\":\"b8_gui_hello_world_actual_launch_report_v0\",\"case_id\":\"b8_gui_hello_world\",\"actual_runtime\":\"bara_arm64_user_space\",\"status\":\"blocked\",\"input\":{\"kind\":\"mach_o_executable_image\",\"source_isa\":\"x86_64\",\"binary_format\":\"mach_o\",\"target_triple\":\"x86_64-apple-macos13\",\"gui_framework\":\"appkit\",\"probe\":{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\"},\"loader_metadata\":{\"source\":\"public_mach_o_probe\",\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":0,\"byte_size\":0,\"recognized_entry_points\":[],\"recognized_segments\":[],\"unsupported_commands\":[]},\"executable_image_conversion\":{\"status\":\"not_convertible\",\"blocker\":\"missing_entry_point\"}},\"sections\":{\"status\":\"modeled_from_lc_segment_64_section_table\"},\"imports\":{\"status\":\"modeled_from_dylib_load_commands\"},\"relocations\":{\"status\":\"modeled_from_linkedit_relocation_and_bind_commands\"}}},\"runtime_preparation\":{\"source\":\"bara_runtime_user_space_launch_plan\",\"status\":\"planned_not_executed\",\"image_mapping\":{\"responsibility\":\"loader\",\"source\":\"mach_o_executable_image\",\"memory_protection\":\"public_os_virtual_memory\"},\"executable_memory\":{\"responsibility\":\"runtime\",\"allocation_api\":\"mmap_private_anonymous\",\"protection_transition\":\"mprotect_read_write_to_read_execute\",\"release_api\":\"munmap\"},\"execution_strategy\":{\"responsibility\":\"runtime\",\"boundary\":\"user_space_runtime\",\"jit\":\"selectable\",\"aot\":\"selectable\",\"fallback_interpreter\":\"selectable\"},\"entry_trampoline\":{\"responsibility\":\"runtime\",\"target\":\"mach_o_entry_point\"},\"initial_stack\":{\"responsibility\":\"runtime\",\"contract\":\"argv_envp_initial_stack\"},\"helper_boundary\":{\"responsibility\":\"helper_boundary\",\"contract\":\"imports_objc_os_api_requests\"},\"integration_policy\":{\"process_scope\":\"current_user_space_process\",\"kernel_extension\":\"not_required\",\"private_kernel_hook\":\"not_required\",\"private_dyld_behavior\":\"not_required\"},\"process_boundary\":{\"loader\":\"current_user_space_process\",\"translation_cache\":\"current_user_space_process\",\"runtime_helper\":\"current_user_space_process\",\"artifact_cache\":\"current_user_space_process\"}},\"blocker\":{\"classification\":\"unsupported_loader_feature\",\"boundary\":\"loader\",\"selected_by\":\"first_unsupported_launch_boundary\",\"candidate_boundaries\":[{\"boundary\":\"loader\",\"classification\":\"unsupported_loader_feature\"},{\"boundary\":\"import\",\"classification\":\"unsupported_import\"},{\"boundary\":\"objc_runtime\",\"classification\":\"unsupported_objc_runtime_boundary\"}],\"message\":\"Bara does not yet load a complete x86_64 Mach-O GUI executable with dynamic loader, AppKit import, and Objective-C runtime requirements.\"}}"
         );
     }
 

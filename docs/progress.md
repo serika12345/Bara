@@ -9,32 +9,30 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 13:15 JST
+最終更新: 2026-06-11 13:25 JST
 
 状態:
 
-- project_state: completed。B8 の executable memory public OS API boundary
-  step として、`mmap` / `mprotect` / `munmap` に限定した executable memory plan
-  を user-space launch plan と actual launch report に載せた。
+- project_state: completed。B8 の execution strategy selection boundary step
+  として、JIT / AOT / fallback interpreter を同じ user-space runtime boundary
+  から selectable として user-space launch plan と actual launch report に載せた。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8:
   実 x86_64 macOS アプリ起動。
-- active_design_focus: B8 executable memory public OS API boundary。
-  self-authored AppKit fixture の launch preparation で executable memory が
-  public OS virtual memory API (`mmap` / `mprotect` / `munmap`) に限定されることを
-  report 境界へ残す。
+- active_design_focus: B8 execution strategy selection boundary。self-authored
+  AppKit fixture の launch preparation で JIT / AOT / fallback interpreter が
+  同じ `user_space_runtime` boundary から選択可能であることを report 境界へ残す。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
   latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B8 の「executable memory は public OS API
-  (`mmap` / `mprotect` など) 経由に限定する」。
-- completed_work: `bara-runtime::UserSpaceLaunchPlan` は `executable_memory` を
-  持ち、allocation を `mmap_private_anonymous`、protection transition を
-  `mprotect_read_write_to_read_execute`、release を `munmap` として保持する。
-  B8 actual launch report は `runtime_preparation.executable_memory` として
-  同じ public OS API policy を保存する。
-- remaining_work: 次の小ステップは JIT / AOT / fallback interpreter を同じ
-  user-space runtime 境界から選べる設計にすること。
-- next_action: commit / push 後、次の B8 小ステップで execution strategy
-  selection を report / runtime model に固定する。
+- related_todo: [TODO.md](../TODO.md) B8 の「JIT / AOT / fallback interpreter を
+  同じ user-space runtime 境界から選べる設計にする」。
+- completed_work: `bara-runtime::UserSpaceLaunchPlan` は `execution_strategy` を
+  持ち、boundary を `user_space_runtime`、JIT / AOT / fallback interpreter を
+  それぞれ `selectable` として保持する。B8 actual launch report は
+  `runtime_preparation.execution_strategy` として同じ selection boundary を保存する。
+- remaining_work: 次の小ステップは syscall / OS API bridge を helper boundary
+  として明示し、core IR / emit へ混ぜないこと。
+- next_action: commit / push 後、次の B8 小ステップで syscall / OS API bridge
+  boundary を report / runtime model に固定する。
 - verification: targeted tests として
   `nix develop -c cargo test -p bara-runtime user_space_launch_plan -- --nocapture`、
   `nix develop -c cargo test -p btbc-cli gui_hello_world_actual -- --nocapture`
@@ -43,6 +41,12 @@
 
 直近で完了した作業:
 
+- 2026-06-11 13:25 JST: B8 の execution strategy selection boundary step
+  として、`bara-runtime::UserSpaceLaunchPlan` に `execution_strategy` を追加した。
+  JIT、AOT、fallback interpreter は同じ `user_space_runtime` boundary から
+  `selectable` として B8 actual launch report に保存される。targeted tests、
+  `bara-runtime` / `btbc-cli` clippy、full `nix develop -c ./scripts/verify` が
+  通過した。
 - 2026-06-11 13:15 JST: B8 の executable memory public OS API boundary step
   として、`bara-runtime::UserSpaceLaunchPlan` に `executable_memory` を追加した。
   allocation は `mmap_private_anonymous`、protection transition は

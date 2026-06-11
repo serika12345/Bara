@@ -140,6 +140,10 @@
   release は `munmap` として report する。これは GUI executable launch の
   実行ではなく、既存 runtime executable memory 境界を B8 launch plan に接続する
   public OS API policy である。
+- 2026-06-11 の B8 小ステップとして、`UserSpaceLaunchPlan` に
+  `execution_strategy` を追加した。JIT、AOT、fallback interpreter は同じ
+  `user_space_runtime` boundary から selectable として report する。これは
+  各 strategy の実装、selection policy、fallback engine 接続の追加ではない。
 
 ## D7: Binary format input/output の分離
 
