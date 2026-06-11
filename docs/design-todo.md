@@ -119,6 +119,11 @@
   を前提にしない。user-space runtime は input Mach-O executable image、
   public system framework imports、entry trampoline、stack / argv / envp、
   launch report をそれぞれ分けて扱う。
+- 2026-06-11 の B8 小ステップとして、`bara-runtime::UserSpaceLaunchPlan` に
+  image mapping、entry trampoline、initial stack、helper boundary の準備責務を
+  分けて置いた。actual launch report はこの plan を `runtime_preparation` として
+  JSON projection する。これは実 loader 実行、private dyld behavior、AppKit /
+  Objective-C runtime 内部の再実装を意味しない。
 
 ## D7: Binary format input/output の分離
 
