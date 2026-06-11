@@ -14,6 +14,10 @@ use serde::{Serialize, Serializer};
 
 const B8_GUI_HELLO_WORLD_CASE_ID: &str = "b8_gui_hello_world";
 const B8_GUI_HELLO_WORLD_SOURCE: &str = include_str!("../../../tests/sources/b8_gui_hello_world.m");
+const B8_GUI_HELLO_WORLD_STDOUT: &str =
+    "{\"event\":\"gui_window_created\",\"title\":\"Bara GUI Hello World\",\"text\":\"hello world\"}\n";
+const B8_GUI_HELLO_WORLD_TITLE: &str = "Bara GUI Hello World";
+const B8_GUI_HELLO_WORLD_TEXT: &str = "hello world";
 
 #[derive(Debug)]
 pub(crate) enum X8664MachOFixtureError {
@@ -67,6 +71,10 @@ pub(crate) enum X8664MachOFixtureError {
         stdout: String,
         source: String,
     },
+    InvalidGuiLaunchStdout {
+        path: PathBuf,
+        stdout: String,
+    },
 }
 
 impl X8664MachOFixtureError {
@@ -85,7 +93,8 @@ impl X8664MachOFixtureError {
             Self::UnsupportedRosettaHost { .. }
             | Self::RunnerSpawn { .. }
             | Self::RunnerFailed { .. }
-            | Self::InvalidRunnerStdout { .. } => FailureKind::RunError,
+            | Self::InvalidRunnerStdout { .. }
+            | Self::InvalidGuiLaunchStdout { .. } => FailureKind::RunError,
         }
     }
 }
@@ -163,6 +172,11 @@ impl fmt::Display for X8664MachOFixtureError {
                 "x86_64 oracle runner {} emitted invalid expected JSON: {source}; stdout={stdout:?}",
                 path.display()
             ),
+            Self::InvalidGuiLaunchStdout { path, stdout } => write!(
+                formatter,
+                "x86_64 GUI fixture {} emitted unexpected launch stdout: {stdout:?}",
+                path.display()
+            ),
         }
     }
 }
@@ -230,6 +244,127 @@ impl GeneratedX8664GuiHelloWorldFixture {
     pub(crate) const fn metadata(&self) -> &X8664MachOFixtureMetadata {
         &self.metadata
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct X8664GuiHelloWorldExpectedBundle {
+    observed_result: ObservedResult,
+    launch_metadata: X8664GuiHelloWorldLaunchMetadata,
+}
+
+impl X8664GuiHelloWorldExpectedBundle {
+    fn new(
+        observed_result: ObservedResult,
+        launch_metadata: X8664GuiHelloWorldLaunchMetadata,
+    ) -> Self {
+        Self {
+            observed_result,
+            launch_metadata,
+        }
+    }
+
+    pub(crate) const fn observed_result(&self) -> &ObservedResult {
+        &self.observed_result
+    }
+
+    pub(crate) const fn launch_metadata(&self) -> &X8664GuiHelloWorldLaunchMetadata {
+        &self.launch_metadata
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub(crate) struct X8664GuiHelloWorldLaunchMetadata {
+    schema: &'static str,
+    case_id: CaseId,
+    oracle: X8664GuiHelloWorldOracleKind,
+    fixture: X8664GuiHelloWorldFixtureLaunchMetadata,
+    observed_events: Vec<X8664GuiHelloWorldLaunchEvent>,
+}
+
+impl X8664GuiHelloWorldLaunchMetadata {
+    fn expected() -> Result<Self, X8664MachOFixtureError> {
+        Ok(Self {
+            schema: "b8_gui_hello_world_launch_metadata_v0",
+            case_id: b8_gui_hello_world_case_id()?,
+            oracle: X8664GuiHelloWorldOracleKind::RosettaBlackBox,
+            fixture: X8664GuiHelloWorldFixtureLaunchMetadata::new(),
+            observed_events: vec![X8664GuiHelloWorldLaunchEvent::window_created()],
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum X8664GuiHelloWorldOracleKind {
+    #[serde(rename = "rosetta_black_box")]
+    RosettaBlackBox,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct X8664GuiHelloWorldFixtureLaunchMetadata {
+    kind: X8664GuiHelloWorldFixtureKind,
+    source_isa: X8664GuiHelloWorldSourceIsa,
+    binary_format: X8664GuiHelloWorldBinaryFormat,
+    target_triple: X8664MachOFixtureTargetTriple,
+    gui_framework: X8664GuiHelloWorldFramework,
+}
+
+impl X8664GuiHelloWorldFixtureLaunchMetadata {
+    const fn new() -> Self {
+        Self {
+            kind: X8664GuiHelloWorldFixtureKind::SingleMachOExecutable,
+            source_isa: X8664GuiHelloWorldSourceIsa::X8664,
+            binary_format: X8664GuiHelloWorldBinaryFormat::MachO,
+            target_triple: X8664MachOFixtureTargetTriple::X8664AppleMacos13,
+            gui_framework: X8664GuiHelloWorldFramework::AppKit,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum X8664GuiHelloWorldFixtureKind {
+    #[serde(rename = "single_mach_o_executable")]
+    SingleMachOExecutable,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum X8664GuiHelloWorldSourceIsa {
+    #[serde(rename = "x86_64")]
+    X8664,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum X8664GuiHelloWorldBinaryFormat {
+    #[serde(rename = "mach_o")]
+    MachO,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum X8664GuiHelloWorldFramework {
+    #[serde(rename = "appkit")]
+    AppKit,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct X8664GuiHelloWorldLaunchEvent {
+    event: X8664GuiHelloWorldLaunchEventKind,
+    title: &'static str,
+    text: &'static str,
+}
+
+impl X8664GuiHelloWorldLaunchEvent {
+    const fn window_created() -> Self {
+        Self {
+            event: X8664GuiHelloWorldLaunchEventKind::GuiWindowCreated,
+            title: B8_GUI_HELLO_WORLD_TITLE,
+            text: B8_GUI_HELLO_WORLD_TEXT,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum X8664GuiHelloWorldLaunchEventKind {
+    #[serde(rename = "gui_window_created")]
+    GuiWindowCreated,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -475,12 +610,7 @@ pub(crate) struct X8664GuiHelloWorldBuildRequest {
 
 impl X8664GuiHelloWorldBuildRequest {
     fn new(output_path: &Path) -> Result<Self, X8664MachOFixtureError> {
-        let case_id = CaseId::new(B8_GUI_HELLO_WORLD_CASE_ID).map_err(|source| {
-            X8664MachOFixtureError::InvalidBuiltInCaseId {
-                case_id: B8_GUI_HELLO_WORLD_CASE_ID,
-                source,
-            }
-        })?;
+        let case_id = b8_gui_hello_world_case_id()?;
         Ok(Self {
             case_id,
             source: X8664GuiHelloWorldSource::new(),
@@ -808,6 +938,28 @@ pub(crate) fn observe_x86_64_oracle_expected(
     RosettaOracleObservation::from_process_output(output?).into_expected_result(&runner_path)
 }
 
+pub(crate) fn observe_x86_64_gui_hello_world_expected(
+) -> Result<X8664GuiHelloWorldExpectedBundle, X8664MachOFixtureError> {
+    ensure_supported_rosetta_host()?;
+
+    let runner_path = temporary_path("bara-x86-64-gui-hello-world", "exe")?;
+    if let Err(error) = build_x86_64_gui_hello_world_fixture(&runner_path) {
+        let _ = fs::remove_file(&runner_path);
+        return Err(error);
+    }
+
+    let output =
+        Command::new(&runner_path)
+            .output()
+            .map_err(|source| X8664MachOFixtureError::RunnerSpawn {
+                path: runner_path.clone(),
+                source,
+            });
+    let _ = fs::remove_file(&runner_path);
+
+    RosettaGuiHelloWorldObservation::from_process_output(output?).into_expected_bundle(&runner_path)
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct RosettaOracleObservation {
     runner_succeeded: bool,
@@ -864,6 +1016,76 @@ impl RosettaOracleObservation {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct RosettaGuiHelloWorldObservation {
+    runner_succeeded: bool,
+    runner_status: String,
+    runner_exit_code: Option<i32>,
+    stdout: String,
+    stderr: String,
+}
+
+impl RosettaGuiHelloWorldObservation {
+    fn from_process_output(output: Output) -> Self {
+        Self {
+            runner_succeeded: output.status.success(),
+            runner_status: output.status.to_string(),
+            runner_exit_code: output.status.code(),
+            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        }
+    }
+
+    #[cfg(test)]
+    const fn from_parts(
+        runner_succeeded: bool,
+        runner_status: String,
+        runner_exit_code: Option<i32>,
+        stdout: String,
+        stderr: String,
+    ) -> Self {
+        Self {
+            runner_succeeded,
+            runner_status,
+            runner_exit_code,
+            stdout,
+            stderr,
+        }
+    }
+
+    fn into_expected_bundle(
+        self,
+        runner_path: &Path,
+    ) -> Result<X8664GuiHelloWorldExpectedBundle, X8664MachOFixtureError> {
+        if !self.runner_succeeded {
+            return Err(X8664MachOFixtureError::RunnerFailed {
+                path: runner_path.to_path_buf(),
+                status: self.runner_status,
+                stdout: self.stdout,
+                stderr: self.stderr,
+            });
+        }
+        if self.stdout != B8_GUI_HELLO_WORLD_STDOUT {
+            return Err(X8664MachOFixtureError::InvalidGuiLaunchStdout {
+                path: runner_path.to_path_buf(),
+                stdout: self.stdout,
+            });
+        }
+
+        let observed_result = ObservedResult::new(
+            b8_gui_hello_world_case_id()?,
+            self.runner_exit_code.unwrap_or(0),
+            0,
+            self.stdout,
+            self.stderr,
+        );
+        Ok(X8664GuiHelloWorldExpectedBundle::new(
+            observed_result,
+            X8664GuiHelloWorldLaunchMetadata::expected()?,
+        ))
+    }
+}
+
 fn ensure_supported_host() -> Result<(), X8664MachOFixtureError> {
     if cfg!(target_os = "macos") {
         Ok(())
@@ -884,6 +1106,15 @@ fn ensure_supported_rosetta_host() -> Result<(), X8664MachOFixtureError> {
             arch: std::env::consts::ARCH,
         })
     }
+}
+
+fn b8_gui_hello_world_case_id() -> Result<CaseId, X8664MachOFixtureError> {
+    CaseId::new(B8_GUI_HELLO_WORLD_CASE_ID).map_err(|source| {
+        X8664MachOFixtureError::InvalidBuiltInCaseId {
+            case_id: B8_GUI_HELLO_WORLD_CASE_ID,
+            source,
+        }
+    })
 }
 
 fn temporary_path(prefix: &str, extension: &str) -> Result<PathBuf, X8664MachOFixtureError> {
@@ -982,9 +1213,9 @@ mod tests {
     use super::{
         json_string_literal, observe_x86_64_oracle_expected, package_x86_64_mach_o_fixture,
         package_x86_64_oracle_runner, GeneratedX8664MachOFixture, GeneratedX8664OracleRunner,
-        RosettaOracleObservation, X8664GuiHelloWorldSource, X8664MachOAssemblySource,
-        X8664MachOFixtureBuildRequest, X8664MachOFixtureError, X8664MachOFixtureOutputPath,
-        X8664MachOFixturePackager, X8664MachOFixtureSourceLanguage,
+        RosettaGuiHelloWorldObservation, RosettaOracleObservation, X8664GuiHelloWorldSource,
+        X8664MachOAssemblySource, X8664MachOFixtureBuildRequest, X8664MachOFixtureError,
+        X8664MachOFixtureOutputPath, X8664MachOFixturePackager, X8664MachOFixtureSourceLanguage,
         X8664MachOFixtureToolchainCommand, X8664OracleRunnerBuildRequest,
         X8664OracleRunnerPackager, X8664OracleRunnerSource,
     };
@@ -1118,6 +1349,38 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "x86_64 oracle runner /tmp/return_42_oracle failed with signal: 4 (SIGILL): stdout=\"partial stdout\" stderr=\"illegal instruction\""
+        );
+    }
+
+    #[test]
+    fn rosetta_gui_hello_world_observation_builds_expected_and_launch_metadata() {
+        let observation = RosettaGuiHelloWorldObservation::from_parts(
+            true,
+            String::from("exit status: 0"),
+            Some(0),
+            String::from("{\"event\":\"gui_window_created\",\"title\":\"Bara GUI Hello World\",\"text\":\"hello world\"}\n"),
+            String::new(),
+        );
+
+        let expected = observation
+            .into_expected_bundle(Path::new("/tmp/b8_gui_hello_world"))
+            .expect("GUI stdout contains the expected deterministic launch event");
+
+        assert_eq!(
+            expected.observed_result(),
+            &ObservedResult::new(
+                CaseId::new("b8_gui_hello_world").expect("case id is non-empty"),
+                0,
+                0,
+                String::from(
+                    "{\"event\":\"gui_window_created\",\"title\":\"Bara GUI Hello World\",\"text\":\"hello world\"}\n"
+                ),
+                String::new(),
+            )
+        );
+        assert_eq!(
+            serde_json::to_string(expected.launch_metadata()).expect("metadata serializes"),
+            "{\"schema\":\"b8_gui_hello_world_launch_metadata_v0\",\"case_id\":\"b8_gui_hello_world\",\"oracle\":\"rosetta_black_box\",\"fixture\":{\"kind\":\"single_mach_o_executable\",\"source_isa\":\"x86_64\",\"binary_format\":\"mach_o\",\"target_triple\":\"x86_64-apple-macos13\",\"gui_framework\":\"appkit\"},\"observed_events\":[{\"event\":\"gui_window_created\",\"title\":\"Bara GUI Hello World\",\"text\":\"hello world\"}]}"
         );
     }
 

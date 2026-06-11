@@ -49,6 +49,8 @@
 
 int main(void) {
     @autoreleasepool {
+        freopen("/dev/null", "w", stderr);
+
         [NSApplication sharedApplication];
         [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
 

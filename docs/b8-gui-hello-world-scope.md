@@ -41,6 +41,20 @@ B8 完了時の成功条件は、arm64 macOS 上で self-authored x86_64 GUI Hel
 を stdout または launch metadata へ出す。画面表示そのものは補助観測として扱い、
 自動判定は public process observation と stable JSON report に限定する。
 
+## 初期 launch metadata schema
+
+Rosetta black-box oracle から生成する初期 sidecar は
+`b8_gui_hello_world_launch_metadata_v0` とする。保存場所は
+`tests/expected/b8_gui_hello_world.launch.metadata.json` である。
+
+初期 schema は次を含む。
+
+- `case_id`: `b8_gui_hello_world`
+- `oracle`: `rosetta_black_box`
+- `fixture`: single Mach-O executable、source ISA、binary format、target triple、
+  GUI framework
+- `observed_events`: GUI surface creation を表す deterministic lifecycle event
+
 ## 初期 non-goals
 
 次は B8 の最初の GUI Hello World target では扱わない。

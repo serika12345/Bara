@@ -9,38 +9,52 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 10:52 JST
+最終更新: 2026-06-11 11:07 JST
 
 状態:
 
-- project_state: completed。B8 の 2 つ目の小ステップとして、self-authored
-  single-binary GUI Hello World source を追加し、x86_64 Mach-O executable
-  としてビルドできる host-specific fixture にした。
+- project_state: completed。B8 の 3 つ目の小ステップとして、GUI Hello World
+  fixture を Rosetta black-box oracle で実行し、`expected.json` と launch
+  metadata の初期 schema を固定した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8:
   実 x86_64 macOS アプリ起動。
-- active_design_focus: B8 GUI fixture build。`.app` bundle ではなく x86_64
-  Mach-O `MH_EXECUTE` の単一 executable を self-authored AppKit source から
-  clang で生成する。
+- active_design_focus: B8 GUI expected oracle。self-authored AppKit fixture を
+  x86_64 Mach-O executable として生成し、Rosetta black-box execution の
+  process observation と launch metadata sidecar を保存する。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
   latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B8 の「self-authored single-binary GUI
-  Hello World source を追加し、x86_64 Mach-O executable としてビルドできる
-  host-specific fixture にする」。
-- completed_work: `tests/sources/b8_gui_hello_world.m` に self-authored AppKit
-  source を追加した。`btbc-cli build-x86_64-gui-hello-world-fixture <out-exe>` は
-  macOS host で `x86_64-apple-macos13` Mach-O executable を生成し、非 macOS
-  host では既存の `UnsupportedHost` 分類を返す。
-- remaining_work: 次の小ステップは GUI Hello World fixture を Rosetta black-box
-  oracle で実行し、`expected.json` と launch metadata の初期 schema を固定すること。
-- next_action: commit / push 後、次の B8 小ステップで Rosetta expected generation
-  経路を作る。
+- related_todo: [TODO.md](../TODO.md) B8 の「GUI Hello World fixture を Rosetta
+  black-box oracle で実行し、`expected.json` と launch metadata の初期 schema
+  を固定する」。
+- completed_work: `btbc-cli generate-x86_64-gui-hello-world-expected <expected.json>
+  <launch-metadata.json>` を追加した。command は GUI fixture を一時 x86_64
+  Mach-O として build し、Rosetta 実行の stdout、stderr、exit status、
+  process-level return equivalent を `ObservedResult` として保存する。
+  `b8_gui_hello_world_launch_metadata_v0` sidecar は oracle、fixture identity、
+  deterministic GUI lifecycle event を含む。
+  self-authored fixture は host 環境由来の AppKit diagnostics が expected stderr
+  を不安定にしないよう、process stderr を `/dev/null` に向ける。
+- remaining_work: 次の小ステップは Bara 側の GUI Hello World 起動 attempt を
+  `actual.json` / launch report / blocker classification として保存できる CLI
+  境界を作ること。
+- next_action: commit / push 後、次の B8 小ステップで Bara actual launch report
+  境界を作る。
 - verification: targeted tests として
-  `nix develop -c cargo test -p btbc-cli gui_hello_world -- --nocapture`、
-  `nix develop -c cargo test -p btbc-cli clang_objective_c_appkit_command_targets_x86_64_apple_macos -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli gui_hello_world_expected -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli rosetta_gui_hello_world_observation_builds_expected_and_launch_metadata -- --nocapture`、
   `nix develop -c cargo test -p btbc-cli usage_includes_probe_binary_command -- --nocapture`
   が通過した。full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
+
+- 2026-06-11 11:03 JST: B8 の 3 つ目の小ステップとして、GUI Hello World
+  fixture を Rosetta black-box oracle で実行し、`expected.json` と launch
+  metadata の初期 schema を固定した。`tests/expected/b8_gui_hello_world.json`
+  は stdout 上の deterministic `gui_window_created` event、exit status 0、
+  stderr 空を保存する。`tests/expected/b8_gui_hello_world.launch.metadata.json`
+  は `b8_gui_hello_world_launch_metadata_v0` として oracle identity、fixture
+  identity、observed lifecycle event を保存する。検証は snapshot の targeted
+  tests と commit 前の full verification。
 
 - 2026-06-11 10:48 JST: B8 の 2 つ目の小ステップとして、self-authored
   single-binary GUI Hello World source を追加し、x86_64 Mach-O executable

@@ -1,0 +1,1 @@
+{"schema":"b8_gui_hello_world_launch_metadata_v0","case_id":"b8_gui_hello_world","oracle":"rosetta_black_box","fixture":{"kind":"single_mach_o_executable","source_isa":"x86_64","binary_format":"mach_o","target_triple":"x86_64-apple-macos13","gui_framework":"appkit"},"observed_events":[{"event":"gui_window_created","title":"Bara GUI Hello World","text":"hello world"}]}

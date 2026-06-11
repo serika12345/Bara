@@ -42,7 +42,8 @@ use native_artifact::{
 };
 use x86_64_mach_o_fixture::{
     build_x86_64_gui_hello_world_fixture, build_x86_64_mach_o_fixture, build_x86_64_oracle_runner,
-    observe_x86_64_oracle_expected, X8664MachOFixtureError,
+    observe_x86_64_gui_hello_world_expected, observe_x86_64_oracle_expected,
+    X8664MachOFixtureError,
 };
 
 fn main() -> ExitCode {
@@ -105,6 +106,14 @@ fn run_cli(args: Vec<String>) -> Result<String, CliError> {
         }
         [command, case_path, expected_path] if command == "generate-x86_64-expected" => {
             run_generate_x86_64_expected(Path::new(case_path), Path::new(expected_path))
+        }
+        [command, expected_path, launch_metadata_path]
+            if command == "generate-x86_64-gui-hello-world-expected" =>
+        {
+            run_generate_x86_64_gui_hello_world_expected(
+                Path::new(expected_path),
+                Path::new(launch_metadata_path),
+            )
         }
         [command, case_path, actual_path] if command == "generate-arm64-actual" => {
             run_generate_arm64_actual(Path::new(case_path), Path::new(actual_path))
@@ -250,6 +259,46 @@ fn run_generate_x86_64_expected(
     write_text_file(expected_path, &expected_json)?;
 
     Ok(expected_json)
+}
+
+fn run_generate_x86_64_gui_hello_world_expected(
+    expected_path: &Path,
+    launch_metadata_path: &Path,
+) -> Result<String, CliError> {
+    let expected_bundle =
+        observe_x86_64_gui_hello_world_expected().map_err(CliError::X8664MachOFixture)?;
+    let expected_json =
+        observed_result_to_json(expected_bundle.observed_result()).map_err(CliError::Json)?;
+    let launch_metadata_json = serde_json::to_string(expected_bundle.launch_metadata())
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)?;
+
+    create_output_parent_dir(expected_path)?;
+    write_text_file(expected_path, &expected_json)?;
+    create_output_parent_dir(launch_metadata_path)?;
+    write_text_file(launch_metadata_path, &launch_metadata_json)?;
+
+    serde_json::to_string(&GuiHelloWorldExpectedOutputPaths::new(
+        expected_path,
+        launch_metadata_path,
+    ))
+    .map_err(JsonError::new)
+    .map_err(CliError::Json)
+}
+
+#[derive(Serialize)]
+struct GuiHelloWorldExpectedOutputPaths {
+    expected: String,
+    launch_metadata: String,
+}
+
+impl GuiHelloWorldExpectedOutputPaths {
+    fn new(expected_path: &Path, launch_metadata_path: &Path) -> Self {
+        Self {
+            expected: expected_path.to_string_lossy().into_owned(),
+            launch_metadata: launch_metadata_path.to_string_lossy().into_owned(),
+        }
+    }
 }
 
 fn run_generate_arm64_actual(case_path: &Path, actual_path: &Path) -> Result<String, CliError> {
@@ -1312,7 +1361,7 @@ impl std::fmt::Display for CliError {
         match self {
             Self::Usage => write!(
                 formatter,
-                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | emit-fixture-artifacts <case.json> <out-dir> | link-fixture-arm64-main <case.json> <out-exe> | build-x86_64-macho-fixture <case.json> <out-exe> | build-x86_64-gui-hello-world-fixture <out-exe> | build-x86_64-oracle-runner <case.json> <out-exe> | generate-x86_64-expected <case.json> <expected.json> | generate-arm64-actual <case.json> <actual.json> | compare-expected-actual <expected.json> <actual.json> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
+                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | emit-fixture-artifacts <case.json> <out-dir> | link-fixture-arm64-main <case.json> <out-exe> | build-x86_64-macho-fixture <case.json> <out-exe> | build-x86_64-gui-hello-world-fixture <out-exe> | build-x86_64-oracle-runner <case.json> <out-exe> | generate-x86_64-expected <case.json> <expected.json> | generate-x86_64-gui-hello-world-expected <expected.json> <launch-metadata.json> | generate-arm64-actual <case.json> <actual.json> | compare-expected-actual <expected.json> <actual.json> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
             ),
             Self::ReadFile { path, source } => {
                 write!(formatter, "failed to read file {}: {source}", path.display())
@@ -1797,6 +1846,49 @@ mod tests {
         assert_eq!(read_file(&expected_path), expected);
     }
 
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    #[test]
+    fn generate_x86_64_gui_hello_world_expected_writes_expected_and_launch_metadata() {
+        let temp_dir = TestTempDir::new(
+            "generate_x86_64_gui_hello_world_expected_writes_expected_and_launch_metadata",
+        );
+        let expected_path = temp_dir
+            .path
+            .join("expected")
+            .join("b8_gui_hello_world.json");
+        let launch_metadata_path = temp_dir
+            .path
+            .join("expected")
+            .join("b8_gui_hello_world.launch.metadata.json");
+
+        let output = run_cli(vec![
+            String::from("generate-x86_64-gui-hello-world-expected"),
+            expected_path.to_string_lossy().into_owned(),
+            launch_metadata_path.to_string_lossy().into_owned(),
+        ])
+        .expect("B8 GUI Hello World expected JSON is generated under Rosetta");
+
+        assert_eq!(
+            output,
+            format!(
+                "{{\"expected\":\"{}\",\"launch_metadata\":\"{}\"}}",
+                expected_path.display(),
+                launch_metadata_path.display()
+            )
+        );
+        let expected = observed_result_from_json(include_str!(
+            "../../../tests/expected/b8_gui_hello_world.json"
+        ))
+        .and_then(|result| observed_result_to_json(&result))
+        .expect("B8 GUI expected fixture normalizes to output json");
+        assert_eq!(read_file(&expected_path), expected);
+        assert_eq!(
+            read_file(&launch_metadata_path),
+            include_str!("../../../tests/expected/b8_gui_hello_world.launch.metadata.json")
+                .trim_end_matches('\n')
+        );
+    }
+
     #[cfg(all(unix, target_arch = "aarch64"))]
     #[test]
     fn generate_arm64_actual_writes_return_42_actual_json() {
@@ -2091,6 +2183,35 @@ mod tests {
         assert!(!expected_path.exists());
     }
 
+    #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
+    #[test]
+    fn generate_x86_64_gui_hello_world_expected_reports_unsupported_rosetta_host() {
+        let temp_dir = TestTempDir::new(
+            "generate_x86_64_gui_hello_world_expected_reports_unsupported_rosetta_host",
+        );
+        let expected_path = temp_dir.path.join("b8_gui_hello_world_expected.json");
+        let launch_metadata_path = temp_dir
+            .path
+            .join("b8_gui_hello_world.launch.metadata.json");
+
+        let error = run_cli(vec![
+            String::from("generate-x86_64-gui-hello-world-expected"),
+            expected_path.to_string_lossy().into_owned(),
+            launch_metadata_path.to_string_lossy().into_owned(),
+        ])
+        .expect_err("Rosetta GUI expected generation requires arm64 macOS");
+
+        assert!(matches!(
+            error,
+            CliError::X8664MachOFixture(
+                super::x86_64_mach_o_fixture::X8664MachOFixtureError::UnsupportedRosettaHost { .. }
+            )
+        ));
+        assert_eq!(error.failure_kind(), FailureKind::RunError);
+        assert!(!expected_path.exists());
+        assert!(!launch_metadata_path.exists());
+    }
+
     #[cfg(not(all(unix, target_arch = "aarch64")))]
     #[test]
     fn generate_arm64_actual_reports_unsupported_native_runner_host() {
@@ -2193,6 +2314,9 @@ mod tests {
         assert!(error
             .to_string()
             .contains("generate-x86_64-expected <case.json> <expected.json>"));
+        assert!(error.to_string().contains(
+            "generate-x86_64-gui-hello-world-expected <expected.json> <launch-metadata.json>"
+        ));
         assert!(error
             .to_string()
             .contains("generate-arm64-actual <case.json> <actual.json>"));
