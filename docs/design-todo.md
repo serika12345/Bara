@@ -134,6 +134,13 @@
   current blocker は Objective-C runtime helper boundary になる。これは
   Objective-C runtime bridge の実行ではなく、helper boundary の explicit blocker
   promotion である。
+- 2026-06-11 の B8 小ステップとして、Objective-C runtime / AppKit lifecycle
+  helper capability contract を `bara-runtime::UserSpaceHelperCapabilityPlan` と
+  B8 actual / feedback report に追加した。contract は self-authored fixture の
+  deterministic GUI lifecycle event を stdout observation として扱うための
+  helper boundary model であり、Objective-C runtime や AppKit の内部構造を
+  core IR / emit へ混ぜない。実 host execution、GUI helper process、current blocker
+  解除は次 step に残す。
 - wasm2c platform adapter / NDA target adapter は本流 TODO ではなく、
   [将来構想メモ](future-research-concepts.md) の未確立構想として扱う。
 

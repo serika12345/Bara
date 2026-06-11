@@ -5,6 +5,7 @@ pub struct UserSpaceLaunchPlan {
     entry_trampoline: UserSpaceEntryTrampolinePlan,
     initial_stack: UserSpaceInitialStackPlan,
     helper_boundary: UserSpaceHelperBoundaryPlan,
+    helper_capability: UserSpaceHelperCapabilityPlan,
     bridge_boundary: UserSpaceBridgeBoundaryPlan,
     executable_memory: UserSpaceExecutableMemoryPlan,
     execution_strategy: UserSpaceExecutionStrategyPlan,
@@ -24,6 +25,7 @@ impl UserSpaceLaunchPlan {
             entry_trampoline: UserSpaceEntryTrampolinePlan::mach_o_entry_point(),
             initial_stack: UserSpaceInitialStackPlan::argv_envp_initial_stack(),
             helper_boundary: UserSpaceHelperBoundaryPlan::imports_objc_os_api_requests(),
+            helper_capability: UserSpaceHelperCapabilityPlan::appkit_gui_lifecycle_event(),
             bridge_boundary: UserSpaceBridgeBoundaryPlan::syscall_and_os_api_helpers(),
             executable_memory: UserSpaceExecutableMemoryPlan::public_os_api(),
             execution_strategy: UserSpaceExecutionStrategyPlan::user_space_runtime_selectable(),
@@ -54,6 +56,10 @@ impl UserSpaceLaunchPlan {
 
     pub const fn helper_boundary(&self) -> &UserSpaceHelperBoundaryPlan {
         &self.helper_boundary
+    }
+
+    pub const fn helper_capability(&self) -> &UserSpaceHelperCapabilityPlan {
+        &self.helper_capability
     }
 
     pub const fn bridge_boundary(&self) -> &UserSpaceBridgeBoundaryPlan {
@@ -333,6 +339,73 @@ pub enum UserSpaceHelperBoundaryNextBlocker {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum UserSpaceHelperBoundaryStatus {
+    PlannedNotExecuted,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UserSpaceHelperCapabilityPlan {
+    responsibility: UserSpaceLaunchResponsibility,
+    contract: UserSpaceHelperCapabilityContract,
+    objc_runtime_bridge: UserSpaceHelperCapabilityConnection,
+    appkit_lifecycle_event: UserSpaceHelperCapabilityConnection,
+    observation: UserSpaceHelperObservationContract,
+    status: UserSpaceHelperCapabilityStatus,
+}
+
+impl UserSpaceHelperCapabilityPlan {
+    const fn appkit_gui_lifecycle_event() -> Self {
+        Self {
+            responsibility: UserSpaceLaunchResponsibility::HelperBoundary,
+            contract: UserSpaceHelperCapabilityContract::AppKitGuiLifecycleEvent,
+            objc_runtime_bridge: UserSpaceHelperCapabilityConnection::Planned,
+            appkit_lifecycle_event: UserSpaceHelperCapabilityConnection::Planned,
+            observation: UserSpaceHelperObservationContract::StdoutLifecycleEvent,
+            status: UserSpaceHelperCapabilityStatus::PlannedNotExecuted,
+        }
+    }
+
+    pub const fn responsibility(self) -> UserSpaceLaunchResponsibility {
+        self.responsibility
+    }
+
+    pub const fn contract(self) -> UserSpaceHelperCapabilityContract {
+        self.contract
+    }
+
+    pub const fn objc_runtime_bridge(self) -> UserSpaceHelperCapabilityConnection {
+        self.objc_runtime_bridge
+    }
+
+    pub const fn appkit_lifecycle_event(self) -> UserSpaceHelperCapabilityConnection {
+        self.appkit_lifecycle_event
+    }
+
+    pub const fn observation(self) -> UserSpaceHelperObservationContract {
+        self.observation
+    }
+
+    pub const fn status(self) -> UserSpaceHelperCapabilityStatus {
+        self.status
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceHelperCapabilityContract {
+    AppKitGuiLifecycleEvent,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceHelperCapabilityConnection {
+    Planned,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceHelperObservationContract {
+    StdoutLifecycleEvent,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceHelperCapabilityStatus {
     PlannedNotExecuted,
 }
 
@@ -863,15 +936,17 @@ mod tests {
         UserSpaceFallbackEngineStatus, UserSpaceFallbackPolicyAction, UserSpaceFeedbackCycleState,
         UserSpaceHelperBoundaryContract, UserSpaceHelperBoundaryNextBlocker,
         UserSpaceHelperBoundaryPublicImport, UserSpaceHelperBoundaryResolution,
-        UserSpaceHelperBoundaryStatus, UserSpaceImageMappingSource, UserSpaceInitialStackContract,
-        UserSpaceLaunchPlan, UserSpaceLaunchResponsibility, UserSpaceLoaderEntryPointPlan,
-        UserSpaceLoaderExecutionStatus, UserSpaceLoaderImportPlan, UserSpaceLoaderMetadataSource,
-        UserSpaceLoaderObjcRuntimePlan, UserSpaceLoaderRelocationPlan,
-        UserSpaceLoaderSegmentMappingPlan, UserSpaceMacosCodeSigningPolicy,
-        UserSpaceMacosHardenedRuntimePolicy, UserSpaceMacosWriteXorExecutePolicy,
-        UserSpaceMemoryProtectionModel, UserSpacePlatformExceptionModel,
-        UserSpacePlatformMemoryProtectionModel, UserSpacePlatformSignalModel,
-        UserSpacePlatformThreadModel, UserSpacePlatformTlsModel,
+        UserSpaceHelperBoundaryStatus, UserSpaceHelperCapabilityConnection,
+        UserSpaceHelperCapabilityContract, UserSpaceHelperCapabilityStatus,
+        UserSpaceHelperObservationContract, UserSpaceImageMappingSource,
+        UserSpaceInitialStackContract, UserSpaceLaunchPlan, UserSpaceLaunchResponsibility,
+        UserSpaceLoaderEntryPointPlan, UserSpaceLoaderExecutionStatus, UserSpaceLoaderImportPlan,
+        UserSpaceLoaderMetadataSource, UserSpaceLoaderObjcRuntimePlan,
+        UserSpaceLoaderRelocationPlan, UserSpaceLoaderSegmentMappingPlan,
+        UserSpaceMacosCodeSigningPolicy, UserSpaceMacosHardenedRuntimePolicy,
+        UserSpaceMacosWriteXorExecutePolicy, UserSpaceMemoryProtectionModel,
+        UserSpacePlatformExceptionModel, UserSpacePlatformMemoryProtectionModel,
+        UserSpacePlatformSignalModel, UserSpacePlatformThreadModel, UserSpacePlatformTlsModel,
         UserSpacePrivateIntegrationRequirement, UserSpaceProcessScope, UserSpaceSourceIsaMode,
         UserSpaceSourceIsaProfile, UserSpaceSourceWidth,
     };
@@ -949,6 +1024,36 @@ mod tests {
         assert_eq!(
             helper_boundary.status(),
             UserSpaceHelperBoundaryStatus::PlannedNotExecuted
+        );
+    }
+
+    #[test]
+    fn user_space_launch_plan_models_appkit_lifecycle_helper_capability() {
+        let helper_capability = *UserSpaceLaunchPlan::mach_o_executable_image().helper_capability();
+
+        assert_eq!(
+            helper_capability.responsibility(),
+            UserSpaceLaunchResponsibility::HelperBoundary
+        );
+        assert_eq!(
+            helper_capability.contract(),
+            UserSpaceHelperCapabilityContract::AppKitGuiLifecycleEvent
+        );
+        assert_eq!(
+            helper_capability.objc_runtime_bridge(),
+            UserSpaceHelperCapabilityConnection::Planned
+        );
+        assert_eq!(
+            helper_capability.appkit_lifecycle_event(),
+            UserSpaceHelperCapabilityConnection::Planned
+        );
+        assert_eq!(
+            helper_capability.observation(),
+            UserSpaceHelperObservationContract::StdoutLifecycleEvent
+        );
+        assert_eq!(
+            helper_capability.status(),
+            UserSpaceHelperCapabilityStatus::PlannedNotExecuted
         );
     }
 

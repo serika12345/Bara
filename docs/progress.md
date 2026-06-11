@@ -9,32 +9,34 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 15:07 JST
+最終更新: 2026-06-11 15:17 JST
 
 状態:
 
-- project_state: completed。B8 の helper boundary plan で固定した
-  `unsupported_objc_runtime_boundary` blocker を actual result と current blocker に
-  接続した。
+- project_state: completed。B8 の Objective-C runtime / AppKit lifecycle helper
+  capability contract を actual / feedback report に接続し、実 host execution 接続へ
+  進む準備をした。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8:
   実 x86_64 macOS アプリ起動。
 - active_design_focus: B8 AppKit / Objective-C helper boundary。public AppKit
-  framework import blocker を通過し、Objective-C runtime boundary を current
-  blocker として扱う。
+  framework import blocker と Objective-C runtime blocker promotion を通過し、
+  AppKit lifecycle helper capability の execution 接続へ進む。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
   latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B8 の「Objective-C runtime boundary を
-  helper boundary または明示 blocker として actual result に接続する」小項目。
-- completed_work: `UserSpaceHelperBoundaryPlan` の next blocker を
-  `unsupported_objc_runtime_boundary` に進め、
-  `GuiHelloWorldInitialBlockerPlan::current()` を Objective-C runtime boundary に
-  合わせた。B8 actual result の `stderr`、launch report の `blocker`、
-  feedback report の `current_blocker` は `unsupported_objc_runtime_boundary` になり、
-  candidate boundary は Objective-C runtime のみに絞った。
-- remaining_work: Objective-C runtime helper capability または runtime support を
-  実装 / 接続し、current blocker を解除すること。
+- related_todo: [TODO.md](../TODO.md) B8 の「Objective-C runtime / AppKit lifecycle
+  helper capability contract を domain model と actual / feedback report schema に
+  追加する」小項目。
+- completed_work: `bara-runtime::UserSpaceHelperCapabilityPlan` を追加し、AppKit GUI
+  lifecycle event、Objective-C runtime bridge、stdout lifecycle observation を
+  planned not executed の helper boundary contract として model 化した。B8 actual
+  launch report の `runtime_preparation.helper_capability` と feedback report の
+  `helper_capability_plan` に同じ plan を保存し、next action を
+  `connect_appkit_lifecycle_helper_execution` に進めた。
+- remaining_work: Objective-C runtime / AppKit lifecycle helper capability の host
+  execution を actual path に接続し、current blocker を解除すること。その後、
+  Rosetta expected と Bara actual を一致させる。
 - next_action: commit / push 後、次の B8 小ステップで
-  Objective-C runtime helper capability の実装 / 接続に向けて最小 scope を切る。
+  AppKit lifecycle helper execution を actual result に接続する。
 - verification:
   `nix develop -c cargo test -p bara-runtime user_space_launch_plan -- --nocapture` と
   `nix develop -c cargo test -p btbc-cli gui_hello_world -- --nocapture` が通過した。
@@ -45,6 +47,16 @@
 
 直近で完了した作業:
 
+- 2026-06-11 15:15 JST: B8 の helper capability contract step として、
+  `UserSpaceHelperCapabilityPlan` を追加し、Objective-C runtime / AppKit lifecycle
+  helper capability を actual launch report と feedback report に接続した。
+  `runtime_preparation.helper_capability` と `helper_capability_plan` は
+  `appkit_gui_lifecycle_event`、`planned` bridge / lifecycle event、
+  `stdout_lifecycle_event`、`planned_not_executed` を保存する。current blocker は
+  `unsupported_objc_runtime_boundary` のままで、next action は
+  `connect_appkit_lifecycle_helper_execution` に進んだ。targeted tests、
+  `bara-runtime` / `btbc-cli` clippy、full `nix develop -c ./scripts/verify` が
+  通過した。
 - 2026-06-11 15:04 JST: B8 の Objective-C runtime helper boundary step として、
   `helper_boundary_plan.next_blocker` を `unsupported_objc_runtime_boundary` に進め、
   actual result / launch report / feedback report に接続した。B8 actual の

@@ -10,7 +10,9 @@ use bara_runtime::{
     UserSpaceFallbackEngineStatus, UserSpaceFallbackPolicyAction, UserSpaceFeedbackCycleState,
     UserSpaceHelperBoundaryContract, UserSpaceHelperBoundaryNextBlocker,
     UserSpaceHelperBoundaryPublicImport, UserSpaceHelperBoundaryResolution,
-    UserSpaceHelperBoundaryStatus, UserSpaceImageMappingSource, UserSpaceInitialStackContract,
+    UserSpaceHelperBoundaryStatus, UserSpaceHelperCapabilityConnection,
+    UserSpaceHelperCapabilityContract, UserSpaceHelperCapabilityStatus,
+    UserSpaceHelperObservationContract, UserSpaceImageMappingSource, UserSpaceInitialStackContract,
     UserSpaceLaunchPlan, UserSpaceLaunchResponsibility, UserSpaceLoaderEntryPointPlan,
     UserSpaceLoaderExecutionStatus, UserSpaceLoaderImportPlan, UserSpaceLoaderMetadataSource,
     UserSpaceLoaderObjcRuntimePlan, UserSpaceLoaderRelocationPlan,
@@ -107,6 +109,7 @@ pub(crate) struct GuiHelloWorldFeedbackReport {
     current_blocker: GuiHelloWorldActualBlocker,
     loader_execution_plan: GuiHelloWorldActualLoaderExecutionPreparation,
     helper_boundary_plan: GuiHelloWorldActualHelperBoundaryPreparation,
+    helper_capability_plan: GuiHelloWorldActualHelperCapabilityPreparation,
     next_action: GuiHelloWorldFeedbackNextAction,
 }
 
@@ -126,7 +129,8 @@ impl GuiHelloWorldFeedbackReport {
             current_blocker: actual.launch_report.blocker.clone(),
             loader_execution_plan: actual.launch_report.runtime_preparation.loader_execution,
             helper_boundary_plan: actual.launch_report.runtime_preparation.helper_boundary,
-            next_action: GuiHelloWorldFeedbackNextAction::ImplementObjcRuntimeHelperBoundary,
+            helper_capability_plan: actual.launch_report.runtime_preparation.helper_capability,
+            next_action: GuiHelloWorldFeedbackNextAction::ConnectAppKitLifecycleHelperExecution,
         }
     }
 }
@@ -151,8 +155,8 @@ impl GuiHelloWorldFeedbackStatus {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 enum GuiHelloWorldFeedbackNextAction {
-    #[serde(rename = "implement_objc_runtime_helper_boundary")]
-    ImplementObjcRuntimeHelperBoundary,
+    #[serde(rename = "connect_appkit_lifecycle_helper_execution")]
+    ConnectAppKitLifecycleHelperExecution,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -209,6 +213,7 @@ struct GuiHelloWorldActualRuntimePreparation {
     entry_trampoline: GuiHelloWorldActualEntryTrampolinePreparation,
     initial_stack: GuiHelloWorldActualInitialStackPreparation,
     helper_boundary: GuiHelloWorldActualHelperBoundaryPreparation,
+    helper_capability: GuiHelloWorldActualHelperCapabilityPreparation,
     bridge_boundary: GuiHelloWorldActualBridgeBoundaryPreparation,
     integration_policy: GuiHelloWorldActualIntegrationPolicy,
     process_boundary: GuiHelloWorldActualProcessBoundary,
@@ -243,6 +248,9 @@ impl GuiHelloWorldActualRuntimePreparation {
             ),
             helper_boundary: GuiHelloWorldActualHelperBoundaryPreparation::from_plan(
                 plan.helper_boundary(),
+            ),
+            helper_capability: GuiHelloWorldActualHelperCapabilityPreparation::from_plan(
+                plan.helper_capability(),
             ),
             bridge_boundary: GuiHelloWorldActualBridgeBoundaryPreparation::from_plan(
                 plan.bridge_boundary(),
@@ -477,6 +485,37 @@ impl GuiHelloWorldActualHelperBoundaryPreparation {
                 plan.next_blocker(),
             ),
             status: GuiHelloWorldActualHelperBoundaryStatus::from_runtime(plan.status()),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+struct GuiHelloWorldActualHelperCapabilityPreparation {
+    responsibility: GuiHelloWorldActualRuntimePreparationResponsibility,
+    contract: GuiHelloWorldActualHelperCapabilityContract,
+    objc_runtime_bridge: GuiHelloWorldActualHelperCapabilityConnection,
+    appkit_lifecycle_event: GuiHelloWorldActualHelperCapabilityConnection,
+    observation: GuiHelloWorldActualHelperObservationContract,
+    status: GuiHelloWorldActualHelperCapabilityStatus,
+}
+
+impl GuiHelloWorldActualHelperCapabilityPreparation {
+    const fn from_plan(plan: &bara_runtime::UserSpaceHelperCapabilityPlan) -> Self {
+        Self {
+            responsibility: GuiHelloWorldActualRuntimePreparationResponsibility::from_runtime(
+                plan.responsibility(),
+            ),
+            contract: GuiHelloWorldActualHelperCapabilityContract::from_runtime(plan.contract()),
+            objc_runtime_bridge: GuiHelloWorldActualHelperCapabilityConnection::from_runtime(
+                plan.objc_runtime_bridge(),
+            ),
+            appkit_lifecycle_event: GuiHelloWorldActualHelperCapabilityConnection::from_runtime(
+                plan.appkit_lifecycle_event(),
+            ),
+            observation: GuiHelloWorldActualHelperObservationContract::from_runtime(
+                plan.observation(),
+            ),
+            status: GuiHelloWorldActualHelperCapabilityStatus::from_runtime(plan.status()),
         }
     }
 }
@@ -847,6 +886,64 @@ impl GuiHelloWorldActualHelperBoundaryStatus {
     const fn from_runtime(status: UserSpaceHelperBoundaryStatus) -> Self {
         match status {
             UserSpaceHelperBoundaryStatus::PlannedNotExecuted => Self::PlannedNotExecuted,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualHelperCapabilityContract {
+    #[serde(rename = "appkit_gui_lifecycle_event")]
+    AppKitGuiLifecycleEvent,
+}
+
+impl GuiHelloWorldActualHelperCapabilityContract {
+    const fn from_runtime(contract: UserSpaceHelperCapabilityContract) -> Self {
+        match contract {
+            UserSpaceHelperCapabilityContract::AppKitGuiLifecycleEvent => {
+                Self::AppKitGuiLifecycleEvent
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualHelperCapabilityConnection {
+    #[serde(rename = "planned")]
+    Planned,
+}
+
+impl GuiHelloWorldActualHelperCapabilityConnection {
+    const fn from_runtime(connection: UserSpaceHelperCapabilityConnection) -> Self {
+        match connection {
+            UserSpaceHelperCapabilityConnection::Planned => Self::Planned,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualHelperObservationContract {
+    #[serde(rename = "stdout_lifecycle_event")]
+    StdoutLifecycleEvent,
+}
+
+impl GuiHelloWorldActualHelperObservationContract {
+    const fn from_runtime(contract: UserSpaceHelperObservationContract) -> Self {
+        match contract {
+            UserSpaceHelperObservationContract::StdoutLifecycleEvent => Self::StdoutLifecycleEvent,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualHelperCapabilityStatus {
+    #[serde(rename = "planned_not_executed")]
+    PlannedNotExecuted,
+}
+
+impl GuiHelloWorldActualHelperCapabilityStatus {
+    const fn from_runtime(status: UserSpaceHelperCapabilityStatus) -> Self {
+        match status {
+            UserSpaceHelperCapabilityStatus::PlannedNotExecuted => Self::PlannedNotExecuted,
         }
     }
 }
