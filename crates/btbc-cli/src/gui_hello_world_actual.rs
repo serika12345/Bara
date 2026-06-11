@@ -1,4 +1,6 @@
-use bara_oracle::{CaseId, ObservedResult};
+use bara_oracle::{
+    BinaryFormat, BinaryFormatProbeReport, BinaryFormatProbeStatus, CaseId, ObservedResult,
+};
 use serde::Serialize;
 
 use crate::x86_64_mach_o_fixture::{b8_gui_hello_world_case_id, X8664MachOFixtureError};
@@ -12,6 +14,7 @@ pub(crate) struct GuiHelloWorldActualLaunchBundle {
 impl GuiHelloWorldActualLaunchBundle {
     fn blocked_by_initial_blocker(
         case_id: CaseId,
+        input_probe: GuiHelloWorldActualInputProbe,
         classification_plan: GuiHelloWorldInitialBlockerPlan,
     ) -> Self {
         let classification = classification_plan.selected_classification();
@@ -24,6 +27,7 @@ impl GuiHelloWorldActualLaunchBundle {
         );
         let launch_report = GuiHelloWorldActualLaunchReport::blocked_by_initial_blocker(
             case_id,
+            input_probe,
             classification_plan,
         );
 
@@ -55,6 +59,7 @@ pub(crate) struct GuiHelloWorldActualLaunchReport {
 impl GuiHelloWorldActualLaunchReport {
     fn blocked_by_initial_blocker(
         case_id: CaseId,
+        input_probe: GuiHelloWorldActualInputProbe,
         classification_plan: GuiHelloWorldInitialBlockerPlan,
     ) -> Self {
         Self {
@@ -62,7 +67,7 @@ impl GuiHelloWorldActualLaunchReport {
             case_id,
             actual_runtime: GuiHelloWorldActualRuntime::BaraArm64UserSpace,
             status: GuiHelloWorldActualLaunchStatus::Blocked,
-            input: GuiHelloWorldActualInput::new(),
+            input: GuiHelloWorldActualInput::from_probe(input_probe),
             blocker: GuiHelloWorldActualBlocker::from_classification_plan(&classification_plan),
         }
     }
@@ -87,24 +92,26 @@ struct GuiHelloWorldActualInput {
     binary_format: GuiHelloWorldActualBinaryFormat,
     target_triple: GuiHelloWorldActualTargetTriple,
     gui_framework: GuiHelloWorldActualFramework,
+    probe: GuiHelloWorldActualInputProbe,
 }
 
 impl GuiHelloWorldActualInput {
-    const fn new() -> Self {
+    const fn from_probe(probe: GuiHelloWorldActualInputProbe) -> Self {
         Self {
-            kind: GuiHelloWorldActualInputKind::SingleMachOExecutable,
+            kind: GuiHelloWorldActualInputKind::MachOExecutableImage,
             source_isa: GuiHelloWorldActualSourceIsa::X8664,
             binary_format: GuiHelloWorldActualBinaryFormat::MachO,
             target_triple: GuiHelloWorldActualTargetTriple::X8664AppleMacos13,
             gui_framework: GuiHelloWorldActualFramework::AppKit,
+            probe,
         }
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 enum GuiHelloWorldActualInputKind {
-    #[serde(rename = "single_mach_o_executable")]
-    SingleMachOExecutable,
+    #[serde(rename = "mach_o_executable_image")]
+    MachOExecutableImage,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -129,6 +136,21 @@ enum GuiHelloWorldActualTargetTriple {
 enum GuiHelloWorldActualFramework {
     #[serde(rename = "appkit")]
     AppKit,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+struct GuiHelloWorldActualInputProbe {
+    format: BinaryFormat,
+    status: BinaryFormatProbeStatus,
+}
+
+impl GuiHelloWorldActualInputProbe {
+    const fn from_report(report: &BinaryFormatProbeReport) -> Self {
+        Self {
+            format: report.format(),
+            status: report.status(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -299,16 +321,18 @@ impl NonEmptyGuiHelloWorldUnsupportedLaunchBoundaries {
 }
 
 pub(crate) fn b8_gui_hello_world_actual_launch_attempt(
+    input_probe_report: &BinaryFormatProbeReport,
 ) -> Result<GuiHelloWorldActualLaunchBundle, X8664MachOFixtureError> {
     Ok(GuiHelloWorldActualLaunchBundle::blocked_by_initial_blocker(
         b8_gui_hello_world_case_id()?,
+        GuiHelloWorldActualInputProbe::from_report(input_probe_report),
         GuiHelloWorldInitialBlockerPlan::current(),
     ))
 }
 
 #[cfg(test)]
 mod tests {
-    use bara_oracle::{CaseId, ObservedResult};
+    use bara_oracle::{probe_public_binary_format, BinaryInput, CaseId, ObservedResult};
 
     use super::{
         b8_gui_hello_world_actual_launch_attempt, GuiHelloWorldActualBlockerClassification,
@@ -317,7 +341,8 @@ mod tests {
 
     #[test]
     fn gui_hello_world_actual_attempt_reports_loader_blocker() {
-        let attempt = b8_gui_hello_world_actual_launch_attempt()
+        let probe_report = mach_o_execute_header_probe();
+        let attempt = b8_gui_hello_world_actual_launch_attempt(&probe_report)
             .expect("built-in B8 GUI Hello World case id is valid");
 
         assert_eq!(
@@ -332,7 +357,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_string(attempt.launch_report()).expect("launch report serializes"),
-            "{\"schema\":\"b8_gui_hello_world_actual_launch_report_v0\",\"case_id\":\"b8_gui_hello_world\",\"actual_runtime\":\"bara_arm64_user_space\",\"status\":\"blocked\",\"input\":{\"kind\":\"single_mach_o_executable\",\"source_isa\":\"x86_64\",\"binary_format\":\"mach_o\",\"target_triple\":\"x86_64-apple-macos13\",\"gui_framework\":\"appkit\"},\"blocker\":{\"classification\":\"unsupported_loader_feature\",\"boundary\":\"loader\",\"selected_by\":\"first_unsupported_launch_boundary\",\"candidate_boundaries\":[{\"boundary\":\"loader\",\"classification\":\"unsupported_loader_feature\"},{\"boundary\":\"import\",\"classification\":\"unsupported_import\"},{\"boundary\":\"objc_runtime\",\"classification\":\"unsupported_objc_runtime_boundary\"}],\"message\":\"Bara does not yet load a complete x86_64 Mach-O GUI executable with dynamic loader, AppKit import, and Objective-C runtime requirements.\"}}"
+            "{\"schema\":\"b8_gui_hello_world_actual_launch_report_v0\",\"case_id\":\"b8_gui_hello_world\",\"actual_runtime\":\"bara_arm64_user_space\",\"status\":\"blocked\",\"input\":{\"kind\":\"mach_o_executable_image\",\"source_isa\":\"x86_64\",\"binary_format\":\"mach_o\",\"target_triple\":\"x86_64-apple-macos13\",\"gui_framework\":\"appkit\",\"probe\":{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\"}},\"blocker\":{\"classification\":\"unsupported_loader_feature\",\"boundary\":\"loader\",\"selected_by\":\"first_unsupported_launch_boundary\",\"candidate_boundaries\":[{\"boundary\":\"loader\",\"classification\":\"unsupported_loader_feature\"},{\"boundary\":\"import\",\"classification\":\"unsupported_import\"},{\"boundary\":\"objc_runtime\",\"classification\":\"unsupported_objc_runtime_boundary\"}],\"message\":\"Bara does not yet load a complete x86_64 Mach-O GUI executable with dynamic loader, AppKit import, and Objective-C runtime requirements.\"}}"
         );
     }
 
@@ -377,5 +402,13 @@ mod tests {
             objc_runtime_plan.selected_classification(),
             GuiHelloWorldActualBlockerClassification::ObjcRuntimeBoundary
         );
+    }
+
+    fn mach_o_execute_header_probe() -> bara_oracle::BinaryFormatProbeReport {
+        let input = BinaryInput::from_hex(
+            "cffaedfe07000001030000000200000000000000000000000000000000000000",
+        )
+        .expect("minimal Mach-O executable header hex parses");
+        probe_public_binary_format(&input).expect("minimal Mach-O executable header probes")
     }
 }

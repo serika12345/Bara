@@ -9,31 +9,32 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 11:31 JST
+最終更新: 2026-06-11 11:46 JST
 
 状態:
 
-- project_state: completed。B8 の 5 つ目の小ステップとして、GUI Hello World
-  の initial blocker を stable な launch boundary 分類として固定した。
+- project_state: completed。B8 の 6 つ目の小ステップとして、Bara 側の
+  GUI Hello World actual launch attempt が raw function fixture ではなく
+  x86_64 Mach-O executable image 全体を入力として受け取るようにした。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8:
   実 x86_64 macOS アプリ起動。
-- active_design_focus: B8 GUI blocker classification。self-authored AppKit
-  fixture の初期 blocker を unsupported loader feature / unsupported import /
-  unsupported ObjC runtime boundary の候補から安定分類する。
+- active_design_focus: B8 GUI executable image input。self-authored AppKit
+  fixture を raw function bytes ではなく Mach-O executable image として actual
+  launch report 境界へ渡す。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
   latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B8 の「GUI Hello World の initial blocker
-  を unsupported import / unsupported loader feature / unsupported ObjC runtime
-  boundary のどれかに安定分類する」。
-- completed_work: `b8_gui_hello_world_actual_launch_report_v0` の `blocker` に
-  `boundary`、`selected_by`、`candidate_boundaries` を追加した。分類候補は
-  loader、import、ObjC runtime の 3 境界に固定し、選択規則は
-  `first_unsupported_launch_boundary` とした。現在の initial blocker は loader
-  boundary のため `unsupported_loader_feature` である。
-- remaining_work: 次の小ステップは raw function fixture ではなく、x86_64
-  Mach-O executable image 全体を入力として扱うこと。
-- next_action: commit / push 後、次の B8 小ステップで GUI fixture の入力を
-  function bytes ではなく Mach-O executable image として渡す境界を作る。
+- related_todo: [TODO.md](../TODO.md) B8 の「raw function fixture ではなく、
+  x86_64 Mach-O executable image 全体を入力として扱う」。
+- completed_work: `btbc-cli generate-arm64-gui-hello-world-actual` の入力を
+  `<binary> <actual.json> <launch-report.json>` に変更した。command は input
+  binary 全体を `BinaryInput` として読み込み、public Mach-O probe に通した上で
+  actual launch report の `input.kind` を `mach_o_executable_image` とし、
+  top-level probe summary を保存する。
+- remaining_work: 次の小ステップは entry、segments、sections、imports、
+  relocations、必要な loader metadata を public Mach-O 仕様ベースで model 化
+  すること。
+- next_action: commit / push 後、次の B8 小ステップで actual launch report が
+  public Mach-O metadata を段階的に保持できるようにする。
 - verification: targeted tests として
   `nix develop -c cargo test -p btbc-cli gui_hello_world_actual -- --nocapture`、
   `nix develop -c cargo test -p btbc-cli usage_includes_probe_binary_command -- --nocapture`
@@ -42,6 +43,14 @@
 
 直近で完了した作業:
 
+- 2026-06-11 11:43 JST: B8 の 6 つ目の小ステップとして、Bara 側の
+  GUI Hello World actual launch attempt が raw function fixture ではなく
+  x86_64 Mach-O executable image 全体を入力として受け取るようにした。
+  `btbc-cli generate-arm64-gui-hello-world-actual` は `<binary> <actual.json>
+  <launch-report.json>` を受け取り、input binary 全体を `BinaryInput` として
+  public Mach-O probe に通す。launch report の `input.kind` は
+  `mach_o_executable_image` になり、probe の format / status summary を保存する。
+  targeted tests、`btbc-cli` clippy、full `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-11 11:28 JST: B8 の 5 つ目の小ステップとして、GUI Hello World の
   initial blocker を stable な launch boundary 分類として固定した。
   `b8_gui_hello_world_actual_launch_report_v0` の `blocker` は
