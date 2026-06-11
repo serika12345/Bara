@@ -2456,13 +2456,28 @@ mod tests {
             .contains("\"command\":\"dyld_chained_fixups\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"dataoff\":24576"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"datasize\":584"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"chained_fixups\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"mach_o_chained_fixups_target_report_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"status\":\"resolved_import\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"imports_format\":{\"value\":1,\"kind\":\"dyld_chained_import\"}"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"pointer_format\":{\"value\":6,\"kind\":\"ptr64_offset\"}"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"symbol_name\":\"_objc_msgSend\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"dylib_path\":\"/usr/lib/libobjc.A.dylib\""));
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"helper_boundary_request\"")
         );
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"reason\":\"import_symbol_identity_unresolved\""));
+            .contains("\"reason\":\"import_helper_boundary_unimplemented\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"next_action\":\"decode_public_dyld_chained_fixups_imports\""));
+            .contains("\"resolution\":\"resolved_public_dyld_chained_fixups_import\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_action\":\"connect_import_helper_boundary_request\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_entry_source\":\"first_unsupported_boundary\""));
         assert!(read_file(&bundle_dir.join("runtime-attempt.json"))
