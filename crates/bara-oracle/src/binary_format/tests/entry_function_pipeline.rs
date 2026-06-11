@@ -37,6 +37,7 @@ fn builds_no_args_u64_testcase_from_mach_o_binary_input() {
         testcase.x86_bytes().bytes(),
         &[0xb8, 0x2a, 0x00, 0x00, 0x00, 0xc3]
     );
+    assert_eq!(testcase.x86_bytes().entry(), X86Va::new(0x1_0000_0002));
     assert!(testcase.host_trap_plan().is_empty());
     assert_eq!(
         testcase.stack_state().size(),
@@ -79,7 +80,18 @@ fn builds_entry_function_input_from_full_mach_o_executable_image() {
             .bytes(),
         &[0x90, 0x90, 0xb8, 0x2a, 0x00, 0x00, 0x00, 0xc3]
     );
-    assert_eq!(entry_input.executable_image().entry().offset().value(), 2);
+    assert_eq!(
+        entry_input
+            .executable_image()
+            .code_segment()
+            .x86_bytes()
+            .entry(),
+        X86Va::new(0x1_0000_0000)
+    );
+    assert_eq!(
+        entry_input.executable_image().entry().offset(),
+        X86Va::new(0x1_0000_0002)
+    );
     assert_eq!(
         entry_input.program_image_metadata().sections().items()[0].kind(),
         ProgramImageSectionKind::Code
@@ -88,19 +100,19 @@ fn builds_entry_function_input_from_full_mach_o_executable_image() {
         entry_input.program_image_metadata().sections().items()[0]
             .range()
             .start(),
-        X86Va::new(2)
+        X86Va::new(0x1_0000_0002)
     );
     assert_eq!(
         entry_input.program_image_metadata().sections().items()[0]
             .range()
             .end(),
-        X86Va::new(8)
+        X86Va::new(0x1_0000_0008)
     );
     assert_eq!(
         entry_input
             .program_image_metadata()
             .mapped_bytes()
-            .read_u64_le(X86Va::new(0)),
+            .read_u64_le(X86Va::new(0x1_0000_0000)),
         Some(0xc300_0000_2ab8_9090)
     );
     assert!(entry_input.program_image_metadata().symbols().is_empty());
@@ -170,6 +182,7 @@ fn derives_stdout_host_trap_plan_from_mach_o_embedded_metadata() {
         testcase.x86_bytes().bytes(),
         &[0x0f, 0x0b, 0x31, 0xc0, 0xc3]
     );
+    assert_eq!(testcase.x86_bytes().entry(), X86Va::new(0x1_0000_0018));
     assert_eq!(
         testcase
             .host_trap_plan()
@@ -210,11 +223,11 @@ fn derives_const_data_and_stdout_request_from_mach_o_embedded_metadata() {
 
     assert_eq!(sections.len(), 2);
     assert_eq!(sections[0].kind(), ProgramImageSectionKind::Code);
-    assert_eq!(sections[0].range().start(), X86Va::new(24));
-    assert_eq!(sections[0].range().end(), X86Va::new(29));
+    assert_eq!(sections[0].range().start(), X86Va::new(0x1_0000_0018));
+    assert_eq!(sections[0].range().end(), X86Va::new(0x1_0000_001d));
     assert_eq!(sections[1].kind(), ProgramImageSectionKind::ConstData);
-    assert_eq!(sections[1].range().start(), X86Va::new(0));
-    assert_eq!(sections[1].range().end(), X86Va::new(24));
+    assert_eq!(sections[1].range().start(), X86Va::new(0x1_0000_0000));
+    assert_eq!(sections[1].range().end(), X86Va::new(0x1_0000_0018));
     assert_eq!(
         entry_input
             .test_case()

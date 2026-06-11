@@ -88,6 +88,10 @@ impl MachOSegmentVmAddr {
     pub(crate) const fn from_public_segment_value(value: u64) -> Self {
         Self { value }
     }
+
+    pub(crate) const fn as_u64(self) -> u64 {
+        self.value
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]

@@ -13,7 +13,7 @@ use bara_isa_x86::{
 use bara_oracle::{
     binary_format_probe_report_to_json, mach_o_entry_function_input, probe_public_binary_format,
     BinaryFileBytes, BinaryFormatProbeError, BinaryInput, FailureKind, JsonError,
-    MachOEntryFunctionTestCaseError, TestCase,
+    MachOEntryFunctionInput, MachOEntryFunctionTestCaseError, TestCase,
 };
 use serde::Serialize;
 
@@ -65,7 +65,7 @@ pub(crate) fn generate_b8_debug_bundle(
     write_json_file(&paths.helpers_path(), &attempt.helpers)?;
     write_json_file(
         &paths.loader_plan_path(),
-        &B8DebugLoaderPlanReport::real_lc_main_attempted(),
+        &B8DebugLoaderPlanReport::real_lc_main_attempted(&entry_input),
     )?;
     write_json_file(&paths.runtime_attempt_path(), &attempt.runtime_report)?;
     write_json_file(&paths.launch_report_path(), &attempt.launch_report)?;
@@ -830,17 +830,34 @@ struct B8DebugLoaderPlanReport {
     source: &'static str,
     status: B8DebugStageStatus,
     input_metadata: B8DebugLoaderInputMetadata,
+    image_mapping: B8DebugLoaderImageMappingReport,
+    relocation_binding: B8DebugLoaderDeferredStepReport,
     entry_source_for_this_bundle: B8DebugEntrySource,
     next_entry_source: B8DebugLoaderNextEntrySource,
 }
 
 impl B8DebugLoaderPlanReport {
-    const fn real_lc_main_attempted() -> Self {
+    fn real_lc_main_attempted(entry_input: &MachOEntryFunctionInput) -> Self {
+        let code = entry_input.executable_image().code_segment().x86_bytes();
         Self {
             schema: "b8_debug_loader_plan_v0",
             source: "bara_runtime_user_space_launch_plan",
             status: B8DebugStageStatus::Executed,
             input_metadata: B8DebugLoaderInputMetadata::PublicMachOProbe,
+            image_mapping: B8DebugLoaderImageMappingReport {
+                status: B8DebugStageStatus::Executed,
+                segment_source: B8DebugLoaderSegmentSource::LcSegment64FileRange,
+                address_space: B8DebugLoaderAddressSpace::MachOVirtualAddress,
+                code_segment_vmaddr: code.entry().value(),
+                code_segment_byte_len: code.bytes().len(),
+                entry_pc: entry_input.executable_image().entry().offset().value(),
+                mapped_bytes_source: B8DebugLoaderMappedBytesSource::ProgramImageMetadata,
+            },
+            relocation_binding: B8DebugLoaderDeferredStepReport {
+                status: B8DebugStageStatus::Skipped,
+                reason: "public rebase/bind/import resolution is not applied in this B8-G4a slice",
+                next_action: B8DebugLoaderDeferredAction::ResolvePublicRebaseBindImports,
+            },
             entry_source_for_this_bundle: B8DebugEntrySource::PublicLcMainEntryoff,
             next_entry_source: B8DebugLoaderNextEntrySource::FirstUnsupportedBoundary,
         }
@@ -851,6 +868,48 @@ impl B8DebugLoaderPlanReport {
 #[serde(rename_all = "snake_case")]
 enum B8DebugLoaderInputMetadata {
     PublicMachOProbe,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugLoaderImageMappingReport {
+    status: B8DebugStageStatus,
+    segment_source: B8DebugLoaderSegmentSource,
+    address_space: B8DebugLoaderAddressSpace,
+    code_segment_vmaddr: u64,
+    code_segment_byte_len: usize,
+    entry_pc: u64,
+    mapped_bytes_source: B8DebugLoaderMappedBytesSource,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugLoaderSegmentSource {
+    LcSegment64FileRange,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugLoaderAddressSpace {
+    MachOVirtualAddress,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugLoaderMappedBytesSource {
+    ProgramImageMetadata,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugLoaderDeferredStepReport {
+    status: B8DebugStageStatus,
+    reason: &'static str,
+    next_action: B8DebugLoaderDeferredAction,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugLoaderDeferredAction {
+    ResolvePublicRebaseBindImports,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -963,10 +1022,24 @@ impl B8DebugBlockerReport {
     }
 
     fn from_function_error(error: &FunctionRunError) -> Self {
-        Self::blocked(
+        let next_action = match error {
+            FunctionRunError::Emit(EmitError::UnsupportedIr {
+                reason: UnsupportedReason::RegisterIndirectCallUnsupported { .. },
+            }) => B8DebugNextAction::ConnectPublicRebaseBindImportBoundary,
+            FunctionRunError::Decode(_)
+            | FunctionRunError::Lift(_)
+            | FunctionRunError::Emit(_)
+            | FunctionRunError::StandaloneArtifact(_)
+            | FunctionRunError::InputMemory(_)
+            | FunctionRunError::StdoutTrap(_)
+            | FunctionRunError::Run(_) => B8DebugNextAction::AdvanceToNextIsaBlocker,
+        };
+
+        Self::blocked_with_next_action(
             B8DebugBlocker::from_failure_kind(error.failure_kind()),
             error.failure_kind(),
             error.to_string(),
+            next_action,
         )
     }
 
@@ -975,6 +1048,20 @@ impl B8DebugBlockerReport {
         failure_kind: FailureKind,
         message: String,
     ) -> Self {
+        Self::blocked_with_next_action(
+            current_blocker,
+            failure_kind,
+            message,
+            B8DebugNextAction::AdvanceToNextIsaBlocker,
+        )
+    }
+
+    fn blocked_with_next_action(
+        current_blocker: B8DebugBlocker,
+        failure_kind: FailureKind,
+        message: String,
+        next_action: B8DebugNextAction,
+    ) -> Self {
         Self {
             schema: "b8_debug_blocker_v0",
             status: B8DebugBlockerStatus::Blocked,
@@ -982,7 +1069,7 @@ impl B8DebugBlockerReport {
             failure_kind: Some(failure_kind),
             unsupported_instruction: None,
             message: Some(message),
-            next_action: B8DebugNextAction::AdvanceToNextIsaBlocker,
+            next_action,
         }
     }
 
@@ -1038,6 +1125,7 @@ impl B8DebugBlocker {
 #[serde(rename_all = "snake_case")]
 enum B8DebugNextAction {
     AdvanceToNextIsaBlocker,
+    ConnectPublicRebaseBindImportBoundary,
     InspectNextDebugBundleBlocker,
 }
 

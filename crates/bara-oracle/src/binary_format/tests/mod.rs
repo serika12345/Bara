@@ -4,7 +4,7 @@ use super::{
     BinaryFileBytes, BinaryFormat, BinaryFormatProbeError, BinaryFormatProbeMetadata,
     BinaryFormatProbeReport, BinaryFormatProbeStatus, BinaryInput, MachOEntryFunctionTestCaseError,
     MachOEntryPointCommandMetadata, MachOEntryPointFileOffset, MachOEntryPointSegmentOffset,
-    MachOEntryPointStackSize, MachOExecutableImageConversionBlocker,
+    MachOEntryPointStackSize, MachOEntryPointVirtualAddress, MachOExecutableImageConversionBlocker,
     MachOExecutableImageConversionStatus, MachOExecutableImageMaterializationError,
     MachOExecutableImagePlan, MachOExecutableImagePlanError, MachOFileType,
     MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommandSummary, MachOLoadCommandType,

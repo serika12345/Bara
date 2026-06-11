@@ -291,6 +291,14 @@
   terminator に変換する。B8 debug bundle は lifted IR の frontier unsupported terminator を
   stable `register_indirect_call` boundary として report する。arbitrary indirect target
   execution、translation cache、fallback JIT/interpreter はまだ導入しない。
+- 2026-06-11 の B8-G4a として、Mach-O entry image materialization を segment-relative
+  PC から public `LC_SEGMENT_64.vmaddr` ベースの VM address space へ切り替えた。
+  `MachOExecutableImagePlan` は selected segment の file range、segment `vmaddr`、
+  entry segment offset、entry virtual address を分けて持つ。`ExecutableImage` は
+  code segment base と entry PC の差分から entry bytes を切り出し、
+  `ProgramImageMetadata` の mapped bytes / code / const-data range と B8 debug bundle
+  は同じ Mach-O VM address space を report する。rebase / bind / import 解決は
+  `loader.plan.json` の deferred step として残し、private dyld behavior には踏み込まない。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、

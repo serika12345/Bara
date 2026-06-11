@@ -71,4 +71,12 @@ fn plans_convertible_mach_o_executable_image_candidate() {
         plan.entry_point_segment_offset(),
         MachOEntryPointSegmentOffset::from_valid_segment_relative_value(0x34)
     );
+    assert_eq!(
+        plan.segment_vmaddr(),
+        MachOSegmentVmAddr::from_public_segment_value(0x1_0000_0000)
+    );
+    assert_eq!(
+        plan.entry_point_virtual_address(),
+        MachOEntryPointVirtualAddress::from_valid_runtime_value(0x1_0000_0034)
+    );
 }
