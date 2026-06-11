@@ -110,6 +110,13 @@ fn lift_instruction(
                 },
             }))
         }
+        DecodedInstructionKind::MovRdxQwordPtrRax => Ok(LiftedInstruction::Op(IrOp::Mov {
+            dst: Operand::Reg(X86Reg::Rdx),
+            src: Operand::MemRegIndirect {
+                base: X86Reg::Rax,
+                width: MemoryReadWidth::Bits64,
+            },
+        })),
         DecodedInstructionKind::MovRbpRsp => Ok(LiftedInstruction::Op(IrOp::Mov {
             dst: Operand::Reg(X86Reg::Rbp),
             src: Operand::Reg(X86Reg::Rsp),
@@ -841,7 +848,7 @@ mod tests {
     }
 
     #[test]
-    fn lifts_prologue_and_rip_relative_load_before_next_unsupported_opcode() {
+    fn lifts_prologue_and_rax_indirect_load_before_next_unsupported_opcode() {
         let decoded = DecodedFunction::new(
             X86Va::new(0x1600),
             vec![
@@ -886,10 +893,15 @@ mod tests {
                 DecodedInstruction::new(
                     X86Va::new(0x1613),
                     X86Va::new(0x1616),
+                    DecodedInstructionKind::MovRdxQwordPtrRax,
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(0x1616),
+                    X86Va::new(0x1619),
                     DecodedInstructionKind::Unsupported {
                         reason: UnsupportedReason::DecodeUnsupportedOpcode {
                             opcode: 0x48,
-                            at: X86Va::new(0x1613),
+                            at: X86Va::new(0x1616),
                         },
                     },
                 ),
@@ -928,6 +940,13 @@ mod tests {
                         address: X86Va::new(0x3012),
                         width: MemoryReadWidth::Bits64,
                     }
+                },
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rdx),
+                    src: Operand::MemRegIndirect {
+                        base: X86Reg::Rax,
+                        width: MemoryReadWidth::Bits64,
+                    }
                 }
             ]
         );
@@ -936,10 +955,41 @@ mod tests {
             &Terminator::Unsupported {
                 reason: UnsupportedReason::DecodeUnsupportedOpcode {
                     opcode: 0x48,
-                    at: X86Va::new(0x1613),
+                    at: X86Va::new(0x1616),
                 }
             }
         );
+    }
+
+    #[test]
+    fn lifts_mov_rdx_qword_ptr_rax_to_register_indirect_memory_load() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(3),
+                    DecodedInstructionKind::MovRdxQwordPtrRax,
+                ),
+                DecodedInstruction::new(X86Va::new(3), X86Va::new(4), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded RAX-indirect load lifts");
+        let block = &program.blocks()[0];
+
+        assert_eq!(
+            block.ops(),
+            &[IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rdx),
+                src: Operand::MemRegIndirect {
+                    base: X86Reg::Rax,
+                    width: MemoryReadWidth::Bits64,
+                }
+            }]
+        );
+        assert_eq!(block.terminator(), &Terminator::Return);
     }
 
     #[test]

@@ -136,6 +136,10 @@ pub enum Operand {
     Mem8 {
         base: X86Reg,
     },
+    MemRegIndirect {
+        base: X86Reg,
+        width: MemoryReadWidth,
+    },
     MemRipRelative {
         address: X86Va,
         width: MemoryReadWidth,
@@ -153,6 +157,10 @@ pub enum X86Reg {
     Eax,
     Ax,
     Al,
+    Rdx,
+    Edx,
+    Dx,
+    Dl,
     Rbx,
     Ebx,
     Bx,
@@ -183,6 +191,7 @@ impl X86Reg {
     pub const fn family(self) -> X86RegFamily {
         match self {
             Self::Rax | Self::Eax | Self::Ax | Self::Al => X86RegFamily::Accumulator,
+            Self::Rdx | Self::Edx | Self::Dx | Self::Dl => X86RegFamily::Data,
             Self::Rbx | Self::Ebx | Self::Bx | Self::Bl => X86RegFamily::Base,
             Self::Rbp | Self::Ebp | Self::Bp | Self::Bpl => X86RegFamily::BasePointer,
             Self::Rsp | Self::Esp | Self::Sp | Self::Spl => X86RegFamily::StackPointer,
@@ -194,24 +203,45 @@ impl X86Reg {
 
     pub const fn width(self) -> X86RegWidth {
         match self {
-            Self::Al | Self::Bl | Self::Bpl | Self::Spl | Self::R14b | Self::R15b | Self::Dil => {
-                X86RegWidth::Bits8
-            }
-            Self::Ax | Self::Bx | Self::Bp | Self::Sp | Self::R14w | Self::R15w | Self::Di => {
-                X86RegWidth::Bits16
-            }
-            Self::Eax | Self::Ebx | Self::Ebp | Self::Esp | Self::R14d | Self::R15d | Self::Edi => {
-                X86RegWidth::Bits32
-            }
-            Self::Rax | Self::Rbx | Self::Rbp | Self::Rsp | Self::R14 | Self::R15 | Self::Rdi => {
-                X86RegWidth::Bits64
-            }
+            Self::Al
+            | Self::Dl
+            | Self::Bl
+            | Self::Bpl
+            | Self::Spl
+            | Self::R14b
+            | Self::R15b
+            | Self::Dil => X86RegWidth::Bits8,
+            Self::Ax
+            | Self::Dx
+            | Self::Bx
+            | Self::Bp
+            | Self::Sp
+            | Self::R14w
+            | Self::R15w
+            | Self::Di => X86RegWidth::Bits16,
+            Self::Eax
+            | Self::Edx
+            | Self::Ebx
+            | Self::Ebp
+            | Self::Esp
+            | Self::R14d
+            | Self::R15d
+            | Self::Edi => X86RegWidth::Bits32,
+            Self::Rax
+            | Self::Rdx
+            | Self::Rbx
+            | Self::Rbp
+            | Self::Rsp
+            | Self::R14
+            | Self::R15
+            | Self::Rdi => X86RegWidth::Bits64,
         }
     }
 
     pub const fn full_width(self) -> Self {
         match self.family() {
             X86RegFamily::Accumulator => Self::Rax,
+            X86RegFamily::Data => Self::Rdx,
             X86RegFamily::Base => Self::Rbx,
             X86RegFamily::BasePointer => Self::Rbp,
             X86RegFamily::StackPointer => Self::Rsp,
@@ -229,6 +259,7 @@ impl X86Reg {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum X86RegFamily {
     Accumulator,
+    Data,
     Base,
     BasePointer,
     StackPointer,
@@ -262,11 +293,31 @@ impl HostTrapKind {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum UnsupportedReason {
-    DecodeUnsupportedOpcode { opcode: u8, at: X86Va },
-    MissingReturnTerminator { at: X86Va },
-    DirectCallUnsupported { target: X86Va, return_to: X86Va },
-    ExternalCallUnsupported { request: ExternalCallRequest },
-    SyscallUnsupported { request: SyscallRequest },
+    DecodeUnsupportedOpcode {
+        opcode: u8,
+        at: X86Va,
+    },
+    MissingReturnTerminator {
+        at: X86Va,
+    },
+    DirectCallUnsupported {
+        target: X86Va,
+        return_to: X86Va,
+    },
+    RegisterIndirectMemoryReadUnsupported {
+        base: X86Reg,
+        width: MemoryReadWidth,
+    },
+    MappedMemoryReadUnsupported {
+        address: X86Va,
+        width: MemoryReadWidth,
+    },
+    ExternalCallUnsupported {
+        request: ExternalCallRequest,
+    },
+    SyscallUnsupported {
+        request: SyscallRequest,
+    },
     EmitUnsupportedIr,
 }
 
@@ -443,6 +494,19 @@ mod tests {
         assert_eq!(X86Reg::Ax.full_width(), X86Reg::Rax);
         assert_eq!(X86Reg::Al.full_width(), X86Reg::Rax);
         assert!(X86Reg::Eax.is_partial_view());
+
+        assert_eq!(X86Reg::Rdx.family(), X86RegFamily::Data);
+        assert_eq!(X86Reg::Edx.family(), X86RegFamily::Data);
+        assert_eq!(X86Reg::Dx.family(), X86RegFamily::Data);
+        assert_eq!(X86Reg::Dl.family(), X86RegFamily::Data);
+        assert_eq!(X86Reg::Rdx.width(), X86RegWidth::Bits64);
+        assert_eq!(X86Reg::Edx.width(), X86RegWidth::Bits32);
+        assert_eq!(X86Reg::Dx.width(), X86RegWidth::Bits16);
+        assert_eq!(X86Reg::Dl.width(), X86RegWidth::Bits8);
+        assert_eq!(X86Reg::Edx.full_width(), X86Reg::Rdx);
+        assert_eq!(X86Reg::Dx.full_width(), X86Reg::Rdx);
+        assert_eq!(X86Reg::Dl.full_width(), X86Reg::Rdx);
+        assert!(X86Reg::Edx.is_partial_view());
 
         assert_eq!(X86Reg::Rbx.family(), X86RegFamily::Base);
         assert_eq!(X86Reg::Ebx.family(), X86RegFamily::Base);

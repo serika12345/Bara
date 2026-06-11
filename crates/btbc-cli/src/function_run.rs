@@ -282,6 +282,10 @@ enum FunctionOperandArtifact {
     Mem8 {
         base: FunctionRegisterArtifact,
     },
+    MemRegIndirect {
+        base: FunctionRegisterArtifact,
+        width: FunctionMemoryReadWidthArtifact,
+    },
     MemRipRelative {
         address: u64,
         width: FunctionMemoryReadWidthArtifact,
@@ -297,6 +301,10 @@ impl FunctionOperandArtifact {
             bara_ir::Operand::ImmU64(value) => Self::ImmU64 { value: *value },
             bara_ir::Operand::Mem8 { base } => Self::Mem8 {
                 base: FunctionRegisterArtifact::from_ir(*base),
+            },
+            bara_ir::Operand::MemRegIndirect { base, width } => Self::MemRegIndirect {
+                base: FunctionRegisterArtifact::from_ir(*base),
+                width: FunctionMemoryReadWidthArtifact::from_ir(*width),
             },
             bara_ir::Operand::MemRipRelative { address, width } => Self::MemRipRelative {
                 address: address.value(),
@@ -327,6 +335,10 @@ enum FunctionRegisterArtifact {
     Eax,
     Ax,
     Al,
+    Rdx,
+    Edx,
+    Dx,
+    Dl,
     Rbx,
     Ebx,
     Bx,
@@ -360,6 +372,10 @@ impl FunctionRegisterArtifact {
             bara_ir::X86Reg::Eax => Self::Eax,
             bara_ir::X86Reg::Ax => Self::Ax,
             bara_ir::X86Reg::Al => Self::Al,
+            bara_ir::X86Reg::Rdx => Self::Rdx,
+            bara_ir::X86Reg::Edx => Self::Edx,
+            bara_ir::X86Reg::Dx => Self::Dx,
+            bara_ir::X86Reg::Dl => Self::Dl,
             bara_ir::X86Reg::Rbx => Self::Rbx,
             bara_ir::X86Reg::Ebx => Self::Ebx,
             bara_ir::X86Reg::Bx => Self::Bx,
@@ -1110,6 +1126,8 @@ const fn failure_kind_from_unsupported_reason(reason: &UnsupportedReason) -> Fai
         | UnsupportedReason::DirectCallUnsupported { .. } => FailureKind::UnsupportedInstruction,
         UnsupportedReason::ExternalCallUnsupported { .. }
         | UnsupportedReason::SyscallUnsupported { .. }
+        | UnsupportedReason::RegisterIndirectMemoryReadUnsupported { .. }
+        | UnsupportedReason::MappedMemoryReadUnsupported { .. }
         | UnsupportedReason::EmitUnsupportedIr => FailureKind::EmitError,
     }
 }
@@ -1171,6 +1189,8 @@ impl FunctionUnsupportedBoundaryReport {
             UnsupportedReason::DecodeUnsupportedOpcode { .. }
             | UnsupportedReason::MissingReturnTerminator { .. }
             | UnsupportedReason::DirectCallUnsupported { .. }
+            | UnsupportedReason::RegisterIndirectMemoryReadUnsupported { .. }
+            | UnsupportedReason::MappedMemoryReadUnsupported { .. }
             | UnsupportedReason::EmitUnsupportedIr => return None,
         };
 
@@ -1561,6 +1581,10 @@ mod tests {
             FunctionRegisterArtifact::from_ir(X86Reg::Eax),
             FunctionRegisterArtifact::from_ir(X86Reg::Ax),
             FunctionRegisterArtifact::from_ir(X86Reg::Al),
+            FunctionRegisterArtifact::from_ir(X86Reg::Rdx),
+            FunctionRegisterArtifact::from_ir(X86Reg::Edx),
+            FunctionRegisterArtifact::from_ir(X86Reg::Dx),
+            FunctionRegisterArtifact::from_ir(X86Reg::Dl),
             FunctionRegisterArtifact::from_ir(X86Reg::Rbx),
             FunctionRegisterArtifact::from_ir(X86Reg::Ebx),
             FunctionRegisterArtifact::from_ir(X86Reg::Bx),
@@ -1589,7 +1613,7 @@ mod tests {
 
         assert_eq!(
             serde_json::to_string(&registers).expect("register artifacts serialize"),
-            "[\"rax\",\"eax\",\"ax\",\"al\",\"rbx\",\"ebx\",\"bx\",\"bl\",\"rbp\",\"ebp\",\"bp\",\"bpl\",\"rsp\",\"esp\",\"sp\",\"spl\",\"r14\",\"r14d\",\"r14w\",\"r14b\",\"r15\",\"r15d\",\"r15w\",\"r15b\",\"rdi\",\"edi\",\"di\",\"dil\"]"
+            "[\"rax\",\"eax\",\"ax\",\"al\",\"rdx\",\"edx\",\"dx\",\"dl\",\"rbx\",\"ebx\",\"bx\",\"bl\",\"rbp\",\"ebp\",\"bp\",\"bpl\",\"rsp\",\"esp\",\"sp\",\"spl\",\"r14\",\"r14d\",\"r14w\",\"r14b\",\"r15\",\"r15d\",\"r15w\",\"r15b\",\"rdi\",\"edi\",\"di\",\"dil\"]"
         );
     }
 
