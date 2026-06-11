@@ -97,6 +97,16 @@ pub enum FailureKind {
     EmitError,
     RunError,
     ComparisonMismatch,
+    UnsupportedInstruction,
+    WrongReturnValue,
+    WrongRegisterValue,
+    WrongFlags,
+    WrongMemory,
+    WrongBranchTarget,
+    WrongCallReturn,
+    WrongExternalCall,
+    RunnerCrash,
+    OracleCrash,
 }
 
 #[cfg(test)]

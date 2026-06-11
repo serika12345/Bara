@@ -12,10 +12,10 @@ use bara_oracle::{
     mach_o_entry_function_test_case_with_embedded_host_traps,
     mach_o_entry_function_test_case_with_host_traps, observed_result_from_json,
     observed_result_to_json, probe_public_binary_format, test_case_from_json, BinaryFileBytes,
-    BinaryFormatProbeError, BinaryFormatProbeReport, BinaryInput, CaseId, ComparisonReport,
-    CorpusReport, ExecutableManifest, ExpectedResult, FailureKind, FailureMessage, FixtureOutcome,
-    FixtureReport, JsonError, MachOEntryFunctionInput, MachOEntryFunctionTestCaseError,
-    ObservedResult, TestCase,
+    BinaryFormatProbeError, BinaryFormatProbeReport, BinaryInput, CaseId, ComparisonIssue,
+    ComparisonReport, CorpusReport, ExecutableManifest, ExpectedResult, FailureKind,
+    FailureMessage, FixtureOutcome, FixtureReport, JsonError, MachOEntryFunctionInput,
+    MachOEntryFunctionTestCaseError, ObservedResult, TestCase,
 };
 use serde::Serialize;
 
@@ -739,7 +739,7 @@ fn run_corpus_fixture(case_path: &Path, expected_dir: &Path) -> FixtureRun {
         let message = format!("comparison failed: {comparison:?}");
         return FixtureRun::failed_with_actual_and_artifacts(
             case_id,
-            FailureKind::ComparisonMismatch,
+            failure_kind_from_comparison_report(&comparison),
             message,
             actual.clone(),
             artifact_metadata,
@@ -1099,7 +1099,45 @@ fn failure_kind_label(kind: FailureKind) -> &'static str {
         FailureKind::EmitError => "emit_error",
         FailureKind::RunError => "run_error",
         FailureKind::ComparisonMismatch => "comparison_mismatch",
+        FailureKind::UnsupportedInstruction => "unsupported_instruction",
+        FailureKind::WrongReturnValue => "wrong_return_value",
+        FailureKind::WrongRegisterValue => "wrong_register_value",
+        FailureKind::WrongFlags => "wrong_flags",
+        FailureKind::WrongMemory => "wrong_memory",
+        FailureKind::WrongBranchTarget => "wrong_branch_target",
+        FailureKind::WrongCallReturn => "wrong_call_return",
+        FailureKind::WrongExternalCall => "wrong_external_call",
+        FailureKind::RunnerCrash => "runner_crash",
+        FailureKind::OracleCrash => "oracle_crash",
     }
+}
+
+pub(crate) fn failure_kind_from_comparison_report(report: &ComparisonReport) -> FailureKind {
+    if report
+        .issues()
+        .iter()
+        .any(|issue| matches!(issue, ComparisonIssue::ReturnValueMismatch { .. }))
+    {
+        return FailureKind::WrongRegisterValue;
+    }
+
+    if report
+        .issues()
+        .iter()
+        .any(|issue| matches!(issue, ComparisonIssue::StdoutMismatch { .. }))
+    {
+        return FailureKind::WrongExternalCall;
+    }
+
+    if report
+        .issues()
+        .iter()
+        .any(|issue| matches!(issue, ComparisonIssue::ExitStatusMismatch { .. }))
+    {
+        return FailureKind::WrongCallReturn;
+    }
+
+    FailureKind::ComparisonMismatch
 }
 
 fn create_dir(path: &Path) -> Result<(), CliError> {
@@ -1243,7 +1281,7 @@ impl CliError {
             Self::X8664MachOFixture(error) => error.failure_kind(),
             Self::NativeSourceImageMetadata(_) => FailureKind::InvalidTestCase,
             Self::ExecutableRun(error) => error.failure_kind(),
-            Self::Comparison(_) => FailureKind::ComparisonMismatch,
+            Self::Comparison(report) => failure_kind_from_comparison_report(report),
             Self::ReadFile { .. } | Self::WriteFile { .. } | Self::CreateDir { .. } => {
                 FailureKind::InvalidTestCase
             }
@@ -1796,6 +1834,37 @@ mod tests {
     }
 
     #[test]
+    fn comparison_report_maps_to_specific_failure_kinds() {
+        assert_eq!(
+            super::failure_kind_from_comparison_report(&bara_oracle::ComparisonReport::new(vec![
+                bara_oracle::ComparisonIssue::ReturnValueMismatch {
+                    expected: 42,
+                    actual: 41,
+                },
+            ])),
+            FailureKind::WrongRegisterValue
+        );
+        assert_eq!(
+            super::failure_kind_from_comparison_report(&bara_oracle::ComparisonReport::new(vec![
+                bara_oracle::ComparisonIssue::StdoutMismatch {
+                    expected: String::from("expected"),
+                    actual: String::from("actual"),
+                },
+            ])),
+            FailureKind::WrongExternalCall
+        );
+        assert_eq!(
+            super::failure_kind_from_comparison_report(&bara_oracle::ComparisonReport::new(vec![
+                bara_oracle::ComparisonIssue::ExitStatusMismatch {
+                    expected: 0,
+                    actual: 42,
+                },
+            ])),
+            FailureKind::WrongCallReturn
+        );
+    }
+
+    #[test]
     fn emit_fixture_artifacts_writes_compilation_metadata_files() {
         let temp_dir = TestTempDir::new("emit_fixture_artifacts_writes_compilation_metadata_files");
         let case_path = temp_dir.write_file(
@@ -2317,9 +2386,9 @@ mod tests {
     }
 
     #[test]
-    fn check_corpus_writes_failure_package_for_comparison_mismatch() -> Result<(), String> {
+    fn check_corpus_classifies_return_value_mismatch_as_wrong_register() -> Result<(), String> {
         let temp_dir =
-            TestTempDir::new("check_corpus_writes_failure_package_for_comparison_mismatch");
+            TestTempDir::new("check_corpus_classifies_return_value_mismatch_as_wrong_register");
         let cases_dir = temp_dir.create_dir("cases");
         let expected_dir = temp_dir.create_dir("expected");
         let output_dir = temp_dir.create_dir("out");
@@ -2347,7 +2416,7 @@ mod tests {
         let failure_dir = output_dir.join("failures").join("return_42");
         assert_eq!(
             read_file(&failure_dir.join("failure.json")),
-            "{\"case_id\":\"return_42\",\"kind\":\"comparison_mismatch\",\"message\":\"comparison failed: ComparisonReport { issues: [ReturnValueMismatch { expected: 41, actual: 42 }] }\",\"final_state\":{\"issues\":[{\"return_value_mismatch\":{\"expected\":41,\"actual\":42}}]},\"shrink\":{\"status\":\"not_attempted\",\"recommended_next_step\":\"minimize testcase while preserving failure kind comparison_mismatch\"},\"corpus_update\":{\"action\":\"review_failure_package\",\"candidate_testcase\":\"testcase.json\",\"candidate_expected\":\"expected.json\",\"candidate_actual\":\"actual.json\"}}"
+            "{\"case_id\":\"return_42\",\"kind\":\"wrong_register_value\",\"message\":\"comparison failed: ComparisonReport { issues: [ReturnValueMismatch { expected: 41, actual: 42 }] }\",\"final_state\":{\"issues\":[{\"return_value_mismatch\":{\"expected\":41,\"actual\":42}}]},\"shrink\":{\"status\":\"not_attempted\",\"recommended_next_step\":\"minimize testcase while preserving failure kind wrong_register_value\"},\"corpus_update\":{\"action\":\"review_failure_package\",\"candidate_testcase\":\"testcase.json\",\"candidate_expected\":\"expected.json\",\"candidate_actual\":\"actual.json\"}}"
         );
         assert_eq!(read_file(&failure_dir.join("testcase.json")), testcase_json);
         assert_eq!(read_file(&failure_dir.join("expected.json")), expected_json);

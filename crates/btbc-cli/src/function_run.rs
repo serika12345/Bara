@@ -870,10 +870,32 @@ impl FunctionRunError {
         match self {
             Self::Decode(_) => FailureKind::DecodeError,
             Self::Lift(_) => FailureKind::LiftError,
-            Self::Emit(_) => FailureKind::EmitError,
+            Self::Emit(error) => failure_kind_from_emit_error(error),
             Self::StandaloneArtifact(_) => FailureKind::EmitError,
             Self::InputMemory(_) | Self::StdoutTrap(_) | Self::Run(_) => FailureKind::RunError,
         }
+    }
+}
+
+const fn failure_kind_from_emit_error(error: &bara_arm64::EmitError) -> FailureKind {
+    match error {
+        bara_arm64::EmitError::UnsupportedIr { reason } => {
+            failure_kind_from_unsupported_reason(reason)
+        }
+        bara_arm64::EmitError::InvalidProgram
+        | bara_arm64::EmitError::EmptyCode
+        | bara_arm64::EmitError::UnsupportedShape => FailureKind::EmitError,
+    }
+}
+
+const fn failure_kind_from_unsupported_reason(reason: &UnsupportedReason) -> FailureKind {
+    match reason {
+        UnsupportedReason::DecodeUnsupportedOpcode { .. }
+        | UnsupportedReason::MissingReturnTerminator { .. }
+        | UnsupportedReason::DirectCallUnsupported { .. } => FailureKind::UnsupportedInstruction,
+        UnsupportedReason::ExternalCallUnsupported { .. }
+        | UnsupportedReason::SyscallUnsupported { .. }
+        | UnsupportedReason::EmitUnsupportedIr => FailureKind::EmitError,
     }
 }
 
@@ -1276,5 +1298,17 @@ mod tests {
             error.to_string(),
             "{\"status\":\"unsupported_boundary\",\"failure_kind\":\"emit_error\",\"boundary\":{\"kind\":\"external_call\",\"symbol_id\":11,\"import_target\":{\"kind\":\"unresolved\"},\"call_site\":12288,\"return_to\":12293}}"
         );
+    }
+
+    #[test]
+    fn unsupported_instruction_emit_error_uses_stable_failure_kind() {
+        let error = FunctionRunError::Emit(bara_arm64::EmitError::UnsupportedIr {
+            reason: UnsupportedReason::DecodeUnsupportedOpcode {
+                opcode: 0xff,
+                at: X86Va::new(0x1000),
+            },
+        });
+
+        assert_eq!(error.failure_kind(), FailureKind::UnsupportedInstruction);
     }
 }

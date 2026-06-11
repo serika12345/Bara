@@ -13,30 +13,38 @@
 
 状態:
 
-- project_state: completed。B7 の 17 個目の小ステップとして、quick / native /
-  oracle / nightly verification lane scripts を分離した。
+- project_state: completed。B7 の 18 個目の小ステップとして、B7 の stable
+  failure classification kind を追加し、final-state mismatch を具体分類へ接続した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B7:
   Oracle / Regression 基盤。
-- active_design_focus: B7 verification lanes。quick checks、host-specific native
-  tests、oracle blackbox、nightly-style small-case/shrink + corpus output を
-  repo-local scripts として分離する。
+- active_design_focus: B7 failure classification。comparison failure を
+  `ComparisonMismatch` へ潰さず、観測できる範囲で wrong register / call return /
+  external call などの stable failure kind に分類する。
 - active_branch: `task/b7-x86_64-macho-fixture-generation`。base commit は
   `8d39a4a`。latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B7 の CI lane 分割と failure corpus 保存項目。
-- completed_work: `scripts/verify` は `verify-quick`、`verify-native`、
-  `verify-oracle` を順に呼ぶ。`verify-nightly` は small-case shrink tests と
-  `check-blackbox --out` を `target/bara-nightly/` に保存する。
-- remaining_work: B7 は継続中。failure classification 拡張は未実装。
-- next_action: wrong register / flags / memory / branch target / call return /
-  external call を failure classification として扱う。
-- verification: lane scripts として
-  `nix develop -c ./scripts/verify-quick`、
-  `nix develop -c ./scripts/verify-native`、
-  `nix develop -c ./scripts/verify-oracle`、
-  `nix develop -c ./scripts/verify-nightly` が通過した。
-  `nix develop -c ./scripts/verify` も通過した。
+- related_todo: [TODO.md](../TODO.md) B7 の wrong register / flags / memory /
+  branch target / call return / external call failure classification 項目。
+- completed_work: `FailureKind` に B7 の stable classification kind を追加した。
+  `return_value_mismatch` は `WrongRegisterValue`、`stdout_mismatch` は
+  `WrongExternalCall`、`exit_status_mismatch` は `WrongCallReturn` に分類する。
+- remaining_work: B7 は継続中。IR invariant を verifier report に明示接続してから
+  B7 完了候補を確認する。
+- next_action: IR invariant を verifier report で検査する。
+- verification: targeted tests として
+  `nix develop -c cargo test -p btbc-cli comparison_report_maps_to_specific_failure_kinds`、
+  `nix develop -c cargo test -p btbc-cli check_corpus_classifies_return_value_mismatch_as_wrong_register`、
+  `nix develop -c cargo test -p btbc-cli unsupported_instruction_emit_error_uses_stable_failure_kind`
+  が通過した。`nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
+
+- 2026-06-11 10:10 JST: B7 の 18 個目の小ステップとして、
+  stable failure classification kind を追加し、final-state mismatch から具体分類へ
+  接続した。`return_value_mismatch` は `WrongRegisterValue`、`stdout_mismatch` は
+  `WrongExternalCall`、`exit_status_mismatch` は `WrongCallReturn` になる。
+  `UnsupportedReason::DecodeUnsupportedOpcode` などの未対応命令系 emit error は
+  `UnsupportedInstruction` に分類する。検証は snapshot の targeted test と
+  commit 前の full verification。
 
 - 2026-06-11 10:10 JST: B7 の 17 個目の小ステップとして、
   verification lane scripts を分離した。`verify-quick` は format / security /

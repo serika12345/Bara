@@ -247,6 +247,11 @@ RunnerCrash
 OracleCrash
 ```
 
+`ComparisonReport` を持つ failure は、観測できる範囲でより具体的な failure kind に
+分類する。B7 時点では `return_value_mismatch` を `WrongRegisterValue`、
+`stdout_mismatch` を `WrongExternalCall`、`exit_status_mismatch` を
+`WrongCallReturn` として扱い、分類不能な比較差分は `ComparisonMismatch` に残す。
+
 ## verifier 導入判断
 
 2026-06-11 時点では、B7 に Haskell package、schema reader、small x86 semantics

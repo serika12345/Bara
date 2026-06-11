@@ -11,10 +11,11 @@ use bara_oracle::{
 };
 
 use crate::{
-    case_id_from_path, run_check_binary_probe, run_check_executable, run_check_mach_o,
-    run_check_mach_o_embedded_host_traps, run_corpus_fixture, run_link_fixture_arm64_main,
-    run_link_mach_o_arm64_main, run_link_mach_o_arm64_stdout_main, sorted_case_paths,
-    write_corpus_outputs, CliError, FixtureRun,
+    case_id_from_path, failure_kind_from_comparison_report, run_check_binary_probe,
+    run_check_executable, run_check_mach_o, run_check_mach_o_embedded_host_traps,
+    run_corpus_fixture, run_link_fixture_arm64_main, run_link_mach_o_arm64_main,
+    run_link_mach_o_arm64_stdout_main, sorted_case_paths, write_corpus_outputs, CliError,
+    FixtureRun,
 };
 
 pub(crate) fn run_check_blackbox(output_dir: Option<&Path>) -> Result<String, CliError> {
@@ -247,7 +248,7 @@ fn run_native_executable_smoke(
         let message = format!("native executable smoke comparison failed: {comparison:?}");
         return FixtureRun::failed_with_actual(
             actual_case_id,
-            FailureKind::ComparisonMismatch,
+            failure_kind_from_comparison_report(&comparison),
             message,
             actual,
         )
@@ -401,7 +402,7 @@ fn run_observed_comparison_fixture(
         let message = format!("comparison failed: {comparison:?}");
         return FixtureRun::failed_with_actual(
             actual_case_id,
-            FailureKind::ComparisonMismatch,
+            failure_kind_from_comparison_report(&comparison),
             message,
             actual,
         )
