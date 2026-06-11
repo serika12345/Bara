@@ -145,6 +145,10 @@ arm64 macOS 上で Rosetta 経由の x86_64 プロセスとして実行する。
 だけを `ObservedResult` として parse し、正規化した JSON を指定された
 `expected.json` path に保存する。Rosetta は testcase の外部観測結果を得る
 black-box oracle としてだけ使い、runner の構造や内部情報は実装根拠にしない。
+CLI 実装では Rosetta runner の observation を process status、stdout、stderr に
+限定し、`expected.json` に入る testcase behavior は runner stdout の
+`ObservedResult` JSON だけから作る。runner stderr は runner failure の診断として
+扱い、expected behavior には含めない。
 
 `generate-arm64-actual` は、同じ testcase を Bara の decode / lift / ARM64 emit
 経路に通し、対応 host では ARM64 native runner で実行する。実行結果は

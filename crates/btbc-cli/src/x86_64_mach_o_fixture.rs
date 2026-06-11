@@ -2,7 +2,7 @@ use std::{
     error::Error,
     fmt, fs, io,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Output},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -627,25 +627,63 @@ pub(crate) fn observe_x86_64_oracle_expected(
             });
     let _ = fs::remove_file(&runner_path);
 
-    let output = output?;
-    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
-    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
-    if !output.status.success() {
-        return Err(X8664MachOFixtureError::RunnerFailed {
-            path: runner_path,
-            status: output.status.to_string(),
-            stdout,
-            stderr,
-        });
+    RosettaOracleObservation::from_process_output(output?).into_expected_result(&runner_path)
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct RosettaOracleObservation {
+    runner_succeeded: bool,
+    runner_status: String,
+    stdout: String,
+    stderr: String,
+}
+
+impl RosettaOracleObservation {
+    fn from_process_output(output: Output) -> Self {
+        Self {
+            runner_succeeded: output.status.success(),
+            runner_status: output.status.to_string(),
+            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        }
     }
 
-    observed_result_from_json(&stdout).map_err(|source| {
-        X8664MachOFixtureError::InvalidRunnerStdout {
-            path: runner_path,
+    #[cfg(test)]
+    const fn from_parts(
+        runner_succeeded: bool,
+        runner_status: String,
+        stdout: String,
+        stderr: String,
+    ) -> Self {
+        Self {
+            runner_succeeded,
+            runner_status,
             stdout,
-            source: source.to_string(),
+            stderr,
         }
-    })
+    }
+
+    fn into_expected_result(
+        self,
+        runner_path: &Path,
+    ) -> Result<ObservedResult, X8664MachOFixtureError> {
+        if !self.runner_succeeded {
+            return Err(X8664MachOFixtureError::RunnerFailed {
+                path: runner_path.to_path_buf(),
+                status: self.runner_status,
+                stdout: self.stdout,
+                stderr: self.stderr,
+            });
+        }
+
+        observed_result_from_json(&self.stdout).map_err(|source| {
+            X8664MachOFixtureError::InvalidRunnerStdout {
+                path: runner_path.to_path_buf(),
+                stdout: self.stdout,
+                source: source.to_string(),
+            }
+        })
+    }
 }
 
 fn ensure_supported_host() -> Result<(), X8664MachOFixtureError> {
@@ -766,10 +804,10 @@ mod tests {
     use super::{
         json_string_literal, observe_x86_64_oracle_expected, package_x86_64_mach_o_fixture,
         package_x86_64_oracle_runner, GeneratedX8664MachOFixture, GeneratedX8664OracleRunner,
-        X8664MachOAssemblySource, X8664MachOFixtureBuildRequest, X8664MachOFixtureError,
-        X8664MachOFixtureOutputPath, X8664MachOFixturePackager, X8664MachOFixtureSourceLanguage,
-        X8664MachOFixtureToolchainCommand, X8664OracleRunnerBuildRequest,
-        X8664OracleRunnerPackager, X8664OracleRunnerSource,
+        RosettaOracleObservation, X8664MachOAssemblySource, X8664MachOFixtureBuildRequest,
+        X8664MachOFixtureError, X8664MachOFixtureOutputPath, X8664MachOFixturePackager,
+        X8664MachOFixtureSourceLanguage, X8664MachOFixtureToolchainCommand,
+        X8664OracleRunnerBuildRequest, X8664OracleRunnerPackager, X8664OracleRunnerSource,
     };
 
     #[test]
@@ -845,6 +883,52 @@ mod tests {
         assert_eq!(
             json_string_literal("quote\"slash\\newline\n"),
             "\"quote\\\"slash\\\\newline\\n\""
+        );
+    }
+
+    #[test]
+    fn rosetta_oracle_observation_parses_only_runner_stdout_json() {
+        let observation = RosettaOracleObservation::from_parts(
+            true,
+            String::from("exit status: 0"),
+            String::from(
+                "{\"case_id\":\"return_42\",\"exit_status\":0,\"return_value\":42,\"stdout\":\"\",\"stderr\":\"\"}\n",
+            ),
+            String::from("ignored runner diagnostic"),
+        );
+
+        let expected = observation
+            .into_expected_result(Path::new("/tmp/return_42_oracle"))
+            .expect("runner stdout contains observed result JSON");
+
+        assert_eq!(
+            expected,
+            ObservedResult::new(
+                CaseId::new("return_42").expect("case id is non-empty"),
+                0,
+                42,
+                String::new(),
+                String::new()
+            )
+        );
+    }
+
+    #[test]
+    fn rosetta_oracle_observation_reports_public_runner_failure_fields() {
+        let observation = RosettaOracleObservation::from_parts(
+            false,
+            String::from("signal: 4 (SIGILL)"),
+            String::from("partial stdout"),
+            String::from("illegal instruction"),
+        );
+
+        let error = observation
+            .into_expected_result(Path::new("/tmp/return_42_oracle"))
+            .expect_err("failed runner process is not a valid oracle result");
+
+        assert_eq!(
+            error.to_string(),
+            "x86_64 oracle runner /tmp/return_42_oracle failed with signal: 4 (SIGILL): stdout=\"partial stdout\" stderr=\"illegal instruction\""
         );
     }
 

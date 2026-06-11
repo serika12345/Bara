@@ -132,7 +132,7 @@
 
 ## D8: Clean-room research boundary
 
-- [ ] Rosetta は black-box oracle としてのみ扱い、内部構造を設計根拠にしない。
+- [x] Rosetta は black-box oracle としてのみ扱い、内部構造を設計根拠にしない。
 - [ ] FEX-Emu / Box64 / QEMU user-mode は問題領域と外部挙動の比較対象に限定する。
 - [ ] 研究メモには、実装根拠、比較対象、禁止情報の区別を明記する。
 - [ ] 新しい設計判断を追加するときは public spec、自前 test、外部観測のどれに基づくかを記録する。

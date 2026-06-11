@@ -31,6 +31,21 @@ Rosetta から取得してよいもの:
 - テスト harness が明示的に出力した JSON
 - クラッシュしたかどうか
 
+## Rosetta oracle 実行境界
+
+B7 の x86_64 oracle runner は、arm64 macOS 上で x86_64 Mach-O プロセスとして
+実行し、Bara 側は subprocess の public process observation だけを読む。
+許可される入力は runner の process status、stdout、stderr に限定する。
+
+`expected.json` へ正規化してよい値は、runner stdout に明示的に出力された
+`ObservedResult` JSON の `case_id`、`exit_status`、`return_value`、`stdout`、
+`stderr` だけである。runner stderr は runner 自体の診断として failure report に
+保持してよいが、期待される testcase behavior には混ぜない。
+
+Rosetta 実行によって得た結果は、公開 ISA / ABI 仕様に基づく実装の回帰 oracle として
+使う。Rosetta の内部 layout、translation strategy、metadata、symbol、disassembly、
+実行時 helper 構造は、設計判断や実装根拠として使わない。
+
 ## 禁止する情報
 
 実装根拠として使わないもの:
