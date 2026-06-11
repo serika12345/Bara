@@ -17,6 +17,7 @@ use bara_oracle::{
     FixtureReport, JsonError, MachOEntryFunctionInput, MachOEntryFunctionTestCaseError,
     ObservedResult, TestCase,
 };
+use serde::Serialize;
 
 mod blackbox_run;
 mod executable_run;
@@ -664,7 +665,12 @@ fn run_corpus_fixture(case_path: &Path, expected_dir: &Path) -> FixtureRun {
                 fallback_case_id,
                 FailureKind::InvalidTestCase,
                 error.to_string(),
-            );
+            )
+            .with_failure_artifacts(FixtureFailureArtifacts::new(
+                Some(case_json),
+                None,
+                None,
+            ));
         }
     };
     let case_id = test_case.case_id().clone();
@@ -672,26 +678,47 @@ fn run_corpus_fixture(case_path: &Path, expected_dir: &Path) -> FixtureRun {
     let expected_json = match read_text_file(&expected_path) {
         Ok(expected_json) => expected_json,
         Err(error) => {
-            return FixtureRun::failed(case_id, FailureKind::MissingExpected, error.to_string());
+            return FixtureRun::failed(case_id, FailureKind::MissingExpected, error.to_string())
+                .with_failure_artifacts(FixtureFailureArtifacts::new(Some(case_json), None, None));
         }
     };
     let expected = match observed_result_from_json(&expected_json) {
         Ok(expected) => expected,
         Err(error) => {
-            return FixtureRun::failed(case_id, FailureKind::InvalidExpected, error.to_string());
+            return FixtureRun::failed(case_id, FailureKind::InvalidExpected, error.to_string())
+                .with_failure_artifacts(FixtureFailureArtifacts::new(
+                    Some(case_json),
+                    Some(expected_json),
+                    None,
+                ));
         }
     };
 
     let actual = match observe_test_case(&test_case) {
         Ok(actual) => actual,
         Err(error) => {
-            return FixtureRun::failed(case_id, error.failure_kind(), error.to_string());
+            return FixtureRun::failed(case_id, error.failure_kind(), error.to_string())
+                .with_failure_artifacts(FixtureFailureArtifacts::new(
+                    Some(case_json),
+                    Some(expected_json),
+                    None,
+                ));
         }
     };
     let artifact_metadata = match fixture_artifact_metadata(&test_case) {
         Ok(artifact_metadata) => artifact_metadata,
         Err(error) => {
-            return FixtureRun::failed(case_id, error.failure_kind(), error.to_string());
+            return FixtureRun::failed_with_actual(
+                case_id,
+                error.failure_kind(),
+                error.to_string(),
+                actual.clone(),
+            )
+            .with_failure_artifacts(FixtureFailureArtifacts::new(
+                Some(case_json),
+                Some(expected_json),
+                Some(actual),
+            ));
         }
     };
     let comparison = compare_observed_results(&expected, &actual);
@@ -700,9 +727,14 @@ fn run_corpus_fixture(case_path: &Path, expected_dir: &Path) -> FixtureRun {
             case_id,
             FailureKind::ComparisonMismatch,
             format!("comparison failed: {comparison:?}"),
-            actual,
+            actual.clone(),
             artifact_metadata,
-        );
+        )
+        .with_failure_artifacts(FixtureFailureArtifacts::new(
+            Some(case_json),
+            Some(expected_json),
+            Some(actual),
+        ));
     }
 
     FixtureRun::passed_observed_with_artifacts(case_id, actual, artifact_metadata)
@@ -750,6 +782,7 @@ struct FixtureRun {
     report: FixtureReport,
     output: Option<FixtureOutput>,
     artifact_metadata: Option<FunctionArtifactMetadata>,
+    failure_artifacts: Option<FixtureFailureArtifacts>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -758,12 +791,34 @@ enum FixtureOutput {
     Probe(BinaryFormatProbeReport),
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct FixtureFailureArtifacts {
+    testcase_json: Option<String>,
+    expected_json: Option<String>,
+    actual: Option<ObservedResult>,
+}
+
+impl FixtureFailureArtifacts {
+    const fn new(
+        testcase_json: Option<String>,
+        expected_json: Option<String>,
+        actual: Option<ObservedResult>,
+    ) -> Self {
+        Self {
+            testcase_json,
+            expected_json,
+            actual,
+        }
+    }
+}
+
 impl FixtureRun {
     fn passed_observed(case_id: CaseId, actual: ObservedResult) -> Self {
         Self {
             report: FixtureReport::new(case_id, FixtureOutcome::Passed),
             output: Some(FixtureOutput::Observed(actual)),
             artifact_metadata: None,
+            failure_artifacts: None,
         }
     }
 
@@ -776,6 +831,7 @@ impl FixtureRun {
             report: FixtureReport::new(case_id, FixtureOutcome::Passed),
             output: Some(FixtureOutput::Observed(actual)),
             artifact_metadata: Some(artifact_metadata),
+            failure_artifacts: None,
         }
     }
 
@@ -784,6 +840,7 @@ impl FixtureRun {
             report: FixtureReport::new(case_id, FixtureOutcome::Passed),
             output: Some(FixtureOutput::Probe(actual)),
             artifact_metadata: None,
+            failure_artifacts: None,
         }
     }
 
@@ -792,6 +849,7 @@ impl FixtureRun {
             report: failed_fixture_report(case_id, kind, message),
             output: None,
             artifact_metadata: None,
+            failure_artifacts: None,
         }
     }
 
@@ -805,6 +863,7 @@ impl FixtureRun {
             report: failed_fixture_report(case_id, kind, message),
             output: Some(FixtureOutput::Observed(actual)),
             artifact_metadata: None,
+            failure_artifacts: None,
         }
     }
 
@@ -819,7 +878,13 @@ impl FixtureRun {
             report: failed_fixture_report(case_id, kind, message),
             output: Some(FixtureOutput::Observed(actual)),
             artifact_metadata: Some(artifact_metadata),
+            failure_artifacts: None,
         }
+    }
+
+    fn with_failure_artifacts(mut self, failure_artifacts: FixtureFailureArtifacts) -> Self {
+        self.failure_artifacts = Some(failure_artifacts);
+        self
     }
 }
 
@@ -845,6 +910,18 @@ fn write_corpus_outputs(
     write_text_file(&output_dir.join("report.json"), &report_json)?;
 
     for run in fixture_runs {
+        if let FixtureOutcome::Failed { kind, message } = run.report.outcome() {
+            write_fixture_failure_package(
+                &output_dir
+                    .join("failures")
+                    .join(run.report.case_id().as_str()),
+                run.report.case_id(),
+                *kind,
+                message.as_str(),
+                run.failure_artifacts.as_ref(),
+            )?;
+        }
+
         if let Some(artifact_metadata) = &run.artifact_metadata {
             write_fixture_artifacts(
                 &compiled_dir.join(run.report.case_id().as_str()),
@@ -868,6 +945,127 @@ fn write_corpus_outputs(
     }
 
     Ok(())
+}
+
+fn write_fixture_failure_package(
+    failure_dir: &Path,
+    case_id: &CaseId,
+    kind: FailureKind,
+    message: &str,
+    artifacts: Option<&FixtureFailureArtifacts>,
+) -> Result<(), CliError> {
+    create_dir(failure_dir)?;
+    let report = FixtureFailurePackageJson::new(case_id, kind, message, artifacts);
+    let report_json = serde_json::to_string(&report)
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)?;
+    write_text_file(&failure_dir.join("failure.json"), &report_json)?;
+
+    if let Some(artifacts) = artifacts {
+        if let Some(testcase_json) = &artifacts.testcase_json {
+            write_text_file(&failure_dir.join("testcase.json"), testcase_json)?;
+        }
+        if let Some(expected_json) = &artifacts.expected_json {
+            write_text_file(&failure_dir.join("expected.json"), expected_json)?;
+        }
+        if let Some(actual) = &artifacts.actual {
+            let actual_json = observed_result_to_json(actual).map_err(CliError::Json)?;
+            write_text_file(&failure_dir.join("actual.json"), &actual_json)?;
+        }
+    }
+
+    Ok(())
+}
+
+#[derive(Serialize)]
+struct FixtureFailurePackageJson<'a> {
+    case_id: &'a str,
+    kind: FailureKind,
+    message: &'a str,
+    shrink: FixtureFailureShrinkJson,
+    corpus_update: FixtureCorpusUpdateJson,
+}
+
+impl<'a> FixtureFailurePackageJson<'a> {
+    fn new(
+        case_id: &'a CaseId,
+        kind: FailureKind,
+        message: &'a str,
+        artifacts: Option<&FixtureFailureArtifacts>,
+    ) -> Self {
+        Self {
+            case_id: case_id.as_str(),
+            kind,
+            message,
+            shrink: FixtureFailureShrinkJson {
+                status: FixtureShrinkStatus::NotAttempted,
+                recommended_next_step: format!(
+                    "minimize testcase while preserving failure kind {}",
+                    failure_kind_label(kind)
+                ),
+            },
+            corpus_update: FixtureCorpusUpdateJson::from_artifacts(artifacts),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct FixtureFailureShrinkJson {
+    status: FixtureShrinkStatus,
+    recommended_next_step: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FixtureShrinkStatus {
+    NotAttempted,
+}
+
+#[derive(Serialize)]
+struct FixtureCorpusUpdateJson {
+    action: FixtureCorpusUpdateAction,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    candidate_testcase: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    candidate_expected: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    candidate_actual: Option<&'static str>,
+}
+
+impl FixtureCorpusUpdateJson {
+    fn from_artifacts(artifacts: Option<&FixtureFailureArtifacts>) -> Self {
+        Self {
+            action: FixtureCorpusUpdateAction::ReviewFailurePackage,
+            candidate_testcase: artifacts
+                .and_then(|artifacts| artifacts.testcase_json.as_ref())
+                .map(|_| "testcase.json"),
+            candidate_expected: artifacts
+                .and_then(|artifacts| artifacts.expected_json.as_ref())
+                .map(|_| "expected.json"),
+            candidate_actual: artifacts
+                .and_then(|artifacts| artifacts.actual.as_ref())
+                .map(|_| "actual.json"),
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FixtureCorpusUpdateAction {
+    ReviewFailurePackage,
+}
+
+fn failure_kind_label(kind: FailureKind) -> &'static str {
+    match kind {
+        FailureKind::InvalidTestCase => "invalid_test_case",
+        FailureKind::MissingExpected => "missing_expected",
+        FailureKind::InvalidExpected => "invalid_expected",
+        FailureKind::DecodeError => "decode_error",
+        FailureKind::LiftError => "lift_error",
+        FailureKind::EmitError => "emit_error",
+        FailureKind::RunError => "run_error",
+        FailureKind::ComparisonMismatch => "comparison_mismatch",
+    }
 }
 
 fn create_dir(path: &Path) -> Result<(), CliError> {
@@ -2075,6 +2273,49 @@ mod tests {
         );
         assert_eq!(report.fixtures()[1].case_id().as_str(), "return_42");
         assert_eq!(report.fixtures()[1].outcome(), &FixtureOutcome::Passed);
+
+        Ok(())
+    }
+
+    #[test]
+    fn check_corpus_writes_failure_package_for_comparison_mismatch() -> Result<(), String> {
+        let temp_dir =
+            TestTempDir::new("check_corpus_writes_failure_package_for_comparison_mismatch");
+        let cases_dir = temp_dir.create_dir("cases");
+        let expected_dir = temp_dir.create_dir("expected");
+        let output_dir = temp_dir.create_dir("out");
+        let testcase_json = include_str!("../../../tests/cases/return_42.json");
+        let expected_json =
+            "{\"case_id\":\"return_42\",\"exit_status\":0,\"return_value\":41,\"stdout\":\"\",\"stderr\":\"\"}";
+        write_file(&cases_dir.join("return_42.json"), testcase_json);
+        write_file(&expected_dir.join("return_42.json"), expected_json);
+
+        let error = run_cli(vec![
+            String::from("check-corpus"),
+            cases_dir.to_string_lossy().into_owned(),
+            expected_dir.to_string_lossy().into_owned(),
+            String::from("--out"),
+            output_dir.to_string_lossy().into_owned(),
+        ])
+        .expect_err("corpus check reports comparison mismatch");
+
+        let report = match error {
+            CliError::CorpusFailures(report) => report,
+            other => return Err(format!("unexpected error: {other:?}")),
+        };
+        assert!(!report.is_success());
+
+        let failure_dir = output_dir.join("failures").join("return_42");
+        assert_eq!(
+            read_file(&failure_dir.join("failure.json")),
+            "{\"case_id\":\"return_42\",\"kind\":\"comparison_mismatch\",\"message\":\"comparison failed: ComparisonReport { issues: [ReturnValueMismatch { expected: 41, actual: 42 }] }\",\"shrink\":{\"status\":\"not_attempted\",\"recommended_next_step\":\"minimize testcase while preserving failure kind comparison_mismatch\"},\"corpus_update\":{\"action\":\"review_failure_package\",\"candidate_testcase\":\"testcase.json\",\"candidate_expected\":\"expected.json\",\"candidate_actual\":\"actual.json\"}}"
+        );
+        assert_eq!(read_file(&failure_dir.join("testcase.json")), testcase_json);
+        assert_eq!(read_file(&failure_dir.join("expected.json")), expected_json);
+        assert_eq!(
+            read_file(&failure_dir.join("actual.json")),
+            "{\"case_id\":\"return_42\",\"exit_status\":0,\"return_value\":42,\"stdout\":\"\",\"stderr\":\"\"}"
+        );
 
         Ok(())
     }

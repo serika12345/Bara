@@ -189,6 +189,10 @@ target/bara-blackbox/
   compiled/<case_id>/fixups.json
   compiled/<case_id>/helpers.json
   compiled/<case_id>/artifact.report.json
+  failures/<case_id>/failure.json
+  failures/<case_id>/testcase.json
+  failures/<case_id>/expected.json
+  failures/<case_id>/actual.json
 ```
 
 将来の分割案:
@@ -202,14 +206,20 @@ btbc-compare expected.json actual.json
 
 ## 失敗時に保存するもの
 
+`check-corpus --out` / `check-blackbox --out` は、失敗 fixture ごとに
+`failures/<case_id>/` を作る。`failure.json` は stable failure classification、
+message、shrink status、corpus update action を持つ。raw testcase fixture では、
+保存できる範囲で以下も同じ directory に置く。
+
 - `testcase.json`
 - `expected.json`
 - `actual.json`
-- `compiled.ir.json`
-- `pcmap.json`
-- `fixups.json`
-- ARM64 disassembly
-- failure classification
+
+`compiled/<case_id>/` が存在する場合は、同じ case id の `compiled.ir.json`、
+`pcmap.json`、`fixups.json`、`helpers.json`、`artifact.report.json` を failure
+analysis に使う。現時点の shrink は自動実行せず、`failure.json` に
+`not_attempted` として記録し、同じ failure kind を保ったまま人間または後続ツールが
+testcase を最小化する。
 
 ## failure classification
 

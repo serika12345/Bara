@@ -9,35 +9,46 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 09:18 JST
+最終更新: 2026-06-11 09:27 JST
 
 状態:
 
-- project_state: completed。B7 の 10 個目の小ステップとして、Rosetta
-  black-box oracle 経路を clean-room ルール内で再検討し、runner observation
-  境界を process status / stdout / stderr と stdout JSON に固定した。
+- project_state: completed。B7 の 11 個目の小ステップとして、fixture shrink /
+  failure classification / corpus update の初期運用 package を追加した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B7:
   Oracle / Regression 基盤。
-- active_design_focus: B7 Rosetta black-box oracle boundary。Rosetta runner から
-  読む値を public process observation に限定し、`expected.json` の testcase
-  behavior は runner stdout の `ObservedResult` JSON だけから作る。
+- active_design_focus: B7 failure package。`check-corpus --out` /
+  `check-blackbox --out` が失敗 fixture ごとに `failures/<case_id>/failure.json`
+  と保存可能な testcase / expected / actual を出し、後続の shrink と corpus
+  update の入力にできるようにした。
 - active_branch: `task/b7-x86_64-macho-fixture-generation`。base commit は
   `8d39a4a`。latest commit はこの小ステップの review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B7 の
-  Rosetta black-box oracle 経路を clean-room ルール内で再検討する項目。
-- completed_work: `x86_64_mach_o_fixture` に `RosettaOracleObservation` 境界を追加し、
-  runner subprocess の status / stdout / stderr からだけ expected result を作るよう
-  明示した。`docs/clean-room.md` と `docs/test-oracle.md` に、Rosetta から得た
-  process observation と testcase behavior JSON の扱いを分けて記録した。
-- remaining_work: B7 は継続中。fixture shrink / failure classification /
-  corpus update の運用は未実装。
-- next_action: fixture shrink / failure classification / corpus update の運用を作る。
+  fixture shrink / failure classification / corpus update の運用を作る項目。
+- completed_work: `FixtureRun` に failure package 用の保存データを持たせ、
+  `--out` 指定時に `failures/<case_id>/failure.json` を出すようにした。
+  comparison mismatch では `testcase.json`、`expected.json`、`actual.json` も同じ
+  directory に保存する。
+- remaining_work: B7 は継続中。Haskell verifier 導入可否、IR / PC map /
+  fixup / final state invariant 検査、property-based 小ケース生成、CI lane 分割は
+  未実装。
+- next_action: Haskell verifier 用 package / schema reader / small x86 semantics
+  interpreter の導入可否を決める。
 - verification: targeted test として
-  `nix develop -c cargo test -p btbc-cli rosetta_oracle_observation`
+  `nix develop -c cargo test -p btbc-cli check_corpus_writes_failure_package_for_comparison_mismatch`
   が通過した。`nix develop -c ./scripts/check-domain-types` と
   `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
+
+- 2026-06-11 09:27 JST: B7 の 11 個目の小ステップとして、
+  fixture shrink / failure classification / corpus update の初期運用 package を
+  追加した。`check-corpus --out` / `check-blackbox --out` は失敗 fixture ごとに
+  `failures/<case_id>/failure.json` を保存し、raw testcase の comparison mismatch
+  では `testcase.json`、`expected.json`、`actual.json` も保存する。
+  `failure.json` には failure kind、message、shrink `not_attempted`、corpus update
+  action を含める。検証は snapshot の targeted test と最終
+  `nix develop -c ./scripts/verify`。
 
 - 2026-06-11 09:18 JST: B7 の 10 個目の小ステップとして、
   Rosetta black-box oracle 経路を clean-room ルール内で再検討した。
