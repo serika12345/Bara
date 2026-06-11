@@ -193,6 +193,15 @@
   helper request、runtime attempt、loader plan、blocker、repro command を
   `target/b8-debug/<case_id>/` 相当の directory に保存する。これは sidecar
   foundation であり、実 `LC_MAIN` first-block translation attempt は B8-G2 に残す。
+- 2026-06-11 の B8-G2 completion step として、debug bundle の entry source を
+  B8-G1 専用 host-trap sentinel から public `LC_MAIN` `entryoff` 由来の実 entry
+  bytes に切り替えた。bundle は decode / lift / emit / runtime attempt を段階別に
+  `available` / `failed` / `skipped` として保存し、`launch.report.json` には
+  `public_lc_main_entryoff`、処理した source PC range、B8-G1 host-trap path
+  `not_used`、同じ blocker report を保存する。現在の source of truth は
+  `blocker.json` の `unsupported_instruction` /
+  `DecodeUnsupportedOpcode { opcode: 85 }` であり、B8-G3 は x86_64 `push rbp`
+  prologue slice から進める。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、

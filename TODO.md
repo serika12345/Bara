@@ -362,15 +362,18 @@ B8-D0 以降でぶつかりそうな大きな壁:
 on-demand translation は、unknown indirect target、callback、lazy binding、
 runtime-generated target が stable blocker として頻出し始めた段階で、必要な範囲から
 導入する。
-- [ ] B8-G2: 実 Mach-O entry からの first-block translation report を作る。
-  - [ ] B8-G1 専用 `0f0b4238473131c0c3` entry とは別に、入力 Mach-O の
+- [x] B8-G2: 実 Mach-O entry からの first-block translation report を作る。
+  - [x] B8-G1 専用 `0f0b4238473131c0c3` entry とは別に、入力 Mach-O の
     public `LC_MAIN` entryoff と executable segment metadata から実 entry bytes を
     切り出す。
-  - [ ] 実 entry bytes に対して decode / lift / emit / runtime attempt を行い、
+  - [x] 実 entry bytes に対して decode / lift / emit / runtime attempt を行い、
     最初の unsupported instruction / terminator / helper boundary を stable
     JSON report に保存する。
-  - [ ] GUI 表示は要求せず、実 x86_64 entry に到達した事実、処理した PC range、
+  - [x] GUI 表示は要求せず、実 x86_64 entry に到達した事実、処理した PC range、
     次 blocker、B8-G1 host trap path との差分を launch report に保存する。
+  - [x] B8-G2 の debug bundle は `blocker.json` で
+    `unsupported_instruction` / `DecodeUnsupportedOpcode { opcode: 85 }` を返す。
+    これは x86_64 `push rbp` prologue であり、B8-G3 の最初の ISA slice として扱う。
 
 #### PR Gate: B8-G2 Real LC_MAIN First-Block Report
 
@@ -378,15 +381,15 @@ branch: `task/b8-g2-entry-first-block`
 
 完了条件:
 
-- B8-G1 専用 sentinel / host trap entry とは別に、public `LC_MAIN` entryoff と
+- [x] B8-G1 専用 sentinel / host trap entry とは別に、public `LC_MAIN` entryoff と
   executable segment metadata から実 entry bytes を切り出している。
-- 実 entry bytes の decode / lift / emit / runtime attempt が debug bundle と
+- [x] 実 entry bytes の decode / lift / emit / runtime attempt が debug bundle と
   launch report に保存される。
-- 最初の unsupported instruction / terminator / helper boundary が stable
+- [x] 最初の unsupported instruction / terminator / helper boundary が stable
   `blocker.json` と launch report に保存される。
-- GUI 表示を完了条件にせず、処理した source PC range と B8-G1 host trap path
+- [x] GUI 表示を完了条件にせず、処理した source PC range と B8-G1 host trap path
   との差分が report される。
-- B8-D0 の debug bundle 出力を使い、次の B8-G3 以降で潰すべき blocker が
+- [x] B8-D0 の debug bundle 出力を使い、次の B8-G3 以降で潰すべき blocker が
   具体的に分かる。
 
 PR に含めない:
@@ -405,6 +408,8 @@ review gate:
 
 - [ ] B8-G3: self-authored GUI fixture の compiler output に必要な x86_64
   ISA subset を corpus-driven に拡張する。
+  - [ ] B8-G2 の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 85 }`
+    (`push rbp`) を最初の ISA blocker として regression corpus に固定する。
   - [ ] prologue / epilogue、stack frame、RIP-relative addressing、`lea`、
     `mov` variants、memory operands、direct / indirect call or jump stubs を
     public ISA 仕様に基づいて decode / lift / emit へ追加する。

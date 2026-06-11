@@ -9,26 +9,27 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 17:18 JST
+最終更新: 2026-06-11 17:37 JST
 
 状態:
 
 - project_state: in_progress。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
-  reviewable GUI 起動 slice の積み上げとして扱う。B8-G1 は到達済みで、B8 全体は
-  B8-G2 以降で self-authored fixture から一般の x86_64 macOS GUI application に
-  近づける長期拡張として継続する。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-D0 PR Gate:
-  一般アプリ化に入る前の debug bundle foundation を作った。B8 GUI input binary の
-  public Mach-O probe と、B8-G1 translated host trap entry の entry bytes、decode
-  report、lift IR、emit report、PC map、fixups、helper request、loader plan、
-  runtime attempt、blocker、repro command を 1 directory に保存できる。
+  reviewable GUI 起動 slice の積み上げとして扱う。B8-G2 までで、self-authored
+  x86_64 GUI fixture の実 `LC_MAIN` entry から first-block translation report を
+  生成できるようになった。B8 全体はここから ISA / loader / import / ABI /
+  Objective-C / AppKit / process-state boundary を debug bundle の blocker report
+  から順に潰す。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G2 PR Gate:
+  B8-G1 専用 translated host-trap sentinel ではなく、public `LC_MAIN` `entryoff` と
+  executable segment metadata から実 entry bytes を切り出し、decode / lift / emit /
+  runtime attempt を debug bundle と `launch.report.json` に保存できる。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
   Objective-C runtime / dyld の private behavior は使わず、public metadata、
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
-- active_branch: `task/b8-d0-debug-bundle`。base commit は `7b2a1da`。
-  latest commit は B8-D0 review package で報告する。
+- active_branch: `task/b8-g2-entry-first-block`。base branch は最新 `main`。
+  latest commit は B8-G2 review package で報告する。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
@@ -38,26 +39,34 @@
   stable comparison が空 issue で一致する。manual visible mode は window close /
   `Command-Q` まで戻らず、GUI window 上の `hello world` label を目視確認できる。
   B8-G2 以降の一般アプリ化計画と、その前提になる B8-D0 debug bundle foundation を
-  TODO / scope / design TODO に明文化した。B8-D0 以降でぶつかりそうな壁の初期順序も
-  debug bundle、実 Mach-O entry、x86_64 ISA coverage、Mach-O loader execution、
-  dynamic library / import boundary、ABI / helper marshaling、Objective-C runtime /
-  AppKit lifecycle、process state、indirect control flow / translation cache、
-  macOS constraints / bundle resource として記録した。B8-D0 として、
-  `generate-b8-debug-bundle <binary> <out-root>` を追加し、通常の actual / launch /
-  feedback report とは別の failure-analysis sidecar を保存できるようにした。
-- remaining_work: B8-G2。B8-G1 専用 sentinel ではなく、Rosetta 確認済み
-  self-authored x86_64 GUI binary の実 `LC_MAIN` entry から first-block
-  translation attempt を行い、次の unsupported boundary を debug bundle と launch
-  report に保存する。
-- next_action: B8-D0 branch を commit / push し、draft PR を開いて review gate で
-  停止する。レビュー後の次 PR Gate は B8-G2 Real LC_MAIN First-Block Report。
-- verification: targeted checks として `nix develop -c cargo check -p btbc-cli`、
-  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_writes_foundation_sidecar -- --nocapture`、
-  `nix develop -c cargo test -p btbc-cli usage_includes_probe_binary_command -- --nocapture`
+  TODO / scope / design TODO に明文化した。B8-D0 として
+  `generate-b8-debug-bundle <binary> <out-root>` を追加し、B8-G2 として同 bundle の
+  entry source を public `LC_MAIN` entry に切り替えた。現在の generated
+  `blocker.json` は `unsupported_instruction` /
+  `DecodeUnsupportedOpcode { opcode: 85 }` を返し、`launch.report.json` は
+  `public_lc_main_entryoff`、source PC range `5632..5633`、B8-G1 host-trap path
+  `not_used` を保存する。
+- remaining_work: B8-G3。B8-G2 の blocker report に基づき、最初の ISA blocker
+  である x86_64 `push rbp` prologue slice を corpus-driven に実装し、次 blocker
+  まで進むことを debug bundle で確認する。
+- next_action: B8-G2 branch を commit / push し、draft PR を開いて review gate で
+  停止する。レビュー後の次 PR Gate は B8-G3 First ISA Blocker Slice。
+- verification: targeted checks として `nix develop -c cargo check -p btbc-cli` と
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_writes_real_entry_first_block_report -- --nocapture`
   が通過した。full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-11 17:37 JST: B8-G2 Real LC_MAIN First-Block Report を実装した。
+  `generate-b8-debug-bundle <binary> <out-root>` は B8-G1 専用 translated host-trap
+  sentinel ではなく、入力 Mach-O の public `LC_MAIN` entry bytes を保存し、その実
+  entry に対する decode / lift / emit / runtime attempt、loader plan、
+  `launch.report.json`、`blocker.json`、repro command を出力する。debug bundle の
+  current blocker は `unsupported_instruction` /
+  `DecodeUnsupportedOpcode { opcode: 85 }` で、B8-G3 の最初の対象は x86_64
+  `push rbp` prologue slice になった。targeted `cargo check` と
+  `generate_b8_debug_bundle_writes_real_entry_first_block_report` test、full
+  `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-11 17:18 JST: B8-D0 Debug Bundle Foundation を実装した。
   `generate-b8-debug-bundle <binary> <out-root>` は
   `<out-root>/b8_gui_hello_world/` に `input.probe.json`、`entry.bytes.bin`、
