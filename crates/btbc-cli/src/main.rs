@@ -19,6 +19,7 @@ use bara_oracle::{
 };
 use serde::Serialize;
 
+mod b8_debug_bundle;
 mod blackbox_run;
 mod executable_run;
 mod function_run;
@@ -29,6 +30,7 @@ mod native_artifact;
 mod native_artifact_cli_tests;
 mod x86_64_mach_o_fixture;
 
+use b8_debug_bundle::{generate_b8_debug_bundle, B8DebugBundleError};
 use blackbox_run::run_check_blackbox;
 use executable_run::{run_executable_manifest, ExecutableRunError};
 use function_run::{
@@ -169,6 +171,9 @@ fn run_cli(args: Vec<String>) -> Result<String, CliError> {
                 Path::new(launch_report_path),
                 Path::new(feedback_report_path),
             )
+        }
+        [command, binary_path, output_root] if command == "generate-b8-debug-bundle" => {
+            run_generate_b8_debug_bundle(Path::new(binary_path), Path::new(output_root))
         }
         [command, case_path, output_dir] if command == "emit-fixture-artifacts" => {
             run_emit_fixture_artifacts(Path::new(case_path), Path::new(output_dir))
@@ -499,6 +504,13 @@ fn run_b8_gui_hello_world_actual_attempt(
         observe_appkit_gui_hello_world_helper_actual().map_err(CliError::X8664MachOFixture)?;
     b8_gui_hello_world_actual_launch_attempt(&input_probe, helper_result)
         .map_err(CliError::X8664MachOFixture)
+}
+
+fn run_generate_b8_debug_bundle(
+    binary_path: &Path,
+    output_root: &Path,
+) -> Result<String, CliError> {
+    generate_b8_debug_bundle(binary_path, output_root).map_err(CliError::B8DebugBundle)
 }
 
 fn probe_binary_path(binary_path: &Path) -> Result<BinaryFormatProbeReport, CliError> {
@@ -1558,6 +1570,7 @@ enum CliError {
     },
     FunctionRun(FunctionRunError),
     GuiHelloWorldTranslatedLaunch(GuiHelloWorldTranslatedLaunchError),
+    B8DebugBundle(B8DebugBundleError),
     NativeArtifact(NativeArtifactError),
     X8664MachOFixture(X8664MachOFixtureError),
     NativeSourceImageMetadata(NativeSourceImageMetadataError),
@@ -1580,6 +1593,7 @@ impl CliError {
             Self::BinaryProbeComparisonMismatch { .. } => FailureKind::ComparisonMismatch,
             Self::FunctionRun(error) => error.failure_kind(),
             Self::GuiHelloWorldTranslatedLaunch(_) => FailureKind::RunError,
+            Self::B8DebugBundle(_) => FailureKind::RunError,
             Self::NativeArtifact(error) => error.failure_kind(),
             Self::X8664MachOFixture(error) => error.failure_kind(),
             Self::NativeSourceImageMetadata(_) => FailureKind::InvalidTestCase,
@@ -1603,7 +1617,7 @@ impl std::fmt::Display for CliError {
         match self {
             Self::Usage => write!(
                 formatter,
-                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | emit-fixture-artifacts <case.json> <out-dir> | link-fixture-arm64-main <case.json> <out-exe> | build-x86_64-macho-fixture <case.json> <out-exe> | build-x86_64-gui-hello-world-fixture <out-exe> | build-x86_64-gui-hello-world-visible-fixture <out-exe> | build-x86_64-oracle-runner <case.json> <out-exe> | generate-x86_64-expected <case.json> <expected.json> | generate-x86_64-gui-hello-world-expected <expected.json> <launch-metadata.json> | generate-arm64-actual <case.json> <actual.json> | generate-arm64-gui-hello-world-actual <binary> <actual.json> <launch-report.json> | generate-arm64-gui-hello-world-translated-actual <binary> <actual.json> <launch-report.json> | run-arm64-gui-hello-world-translated-visible <binary> <launch-report.json> | generate-arm64-gui-hello-world-feedback <binary> <expected.json> <actual.json> <launch-report.json> <feedback-report.json> | compare-expected-actual <expected.json> <actual.json> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
+                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | emit-fixture-artifacts <case.json> <out-dir> | link-fixture-arm64-main <case.json> <out-exe> | build-x86_64-macho-fixture <case.json> <out-exe> | build-x86_64-gui-hello-world-fixture <out-exe> | build-x86_64-gui-hello-world-visible-fixture <out-exe> | build-x86_64-oracle-runner <case.json> <out-exe> | generate-x86_64-expected <case.json> <expected.json> | generate-x86_64-gui-hello-world-expected <expected.json> <launch-metadata.json> | generate-arm64-actual <case.json> <actual.json> | generate-arm64-gui-hello-world-actual <binary> <actual.json> <launch-report.json> | generate-arm64-gui-hello-world-translated-actual <binary> <actual.json> <launch-report.json> | run-arm64-gui-hello-world-translated-visible <binary> <launch-report.json> | generate-arm64-gui-hello-world-feedback <binary> <expected.json> <actual.json> <launch-report.json> <feedback-report.json> | generate-b8-debug-bundle <binary> <out-root> | compare-expected-actual <expected.json> <actual.json> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
             ),
             Self::ReadFile { path, source } => {
                 write!(formatter, "failed to read file {}: {source}", path.display())
@@ -1668,6 +1682,7 @@ impl std::fmt::Display for CliError {
             Self::GuiHelloWorldTranslatedLaunch(error) => {
                 write!(formatter, "B8 translated GUI launch error: {error}")
             }
+            Self::B8DebugBundle(error) => write!(formatter, "B8 debug bundle error: {error}"),
             Self::NativeArtifact(error) => write!(formatter, "native artifact error: {error}"),
             Self::X8664MachOFixture(error) => {
                 write!(formatter, "x86_64 Mach-O fixture error: {error}")
@@ -2344,6 +2359,69 @@ mod tests {
     }
 
     #[test]
+    fn generate_b8_debug_bundle_writes_foundation_sidecar() {
+        let temp_dir = TestTempDir::new("generate_b8_debug_bundle_writes_foundation_sidecar");
+        let binary_path = temp_dir.write_binary_file(
+            "b8_gui_hello_world",
+            include_bytes!("../../../tests/binaries/mach_o_execute_header.bin"),
+        );
+        let output_root = temp_dir.path.join("b8-debug");
+        let bundle_dir = output_root.join("b8_gui_hello_world");
+
+        let output = run_cli(vec![
+            String::from("generate-b8-debug-bundle"),
+            binary_path.to_string_lossy().into_owned(),
+            output_root.to_string_lossy().into_owned(),
+        ])
+        .expect("B8 debug bundle is generated");
+
+        assert_eq!(
+            output,
+            format!(
+                "{{\"bundle_dir\":\"{}\",\"input_probe\":\"{}\",\"entry_bytes_bin\":\"{}\",\"entry_bytes_json\":\"{}\",\"decode_report\":\"{}\",\"lift_ir\":\"{}\",\"emit_report\":\"{}\",\"pcmap\":\"{}\",\"fixups\":\"{}\",\"helpers\":\"{}\",\"loader_plan\":\"{}\",\"runtime_attempt\":\"{}\",\"blocker\":\"{}\",\"repro\":\"{}\"}}",
+                bundle_dir.display(),
+                bundle_dir.join("input.probe.json").display(),
+                bundle_dir.join("entry.bytes.bin").display(),
+                bundle_dir.join("entry.bytes.json").display(),
+                bundle_dir.join("decode.report.json").display(),
+                bundle_dir.join("lift.ir.json").display(),
+                bundle_dir.join("emit.report.json").display(),
+                bundle_dir.join("pcmap.json").display(),
+                bundle_dir.join("fixups.json").display(),
+                bundle_dir.join("helpers.json").display(),
+                bundle_dir.join("loader.plan.json").display(),
+                bundle_dir.join("runtime-attempt.json").display(),
+                bundle_dir.join("blocker.json").display(),
+                bundle_dir.join("repro.sh").display(),
+            )
+        );
+        assert_eq!(
+            fs::read(bundle_dir.join("entry.bytes.bin")).expect("entry bytes are readable"),
+            vec![0x0f, 0x0b, b'B', b'8', b'G', b'1', 0x31, 0xc0, 0xc3]
+        );
+        assert!(read_file(&bundle_dir.join("input.probe.json"))
+            .contains("\"format\":\"mach_o_64_little_endian\""));
+        assert!(read_file(&bundle_dir.join("entry.bytes.json"))
+            .contains("\"source\":\"b8_g1_translated_host_trap_entry\""));
+        assert!(read_file(&bundle_dir.join("decode.report.json"))
+            .contains("\"kind\":\"bara_app_kit_gui_hello_world_trap_sentinel\""));
+        assert!(read_file(&bundle_dir.join("lift.ir.json"))
+            .contains("\"trap\":\"app_kit_gui_hello_world\""));
+        assert!(read_file(&bundle_dir.join("emit.report.json"))
+            .contains("\"target_backend\":\"bara-arm64\""));
+        assert!(read_file(&bundle_dir.join("pcmap.json")).contains("\"entries\""));
+        assert!(read_file(&bundle_dir.join("fixups.json")).contains("\"fixups\""));
+        assert!(read_file(&bundle_dir.join("helpers.json")).contains("\"app_kit_gui_hello_world\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_entry_source\":\"public_lc_main_entryoff\""));
+        assert!(read_file(&bundle_dir.join("runtime-attempt.json"))
+            .contains("\"run_scope\":\"translated_entry_only\""));
+        assert!(read_file(&bundle_dir.join("blocker.json"))
+            .contains("\"current_blocker\":\"real_lc_main_entry_not_attempted\""));
+        assert!(read_file(&bundle_dir.join("repro.sh")).contains("generate-b8-debug-bundle"));
+    }
+
+    #[test]
     fn compare_expected_actual_reports_matching_observations() {
         let temp_dir = TestTempDir::new("compare_expected_actual_reports_matching_observations");
         let expected_path = temp_dir.write_file(
@@ -2785,6 +2863,9 @@ mod tests {
         assert!(error.to_string().contains(
             "run-arm64-gui-hello-world-translated-visible <binary> <launch-report.json>"
         ));
+        assert!(error
+            .to_string()
+            .contains("generate-b8-debug-bundle <binary> <out-root>"));
         assert!(error
             .to_string()
             .contains("compare-expected-actual <expected.json> <actual.json>"));
