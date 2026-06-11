@@ -105,6 +105,18 @@ impl RecognizedMachODyldInfoCommand {
     pub const fn bind(&self) -> MachOLinkeditDataRange {
         self.bind
     }
+
+    pub const fn weak_bind(&self) -> MachOLinkeditDataRange {
+        self.weak_bind
+    }
+
+    pub const fn lazy_bind(&self) -> MachOLinkeditDataRange {
+        self.lazy_bind
+    }
+
+    pub const fn export(&self) -> MachOLinkeditDataRange {
+        self.export
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -176,6 +188,10 @@ impl MachOLinkeditFileOffset {
     const fn from_public_linkedit_value(value: u32) -> Self {
         Self { value }
     }
+
+    pub const fn as_u32(self) -> u32 {
+        self.value
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -187,6 +203,10 @@ pub struct MachOLinkeditByteSize {
 impl MachOLinkeditByteSize {
     const fn from_public_linkedit_value(value: u32) -> Self {
         Self { value }
+    }
+
+    pub const fn as_u32(self) -> u32 {
+        self.value
     }
 }
 
@@ -200,6 +220,10 @@ impl MachOLinkeditEntryCount {
     const fn from_public_linkedit_value(value: u32) -> Self {
         Self { value }
     }
+
+    pub const fn as_u32(self) -> u32 {
+        self.value
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -211,6 +235,10 @@ pub struct MachOSymbolIndex {
 impl MachOSymbolIndex {
     const fn from_public_linkedit_value(value: u32) -> Self {
         Self { value }
+    }
+
+    pub const fn as_u32(self) -> u32 {
+        self.value
     }
 }
 

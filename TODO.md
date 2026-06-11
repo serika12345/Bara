@@ -885,9 +885,11 @@ review gate:
   - [x] B8-G4a: `LC_SEGMENT_64` file range から materialize する executable image を
     segment-relative offset ではなく Mach-O VM address space で map し、entry PC と
     mapped bytes の関係を debug bundle / program image metadata に保存する。
-  - [ ] B8-G4b: public rebase / bind / import metadata を使い、`call r14` の target
+  - [x] B8-G4b: public rebase / bind / import metadata を使い、`call r14` の target
     identity と helper boundary request を stable blocker または解決済み import として
     report する。
+  - [ ] B8-G4c: public `LC_DYLD_CHAINED_FIXUPS` payload を decode し、現在の
+    `call r14` target pointer load を import symbol identity へ近づける。
 
 #### PR Gate: B8-G4a User-Space Mach-O VM Image Mapping
 
@@ -924,6 +926,75 @@ review gate:
 
 - 完了したら commit / push / draft PR 作成で停止する。次の B8-G4b は debug bundle の
   `relocation_binding` deferred report と `register_indirect_call` blocker を見て進める。
+
+#### PR Gate: B8-G4b Public Chained Fixups Import Boundary
+
+branch: `task/b8-g4b-public-bind-import-boundary`
+
+完了条件:
+
+- [x] B8 debug bundle の `loader.plan.json` が `call r14` を import boundary として
+  report し、`target_register`、`call_site`、`return_to` を保存する。
+- [x] `call r14` の直前にある `mov r14, qword ptr [rip+disp32]` を
+  `target_pointer_load` として report し、resolved pointer address を保存する。
+- [x] public Mach-O load command metadata から dylib import command、dyld info range、
+  `LC_DYLD_CHAINED_FIXUPS` linkedit data range、symbol table count を
+  `public_metadata` として保存する。
+- [x] 現 fixture が `LC_DYLD_CHAINED_FIXUPS` を使っている場合は import identity を
+  silent fallback せず、`helper_boundary_request` を
+  `import_symbol_identity_unresolved` の stable blocker として保存する。
+- [x] 次 action が public chained fixups import decoder であることを
+  `decode_public_dyld_chained_fixups_imports` として report する。
+
+PR に含めない:
+
+- public `LC_DYLD_CHAINED_FIXUPS` payload decoder の本実装。
+- chained fixups import table からの symbol identity 解決本体。
+- helper boundary request の実行、Objective-C / AppKit helper bridge の一般化。
+- arbitrary indirect call target execution、translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- manual `generate-b8-debug-bundle` で `loader.plan.json` の
+  `import_boundary.status=blocked`、`target_pointer_load.address=4294979672`、
+  `dyld_chained_fixups dataoff=24576 datasize=584` を確認する。
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止する。次の B8-G4c は
+  `loader.plan.json` の `decode_public_dyld_chained_fixups_imports` blocker を見て進める。
+
+#### PR Gate: B8-G4c Public Chained Fixups Import Decoder
+
+branch: `task/b8-g4c-public-chained-fixups-import-decoder`
+
+完了条件:
+
+- [ ] public `LC_DYLD_CHAINED_FIXUPS` payload の header / starts / imports のうち、
+  現 fixture の `call r14` target pointer load に必要な最小範囲を decode する。
+- [ ] decoded chained fixups metadata を private dyld behavior に依存せず typed report
+  として保存する。
+- [ ] `target_pointer_load.address=4294979672` が chained fixups import metadata で
+  解決可能か、または不足している public metadata を stable blocker として report する。
+
+PR に含めない:
+
+- 全 Mach-O chained fixups opcode / bind target の網羅。
+- import helper execution、Objective-C / AppKit helper bridge の一般化。
+- arbitrary indirect call target execution、translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p bara-oracle chained_fixups -- --nocapture`
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止する。次の gate は decoded import
+  identity と helper boundary request の結果を見て追加または更新する。
 - [ ] B8-G5: import stub / external symbol call を汎用 helper request に接続する。
   - [ ] symbol stubs、lazy bind 相当、`objc_msgSend`、public libc / AppKit symbol を
     core IR に直接埋め込まず、helper capability request と stable blocker に分ける。

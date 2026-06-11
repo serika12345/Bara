@@ -2445,6 +2445,24 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"entry_pc\":4294972928"));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_action\":\"resolve_public_rebase_bind_imports\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"import_boundary\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"status\":\"blocked\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"target_register\":\"r14\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"target_pointer_load\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"address\":4294979672"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"command\":\"dyld_chained_fixups\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"dataoff\":24576"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"datasize\":584"));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"helper_boundary_request\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"reason\":\"import_symbol_identity_unresolved\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_action\":\"decode_public_dyld_chained_fixups_imports\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_entry_source\":\"first_unsupported_boundary\""));
         assert!(read_file(&bundle_dir.join("runtime-attempt.json"))

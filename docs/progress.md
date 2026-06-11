@@ -9,12 +9,12 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 21:54 JST
+最終更新: 2026-06-11 22:35 JST
 
 状態:
 
 - project_state: in_progress。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
-  reviewable GUI 起動 slice の積み上げとして扱う。B8-G4a までで、self-authored
+  reviewable GUI 起動 slice の積み上げとして扱う。B8-G4b までで、self-authored
   x86_64 GUI fixture の実 `LC_MAIN` entry から
   `push rbp; mov rbp,rsp; push r15; push r14; push rbx; push rax; call rel32;
   mov rbx,rax; mov rax,qword ptr [rip+disp32]; mov rdx,qword ptr [rax];
@@ -22,20 +22,23 @@
   mov rsi,qword ptr [rip+disp32]; mov r14,qword ptr [rip+disp32]; call r14` までを
   decode / lift / emit または stable unsupported boundary として扱える。さらに
   entry image は segment-relative offset ではなく public `LC_SEGMENT_64.vmaddr` ベースの
-  Mach-O VM address space で materialize される。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G4a User-Space Mach-O
-  VM Image Mapping: selected `LC_SEGMENT_64` の file range と `vmaddr` から
-  `ExecutableImage` / `ProgramImageMetadata` / B8 debug bundle を VM-addressed にした。
+  Mach-O VM address space で materialize される。`call r14` は public
+  `LC_DYLD_CHAINED_FIXUPS` metadata と結びつく import boundary として stable blocker
+  になり、helper boundary request は import symbol identity 未解決として停止する。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G4b Public Chained Fixups
+  Import Boundary: `call r14` の register-indirect call boundary と直前の R14
+  RIP-relative pointer load を public Mach-O import metadata に接続し、
+  `LC_DYLD_CHAINED_FIXUPS` decoder が次 action であることを report する。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
   Objective-C runtime / dyld の private behavior は使わず、public metadata、
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
-- active_branch: `task/b8-g4-user-space-macho-image-mapping`。base branch は最新 `main`。
-  latest commit は B8-G4a review package で報告する。
+- active_branch: `task/b8-g4b-public-bind-import-boundary`。base branch は最新 `main`。
+  latest commit は B8-G4b review package で報告する。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
-  B8-G3l / B8-G4 / B8-G4a / B8-G4b。
+  B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -60,7 +63,10 @@
   `mov r14, qword ptr [rip+disp32]` (`4c 8b 35 14 1a 00 00`) を通過できるようにし、
   B8-G3l として `call r14` (`41 ff d6`) を register-indirect call boundary として
   stable report できるようにした。B8-G4a として Mach-O entry image materialization を
-  VM-addressed に切り替えた。現在の generated `blocker.json` は
+  VM-addressed に切り替えた。B8-G4b として `loader.plan.json` に
+  public import boundary を追加し、`call r14` と直前の
+  `mov r14, qword ptr [rip+disp32]` の target pointer load を
+  public `LC_DYLD_CHAINED_FIXUPS` metadata に接続した。現在の generated `blocker.json` は
   `unsupported_instruction` / `register_indirect_call` を `call_site=4294972996`、
   `return_to=4294972999`、`target=r14` で返し、
   `decode.report.json` は `push_rbp`、`mov_rbp_rsp`、`push_r15`、`push_r14`、
@@ -71,22 +77,37 @@
   保存する。`launch.report.json` の `source_pc` は `4294972928`、processed source PC
   range は `4294972928..4294972999` である。`loader.plan.json` は
   `lc_segment64_file_range` 由来の `mach_o_virtual_address` mapping と、
-  public rebase / bind / import 解決の deferred step を保存する。
-- remaining_work: B8-G4b。`call r14` の実行先の意味を public Mach-O loader metadata、
-  rebase / bind、import identity と結びつけ、helper boundary request または stable
-  import blocker として report する必要がある。
-- next_action: B8-G4a branch を commit / push し、draft PR を開いて review gate で
-  停止する。レビュー後の次 PR Gate は B8-G4b public rebase / bind / import boundary。
+  public rebase / bind / import 解決の deferred step を保存する。さらに
+  `import_boundary.status=blocked`、`target_pointer_load.address=4294979672`、
+  `linkedit_data.command=dyld_chained_fixups`、`dataoff=24576`、`datasize=584`、
+  `helper_boundary_request.reason=import_symbol_identity_unresolved`、
+  `next_action=decode_public_dyld_chained_fixups_imports` を保存する。
+- remaining_work: B8-G4c。public `LC_DYLD_CHAINED_FIXUPS` payload を decode し、
+  `target_pointer_load.address=4294979672` を import symbol identity へ近づける。
+  まだ import helper execution、Objective-C / AppKit helper bridge、arbitrary
+  indirect call target execution は行わない。
+- next_action: B8-G4b branch を commit / push し、draft PR を開いて review gate で
+  停止する。レビュー後の次 PR Gate は B8-G4c public chained fixups import decoder。
 - verification: targeted check として
-  `nix develop -c cargo test -p bara-oracle mach_o_executable_image -- --nocapture`、
-  `nix develop -c cargo test -p bara-oracle entry_function_pipeline -- --nocapture`、
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
-  manual debug bundle generation で VM-addressed `source_pc=4294972928` と
-  `register_indirect_call { target: r14, call_site: 4294972996, return_to: 4294972999 }`
-  blocker を確認した。full `nix develop -c ./scripts/verify` も通過した。
+  manual debug bundle generation で `loader.plan.json` の
+  `import_boundary.status=blocked`、`target_pointer_load.address=4294979672`、
+  `dyld_chained_fixups dataoff=24576 datasize=584`、および
+  `next_action=decode_public_dyld_chained_fixups_imports` を確認した。full
+  `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-11 22:35 JST: B8-G4b Public Chained Fixups Import Boundary を実装した。
+  `loader.plan.json` は `call r14` の `target_register=r14`、`call_site=4294972996`、
+  `return_to=4294972999` と、直前の R14 RIP-relative qword load が読む
+  `target_pointer_load.address=4294979672` を保存する。public Mach-O metadata として
+  dylib import command、dyld info range、`LC_DYLD_CHAINED_FIXUPS dataoff=24576
+  datasize=584`、symbol table count を report する。現 fixture では import symbol
+  identity はまだ解決せず、helper boundary request は
+  `import_symbol_identity_unresolved` の stable blocker として停止し、次 action は
+  `decode_public_dyld_chained_fixups_imports` になった。targeted check と manual debug
+  bundle generation、full `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-11 21:54 JST: B8-G4a User-Space Mach-O VM Image Mapping を実装した。
   `MachOExecutableImagePlan` は selected segment の file range、segment `vmaddr`、
   entry segment offset、entry virtual address を分けて保持する。materialization は
