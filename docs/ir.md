@@ -323,4 +323,4 @@ pub enum Fixup {
 - [x] fallthrough target が存在する。
 - [x] block range が重ならない。
 - [x] unsupported terminator は明示的に report される。
-- [ ] PC map が source PC を失っていない。
+- [x] PC map が source PC を失っていない。

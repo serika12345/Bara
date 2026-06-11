@@ -189,6 +189,7 @@ target/bara-blackbox/
   compiled/<case_id>/fixups.json
   compiled/<case_id>/helpers.json
   compiled/<case_id>/artifact.report.json
+  compiled/<case_id>/verifier.report.json
   failures/<case_id>/failure.json
   failures/<case_id>/testcase.json
   failures/<case_id>/expected.json
@@ -252,9 +253,14 @@ supply-chain 検証範囲が広がるため、まず既存 Rust workspace 内で
 進める。
 
 直近の verifier は、`compiled/<case_id>/compiled.ir.json`、`pcmap.json`、
-`fixups.json`、`artifact.report.json`、`actual/<case_id>.json`、必要に応じて
+`fixups.json`、`artifact.report.json`、`verifier.report.json`、
+`actual/<case_id>.json`、必要に応じて
 `failures/<case_id>/failure.json` を読み、IR invariant、PC map invariant、
 fixup consistency、final state comparison を stable report として返す。
+
+B7 の初期 Rust verifier report は `verifier.report.json` として保存する。
+最初の検査は、emit 後の PC map が全 IR block start の source PC を保持している
+ことに限定する。
 
 Haskell は、JSON schema が安定し、QuickCheck / Hedgehog による generator と
 shrinker、または Rust 実装から独立した仕様モデルが必要になった時点で `spec/`

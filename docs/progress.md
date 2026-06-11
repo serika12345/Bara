@@ -9,36 +9,42 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 09:32 JST
+最終更新: 2026-06-11 09:45 JST
 
 状態:
 
-- project_state: completed。B7 の 12 個目の小ステップとして、Haskell verifier
-  package / schema reader / small x86 semantics interpreter の導入可否を判断した。
+- project_state: completed。B7 の 13 個目の小ステップとして、Rust verifier report
+  を追加し、PC map が全 IR block start の source PC を保持していることを検査した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B7:
   Oracle / Regression 基盤。
-- active_design_focus: B7 verifier introduction decision。Haskell は B7 では
-  導入せず、Rust workspace 内で IR invariant、PC map invariant、fixup
-  consistency、final state comparator を先に stable report 化する。
+- active_design_focus: B7 Rust verifier report。`bara-arm64` に pure
+  verifier report を追加し、`emit-fixture-artifacts` と `check-corpus --out` /
+  `check-blackbox --out` が `verifier.report.json` を保存する。
 - active_branch: `task/b7-x86_64-macho-fixture-generation`。base commit は
   `8d39a4a`。latest commit はこの小ステップの review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B7 の
-  Haskell verifier 用 package / schema reader / small x86 semantics interpreter の
-  導入可否を決める項目。
-- completed_work: `TODO.md`、`docs/design-todo.md`、`docs/test-oracle.md` に、
-  B7 では Haskell package を追加しない判断を記録した。理由は、現時点の
-  verifier は既存 Rust metadata schema 上で進められ、Haskell toolchain は
-  Nix / supply-chain 境界を広げるため。
-- remaining_work: B7 は継続中。IR / PC map / fixup / final state invariant 検査、
+  IR invariant、PC map invariant、fixup consistency、final state comparator を
+  verifier で検査できるようにする項目の最初の小分け。
+- completed_work: `bara-arm64::verify` が `Program` と `EmittedFunction` を受け取り、
+  missing PC map source を pure report として返す。`FunctionArtifactMetadata` は
+  `verifier.report.json` を出力し、空 issue report は `{"issues":[]}` になる。
+- remaining_work: B7 は継続中。fixup consistency、final state comparator、
   property-based 小ケース生成、CI lane 分割は未実装。
-- next_action: IR invariant、PC map invariant、fixup consistency、final state
-  comparator を Rust verifier で検査できるようにする。
-- verification: documentation-only decision change として
-  `nix develop -c ./scripts/check-no-invisible-chars` と
-  `nix develop -c ./scripts/verify` が通過した。コード、dependency、lockfile、
-  `flake.nix` は変更していないため supply-chain 専用追加検証は不要。
+- next_action: fixup consistency を verifier report で検査する。
+- verification: targeted tests として
+  `nix develop -c cargo test -p bara-arm64 verify::tests` と
+  `nix develop -c cargo test -p btbc-cli emit_fixture_artifacts_writes_compilation_metadata_files`
+  が通過した。`nix develop -c ./scripts/check-domain-types` と
+  `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
+
+- 2026-06-11 09:45 JST: B7 の 13 個目の小ステップとして、
+  Rust verifier report を追加し、PC map が全 IR block start の source PC を
+  保持していることを検査できるようにした。`bara-arm64::verify` は I/O を持たない
+  pure report を返し、`emit-fixture-artifacts` / `check-corpus --out` /
+  `check-blackbox --out` は `verifier.report.json` を保存する。検証は snapshot の
+  targeted tests と最終 `nix develop -c ./scripts/verify`。
 
 - 2026-06-11 09:32 JST: B7 の 12 個目の小ステップとして、
   Haskell verifier package / schema reader / small x86 semantics interpreter の

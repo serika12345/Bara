@@ -283,6 +283,9 @@ fn write_fixture_artifacts(
     let artifact_report_json = serde_json::to_string(artifacts.artifact_report())
         .map_err(JsonError::new)
         .map_err(CliError::Json)?;
+    let verifier_report_json = serde_json::to_string(artifacts.verifier_report())
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)?;
 
     create_dir(output_dir)?;
     write_text_file(&output_paths.compiled_ir_path(), &compiled_ir_json)?;
@@ -290,6 +293,7 @@ fn write_fixture_artifacts(
     write_text_file(&output_paths.fixups_path(), &fixups_json)?;
     write_text_file(&output_paths.helpers_path(), &helpers_json)?;
     write_text_file(&output_paths.artifact_report_path(), &artifact_report_json)?;
+    write_text_file(&output_paths.verifier_report_path(), &verifier_report_json)?;
 
     Ok(output_paths)
 }
@@ -319,6 +323,7 @@ struct FixtureArtifactOutputPaths {
     fixups: String,
     helpers: String,
     artifact_report: String,
+    verifier_report: String,
 }
 
 impl FixtureArtifactOutputPaths {
@@ -339,6 +344,10 @@ impl FixtureArtifactOutputPaths {
                 .into_owned(),
             artifact_report: output_dir
                 .join("artifact.report.json")
+                .to_string_lossy()
+                .into_owned(),
+            verifier_report: output_dir
+                .join("verifier.report.json")
                 .to_string_lossy()
                 .into_owned(),
         }
@@ -362,6 +371,10 @@ impl FixtureArtifactOutputPaths {
 
     fn artifact_report_path(&self) -> PathBuf {
         PathBuf::from(&self.artifact_report)
+    }
+
+    fn verifier_report_path(&self) -> PathBuf {
+        PathBuf::from(&self.verifier_report)
     }
 }
 
@@ -1780,12 +1793,13 @@ mod tests {
         assert_eq!(
             output,
             format!(
-                "{{\"compiled_ir\":\"{}\",\"pcmap\":\"{}\",\"fixups\":\"{}\",\"helpers\":\"{}\",\"artifact_report\":\"{}\"}}",
+                "{{\"compiled_ir\":\"{}\",\"pcmap\":\"{}\",\"fixups\":\"{}\",\"helpers\":\"{}\",\"artifact_report\":\"{}\",\"verifier_report\":\"{}\"}}",
                 output_dir.join("compiled.ir.json").display(),
                 output_dir.join("pcmap.json").display(),
                 output_dir.join("fixups.json").display(),
                 output_dir.join("helpers.json").display(),
                 output_dir.join("artifact.report.json").display(),
+                output_dir.join("verifier.report.json").display(),
             )
         );
         assert_eq!(
@@ -1807,6 +1821,10 @@ mod tests {
         assert_eq!(
             read_file(&output_dir.join("artifact.report.json")),
             "{\"state_layout\":{\"kind\":\"function_level_v0\",\"source_isa\":\"x86_64\",\"target_isa\":\"arm64\",\"abi\":{\"args\":[],\"return\":\"u64\"},\"return_register\":\"rax\",\"stack\":{\"kind\":\"none\"}},\"cache_validation_identity\":{\"kind\":\"fixture_function_v0\",\"case_id\":\"branch_eq_return_42\",\"source_entry\":0,\"source_bytes\":\"b80000000085c07406b807000000c3b82a000000c3\",\"source_abi\":{\"args\":[],\"return\":\"u64\"},\"target_backend\":\"bara-arm64\"},\"helper_requirements\":[]}"
+        );
+        assert_eq!(
+            read_file(&output_dir.join("verifier.report.json")),
+            "{\"issues\":[]}"
         );
     }
 

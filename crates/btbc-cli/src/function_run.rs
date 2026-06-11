@@ -1,6 +1,10 @@
 use std::{error::Error, fmt};
 
-use bara_arm64::{emit_program, BranchFixup, BranchFixupKind, EmittedHostTrapRequests, PcMapEntry};
+use bara_arm64::{
+    emit_program, verify_emitted_function, BranchFixup, BranchFixupKind,
+    EmittedFunctionVerificationIssue, EmittedFunctionVerificationReport, EmittedHostTrapRequests,
+    PcMapEntry,
+};
 use bara_ir::{
     ExternalImportTarget, Program, PublicDyldSymbol, PublicLibcSymbol, PublicSymbolImport,
     SyscallAbi, UnsupportedReason,
@@ -78,6 +82,7 @@ pub(crate) struct FunctionArtifactMetadata {
     fixups: FunctionFixupsArtifact,
     helpers: FunctionHelpersArtifact,
     artifact_report: FunctionArtifactReport,
+    verifier_report: FunctionVerifierReportArtifact,
 }
 
 impl FunctionArtifactMetadata {
@@ -88,6 +93,10 @@ impl FunctionArtifactMetadata {
             fixups: FunctionFixupsArtifact::from_fixups(result.emitted.branch_fixups()),
             helpers: FunctionHelpersArtifact::from_requests(result.emitted.host_trap_requests()),
             artifact_report: FunctionArtifactReport::from_source_and_compile_result(source, result),
+            verifier_report: FunctionVerifierReportArtifact::from_report(&verify_emitted_function(
+                &result.program,
+                &result.emitted,
+            )),
         }
     }
 
@@ -109,6 +118,10 @@ impl FunctionArtifactMetadata {
 
     pub(crate) const fn artifact_report(&self) -> &FunctionArtifactReport {
         &self.artifact_report
+    }
+
+    pub(crate) const fn verifier_report(&self) -> &FunctionVerifierReportArtifact {
+        &self.verifier_report
     }
 }
 
@@ -524,6 +537,41 @@ impl FunctionHelpersArtifact {
 #[serde(tag = "kind", rename_all = "snake_case")]
 enum FunctionHelperArtifact {
     WriteStdout,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub(crate) struct FunctionVerifierReportArtifact {
+    issues: Vec<FunctionVerifierIssueArtifact>,
+}
+
+impl FunctionVerifierReportArtifact {
+    fn from_report(report: &EmittedFunctionVerificationReport) -> Self {
+        Self {
+            issues: report
+                .issues()
+                .iter()
+                .map(FunctionVerifierIssueArtifact::from_issue)
+                .collect(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum FunctionVerifierIssueArtifact {
+    MissingPcMapSource { source: u64 },
+}
+
+impl FunctionVerifierIssueArtifact {
+    const fn from_issue(issue: &EmittedFunctionVerificationIssue) -> Self {
+        match issue {
+            EmittedFunctionVerificationIssue::MissingPcMapSource { source } => {
+                Self::MissingPcMapSource {
+                    source: source.value(),
+                }
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
