@@ -9,33 +9,32 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 21:12 JST
+最終更新: 2026-06-11 21:31 JST
 
 状態:
 
 - project_state: in_progress。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
-  reviewable GUI 起動 slice の積み上げとして扱う。B8-G3k までで、self-authored
+  reviewable GUI 起動 slice の積み上げとして扱う。B8-G3l までで、self-authored
   x86_64 GUI fixture の実 `LC_MAIN` entry から
   `push rbp; mov rbp,rsp; push r15; push r14; push rbx; push rax; call rel32;
   mov rbx,rax; mov rax,qword ptr [rip+disp32]; mov rdx,qword ptr [rax];
   lea rdi,[rip+disp32]; lea rsi,[rip+disp32]; mov rdi,qword ptr [rip+disp32];
-  mov rsi,qword ptr [rip+disp32]; mov r14,qword ptr [rip+disp32]` までを
-  decode / lift / emit または既存 call terminator として扱える。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G3k RIP-Relative MOV Load
-  Batch Boundary: B8-G3j の `blocker.json` で見えた
-  `DecodeUnsupportedOpcode { opcode: 72 }` (`48 8b 35 eb 3a 00 00`) から始まる
-  連続 RIP-relative MOV load を、`rsi` と `r14` destination の 64-bit memory load として
-  最小実装した。
+  mov rsi,qword ptr [rip+disp32]; mov r14,qword ptr [rip+disp32]; call r14` までを
+  decode / lift / emit または stable unsupported boundary として扱える。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G3l Indirect CALL R14
+  Boundary: B8-G3k の `blocker.json` で見えた
+  `DecodeUnsupportedOpcode { opcode: 65 }` (`41 ff d6`) を、direct call や load ではなく
+  register-indirect call boundary として最小実装した。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
   Objective-C runtime / dyld の private behavior は使わず、public metadata、
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
-- active_branch: `task/b8-g3k-rip-relative-load-batch`。base branch は最新 `main`。
-  latest commit は B8-G3k review package で報告する。
+- active_branch: `task/b8-g3l-indirect-call-r14`。base branch は最新 `main`。
+  latest commit は B8-G3l review package で報告する。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
-  B8-G3l。
+  B8-G3l / B8-G4。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -57,32 +56,39 @@
   B8-G3i として `lea rsi, [rip+disp32]` (`48 8d 35 b6 10 00 00`) を通過できるようにし、
   B8-G3j として `mov rdi, qword ptr [rip+disp32]` (`48 8b 3d 22 3b 00 00`) を通過できるようにし、
   B8-G3k として `mov rsi, qword ptr [rip+disp32]` (`48 8b 35 eb 3a 00 00`) と
-  `mov r14, qword ptr [rip+disp32]` (`4c 8b 35 14 1a 00 00`) を通過できるようにした。
-  現在の generated `blocker.json` は `unsupported_instruction` /
-  `DecodeUnsupportedOpcode { opcode: 65 }` を `X86Va(5700)` で返し、
+  `mov r14, qword ptr [rip+disp32]` (`4c 8b 35 14 1a 00 00`) を通過できるようにし、
+  B8-G3l として `call r14` (`41 ff d6`) を register-indirect call boundary として
+  stable report できるようにした。現在の generated `blocker.json` は
+  `unsupported_instruction` / `register_indirect_call` を `call_site=5700`、
+  `return_to=5703`、`target=r14` で返し、
   `decode.report.json` は `push_rbp`、`mov_rbp_rsp`、`push_r15`、`push_r14`、
   `push_rbx`、`push_rax`、`call_rel32`、`mov_rbx_rax`、
   `mov_rax_qword_ptr_rip_relative`、`mov_rdx_qword_ptr_rax`、`lea_rdi_rip_relative`、
   `lea_rsi_rip_relative`、次の `call_rel32`、`mov_rdi_qword_ptr_rip_relative`、
-  `mov_rsi_qword_ptr_rip_relative`、`mov_r14_qword_ptr_rip_relative`、次の unsupported `41`
-  を保存する。`entry.bytes.bin` の次 bytes は `41 ff d6` (`call r14`) で、
-  `launch.report.json` の processed source PC range は `5632..5701` である。
-- remaining_work: B8-G3l。B8-G3k の blocker report に基づき、次の boundary である
-  `41 ff d6` indirect `call r14` を focused fixture から扱う。これは load ではなく
-  unknown indirect control-flow boundary であり、B8-G3k とは別の PR Gate として扱う。
-- next_action: B8-G3k branch を commit / push し、draft PR を開いて review gate で
-  停止する。レビュー後の次 PR Gate は B8-G3l Indirect CALL R14 Boundary。
-- verification: targeted check として `nix develop -c cargo test mov_rsi -- --nocapture`、
-  `nix develop -c cargo test mov_r14 -- --nocapture`、
-  `nix develop -c cargo test rip_relative_load_batch -- --nocapture`、
-  `nix develop -c cargo test static_mapped_qword_for_rsi -- --nocapture`、
-  `nix develop -c cargo test static_mapped_qword_for_r14 -- --nocapture` が通過した。
-  manual debug bundle generation で `mov_rsi_qword_ptr_rip_relative` /
-  `mov_r14_qword_ptr_rip_relative` 通過と次 non-load blocker `41 ff d6` を確認した。
+  `mov_rsi_qword_ptr_rip_relative`、`mov_r14_qword_ptr_rip_relative`、`call_r14` を
+  保存する。`launch.report.json` の processed source PC range は `5632..5703` である。
+- remaining_work: B8-G4。`call r14` は decoded register-indirect control-flow boundary
+  になったため、次は実行先の意味を public Mach-O loader metadata、rebase / bind、
+  import identity と結びつける必要がある。
+- next_action: B8-G3l branch を commit / push し、draft PR を開いて review gate で
+  停止する。レビュー後の次 PR Gate は B8-G4 User-Space Mach-O Image Mapping。
+- verification: targeted check として `nix develop -c cargo test call_r14 -- --nocapture`、
+  `nix develop -c cargo test register_indirect_call -- --nocapture` が通過した。
+  manual debug bundle generation で `call_r14` decode と
+  `register_indirect_call { target: r14, call_site: 5700, return_to: 5703 }` blocker を確認した。
   full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-11 21:31 JST: B8-G3l Indirect CALL R14 Boundary を実装した。
+  x86_64 `41 ff d6` (`call r14`) を `CallR14` として decode し、call 後の bytes を
+  別 blocker として先読みしないようこの boundary で decode を止める。lift は
+  `RegisterIndirectCallUnsupported { target: R14, call_site, return_to }` を持つ unsupported
+  terminator に変換する。B8 debug bundle は lifted IR の frontier unsupported terminator を
+  stable `register_indirect_call` boundary として report し、
+  `call_site=5700`、`return_to=5703`、`target=r14` を保存する。arbitrary indirect target
+  execution、translation cache、fallback JIT/interpreter は導入していない。targeted checks と
+  manual debug bundle generation、full `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-11 21:12 JST: B8-G3k RIP-Relative MOV Load Batch Boundary を実装した。
   x86_64 `48 8b 35 eb 3a 00 00` (`mov rsi, qword ptr [rip+disp32]`) を
   `MovRsiQwordPtrRipRelative` として decode し、`MemRipRelative { width: Bits64 }`

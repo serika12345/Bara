@@ -839,12 +839,12 @@ review gate:
 - 完了したら commit / push / draft PR 作成で停止する。次の blocker は debug bundle の
   結果を見て次の `PR Gate` として追加する。
 
-- [ ] B8-G3l: indirect `call r14` boundary を追加する。
-  - [ ] B8-G3k の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 65 }`
+- [x] B8-G3l: indirect `call r14` boundary を追加する。
+  - [x] B8-G3k の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 65 }`
     (`41 ff d6`) を indirect call blocker として focused fixture に固定する。
-  - [ ] `call r14` を direct call と混同せず、unknown indirect target / helper boundary /
+  - [x] `call r14` を direct call と混同せず、unknown indirect target / helper boundary /
     unsupported terminator のどれで扱うかを stable に表現する。
-  - [ ] indirect control flow や translation cache が必要な場合は silent fallback せず
+  - [x] indirect control flow や translation cache が必要な場合は silent fallback せず
     stable blocker として report する。
 
 #### PR Gate: B8-G3l Indirect CALL R14 Boundary
@@ -853,12 +853,12 @@ branch: `task/b8-g3l-indirect-call-r14`
 
 完了条件:
 
-- B8-G3k の debug bundle / blocker report から、次に潰す boundary として
+- [x] B8-G3k の debug bundle / blocker report から、次に潰す boundary として
   `41 ff d6` (`call r14`) を選んでいる。
-- 選んだ blocker の最小 bytes が focused fixture として保存されている。
-- indirect call を direct call / RIP-relative load と混ぜず、decode / lift / emit の
+- [x] 選んだ blocker の最小 bytes が focused fixture として保存されている。
+- [x] indirect call を direct call / RIP-relative load と混ぜず、decode / lift / emit の
   最小範囲または stable unsupported boundary として表現している。
-- debug bundle または launch report で `41 ff d6` blocker を越えるか、次に必要な
+- [x] debug bundle または launch report で `41 ff d6` blocker を越えるか、次に必要な
   ISA / loader / metadata boundary が stable に report される。
 
 PR に含めない:

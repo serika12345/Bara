@@ -1137,7 +1137,10 @@ const fn failure_kind_from_unsupported_reason(reason: &UnsupportedReason) -> Fai
     match reason {
         UnsupportedReason::DecodeUnsupportedOpcode { .. }
         | UnsupportedReason::MissingReturnTerminator { .. }
-        | UnsupportedReason::DirectCallUnsupported { .. } => FailureKind::UnsupportedInstruction,
+        | UnsupportedReason::DirectCallUnsupported { .. }
+        | UnsupportedReason::RegisterIndirectCallUnsupported { .. } => {
+            FailureKind::UnsupportedInstruction
+        }
         UnsupportedReason::ExternalCallUnsupported { .. }
         | UnsupportedReason::SyscallUnsupported { .. }
         | UnsupportedReason::RegisterIndirectMemoryReadUnsupported { .. }
@@ -1200,6 +1203,15 @@ impl FunctionUnsupportedBoundaryReport {
                     return_to: request.return_to().value(),
                 }
             }
+            UnsupportedReason::RegisterIndirectCallUnsupported {
+                target,
+                call_site,
+                return_to,
+            } => FunctionUnsupportedBoundary::RegisterIndirectCall {
+                target: FunctionRegisterArtifact::from_ir(*target),
+                call_site: call_site.value(),
+                return_to: return_to.value(),
+            },
             UnsupportedReason::DecodeUnsupportedOpcode { .. }
             | UnsupportedReason::MissingReturnTerminator { .. }
             | UnsupportedReason::DirectCallUnsupported { .. }
@@ -1210,7 +1222,7 @@ impl FunctionUnsupportedBoundaryReport {
 
         Some(Self {
             status: FunctionUnsupportedBoundaryStatus::UnsupportedBoundary,
-            failure_kind: FailureKind::EmitError,
+            failure_kind: failure_kind_from_unsupported_reason(reason),
             boundary,
         })
     }
@@ -1233,6 +1245,11 @@ enum FunctionUnsupportedBoundary {
     ExternalCall {
         symbol_id: u32,
         import_target: FunctionExternalImportTarget,
+        call_site: u64,
+        return_to: u64,
+    },
+    RegisterIndirectCall {
+        target: FunctionRegisterArtifact,
         call_site: u64,
         return_to: u64,
     },
@@ -1573,6 +1590,23 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "{\"status\":\"unsupported_boundary\",\"failure_kind\":\"emit_error\",\"boundary\":{\"kind\":\"external_call\",\"symbol_id\":11,\"import_target\":{\"kind\":\"unresolved\"},\"call_site\":12288,\"return_to\":12293}}"
+        );
+    }
+
+    #[test]
+    fn unsupported_register_indirect_call_emit_error_uses_stable_boundary_report() {
+        let error = FunctionRunError::Emit(bara_arm64::EmitError::UnsupportedIr {
+            reason: UnsupportedReason::RegisterIndirectCallUnsupported {
+                target: X86Reg::R14,
+                call_site: X86Va::new(0x1644),
+                return_to: X86Va::new(0x1647),
+            },
+        });
+
+        assert_eq!(error.failure_kind(), FailureKind::UnsupportedInstruction);
+        assert_eq!(
+            error.to_string(),
+            "{\"status\":\"unsupported_boundary\",\"failure_kind\":\"unsupported_instruction\",\"boundary\":{\"kind\":\"register_indirect_call\",\"target\":\"r14\",\"call_site\":5700,\"return_to\":5703}}"
         );
     }
 

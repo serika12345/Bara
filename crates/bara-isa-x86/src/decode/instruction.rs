@@ -131,6 +131,9 @@ pub enum DecodedInstructionKind {
         target: X86Va,
         return_to: X86Va,
     },
+    CallR14 {
+        return_to: X86Va,
+    },
     Syscall,
     BaraHostTrapSentinel,
     BaraAppKitGuiHelloWorldTrapSentinel,

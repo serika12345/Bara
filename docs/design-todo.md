@@ -284,6 +284,13 @@
   `r14` / `x14` へ mapped qword を materialize する。どちらも `rax` destination ではないため、
   `rax` value availability は維持する。次 blocker は `41 ff d6` (`call r14`) であり、
   load ではなく unknown indirect control-flow boundary として次の focused PR Gate で扱う。
+- 2026-06-11 の B8-G3l として、`41 ff d6` (`call r14`) を direct `call rel32` や
+  RIP-relative load と混ぜず、register-indirect call boundary として model 化した。
+  decode は `call_r14` で停止し、lift は
+  `RegisterIndirectCallUnsupported { target: R14, call_site, return_to }` を持つ unsupported
+  terminator に変換する。B8 debug bundle は lifted IR の frontier unsupported terminator を
+  stable `register_indirect_call` boundary として report する。arbitrary indirect target
+  execution、translation cache、fallback JIT/interpreter はまだ導入しない。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、
