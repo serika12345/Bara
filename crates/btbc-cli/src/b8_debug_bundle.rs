@@ -11,9 +11,11 @@ use bara_isa_x86::{
     DecodedInstructionKind, LiftError,
 };
 use bara_oracle::{
-    binary_format_probe_report_to_json, mach_o_entry_function_input, probe_public_binary_format,
-    BinaryFileBytes, BinaryFormatProbeError, BinaryFormatProbeReport, BinaryInput, FailureKind,
-    JsonError, MachODyldInfoCommandKind, MachODylibImportCommandKind, MachOEntryFunctionInput,
+    binary_format_probe_report_to_json, decode_mach_o_chained_fixups_for_target,
+    mach_o_entry_function_input, probe_public_binary_format, BinaryFileBytes,
+    BinaryFormatProbeError, BinaryFormatProbeReport, BinaryInput, FailureKind, JsonError,
+    MachOChainedFixupTargetAddress, MachOChainedFixupsTargetReport, MachOChainedFixupsTargetStatus,
+    MachODyldInfoCommandKind, MachODylibImportCommandKind, MachOEntryFunctionInput,
     MachOEntryFunctionTestCaseError, MachOLinkeditDataCommandKind, TestCase,
 };
 use serde::Serialize;
@@ -67,6 +69,7 @@ pub(crate) fn generate_b8_debug_bundle(
     write_json_file(
         &paths.loader_plan_path(),
         &B8DebugLoaderPlanReport::real_lc_main_attempted(
+            &input,
             &entry_input,
             &input_probe,
             &attempt.decode_report,
@@ -881,6 +884,7 @@ struct B8DebugLoaderPlanReport {
 
 impl B8DebugLoaderPlanReport {
     fn real_lc_main_attempted(
+        input: &BinaryInput,
         entry_input: &MachOEntryFunctionInput,
         input_probe: &BinaryFormatProbeReport,
         decode_report: &B8DebugDecodeReport,
@@ -906,6 +910,7 @@ impl B8DebugLoaderPlanReport {
                 next_action: B8DebugLoaderDeferredAction::ResolvePublicRebaseBindImports,
             },
             import_boundary: B8DebugImportBoundaryReport::from_probe_and_decode_report(
+                input,
                 input_probe,
                 decode_report,
             ),
@@ -969,6 +974,7 @@ struct B8DebugImportBoundaryReport {
     call_boundary: Option<B8DebugRegisterIndirectCallBoundaryReport>,
     target_pointer_load: Option<B8DebugTargetPointerLoadReport>,
     public_metadata: B8DebugPublicImportMetadataReport,
+    chained_fixups: Option<MachOChainedFixupsTargetReport>,
     helper_boundary_request: B8DebugHelperBoundaryRequestReport,
     resolution: B8DebugImportBoundaryResolution,
     next_action: B8DebugImportBoundaryNextAction,
@@ -976,6 +982,7 @@ struct B8DebugImportBoundaryReport {
 
 impl B8DebugImportBoundaryReport {
     fn from_probe_and_decode_report(
+        input: &BinaryInput,
         input_probe: &BinaryFormatProbeReport,
         decode_report: &B8DebugDecodeReport,
     ) -> Self {
@@ -984,33 +991,61 @@ impl B8DebugImportBoundaryReport {
         let target_pointer_load = call_boundary
             .as_ref()
             .and_then(|boundary| decode_report.last_r14_load_before(boundary.call_site));
+        let chained_fixups = target_pointer_load.as_ref().map(|target| {
+            decode_mach_o_chained_fixups_for_target(
+                input,
+                input_probe.metadata().mach_o_metadata(),
+                MachOChainedFixupTargetAddress::from_mach_o_virtual_address(target.address),
+            )
+        });
 
         if call_boundary.is_some() {
-            let (resolution, next_action) = if public_metadata.has_chained_fixups() {
-                (
-                    B8DebugImportBoundaryResolution::RequiresPublicDyldChainedFixupsDecoder,
-                    B8DebugImportBoundaryNextAction::DecodePublicDyldChainedFixupsImports,
-                )
-            } else if public_metadata.has_dyld_info_bind_ranges() {
-                (
-                    B8DebugImportBoundaryResolution::RequiresPublicDyldBindOpcodeDecoder,
-                    B8DebugImportBoundaryNextAction::DecodePublicDyldBindOpcodes,
-                )
-            } else {
-                (
-                    B8DebugImportBoundaryResolution::MissingPublicBindMetadata,
-                    B8DebugImportBoundaryNextAction::InspectUnsupportedLoaderMetadata,
-                )
-            };
+            let chained_fixups_resolved = chained_fixups
+                .as_ref()
+                .map(|report| report.status() == MachOChainedFixupsTargetStatus::ResolvedImport)
+                .unwrap_or(false);
+            let (resolution, next_action, helper_boundary_request) =
+                if public_metadata.has_chained_fixups() && chained_fixups_resolved {
+                    (
+                        B8DebugImportBoundaryResolution::ResolvedPublicDyldChainedFixupsImport,
+                        B8DebugImportBoundaryNextAction::ConnectImportHelperBoundaryRequest,
+                        B8DebugHelperBoundaryRequestReport::blocked(
+                            B8DebugHelperBoundaryBlockedReason::ImportHelperBoundaryUnimplemented,
+                        ),
+                    )
+                } else if public_metadata.has_chained_fixups() {
+                    (
+                        B8DebugImportBoundaryResolution::RequiresPublicDyldChainedFixupsDecoder,
+                        B8DebugImportBoundaryNextAction::DecodePublicDyldChainedFixupsImports,
+                        B8DebugHelperBoundaryRequestReport::blocked(
+                            B8DebugHelperBoundaryBlockedReason::ImportSymbolIdentityUnresolved,
+                        ),
+                    )
+                } else if public_metadata.has_dyld_info_bind_ranges() {
+                    (
+                        B8DebugImportBoundaryResolution::RequiresPublicDyldBindOpcodeDecoder,
+                        B8DebugImportBoundaryNextAction::DecodePublicDyldBindOpcodes,
+                        B8DebugHelperBoundaryRequestReport::blocked(
+                            B8DebugHelperBoundaryBlockedReason::ImportSymbolIdentityUnresolved,
+                        ),
+                    )
+                } else {
+                    (
+                        B8DebugImportBoundaryResolution::MissingPublicBindMetadata,
+                        B8DebugImportBoundaryNextAction::InspectUnsupportedLoaderMetadata,
+                        B8DebugHelperBoundaryRequestReport::blocked(
+                            B8DebugHelperBoundaryBlockedReason::ImportSymbolIdentityUnresolved,
+                        ),
+                    )
+                };
 
             return Self {
                 status: B8DebugImportBoundaryStatus::Blocked,
                 call_boundary,
                 target_pointer_load,
                 public_metadata,
-                helper_boundary_request: B8DebugHelperBoundaryRequestReport::blocked(
-                    B8DebugHelperBoundaryBlockedReason::ImportSymbolIdentityUnresolved,
-                ),
+                chained_fixups,
+                helper_boundary_request,
                 resolution,
                 next_action,
             };
@@ -1021,6 +1056,7 @@ impl B8DebugImportBoundaryReport {
             call_boundary,
             target_pointer_load,
             public_metadata,
+            chained_fixups,
             helper_boundary_request: B8DebugHelperBoundaryRequestReport::skipped(),
             resolution: B8DebugImportBoundaryResolution::NoRegisterIndirectCallBoundary,
             next_action: B8DebugImportBoundaryNextAction::InspectNextDebugBundleBlocker,
@@ -1209,6 +1245,7 @@ impl B8DebugHelperBoundaryRequestReport {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum B8DebugHelperBoundaryBlockedReason {
+    ImportHelperBoundaryUnimplemented,
     ImportSymbolIdentityUnresolved,
 }
 
@@ -1217,6 +1254,7 @@ enum B8DebugHelperBoundaryBlockedReason {
 enum B8DebugImportBoundaryResolution {
     RequiresPublicDyldChainedFixupsDecoder,
     RequiresPublicDyldBindOpcodeDecoder,
+    ResolvedPublicDyldChainedFixupsImport,
     MissingPublicBindMetadata,
     NoRegisterIndirectCallBoundary,
 }
@@ -1224,6 +1262,7 @@ enum B8DebugImportBoundaryResolution {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum B8DebugImportBoundaryNextAction {
+    ConnectImportHelperBoundaryRequest,
     DecodePublicDyldChainedFixupsImports,
     DecodePublicDyldBindOpcodes,
     InspectUnsupportedLoaderMetadata,
