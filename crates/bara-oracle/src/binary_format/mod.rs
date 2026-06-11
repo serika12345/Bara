@@ -6,7 +6,8 @@ mod output;
 pub use input::{
     probe_public_binary_format, BinaryFileBytes, BinaryFormat, BinaryFormatProbeError,
     BinaryFormatProbeMetadata, BinaryFormatProbeReport, BinaryFormatProbeStatus, BinaryInput,
-    BinaryInputError, MachOEntryPointCommandMetadata, MachOEntryPointFileOffset,
+    BinaryInputError, MachODylibImportCommandKind, MachODylibPath, MachODylibTimestamp,
+    MachODylibVersion, MachOEntryPointCommandMetadata, MachOEntryPointFileOffset,
     MachOEntryPointStackSize, MachOExecutableImageConversion,
     MachOExecutableImageConversionBlocker, MachOExecutableImageConversionStatus, MachOFileType,
     MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommandSummary, MachOLoadCommandType,
@@ -14,8 +15,8 @@ pub use input::{
     MachOSectionByteSize, MachOSectionFileOffset, MachOSectionFlags, MachOSectionMetadata,
     MachOSectionName, MachOSectionRelocationCount, MachOSectionRelocationFileOffset,
     MachOSegmentCommandHeaderMetadata, MachOSegmentFileOffset, MachOSegmentFileSize,
-    MachOSegmentName, MachOSegmentVmAddr, RecognizedMachOEntryPointCommand,
-    RecognizedMachOSegmentCommand, UnsupportedMachOLoadCommand,
+    MachOSegmentName, MachOSegmentVmAddr, RecognizedMachODylibImportCommand,
+    RecognizedMachOEntryPointCommand, RecognizedMachOSegmentCommand, UnsupportedMachOLoadCommand,
 };
 pub use mach_o_entry_function_pipeline::{
     mach_o_entry_function_input, mach_o_entry_function_input_with_embedded_host_traps,

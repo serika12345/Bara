@@ -1,4 +1,5 @@
 mod mach_o;
+mod mach_o_dylib_command;
 mod mach_o_entry_point_command;
 mod mach_o_executable_image_conversion;
 mod mach_o_load_command;
@@ -7,6 +8,10 @@ mod mach_o_segment_command;
 mod probe;
 
 pub use mach_o::{MachOFileType, MachOLoadCommands, MachOMetadata};
+pub use mach_o_dylib_command::{
+    MachODylibImportCommandKind, MachODylibPath, MachODylibTimestamp, MachODylibVersion,
+    RecognizedMachODylibImportCommand,
+};
 pub use mach_o_entry_point_command::{
     MachOEntryPointCommandMetadata, MachOEntryPointFileOffset, MachOEntryPointStackSize,
 };

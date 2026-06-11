@@ -1,4 +1,8 @@
 use super::{
+    mach_o_dylib_command::{
+        parse_dylib_import_command_metadata, validate_dylib_command_byte_size,
+        MachODylibImportCommandKind, RecognizedMachODylibImportCommand,
+    },
     mach_o_entry_point_command::{
         parse_entry_point_command_metadata, validate_entry_point_command_byte_size,
         MachOEntryPointCommandMetadata,
@@ -53,11 +57,32 @@ pub struct MachOLoadCommandType {
 }
 
 impl MachOLoadCommandType {
+    const LC_LAZY_LOAD_DYLIB: Self = Self { value: 0x20 };
+    const LC_LOAD_DYLIB: Self = Self { value: 0xc };
     const LC_MAIN: Self = Self { value: 0x80000028 };
+    const LC_REEXPORT_DYLIB: Self = Self { value: 0x8000001f };
     const LC_SEGMENT_64: Self = Self { value: 0x19 };
+    const LC_LOAD_UPWARD_DYLIB: Self = Self { value: 0x80000023 };
+    const LC_LOAD_WEAK_DYLIB: Self = Self { value: 0x80000018 };
 
     pub(crate) const fn from_public_command_value(value: u32) -> Self {
         Self { value }
+    }
+
+    const fn dylib_import_kind(self) -> Option<MachODylibImportCommandKind> {
+        if self.value == Self::LC_LOAD_DYLIB.value {
+            Some(MachODylibImportCommandKind::LoadDylib)
+        } else if self.value == Self::LC_LOAD_WEAK_DYLIB.value {
+            Some(MachODylibImportCommandKind::LoadWeakDylib)
+        } else if self.value == Self::LC_REEXPORT_DYLIB.value {
+            Some(MachODylibImportCommandKind::ReexportDylib)
+        } else if self.value == Self::LC_LAZY_LOAD_DYLIB.value {
+            Some(MachODylibImportCommandKind::LazyLoadDylib)
+        } else if self.value == Self::LC_LOAD_UPWARD_DYLIB.value {
+            Some(MachODylibImportCommandKind::LoadUpwardDylib)
+        } else {
+            None
+        }
     }
 
     const fn is_entry_point(self) -> bool {
@@ -75,6 +100,8 @@ pub struct MachOLoadCommandSummary {
     recognized_entry_points: Vec<RecognizedMachOEntryPointCommand>,
     #[serde(default)]
     recognized_segments: Vec<RecognizedMachOSegmentCommand>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    recognized_dylib_imports: Vec<RecognizedMachODylibImportCommand>,
     unsupported_commands: Vec<UnsupportedMachOLoadCommand>,
 }
 
@@ -83,10 +110,12 @@ impl MachOLoadCommandSummary {
         Self {
             recognized_entry_points: Vec::new(),
             recognized_segments: Vec::new(),
+            recognized_dylib_imports: Vec::new(),
             unsupported_commands: Vec::new(),
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn new<E, R, U>(
         recognized_entry_points: E,
         recognized_segments: R,
@@ -100,6 +129,27 @@ impl MachOLoadCommandSummary {
         Self {
             recognized_entry_points: recognized_entry_points.into(),
             recognized_segments: recognized_segments.into(),
+            recognized_dylib_imports: Vec::new(),
+            unsupported_commands: unsupported_commands.into(),
+        }
+    }
+
+    pub(crate) fn with_dylib_imports<E, R, D, U>(
+        recognized_entry_points: E,
+        recognized_segments: R,
+        recognized_dylib_imports: D,
+        unsupported_commands: U,
+    ) -> Self
+    where
+        E: Into<Vec<RecognizedMachOEntryPointCommand>>,
+        R: Into<Vec<RecognizedMachOSegmentCommand>>,
+        D: Into<Vec<RecognizedMachODylibImportCommand>>,
+        U: Into<Vec<UnsupportedMachOLoadCommand>>,
+    {
+        Self {
+            recognized_entry_points: recognized_entry_points.into(),
+            recognized_segments: recognized_segments.into(),
+            recognized_dylib_imports: recognized_dylib_imports.into(),
             unsupported_commands: unsupported_commands.into(),
         }
     }
@@ -118,6 +168,10 @@ impl MachOLoadCommandSummary {
 
     pub fn recognized_segments(&self) -> &[RecognizedMachOSegmentCommand] {
         &self.recognized_segments
+    }
+
+    pub fn recognized_dylib_imports(&self) -> &[RecognizedMachODylibImportCommand] {
+        &self.recognized_dylib_imports
     }
 
     pub fn unsupported_commands(&self) -> &[UnsupportedMachOLoadCommand] {
@@ -241,6 +295,7 @@ pub(crate) fn parse_mach_o_load_command_summary(
 
     let mut recognized_entry_points = Vec::new();
     let mut recognized_segments = Vec::new();
+    let mut recognized_dylib_imports = Vec::new();
     let mut unsupported_commands = Vec::new();
     let mut command_offset = table_range.start;
 
@@ -278,6 +333,14 @@ pub(crate) fn parse_mach_o_load_command_summary(
                 byte_size,
                 parse_entry_point_command_metadata(input, command_offset)?,
             ));
+        } else if let Some(dylib_import_kind) = command.dylib_import_kind() {
+            validate_dylib_command_byte_size(byte_size.as_usize())?;
+            recognized_dylib_imports.push(parse_dylib_import_command_metadata(
+                input,
+                command_offset,
+                dylib_import_kind,
+                byte_size,
+            )?);
         } else if command.is_segment_64() {
             validate_segment_64_command_byte_size(byte_size.as_usize())?;
             recognized_segments.push(RecognizedMachOSegmentCommand::with_sections(
@@ -291,9 +354,10 @@ pub(crate) fn parse_mach_o_load_command_summary(
         command_offset = command_end;
     }
 
-    Ok(MachOLoadCommandSummary::new(
+    Ok(MachOLoadCommandSummary::with_dylib_imports(
         recognized_entry_points,
         recognized_segments,
+        recognized_dylib_imports,
         unsupported_commands,
     ))
 }

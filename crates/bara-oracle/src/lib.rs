@@ -15,7 +15,8 @@ pub use binary_format::{
     mach_o_executable_image_entry_function_with_host_traps, materialize_mach_o_executable_image,
     plan_mach_o_executable_image, probe_public_binary_format, BinaryFileBytes, BinaryFormat,
     BinaryFormatProbeError, BinaryFormatProbeMetadata, BinaryFormatProbeReport,
-    BinaryFormatProbeStatus, BinaryInput, BinaryInputError, MachOEntryFunctionInput,
+    BinaryFormatProbeStatus, BinaryInput, BinaryInputError, MachODylibImportCommandKind,
+    MachODylibPath, MachODylibTimestamp, MachODylibVersion, MachOEntryFunctionInput,
     MachOEntryFunctionTestCaseError, MachOEntryPointCommandMetadata, MachOEntryPointFileOffset,
     MachOEntryPointSegmentOffset, MachOEntryPointStackSize, MachOExecutableImageConversion,
     MachOExecutableImageConversionBlocker, MachOExecutableImageConversionStatus,
@@ -26,8 +27,8 @@ pub use binary_format::{
     MachOSectionByteSize, MachOSectionFileOffset, MachOSectionFlags, MachOSectionMetadata,
     MachOSectionName, MachOSectionRelocationCount, MachOSectionRelocationFileOffset,
     MachOSegmentCommandHeaderMetadata, MachOSegmentFileOffset, MachOSegmentFileRange,
-    MachOSegmentFileSize, MachOSegmentName, MachOSegmentVmAddr, RecognizedMachOEntryPointCommand,
-    RecognizedMachOSegmentCommand, UnsupportedMachOLoadCommand,
+    MachOSegmentFileSize, MachOSegmentName, MachOSegmentVmAddr, RecognizedMachODylibImportCommand,
+    RecognizedMachOEntryPointCommand, RecognizedMachOSegmentCommand, UnsupportedMachOLoadCommand,
 };
 pub use compare::{compare_observed_results, ComparisonIssue, ComparisonReport};
 pub use executable_manifest::{
