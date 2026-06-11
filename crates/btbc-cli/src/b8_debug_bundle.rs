@@ -576,6 +576,10 @@ enum B8DebugDecodedInstructionKindReport {
         width: B8DebugMemoryReadWidthReport,
     },
     MovRdxQwordPtrRax,
+    LeaRdiRipRelative {
+        displacement: String,
+        address: u64,
+    },
     MovzxEaxBytePtrRdi,
     AddEaxImm32 {
         imm: String,
@@ -645,6 +649,13 @@ impl B8DebugDecodedInstructionKindReport {
                 width: B8DebugMemoryReadWidthReport::Bits64,
             },
             DecodedInstructionKind::MovRdxQwordPtrRax => Self::MovRdxQwordPtrRax,
+            DecodedInstructionKind::LeaRdiRipRelative {
+                displacement,
+                address,
+            } => Self::LeaRdiRipRelative {
+                displacement: format!("{displacement:?}"),
+                address: address.value(),
+            },
             DecodedInstructionKind::MovzxEaxBytePtrRdi => Self::MovzxEaxBytePtrRdi,
             DecodedInstructionKind::AddEaxImm32 { imm } => Self::AddEaxImm32 {
                 imm: format!("{imm:?}"),

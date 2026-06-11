@@ -2360,9 +2360,9 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn generate_b8_debug_bundle_advances_rax_indirect_load_to_next_rex_lea_blocker() {
+    fn generate_b8_debug_bundle_advances_rip_relative_lea_to_next_rex_lea_blocker() {
         let temp_dir = TestTempDir::new(
-            "generate_b8_debug_bundle_advances_rax_indirect_load_to_next_rex_lea_blocker",
+            "generate_b8_debug_bundle_advances_rip_relative_lea_to_next_rex_lea_blocker",
         );
         let binary_path = temp_dir.path.join("b8_gui_hello_world_x86_64");
         let output_root = temp_dir.path.join("b8-debug");
@@ -2423,6 +2423,7 @@ mod tests {
         assert!(decode_report.contains("\"kind\":\"mov_rbx_rax\""));
         assert!(decode_report.contains("\"kind\":\"mov_rax_qword_ptr_rip_relative\""));
         assert!(decode_report.contains("\"kind\":\"mov_rdx_qword_ptr_rax\""));
+        assert!(decode_report.contains("\"kind\":\"lea_rdi_rip_relative\""));
         assert!(decode_report.contains("\"width\":\"bits64\""));
         assert!(decode_report.contains("DecodeUnsupportedOpcode { opcode: 72"));
         assert!(read_file(&bundle_dir.join("lift.ir.json")).contains("\"status\":"));

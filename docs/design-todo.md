@@ -255,6 +255,13 @@
   loader / mapped runtime memory の不足として typed unsupported reason を返す。次 blocker
   は `48 8d 3d b3 10 00 00` (`lea rdi, [rip+disp32]`) であり、memory read ではない
   RIP-relative effective address materialization として次の focused PR Gate で扱う。
+- 2026-06-11 の B8-G3h として、`48 8d 3d disp32`
+  (`lea rdi, [rip+disp32]`) を RIP-relative address materialization slice として追加した。
+  IR は memory read と区別するため、source address を `AddressRipRelative` operand として
+  保持する。ARM64 emit は現状の ABI-focused register mapping に合わせて `rdi` を `x0` に
+  materialize し、その後は `rax` value を available とみなさない。次 blocker は
+  `48 8d 35 b6 10 00 00` (`lea rsi, [rip+disp32]`) であり、`rsi` register family と
+  2 番目の argument register materialization を次の focused PR Gate で扱う。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、

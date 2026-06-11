@@ -290,6 +290,9 @@ enum FunctionOperandArtifact {
         address: u64,
         width: FunctionMemoryReadWidthArtifact,
     },
+    AddressRipRelative {
+        address: u64,
+    },
 }
 
 impl FunctionOperandArtifact {
@@ -309,6 +312,9 @@ impl FunctionOperandArtifact {
             bara_ir::Operand::MemRipRelative { address, width } => Self::MemRipRelative {
                 address: address.value(),
                 width: FunctionMemoryReadWidthArtifact::from_ir(*width),
+            },
+            bara_ir::Operand::AddressRipRelative { address } => Self::AddressRipRelative {
+                address: address.value(),
             },
         }
     }
