@@ -13,6 +13,7 @@ pub struct UserSpaceLaunchPlan {
     platform_model: UserSpacePlatformModelPlan,
     macos_constraints: UserSpaceMacosConstraints,
     fallback_policy: UserSpaceFallbackPolicy,
+    loader_execution: UserSpaceLoaderExecutionPlan,
 }
 
 impl UserSpaceLaunchPlan {
@@ -31,6 +32,7 @@ impl UserSpaceLaunchPlan {
             platform_model: UserSpacePlatformModelPlan::initial_gui_loader_model(),
             macos_constraints: UserSpaceMacosConstraints::public_documented_behavior(),
             fallback_policy: UserSpaceFallbackPolicy::ready_for_feedback_cycle(),
+            loader_execution: UserSpaceLoaderExecutionPlan::public_mach_o_probe_plan(),
         }
     }
 
@@ -84,6 +86,10 @@ impl UserSpaceLaunchPlan {
 
     pub const fn fallback_policy(&self) -> &UserSpaceFallbackPolicy {
         &self.fallback_policy
+    }
+
+    pub const fn loader_execution(&self) -> &UserSpaceLoaderExecutionPlan {
+        &self.loader_execution
     }
 }
 
@@ -696,6 +702,100 @@ pub enum UserSpaceFeedbackCycleState {
     ReadyNotStarted,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UserSpaceLoaderExecutionPlan {
+    responsibility: UserSpaceLaunchResponsibility,
+    metadata_source: UserSpaceLoaderMetadataSource,
+    entry_point: UserSpaceLoaderEntryPointPlan,
+    segment_mapping: UserSpaceLoaderSegmentMappingPlan,
+    imports: UserSpaceLoaderImportPlan,
+    relocations: UserSpaceLoaderRelocationPlan,
+    objc_runtime: UserSpaceLoaderObjcRuntimePlan,
+    status: UserSpaceLoaderExecutionStatus,
+}
+
+impl UserSpaceLoaderExecutionPlan {
+    const fn public_mach_o_probe_plan() -> Self {
+        Self {
+            responsibility: UserSpaceLaunchResponsibility::Loader,
+            metadata_source: UserSpaceLoaderMetadataSource::PublicMachOProbe,
+            entry_point: UserSpaceLoaderEntryPointPlan::LcMainEntryoff,
+            segment_mapping: UserSpaceLoaderSegmentMappingPlan::LcSegment64FileRanges,
+            imports: UserSpaceLoaderImportPlan::DylibLoadCommandsToHelperBoundary,
+            relocations: UserSpaceLoaderRelocationPlan::LinkeditRebaseBindMetadata,
+            objc_runtime: UserSpaceLoaderObjcRuntimePlan::HelperBoundary,
+            status: UserSpaceLoaderExecutionStatus::PlannedNotExecuted,
+        }
+    }
+
+    pub const fn responsibility(self) -> UserSpaceLaunchResponsibility {
+        self.responsibility
+    }
+
+    pub const fn metadata_source(self) -> UserSpaceLoaderMetadataSource {
+        self.metadata_source
+    }
+
+    pub const fn entry_point(self) -> UserSpaceLoaderEntryPointPlan {
+        self.entry_point
+    }
+
+    pub const fn segment_mapping(self) -> UserSpaceLoaderSegmentMappingPlan {
+        self.segment_mapping
+    }
+
+    pub const fn imports(self) -> UserSpaceLoaderImportPlan {
+        self.imports
+    }
+
+    pub const fn relocations(self) -> UserSpaceLoaderRelocationPlan {
+        self.relocations
+    }
+
+    pub const fn objc_runtime(self) -> UserSpaceLoaderObjcRuntimePlan {
+        self.objc_runtime
+    }
+
+    pub const fn status(self) -> UserSpaceLoaderExecutionStatus {
+        self.status
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceLoaderMetadataSource {
+    PublicMachOProbe,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceLoaderEntryPointPlan {
+    LcMainEntryoff,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceLoaderSegmentMappingPlan {
+    LcSegment64FileRanges,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceLoaderImportPlan {
+    DylibLoadCommandsToHelperBoundary,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceLoaderRelocationPlan {
+    LinkeditRebaseBindMetadata,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceLoaderObjcRuntimePlan {
+    HelperBoundary,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceLoaderExecutionStatus {
+    PlannedNotExecuted,
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
@@ -706,6 +806,9 @@ mod tests {
         UserSpaceFallbackEngineStatus, UserSpaceFallbackPolicyAction, UserSpaceFeedbackCycleState,
         UserSpaceHelperBoundaryContract, UserSpaceImageMappingSource,
         UserSpaceInitialStackContract, UserSpaceLaunchPlan, UserSpaceLaunchResponsibility,
+        UserSpaceLoaderEntryPointPlan, UserSpaceLoaderExecutionStatus, UserSpaceLoaderImportPlan,
+        UserSpaceLoaderMetadataSource, UserSpaceLoaderObjcRuntimePlan,
+        UserSpaceLoaderRelocationPlan, UserSpaceLoaderSegmentMappingPlan,
         UserSpaceMacosCodeSigningPolicy, UserSpaceMacosHardenedRuntimePolicy,
         UserSpaceMacosWriteXorExecutePolicy, UserSpaceMemoryProtectionModel,
         UserSpacePlatformExceptionModel, UserSpacePlatformMemoryProtectionModel,
@@ -973,6 +1076,44 @@ mod tests {
         assert_eq!(
             fallback.feedback_cycle(),
             UserSpaceFeedbackCycleState::ReadyNotStarted
+        );
+    }
+
+    #[test]
+    fn user_space_launch_plan_models_initial_mach_o_loader_execution_plan() {
+        let loader_execution = *UserSpaceLaunchPlan::mach_o_executable_image().loader_execution();
+
+        assert_eq!(
+            loader_execution.responsibility(),
+            UserSpaceLaunchResponsibility::Loader
+        );
+        assert_eq!(
+            loader_execution.metadata_source(),
+            UserSpaceLoaderMetadataSource::PublicMachOProbe
+        );
+        assert_eq!(
+            loader_execution.entry_point(),
+            UserSpaceLoaderEntryPointPlan::LcMainEntryoff
+        );
+        assert_eq!(
+            loader_execution.segment_mapping(),
+            UserSpaceLoaderSegmentMappingPlan::LcSegment64FileRanges
+        );
+        assert_eq!(
+            loader_execution.imports(),
+            UserSpaceLoaderImportPlan::DylibLoadCommandsToHelperBoundary
+        );
+        assert_eq!(
+            loader_execution.relocations(),
+            UserSpaceLoaderRelocationPlan::LinkeditRebaseBindMetadata
+        );
+        assert_eq!(
+            loader_execution.objc_runtime(),
+            UserSpaceLoaderObjcRuntimePlan::HelperBoundary
+        );
+        assert_eq!(
+            loader_execution.status(),
+            UserSpaceLoaderExecutionStatus::PlannedNotExecuted
         );
     }
 }

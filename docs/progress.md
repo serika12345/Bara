@@ -9,45 +9,54 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 14:25 JST
+最終更新: 2026-06-11 14:37 JST
 
 状態:
 
-- project_state: completed。B8 の Rosetta 比較フィードバックサイクル開始点として、
-  Rosetta expected と Bara actual / launch report を feedback report に束ね、
-  current blocker と次の修正対象を stable JSON に固定した。
+- project_state: completed。B8 の `unsupported_loader_feature` に対する
+  最初の user-space loader 実行計画として、public Mach-O metadata に基づく
+  loader execution plan を stable JSON に固定した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8:
   実 x86_64 macOS アプリ起動。
-- active_design_focus: B8 feedback report。Rosetta expected / Bara actual の
-  observed comparison issues と `unsupported_loader_feature` blocker を同じ report に
-  保存し、次の user-space loader 実行計画 step へ渡せるようにする。
+- active_design_focus: B8 loader execution plan。`UserSpaceLaunchPlan` の
+  `loader_execution` と B8 feedback report の `loader_execution_plan` に、
+  public Mach-O probe 由来の entry / segment / import / rebase / bind / ObjC
+  boundary 計画を保存する。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
   latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B8 の「Rosetta expected と Bara actual /
-  launch report を同じ feedback report に束ね、現状の blocker と次の修正対象を
-  stable JSON で出す」。
-- completed_work: `btbc-cli generate-arm64-gui-hello-world-feedback` を追加し、
-  x86_64 GUI binary、Rosetta expected JSON から Bara actual JSON、launch report、
-  feedback report をまとめて生成できるようにした。
-  `b8_gui_hello_world_feedback_report_v0` は comparison issues、current blocker、
-  next action を保存し、初期 next action を
-  `implement_user_space_loader_for_mach_o_gui_executable` とする。
-- remaining_work: 次の小ステップは feedback report の `unsupported_loader_feature`
-  に対して、public Mach-O loader metadata から最初の user-space loader 実行計画を
-  作ること。
-- next_action: commit / push 後、次の B8 小ステップで
-  `implement_user_space_loader_for_mach_o_gui_executable` に対応する loader 実行計画を
-  model 化する。
+- related_todo: [TODO.md](../TODO.md) B8 の「feedback report の
+  `unsupported_loader_feature` に対して、public Mach-O loader metadata から
+  最初の user-space loader 実行計画を作る」。
+- completed_work: `bara-runtime::UserSpaceLaunchPlan` に `loader_execution` を
+  追加し、metadata source、`LC_MAIN` entryoff、`LC_SEGMENT_64` file ranges、
+  dylib load commands、link-edit rebase / bind metadata、Objective-C runtime
+  helper boundary、`planned_not_executed` status を typed plan として保持する。
+  B8 actual launch report と feedback report は同じ plan を
+  `runtime_preparation.loader_execution` / `loader_execution_plan` に projection する。
+- remaining_work: AppKit import / Objective-C runtime boundary を helper boundary
+  または明示 blocker として進め、expected / actual 差分を縮めること。
+- next_action: commit / push 後、次の B8 小ステップで AppKit import と
+  Objective-C runtime boundary を runtime helper 境界または stable blocker へ
+  接続する。
 - verification: targeted tests として
+  `nix develop -c cargo test -p bara-runtime user_space_launch_plan -- --nocapture` と
   `nix develop -c cargo test -p btbc-cli gui_hello_world -- --nocapture` が通過した。
-  `target/b8` 上で `build-x86_64-gui-hello-world-fixture` と
-  `generate-arm64-gui-hello-world-feedback` の手動確認も通過した。
   `nix develop -c cargo fmt --all -- --check`、
-  `nix develop -c cargo clippy -p btbc-cli --all-targets -- -D warnings`、
+  `nix develop -c cargo clippy -p bara-runtime -p btbc-cli --all-targets -- -D warnings`、
   `git diff --check`、full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-11 14:37 JST: B8 の `unsupported_loader_feature` に対する
+  最初の修正フィードバック対象として、public Mach-O metadata 由来の
+  user-space loader 実行計画を model 化した。`UserSpaceLaunchPlan` は
+  `loader_execution` に `public_mach_o_probe`、`lc_main_entryoff`、
+  `lc_segment_64_file_ranges`、`dylib_load_commands_to_helper_boundary`、
+  `linkedit_rebase_bind_metadata`、`helper_boundary`、`planned_not_executed` を
+  typed plan として保持し、B8 actual launch report と feedback report は
+  `runtime_preparation.loader_execution` / `loader_execution_plan` に同じ plan を
+  保存する。targeted tests、`bara-runtime` / `btbc-cli` clippy、full
+  `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-11 14:25 JST: B8 の Rosetta 比較フィードバックサイクル開始点として、
   `btbc-cli generate-arm64-gui-hello-world-feedback` を追加した。Rosetta expected
   JSON と Bara actual / launch report から

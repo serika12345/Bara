@@ -175,6 +175,14 @@
   未実装 / 未接続として report する。これは Rosetta 比較フィードバックサイクルを
   開始できる直前の境界固定であり、実 signal handler、thread/TLS 実行、
   fallback engine 実装、または expected / actual 差分修正の開始ではない。
+- 2026-06-11 の B8 小ステップとして、`UserSpaceLaunchPlan` に
+  `loader_execution` を追加した。metadata source は public Mach-O probe、
+  entry は `LC_MAIN` entryoff、segment mapping は `LC_SEGMENT_64` file ranges、
+  imports は dylib load commands から helper boundary、relocations は link-edit
+  rebase / bind metadata、Objective-C runtime は helper boundary として report する。
+  これは `unsupported_loader_feature` に対する最初の修正フィードバック対象を
+  stable plan にするための model 化であり、実 image mapping、import 解決、
+  rebase / bind 適用、Objective-C runtime bridge 実行の追加ではない。
 
 ## D7: Binary format input/output の分離
 
