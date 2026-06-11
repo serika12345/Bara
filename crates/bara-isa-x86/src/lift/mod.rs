@@ -97,6 +97,10 @@ fn lift_instruction(
             dst: Operand::Reg(X86Reg::Rax),
             src: Operand::Reg(X86Reg::Rdi),
         })),
+        DecodedInstructionKind::MovRbpRsp => Ok(LiftedInstruction::Op(IrOp::Mov {
+            dst: Operand::Reg(X86Reg::Rbp),
+            src: Operand::Reg(X86Reg::Rsp),
+        })),
         DecodedInstructionKind::MovzxEaxBytePtrRdi => Ok(LiftedInstruction::Op(IrOp::Mov {
             dst: Operand::Reg(X86Reg::Rax),
             src: Operand::Mem8 { base: X86Reg::Rdi },
@@ -814,7 +818,7 @@ mod tests {
     }
 
     #[test]
-    fn lifts_push_rbp_to_stack_op_before_next_unsupported_prologue_byte() {
+    fn lifts_push_rbp_mov_rbp_rsp_before_next_unsupported_prologue_byte() {
         let decoded = DecodedFunction::new(
             X86Va::new(0x1600),
             vec![
@@ -826,10 +830,15 @@ mod tests {
                 DecodedInstruction::new(
                     X86Va::new(0x1601),
                     X86Va::new(0x1604),
+                    DecodedInstructionKind::MovRbpRsp,
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(0x1604),
+                    X86Va::new(0x1605),
                     DecodedInstructionKind::Unsupported {
                         reason: UnsupportedReason::DecodeUnsupportedOpcode {
-                            opcode: 0x48,
-                            at: X86Va::new(0x1601),
+                            opcode: 0x41,
+                            at: X86Va::new(0x1604),
                         },
                     },
                 ),
@@ -841,16 +850,22 @@ mod tests {
 
         assert_eq!(
             program.blocks()[0].ops(),
-            &[IrOp::Push {
-                src: Operand::Reg(X86Reg::Rbp)
-            }]
+            &[
+                IrOp::Push {
+                    src: Operand::Reg(X86Reg::Rbp)
+                },
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rbp),
+                    src: Operand::Reg(X86Reg::Rsp)
+                }
+            ]
         );
         assert_eq!(
             program.blocks()[0].terminator(),
             &Terminator::Unsupported {
                 reason: UnsupportedReason::DecodeUnsupportedOpcode {
-                    opcode: 0x48,
-                    at: X86Va::new(0x1601),
+                    opcode: 0x41,
+                    at: X86Va::new(0x1604),
                 }
             }
         );

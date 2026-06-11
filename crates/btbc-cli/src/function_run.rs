@@ -303,6 +303,10 @@ enum FunctionRegisterArtifact {
     Ebp,
     Bp,
     Bpl,
+    Rsp,
+    Esp,
+    Sp,
+    Spl,
     Rdi,
     Edi,
     Di,
@@ -320,6 +324,10 @@ impl FunctionRegisterArtifact {
             bara_ir::X86Reg::Ebp => Self::Ebp,
             bara_ir::X86Reg::Bp => Self::Bp,
             bara_ir::X86Reg::Bpl => Self::Bpl,
+            bara_ir::X86Reg::Rsp => Self::Rsp,
+            bara_ir::X86Reg::Esp => Self::Esp,
+            bara_ir::X86Reg::Sp => Self::Sp,
+            bara_ir::X86Reg::Spl => Self::Spl,
             bara_ir::X86Reg::Rdi => Self::Rdi,
             bara_ir::X86Reg::Edi => Self::Edi,
             bara_ir::X86Reg::Di => Self::Di,
@@ -1505,6 +1513,10 @@ mod tests {
             FunctionRegisterArtifact::from_ir(X86Reg::Ebp),
             FunctionRegisterArtifact::from_ir(X86Reg::Bp),
             FunctionRegisterArtifact::from_ir(X86Reg::Bpl),
+            FunctionRegisterArtifact::from_ir(X86Reg::Rsp),
+            FunctionRegisterArtifact::from_ir(X86Reg::Esp),
+            FunctionRegisterArtifact::from_ir(X86Reg::Sp),
+            FunctionRegisterArtifact::from_ir(X86Reg::Spl),
             FunctionRegisterArtifact::from_ir(X86Reg::Rdi),
             FunctionRegisterArtifact::from_ir(X86Reg::Edi),
             FunctionRegisterArtifact::from_ir(X86Reg::Di),
@@ -1513,7 +1525,7 @@ mod tests {
 
         assert_eq!(
             serde_json::to_string(&registers).expect("register artifacts serialize"),
-            "[\"rax\",\"eax\",\"ax\",\"al\",\"rbp\",\"ebp\",\"bp\",\"bpl\",\"rdi\",\"edi\",\"di\",\"dil\"]"
+            "[\"rax\",\"eax\",\"ax\",\"al\",\"rbp\",\"ebp\",\"bp\",\"bpl\",\"rsp\",\"esp\",\"sp\",\"spl\",\"rdi\",\"edi\",\"di\",\"dil\"]"
         );
     }
 

@@ -80,6 +80,7 @@ pub enum DecodedInstructionKind {
         imm: X86Imm8,
     },
     TestEaxEax,
+    MovRbpRsp,
     PushRax,
     PushRbp,
     PopRax,

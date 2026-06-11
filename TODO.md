@@ -446,13 +446,15 @@ review gate:
 - 完了したら commit / push / draft PR 作成で停止する。残りの ISA blocker は
   debug bundle の結果を見て次の `PR Gate` として追加する。
 
-- [ ] B8-G3b: 実 prologue の `REX.W mov rbp,rsp` slice を追加する。
-  - [ ] B8-G3 の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 72 }`
+- [x] B8-G3b: 実 prologue の `REX.W mov rbp,rsp` slice を追加する。
+  - [x] B8-G3 の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 72 }`
     (`48 89 e5`, `mov rbp,rsp`) を次の ISA blocker として focused fixture に固定する。
-  - [ ] `mov rbp,rsp` に必要な register model、decode、lift、emit planning を
+  - [x] `mov rbp,rsp` に必要な register model、decode、lift、emit planning を
     最小範囲で追加する。
-  - [ ] debug bundle が同じ blocker を越えて次の unsupported boundary を返すことを
+  - [x] debug bundle が同じ blocker を越えて次の unsupported boundary を返すことを
     確認する。
+  - [x] B8-G3b の debug bundle は `mov_rbp_rsp` を通過し、次 blocker として
+    `DecodeUnsupportedOpcode { opcode: 65 }` (`41 57`, `push r15`) を返す。
 
 #### PR Gate: B8-G3b REX Mov RBP/RSP Prologue Slice
 
@@ -460,11 +462,11 @@ branch: `task/b8-g3b-mov-rbp-rsp`
 
 完了条件:
 
-- B8-G3 の debug bundle / blocker report から、次に潰す x86_64 ISA blocker として
+- [x] B8-G3 の debug bundle / blocker report から、次に潰す x86_64 ISA blocker として
   `48 89 e5` (`mov rbp,rsp`) を選んでいる。
-- 選んだ blocker の最小 bytes が focused fixture として保存されている。
-- decode / lift / emit のうち、その blocker に必要な最小範囲だけを実装している。
-- debug bundle または launch report で `opcode 72` blocker を越えて次の blocker が
+- [x] 選んだ blocker の最小 bytes が focused fixture として保存されている。
+- [x] decode / lift / emit のうち、その blocker に必要な最小範囲だけを実装している。
+- [x] debug bundle または launch report で `opcode 72` blocker を越えて次の blocker が
   stable に report される。
 
 PR に含めない:
@@ -473,6 +475,43 @@ PR に含めない:
   call/jump stubs の一括実装。
 - loader mapping、import resolution、Objective-C / AppKit bridge の本実装。
 - RSP/RBP 以外の register move の便乗一般化。
+
+検証:
+
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止する。残りの ISA blocker は
+  debug bundle の結果を見て次の `PR Gate` として追加する。
+
+- [ ] B8-G3c: 実 prologue の `REX.B push r15` slice を追加する。
+  - [ ] B8-G3b の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 65 }`
+    (`41 57`, `push r15`) を次の ISA blocker として focused fixture に固定する。
+  - [ ] `push r15` に必要な register model、decode、lift、emit planning を
+    最小範囲で追加する。
+  - [ ] debug bundle が同じ blocker を越えて次の unsupported boundary を返すことを
+    確認する。
+
+#### PR Gate: B8-G3c REX Push R15 Prologue Slice
+
+branch: `task/b8-g3c-push-r15`
+
+完了条件:
+
+- B8-G3b の debug bundle / blocker report から、次に潰す x86_64 ISA blocker として
+  `41 57` (`push r15`) を選んでいる。
+- 選んだ blocker の最小 bytes が focused fixture として保存されている。
+- decode / lift / emit のうち、その blocker に必要な最小範囲だけを実装している。
+- debug bundle または launch report で `opcode 65` blocker を越えて次の blocker が
+  stable に report される。
+
+PR に含めない:
+
+- prologue / epilogue 全体、RIP-relative addressing、`lea`、memory operands、
+  call/jump stubs の一括実装。
+- loader mapping、import resolution、Objective-C / AppKit bridge の本実装。
+- R15 以外の extended register 命令の便乗一般化。
 
 検証:
 

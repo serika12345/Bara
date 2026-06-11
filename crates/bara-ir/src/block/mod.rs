@@ -146,6 +146,10 @@ pub enum X86Reg {
     Ebp,
     Bp,
     Bpl,
+    Rsp,
+    Esp,
+    Sp,
+    Spl,
     Rdi,
     Edi,
     Di,
@@ -157,16 +161,17 @@ impl X86Reg {
         match self {
             Self::Rax | Self::Eax | Self::Ax | Self::Al => X86RegFamily::Accumulator,
             Self::Rbp | Self::Ebp | Self::Bp | Self::Bpl => X86RegFamily::BasePointer,
+            Self::Rsp | Self::Esp | Self::Sp | Self::Spl => X86RegFamily::StackPointer,
             Self::Rdi | Self::Edi | Self::Di | Self::Dil => X86RegFamily::DestinationIndex,
         }
     }
 
     pub const fn width(self) -> X86RegWidth {
         match self {
-            Self::Al | Self::Bpl | Self::Dil => X86RegWidth::Bits8,
-            Self::Ax | Self::Bp | Self::Di => X86RegWidth::Bits16,
-            Self::Eax | Self::Ebp | Self::Edi => X86RegWidth::Bits32,
-            Self::Rax | Self::Rbp | Self::Rdi => X86RegWidth::Bits64,
+            Self::Al | Self::Bpl | Self::Spl | Self::Dil => X86RegWidth::Bits8,
+            Self::Ax | Self::Bp | Self::Sp | Self::Di => X86RegWidth::Bits16,
+            Self::Eax | Self::Ebp | Self::Esp | Self::Edi => X86RegWidth::Bits32,
+            Self::Rax | Self::Rbp | Self::Rsp | Self::Rdi => X86RegWidth::Bits64,
         }
     }
 
@@ -174,6 +179,7 @@ impl X86Reg {
         match self.family() {
             X86RegFamily::Accumulator => Self::Rax,
             X86RegFamily::BasePointer => Self::Rbp,
+            X86RegFamily::StackPointer => Self::Rsp,
             X86RegFamily::DestinationIndex => Self::Rdi,
         }
     }
@@ -187,6 +193,7 @@ impl X86Reg {
 pub enum X86RegFamily {
     Accumulator,
     BasePointer,
+    StackPointer,
     DestinationIndex,
 }
 
@@ -409,6 +416,19 @@ mod tests {
         assert_eq!(X86Reg::Bp.full_width(), X86Reg::Rbp);
         assert_eq!(X86Reg::Bpl.full_width(), X86Reg::Rbp);
         assert!(X86Reg::Ebp.is_partial_view());
+
+        assert_eq!(X86Reg::Rsp.family(), X86RegFamily::StackPointer);
+        assert_eq!(X86Reg::Esp.family(), X86RegFamily::StackPointer);
+        assert_eq!(X86Reg::Sp.family(), X86RegFamily::StackPointer);
+        assert_eq!(X86Reg::Spl.family(), X86RegFamily::StackPointer);
+        assert_eq!(X86Reg::Rsp.width(), X86RegWidth::Bits64);
+        assert_eq!(X86Reg::Esp.width(), X86RegWidth::Bits32);
+        assert_eq!(X86Reg::Sp.width(), X86RegWidth::Bits16);
+        assert_eq!(X86Reg::Spl.width(), X86RegWidth::Bits8);
+        assert_eq!(X86Reg::Esp.full_width(), X86Reg::Rsp);
+        assert_eq!(X86Reg::Sp.full_width(), X86Reg::Rsp);
+        assert_eq!(X86Reg::Spl.full_width(), X86Reg::Rsp);
+        assert!(X86Reg::Esp.is_partial_view());
 
         assert_eq!(X86Reg::Rdi.family(), X86RegFamily::DestinationIndex);
         assert_eq!(X86Reg::Edi.family(), X86RegFamily::DestinationIndex);

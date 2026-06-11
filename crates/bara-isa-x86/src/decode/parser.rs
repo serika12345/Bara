@@ -160,6 +160,14 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                         ));
                         offset = end_offset;
                     }
+                    (0x89, 0xe5) => {
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::MovRbpRsp,
+                        ));
+                        offset = end_offset;
+                    }
                     _ => {
                         instructions.push(unsupported_instruction(at, end, opcode));
                         return DecodedFunction::new(input.entry(), instructions);
