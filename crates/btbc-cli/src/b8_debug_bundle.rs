@@ -575,6 +575,7 @@ enum B8DebugDecodedInstructionKindReport {
         address: u64,
         width: B8DebugMemoryReadWidthReport,
     },
+    MovRdxQwordPtrRax,
     MovzxEaxBytePtrRdi,
     AddEaxImm32 {
         imm: String,
@@ -643,6 +644,7 @@ impl B8DebugDecodedInstructionKindReport {
                 address: address.value(),
                 width: B8DebugMemoryReadWidthReport::Bits64,
             },
+            DecodedInstructionKind::MovRdxQwordPtrRax => Self::MovRdxQwordPtrRax,
             DecodedInstructionKind::MovzxEaxBytePtrRdi => Self::MovzxEaxBytePtrRdi,
             DecodedInstructionKind::AddEaxImm32 { imm } => Self::AddEaxImm32 {
                 imm: format!("{imm:?}"),

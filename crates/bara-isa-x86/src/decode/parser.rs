@@ -185,6 +185,16 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                 let operand = read_u8(input, offset + 2, at, opcode)?;
 
                 match (opcode2, operand) {
+                    (0x8b, 0x10) => {
+                        let end_offset = offset + 3;
+                        let end = instruction_end(input, at, end_offset, 3)?;
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::MovRdxQwordPtrRax,
+                        ));
+                        offset = end_offset;
+                    }
                     (0x8b, 0x05) => {
                         let end_offset = offset + 7;
                         let displacement = read_i32_at(input, offset + 3, at, opcode)?;

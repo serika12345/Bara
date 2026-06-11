@@ -246,6 +246,15 @@
   materialize する。次 blocker は `48 8b 10`
   (`mov rdx, qword ptr [rax]`) であり、register-indirect memory、`rdx` register、
   loader / mapped runtime memory boundary を含むため opcode-only batch では扱わない。
+- 2026-06-11 の B8-G3g として、`48 8b 10`
+  (`mov rdx, qword ptr [rax]`) を register-indirect 64-bit load boundary として追加した。
+  IR は `rdx` register family と `MemRegIndirect { base: Rax, width: Bits64 }` を持つ。
+  ARM64 emit はこの slice では RAX が静的に既知で、かつその address が
+  `ProgramImageMetadata` の mapped bytes にある場合だけ `x2` immediate として
+  materialize する。RAX が runtime value の場合や mapped bytes から読めない場合は、
+  loader / mapped runtime memory の不足として typed unsupported reason を返す。次 blocker
+  は `48 8d 3d b3 10 00 00` (`lea rdi, [rip+disp32]`) であり、memory read ではない
+  RIP-relative effective address materialization として次の focused PR Gate で扱う。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、
