@@ -9,36 +9,43 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 09:52 JST
+最終更新: 2026-06-11 09:59 JST
 
 状態:
 
-- project_state: completed。B7 の 14 個目の小ステップとして、Rust verifier report
-  が branch fixup の target / offset / source consistency を検査できるようにした。
+- project_state: completed。B7 の 15 個目の小ステップとして、final state
+  comparator report を failure package に構造化して保存するようにした。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B7:
   Oracle / Regression 基盤。
-- active_design_focus: B7 Rust verifier report。`bara-arm64` に pure
-  verifier report を置き、emit 後の PC map と branch fixup metadata の
-  consistency を stable report として保存する。
+- active_design_focus: B7 verifier report / failure package。emit 後の PC map と
+  branch fixup metadata の consistency に加えて、expected / actual final state
+  comparison を stable failure report として保存する。
 - active_branch: `task/b7-x86_64-macho-fixture-generation`。base commit は
   `8d39a4a`。latest commit はこの小ステップの review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B7 の
   IR invariant、PC map invariant、fixup consistency、final state comparator を
-  verifier で検査できるようにする項目の fixup consistency 小分け。
-- completed_work: `bara-arm64::verify` が missing PC map source に加えて、
-  branch fixup target が PC map source に存在すること、fixup offset / source の
-  ARM64 PC が生成 code 内の 4-byte instruction slot を指すことを検査する。
-  `verifier.report.json` の issue schema も同じ分類を保存する。
-- remaining_work: B7 は継続中。final state comparator、property-based 小ケース生成、
-  CI lane 分割、failure classification 拡張は未実装。
-- next_action: final state comparator を verifier report に接続する。
+  verifier で検査できるようにする項目の final state comparator 小分け。
+- completed_work: comparison mismatch 時の `failure.json` が、message 文字列だけでなく
+  `final_state` field に `ComparisonReport` を保存する。`check-corpus --out` と
+  `check-blackbox --out` の comparison failure は同じ構造化 report を持つ。
+- remaining_work: B7 は継続中。property-based 小ケース生成、CI lane 分割、
+  failure classification 拡張は未実装。
+- next_action: QuickCheck / Hedgehog の前段として小ケース生成と shrink の最小導線を
+  Rust workspace 内で始める。
 - verification: targeted tests として
-  `nix develop -c cargo test -p bara-arm64 verify::tests` と
-  `nix develop -c cargo test -p btbc-cli emit_fixture_artifacts_writes_compilation_metadata_files`
+  `nix develop -c cargo test -p btbc-cli check_corpus_writes_failure_package_for_comparison_mismatch`
+  と
+  `nix develop -c cargo test -p btbc-cli check_blackbox_reports_raw_manifest_mach_o_and_probe_fixtures`
   が通過した。`nix develop -c ./scripts/check-domain-types` も通過した。
   `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
+
+- 2026-06-11 09:59 JST: B7 の 15 個目の小ステップとして、
+  expected / actual final state comparator report を failure package に接続した。
+  comparison mismatch 時の `failure.json` は `final_state` field に
+  `ComparisonReport` を保存する。検証は snapshot の targeted test と commit 前の
+  full verification。
 
 - 2026-06-11 09:52 JST: B7 の 14 個目の小ステップとして、
   Rust verifier report が branch fixup consistency を検査できるようにした。

@@ -244,12 +244,14 @@ fn run_native_executable_smoke(
     let comparison = compare_observed_results(&expected, &actual);
     let actual_case_id = actual.case_id().clone();
     if !comparison.is_match() {
+        let message = format!("native executable smoke comparison failed: {comparison:?}");
         return FixtureRun::failed_with_actual(
             actual_case_id,
             FailureKind::ComparisonMismatch,
-            format!("native executable smoke comparison failed: {comparison:?}"),
+            message,
             actual,
-        );
+        )
+        .with_final_state_report(comparison);
     }
 
     FixtureRun::passed_observed(actual_case_id, actual)
@@ -396,12 +398,14 @@ fn run_observed_comparison_fixture(
     let comparison = compare_observed_results(&expected, &actual);
     let actual_case_id = actual.case_id().clone();
     if !comparison.is_match() {
+        let message = format!("comparison failed: {comparison:?}");
         return FixtureRun::failed_with_actual(
             actual_case_id,
             FailureKind::ComparisonMismatch,
-            format!("comparison failed: {comparison:?}"),
+            message,
             actual,
-        );
+        )
+        .with_final_state_report(comparison);
     }
 
     FixtureRun::passed_observed(actual_case_id, actual)

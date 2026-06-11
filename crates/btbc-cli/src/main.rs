@@ -736,13 +736,15 @@ fn run_corpus_fixture(case_path: &Path, expected_dir: &Path) -> FixtureRun {
     };
     let comparison = compare_observed_results(&expected, &actual);
     if !comparison.is_match() {
+        let message = format!("comparison failed: {comparison:?}");
         return FixtureRun::failed_with_actual_and_artifacts(
             case_id,
             FailureKind::ComparisonMismatch,
-            format!("comparison failed: {comparison:?}"),
+            message,
             actual.clone(),
             artifact_metadata,
         )
+        .with_final_state_report(comparison)
         .with_failure_artifacts(FixtureFailureArtifacts::new(
             Some(case_json),
             Some(expected_json),
@@ -795,6 +797,7 @@ struct FixtureRun {
     report: FixtureReport,
     output: Option<FixtureOutput>,
     artifact_metadata: Option<FunctionArtifactMetadata>,
+    final_state_report: Option<ComparisonReport>,
     failure_artifacts: Option<FixtureFailureArtifacts>,
 }
 
@@ -831,6 +834,7 @@ impl FixtureRun {
             report: FixtureReport::new(case_id, FixtureOutcome::Passed),
             output: Some(FixtureOutput::Observed(actual)),
             artifact_metadata: None,
+            final_state_report: None,
             failure_artifacts: None,
         }
     }
@@ -844,6 +848,7 @@ impl FixtureRun {
             report: FixtureReport::new(case_id, FixtureOutcome::Passed),
             output: Some(FixtureOutput::Observed(actual)),
             artifact_metadata: Some(artifact_metadata),
+            final_state_report: None,
             failure_artifacts: None,
         }
     }
@@ -853,6 +858,7 @@ impl FixtureRun {
             report: FixtureReport::new(case_id, FixtureOutcome::Passed),
             output: Some(FixtureOutput::Probe(actual)),
             artifact_metadata: None,
+            final_state_report: None,
             failure_artifacts: None,
         }
     }
@@ -862,6 +868,7 @@ impl FixtureRun {
             report: failed_fixture_report(case_id, kind, message),
             output: None,
             artifact_metadata: None,
+            final_state_report: None,
             failure_artifacts: None,
         }
     }
@@ -876,6 +883,7 @@ impl FixtureRun {
             report: failed_fixture_report(case_id, kind, message),
             output: Some(FixtureOutput::Observed(actual)),
             artifact_metadata: None,
+            final_state_report: None,
             failure_artifacts: None,
         }
     }
@@ -891,8 +899,14 @@ impl FixtureRun {
             report: failed_fixture_report(case_id, kind, message),
             output: Some(FixtureOutput::Observed(actual)),
             artifact_metadata: Some(artifact_metadata),
+            final_state_report: None,
             failure_artifacts: None,
         }
+    }
+
+    fn with_final_state_report(mut self, final_state_report: ComparisonReport) -> Self {
+        self.final_state_report = Some(final_state_report);
+        self
     }
 
     fn with_failure_artifacts(mut self, failure_artifacts: FixtureFailureArtifacts) -> Self {
@@ -931,6 +945,7 @@ fn write_corpus_outputs(
                 run.report.case_id(),
                 *kind,
                 message.as_str(),
+                run.final_state_report.as_ref(),
                 run.failure_artifacts.as_ref(),
             )?;
         }
@@ -965,10 +980,12 @@ fn write_fixture_failure_package(
     case_id: &CaseId,
     kind: FailureKind,
     message: &str,
+    final_state_report: Option<&ComparisonReport>,
     artifacts: Option<&FixtureFailureArtifacts>,
 ) -> Result<(), CliError> {
     create_dir(failure_dir)?;
-    let report = FixtureFailurePackageJson::new(case_id, kind, message, artifacts);
+    let report =
+        FixtureFailurePackageJson::new(case_id, kind, message, final_state_report, artifacts);
     let report_json = serde_json::to_string(&report)
         .map_err(JsonError::new)
         .map_err(CliError::Json)?;
@@ -995,6 +1012,8 @@ struct FixtureFailurePackageJson<'a> {
     case_id: &'a str,
     kind: FailureKind,
     message: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    final_state: Option<&'a ComparisonReport>,
     shrink: FixtureFailureShrinkJson,
     corpus_update: FixtureCorpusUpdateJson,
 }
@@ -1004,12 +1023,14 @@ impl<'a> FixtureFailurePackageJson<'a> {
         case_id: &'a CaseId,
         kind: FailureKind,
         message: &'a str,
+        final_state_report: Option<&'a ComparisonReport>,
         artifacts: Option<&FixtureFailureArtifacts>,
     ) -> Self {
         Self {
             case_id: case_id.as_str(),
             kind,
             message,
+            final_state: final_state_report,
             shrink: FixtureFailureShrinkJson {
                 status: FixtureShrinkStatus::NotAttempted,
                 recommended_next_step: format!(
@@ -2326,7 +2347,7 @@ mod tests {
         let failure_dir = output_dir.join("failures").join("return_42");
         assert_eq!(
             read_file(&failure_dir.join("failure.json")),
-            "{\"case_id\":\"return_42\",\"kind\":\"comparison_mismatch\",\"message\":\"comparison failed: ComparisonReport { issues: [ReturnValueMismatch { expected: 41, actual: 42 }] }\",\"shrink\":{\"status\":\"not_attempted\",\"recommended_next_step\":\"minimize testcase while preserving failure kind comparison_mismatch\"},\"corpus_update\":{\"action\":\"review_failure_package\",\"candidate_testcase\":\"testcase.json\",\"candidate_expected\":\"expected.json\",\"candidate_actual\":\"actual.json\"}}"
+            "{\"case_id\":\"return_42\",\"kind\":\"comparison_mismatch\",\"message\":\"comparison failed: ComparisonReport { issues: [ReturnValueMismatch { expected: 41, actual: 42 }] }\",\"final_state\":{\"issues\":[{\"return_value_mismatch\":{\"expected\":41,\"actual\":42}}]},\"shrink\":{\"status\":\"not_attempted\",\"recommended_next_step\":\"minimize testcase while preserving failure kind comparison_mismatch\"},\"corpus_update\":{\"action\":\"review_failure_package\",\"candidate_testcase\":\"testcase.json\",\"candidate_expected\":\"expected.json\",\"candidate_actual\":\"actual.json\"}}"
         );
         assert_eq!(read_file(&failure_dir.join("testcase.json")), testcase_json);
         assert_eq!(read_file(&failure_dir.join("expected.json")), expected_json);

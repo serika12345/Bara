@@ -209,8 +209,10 @@ btbc-compare expected.json actual.json
 
 `check-corpus --out` / `check-blackbox --out` は、失敗 fixture ごとに
 `failures/<case_id>/` を作る。`failure.json` は stable failure classification、
-message、shrink status、corpus update action を持つ。raw testcase fixture では、
-保存できる範囲で以下も同じ directory に置く。
+message、final state comparison report、shrink status、corpus update action を持つ。
+final state comparison report は expected / actual の外部観測結果を比較できた
+失敗だけに保存する。raw testcase fixture では、保存できる範囲で以下も同じ
+directory に置く。
 
 - `testcase.json`
 - `expected.json`
@@ -261,7 +263,8 @@ fixup consistency、final state comparison を stable report として返す。
 B7 の初期 Rust verifier report は `verifier.report.json` として保存する。
 現在の検査は、emit 後の PC map が全 IR block start の source PC を保持している
 ことと、branch fixup の target が PC map source に解決でき、offset / source の
-ARM64 PC が生成 code 内の命令 slot を指していることに限定する。
+ARM64 PC が生成 code 内の命令 slot を指していること、比較失敗時の
+`failure.json` が final state comparison report を保持することに限定する。
 
 Haskell は、JSON schema が安定し、QuickCheck / Hedgehog による generator と
 shrinker、または Rust 実装から独立した仕様モデルが必要になった時点で `spec/`
