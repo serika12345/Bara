@@ -270,6 +270,14 @@
   次 blocker は `48 8b 3d 22 3b 00 00` (`mov rdi, qword ptr [rip+disp32]`) であり、
   address materialization ではなく RIP-relative 64-bit memory load into argument register
   として次の focused PR Gate で扱う。
+- 2026-06-11 の B8-G3j として、`48 8b 3d disp32`
+  (`mov rdi, qword ptr [rip+disp32]`) を RIP-relative 64-bit memory load slice として追加した。
+  IR は B8-G3f と同じ `MemRipRelative { width: Bits64 }` operand を使い、destination を
+  `rdi` として保持する。ARM64 emit は現在の mapped bytes から qword を読み、ABI-focused
+  mapping に合わせて `x0` に materialize する。ただし destination は `rdi` なので、
+  `rax` value availability は無効化する。次 blocker は
+  `48 8b 35 eb 3a 00 00` (`mov rsi, qword ptr [rip+disp32]`) であり、同じ memory load を
+  2 番目の argument register destination として次の focused PR Gate で扱う。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、

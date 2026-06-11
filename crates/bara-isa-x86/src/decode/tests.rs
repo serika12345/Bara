@@ -437,14 +437,14 @@ fn decodes_push_rax_pop_rax_between_mov_and_ret() {
 }
 
 #[test]
-fn decodes_prologue_and_rip_relative_lea_rsi_before_next_unsupported_opcode() {
+fn decodes_prologue_and_rip_relative_mov_rdi_before_next_unsupported_opcode() {
     let input = X86Bytes::new(
         X86Va::new(0x1600),
         vec![
             0x55, 0x48, 0x89, 0xe5, 0x41, 0x57, 0x41, 0x56, 0x53, 0x48, 0x89, 0xc3, 0x48, 0x8b,
             0x05, 0xff, 0x19, 0x00, 0x00, 0x48, 0x8b, 0x10, 0x48, 0x8d, 0x3d, 0xb3, 0x10, 0x00,
             0x00, 0x48, 0x8d, 0x35, 0xb6, 0x10, 0x00, 0x00, 0xe8, 0x79, 0x00, 0x00, 0x00, 0x48,
-            0x8b, 0x3d,
+            0x8b, 0x3d, 0x22, 0x3b, 0x00, 0x00, 0x48, 0x8b, 0x35,
         ],
     )
     .expect("test bytes are non-empty");
@@ -523,11 +523,19 @@ fn decodes_prologue_and_rip_relative_lea_rsi_before_next_unsupported_opcode() {
             ),
             DecodedInstruction::new(
                 X86Va::new(0x1629),
-                X86Va::new(0x162c),
+                X86Va::new(0x1630),
+                DecodedInstructionKind::MovRdiQwordPtrRipRelative {
+                    displacement: crate::decode::X86Imm32::new(0x3b22),
+                    address: X86Va::new(0x5152),
+                }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x1630),
+                X86Va::new(0x1633),
                 DecodedInstructionKind::Unsupported {
                     reason: UnsupportedReason::DecodeUnsupportedOpcode {
                         opcode: 0x48,
-                        at: X86Va::new(0x1629),
+                        at: X86Va::new(0x1630),
                     }
                 }
             )
@@ -700,6 +708,36 @@ fn decodes_mov_rax_qword_ptr_rip_relative_then_ret() {
 }
 
 #[test]
+fn decodes_mov_rdi_qword_ptr_rip_relative_then_ret() {
+    let input = X86Bytes::new(
+        X86Va::new(0x2000),
+        vec![0x48, 0x8b, 0x3d, 0xf9, 0xff, 0xff, 0xff, 0xc3],
+    )
+    .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0x2000),
+                X86Va::new(0x2007),
+                DecodedInstructionKind::MovRdiQwordPtrRipRelative {
+                    displacement: crate::decode::X86Imm32::new(-7),
+                    address: X86Va::new(0x2000),
+                }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x2007),
+                X86Va::new(0x2008),
+                DecodedInstructionKind::Ret
+            )
+        ]
+    );
+}
+
+#[test]
 fn truncated_mov_rax_qword_ptr_rip_relative_is_reported() {
     let input = X86Bytes::new(X86Va::new(0x160c), vec![0x48, 0x8b, 0x05])
         .expect("test bytes are non-empty");
@@ -708,6 +746,20 @@ fn truncated_mov_rax_qword_ptr_rip_relative_is_reported() {
         decode_function(&input),
         Err(DecodeError::TruncatedInstruction {
             at: X86Va::new(0x160c),
+            opcode: 0x48
+        })
+    );
+}
+
+#[test]
+fn truncated_mov_rdi_qword_ptr_rip_relative_is_reported() {
+    let input = X86Bytes::new(X86Va::new(0x162f), vec![0x48, 0x8b, 0x3d])
+        .expect("test bytes are non-empty");
+
+    assert_eq!(
+        decode_function(&input),
+        Err(DecodeError::TruncatedInstruction {
+            at: X86Va::new(0x162f),
             opcode: 0x48
         })
     );

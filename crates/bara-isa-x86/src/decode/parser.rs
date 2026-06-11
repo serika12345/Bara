@@ -210,6 +210,21 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                         ));
                         offset = end_offset;
                     }
+                    (0x8b, 0x3d) => {
+                        let end_offset = offset + 7;
+                        let displacement = read_i32_at(input, offset + 3, at, opcode)?;
+                        let end = instruction_end(input, at, end_offset, 7)?;
+                        let address = relative_target(end, displacement, at)?;
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::MovRdiQwordPtrRipRelative {
+                                displacement: X86Imm32::new(displacement),
+                                address,
+                            },
+                        ));
+                        offset = end_offset;
+                    }
                     (0x8d, 0x3d) => {
                         let end_offset = offset + 7;
                         let displacement = read_i32_at(input, offset + 3, at, opcode)?;
