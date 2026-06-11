@@ -797,26 +797,31 @@ review gate:
 - 完了したら commit / push / draft PR 作成で停止する。次の blocker は debug bundle の
   結果を見て次の `PR Gate` として追加する。
 
-- [ ] B8-G3k: RIP-relative `mov rsi,qword ptr [rip+disp32]` load boundary を追加する。
-  - [ ] B8-G3j の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 72 }`
+- [x] B8-G3k: 連続する RIP-relative MOV load boundary を次の non-load blocker まで追加する。
+  - [x] B8-G3j の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 72 }`
     (`48 8b 35 eb 3a 00 00`) を RIP-relative MOV RSI load blocker として focused fixture に固定する。
-  - [ ] `rsi` destination の RIP-relative 64-bit memory load を、`lea` の address
+  - [x] 同じ load 系が連続する場合は、debug bundle / entry bytes で確認できる範囲に限り
+    次の RIP-relative MOV load blocker まで同じ PR で進める。
+  - [x] `rsi` / `r14` destination の RIP-relative 64-bit memory load を、`lea` の address
     materialization と区別して typed memory operand として表現する。
-  - [ ] arbitrary destination registers、relocation / rebase / bind 適用、import resolution が
+  - [x] 次 blocker が indirect call など non-load になった時点で batch を止める。
+  - [x] arbitrary destination registers、relocation / rebase / bind 適用、import resolution が
     必要な場合は silent fallback せず stable blocker として report する。
 
-#### PR Gate: B8-G3k RIP-Relative MOV RSI Load Boundary
+#### PR Gate: B8-G3k RIP-Relative MOV Load Batch Boundary
 
-branch: `task/b8-g3k-rip-relative-mov-rsi-load`
+branch: `task/b8-g3k-rip-relative-load-batch`
 
 完了条件:
 
-- B8-G3j の debug bundle / blocker report から、次に潰す boundary として
+- [x] B8-G3j の debug bundle / blocker report から、次に潰す boundary として
   `48 8b 35 disp32` (`mov rsi, qword ptr [rip+disp32]`) を選んでいる。
-- 選んだ blocker の最小 bytes が focused fixture として保存されている。
-- `rsi` destination の RIP-relative 64-bit memory load を decode / lift / emit の
+- [x] 選んだ `rsi` blocker の最小 bytes が focused fixture として保存されている。
+- [x] `rsi` destination の RIP-relative 64-bit memory load を decode / lift / emit の
   最小範囲または stable blocker として表現している。
-- debug bundle または launch report で `48 8b 35` blocker を越えるか、次に必要な
+- [x] `rsi` load を越えた次が `4c 8b 35 disp32` (`mov r14, qword ptr [rip+disp32]`) である場合、
+  同じ RIP-relative MOV load batch として focused fixture と decode / lift / emit に追加している。
+- [x] debug bundle または launch report で連続する load blocker を越え、次に必要な
   ISA / loader / metadata boundary が stable に report される。
 
 PR に含めない:
@@ -824,6 +829,43 @@ PR に含めない:
 - REX.W MOV の全 ModRM 形式や arbitrary destination registers の一括実装。
 - relocation / rebase / bind、import resolution、Objective-C / AppKit bridge の本実装。
 - 汎用 register allocation や JIT/on-demand translation cache の本実装。
+
+検証:
+
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止する。次の blocker は debug bundle の
+  結果を見て次の `PR Gate` として追加する。
+
+- [ ] B8-G3l: indirect `call r14` boundary を追加する。
+  - [ ] B8-G3k の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 65 }`
+    (`41 ff d6`) を indirect call blocker として focused fixture に固定する。
+  - [ ] `call r14` を direct call と混同せず、unknown indirect target / helper boundary /
+    unsupported terminator のどれで扱うかを stable に表現する。
+  - [ ] indirect control flow や translation cache が必要な場合は silent fallback せず
+    stable blocker として report する。
+
+#### PR Gate: B8-G3l Indirect CALL R14 Boundary
+
+branch: `task/b8-g3l-indirect-call-r14`
+
+完了条件:
+
+- B8-G3k の debug bundle / blocker report から、次に潰す boundary として
+  `41 ff d6` (`call r14`) を選んでいる。
+- 選んだ blocker の最小 bytes が focused fixture として保存されている。
+- indirect call を direct call / RIP-relative load と混ぜず、decode / lift / emit の
+  最小範囲または stable unsupported boundary として表現している。
+- debug bundle または launch report で `41 ff d6` blocker を越えるか、次に必要な
+  ISA / loader / metadata boundary が stable に report される。
+
+PR に含めない:
+
+- arbitrary indirect call targets、translation cache、fallback JIT/interpreter の本実装。
+- relocation / rebase / bind、import resolution、Objective-C / AppKit bridge の本実装。
+- 汎用 register allocation の本実装。
 
 検証:
 

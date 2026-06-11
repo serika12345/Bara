@@ -278,6 +278,12 @@
   `rax` value availability は無効化する。次 blocker は
   `48 8b 35 eb 3a 00 00` (`mov rsi, qword ptr [rip+disp32]`) であり、同じ memory load を
   2 番目の argument register destination として次の focused PR Gate で扱う。
+- 2026-06-11 の B8-G3k として、連続する RIP-relative MOV load batch を次の non-load
+  blocker まで進めた。`48 8b 35 disp32` (`mov rsi, qword ptr [rip+disp32]`) は
+  `rsi` / `x1` へ、続く `4c 8b 35 disp32` (`mov r14, qword ptr [rip+disp32]`) は
+  `r14` / `x14` へ mapped qword を materialize する。どちらも `rax` destination ではないため、
+  `rax` value availability は維持する。次 blocker は `41 ff d6` (`call r14`) であり、
+  load ではなく unknown indirect control-flow boundary として次の focused PR Gate で扱う。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、

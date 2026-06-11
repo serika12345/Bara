@@ -225,6 +225,21 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                         ));
                         offset = end_offset;
                     }
+                    (0x8b, 0x35) => {
+                        let end_offset = offset + 7;
+                        let displacement = read_i32_at(input, offset + 3, at, opcode)?;
+                        let end = instruction_end(input, at, end_offset, 7)?;
+                        let address = relative_target(end, displacement, at)?;
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::MovRsiQwordPtrRipRelative {
+                                displacement: X86Imm32::new(displacement),
+                                address,
+                            },
+                        ));
+                        offset = end_offset;
+                    }
                     (0x8d, 0x3d) => {
                         let end_offset = offset + 7;
                         let displacement = read_i32_at(input, offset + 3, at, opcode)?;
@@ -282,6 +297,33 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                             at,
                             end,
                             DecodedInstructionKind::MovRbpRsp,
+                        ));
+                        offset = end_offset;
+                    }
+                    _ => {
+                        let end = instruction_end(input, at, offset + 3, 3)?;
+                        instructions.push(unsupported_instruction(at, end, opcode));
+                        return DecodedFunction::new(input.entry(), instructions);
+                    }
+                }
+            }
+            0x4c => {
+                let opcode2 = read_u8(input, offset + 1, at, opcode)?;
+                let operand = read_u8(input, offset + 2, at, opcode)?;
+
+                match (opcode2, operand) {
+                    (0x8b, 0x35) => {
+                        let end_offset = offset + 7;
+                        let displacement = read_i32_at(input, offset + 3, at, opcode)?;
+                        let end = instruction_end(input, at, end_offset, 7)?;
+                        let address = relative_target(end, displacement, at)?;
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::MovR14QwordPtrRipRelative {
+                                displacement: X86Imm32::new(displacement),
+                                address,
+                            },
                         ));
                         offset = end_offset;
                     }

@@ -119,6 +119,24 @@ fn lift_instruction(
                 },
             }))
         }
+        DecodedInstructionKind::MovRsiQwordPtrRipRelative { address, .. } => {
+            Ok(LiftedInstruction::Op(IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rsi),
+                src: Operand::MemRipRelative {
+                    address: *address,
+                    width: MemoryReadWidth::Bits64,
+                },
+            }))
+        }
+        DecodedInstructionKind::MovR14QwordPtrRipRelative { address, .. } => {
+            Ok(LiftedInstruction::Op(IrOp::Mov {
+                dst: Operand::Reg(X86Reg::R14),
+                src: Operand::MemRipRelative {
+                    address: *address,
+                    width: MemoryReadWidth::Bits64,
+                },
+            }))
+        }
         DecodedInstructionKind::MovRdxQwordPtrRax => Ok(LiftedInstruction::Op(IrOp::Mov {
             dst: Operand::Reg(X86Reg::Rdx),
             src: Operand::MemRegIndirect {
@@ -869,7 +887,7 @@ mod tests {
     }
 
     #[test]
-    fn lifts_prologue_and_rip_relative_mov_rdi_before_next_unsupported_opcode() {
+    fn lifts_prologue_and_rip_relative_load_batch_before_next_unsupported_opcode() {
         let decoded = DecodedFunction::new(
             X86Va::new(0x1600),
             vec![
@@ -942,11 +960,27 @@ mod tests {
                 ),
                 DecodedInstruction::new(
                     X86Va::new(0x162b),
-                    X86Va::new(0x162e),
+                    X86Va::new(0x1632),
+                    DecodedInstructionKind::MovRsiQwordPtrRipRelative {
+                        displacement: crate::decode::X86Imm32::new(0x3aeb),
+                        address: X86Va::new(0x511d),
+                    },
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(0x1632),
+                    X86Va::new(0x1639),
+                    DecodedInstructionKind::MovR14QwordPtrRipRelative {
+                        displacement: crate::decode::X86Imm32::new(0x1a14),
+                        address: X86Va::new(0x304d),
+                    },
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(0x1639),
+                    X86Va::new(0x163a),
                     DecodedInstructionKind::Unsupported {
                         reason: UnsupportedReason::DecodeUnsupportedOpcode {
-                            opcode: 0x48,
-                            at: X86Va::new(0x162b),
+                            opcode: 0x41,
+                            at: X86Va::new(0x1639),
                         },
                     },
                 ),
@@ -1011,6 +1045,20 @@ mod tests {
                         address: X86Va::new(0x514d),
                         width: MemoryReadWidth::Bits64,
                     }
+                },
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rsi),
+                    src: Operand::MemRipRelative {
+                        address: X86Va::new(0x511d),
+                        width: MemoryReadWidth::Bits64,
+                    }
+                },
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::R14),
+                    src: Operand::MemRipRelative {
+                        address: X86Va::new(0x304d),
+                        width: MemoryReadWidth::Bits64,
+                    }
                 }
             ]
         );
@@ -1018,8 +1066,8 @@ mod tests {
             program.blocks()[0].terminator(),
             &Terminator::Unsupported {
                 reason: UnsupportedReason::DecodeUnsupportedOpcode {
-                    opcode: 0x48,
-                    at: X86Va::new(0x162b),
+                    opcode: 0x41,
+                    at: X86Va::new(0x1639),
                 }
             }
         );
@@ -1118,6 +1166,74 @@ mod tests {
                 dst: Operand::Reg(X86Reg::Rdi),
                 src: Operand::MemRipRelative {
                     address: X86Va::new(0x3b29),
+                    width: MemoryReadWidth::Bits64,
+                }
+            }]
+        );
+        assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_mov_rsi_qword_ptr_rip_relative_to_memory_load() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(7),
+                    DecodedInstructionKind::MovRsiQwordPtrRipRelative {
+                        displacement: crate::decode::X86Imm32::new(0x3aeb),
+                        address: X86Va::new(0x3af2),
+                    },
+                ),
+                DecodedInstruction::new(X86Va::new(7), X86Va::new(8), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded RIP-relative RSI MOV lifts");
+        let block = &program.blocks()[0];
+
+        assert_eq!(
+            block.ops(),
+            &[IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rsi),
+                src: Operand::MemRipRelative {
+                    address: X86Va::new(0x3af2),
+                    width: MemoryReadWidth::Bits64,
+                }
+            }]
+        );
+        assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_mov_r14_qword_ptr_rip_relative_to_memory_load() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(7),
+                    DecodedInstructionKind::MovR14QwordPtrRipRelative {
+                        displacement: crate::decode::X86Imm32::new(0x1a14),
+                        address: X86Va::new(0x1a1b),
+                    },
+                ),
+                DecodedInstruction::new(X86Va::new(7), X86Va::new(8), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded RIP-relative R14 MOV lifts");
+        let block = &program.blocks()[0];
+
+        assert_eq!(
+            block.ops(),
+            &[IrOp::Mov {
+                dst: Operand::Reg(X86Reg::R14),
+                src: Operand::MemRipRelative {
+                    address: X86Va::new(0x1a1b),
                     width: MemoryReadWidth::Bits64,
                 }
             }]
