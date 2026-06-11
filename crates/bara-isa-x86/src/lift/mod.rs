@@ -132,6 +132,9 @@ fn lift_instruction(
         DecodedInstructionKind::PushRax => Ok(LiftedInstruction::Op(IrOp::Push {
             src: Operand::Reg(X86Reg::Rax),
         })),
+        DecodedInstructionKind::PushRbp => Ok(LiftedInstruction::Op(IrOp::Push {
+            src: Operand::Reg(X86Reg::Rbp),
+        })),
         DecodedInstructionKind::PopRax => Ok(LiftedInstruction::Op(IrOp::Pop {
             dst: Operand::Reg(X86Reg::Rax),
         })),
@@ -808,6 +811,49 @@ mod tests {
             ]
         );
         assert_eq!(program.blocks()[0].terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_push_rbp_to_stack_op_before_next_unsupported_prologue_byte() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0x1600),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0x1600),
+                    X86Va::new(0x1601),
+                    DecodedInstructionKind::PushRbp,
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(0x1601),
+                    X86Va::new(0x1604),
+                    DecodedInstructionKind::Unsupported {
+                        reason: UnsupportedReason::DecodeUnsupportedOpcode {
+                            opcode: 0x48,
+                            at: X86Va::new(0x1601),
+                        },
+                    },
+                ),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded push rbp function lifts");
+
+        assert_eq!(
+            program.blocks()[0].ops(),
+            &[IrOp::Push {
+                src: Operand::Reg(X86Reg::Rbp)
+            }]
+        );
+        assert_eq!(
+            program.blocks()[0].terminator(),
+            &Terminator::Unsupported {
+                reason: UnsupportedReason::DecodeUnsupportedOpcode {
+                    opcode: 0x48,
+                    at: X86Va::new(0x1601),
+                }
+            }
+        );
     }
 
     #[test]

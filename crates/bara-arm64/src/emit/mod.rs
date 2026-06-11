@@ -301,6 +301,11 @@ pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
                     }
                     emit_push_x0(&mut code);
                 }
+                IrOp::Push {
+                    src: Operand::Reg(X86Reg::Rbp),
+                } => {
+                    emit_push_x29(&mut code);
+                }
                 IrOp::Push { .. } => {
                     return Err(unsupported_ir());
                 }
@@ -688,6 +693,10 @@ fn emit_push_x0(code: &mut Vec<u8>) -> usize {
     emit_u32_le(code, 0xf81f_0fe0)
 }
 
+fn emit_push_x29(code: &mut Vec<u8>) -> usize {
+    emit_u32_le(code, 0xf81f_0ffd)
+}
+
 fn emit_pop_x0(code: &mut Vec<u8>) -> usize {
     emit_u32_le(code, 0xf841_07e0)
 }
@@ -974,6 +983,29 @@ mod tests {
             Err(EmitError::UnsupportedIr {
                 reason: UnsupportedReason::SyscallUnsupported { request }
             })
+        );
+    }
+
+    #[test]
+    fn emits_push_rbp_with_aligned_stack_slot() {
+        let program = program_with_ops(
+            vec![
+                IrOp::Push {
+                    src: Operand::Reg(X86Reg::Rbp),
+                },
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(42),
+                },
+            ],
+            Terminator::Return,
+        );
+
+        let emitted = emit_program(&program).expect("push rbp IR emits");
+
+        assert_eq!(
+            emitted.code().bytes(),
+            &[0xfd, 0x0f, 0x1f, 0xf8, 0x40, 0x05, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]
         );
     }
 

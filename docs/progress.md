@@ -9,27 +9,25 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 17:37 JST
+最終更新: 2026-06-11 18:00 JST
 
 状態:
 
 - project_state: in_progress。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
-  reviewable GUI 起動 slice の積み上げとして扱う。B8-G2 までで、self-authored
-  x86_64 GUI fixture の実 `LC_MAIN` entry から first-block translation report を
-  生成できるようになった。B8 全体はここから ISA / loader / import / ABI /
-  Objective-C / AppKit / process-state boundary を debug bundle の blocker report
-  から順に潰す。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G2 PR Gate:
-  B8-G1 専用 translated host-trap sentinel ではなく、public `LC_MAIN` `entryoff` と
-  executable segment metadata から実 entry bytes を切り出し、decode / lift / emit /
-  runtime attempt を debug bundle と `launch.report.json` に保存できる。
+  reviewable GUI 起動 slice の積み上げとして扱う。B8-G3 までで、self-authored
+  x86_64 GUI fixture の実 `LC_MAIN` entry から `push rbp` prologue slice を
+  decode / lift / emit でき、debug bundle が次の ISA blocker まで進む。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G3 PR Gate:
+  B8-G2 の `blocker.json` で見えた `DecodeUnsupportedOpcode { opcode: 85 }`
+  (`push rbp`) を focused fixture に固定し、`PushRbp` / `Rbp` IR / ARM64
+  frame-pointer push emit を最小実装した。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
   Objective-C runtime / dyld の private behavior は使わず、public metadata、
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
-- active_branch: `task/b8-g2-entry-first-block`。base branch は最新 `main`。
-  latest commit は B8-G2 review package で報告する。
+- active_branch: `task/b8-g3-first-isa-blocker`。base branch は最新 `main`。
+  latest commit は B8-G3 review package で報告する。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
@@ -41,22 +39,29 @@
   B8-G2 以降の一般アプリ化計画と、その前提になる B8-D0 debug bundle foundation を
   TODO / scope / design TODO に明文化した。B8-D0 として
   `generate-b8-debug-bundle <binary> <out-root>` を追加し、B8-G2 として同 bundle の
-  entry source を public `LC_MAIN` entry に切り替えた。現在の generated
-  `blocker.json` は `unsupported_instruction` /
-  `DecodeUnsupportedOpcode { opcode: 85 }` を返し、`launch.report.json` は
-  `public_lc_main_entryoff`、source PC range `5632..5633`、B8-G1 host-trap path
-  `not_used` を保存する。
-- remaining_work: B8-G3。B8-G2 の blocker report に基づき、最初の ISA blocker
-  である x86_64 `push rbp` prologue slice を corpus-driven に実装し、次 blocker
-  まで進むことを debug bundle で確認する。
-- next_action: B8-G2 branch を commit / push し、draft PR を開いて review gate で
-  停止する。レビュー後の次 PR Gate は B8-G3 First ISA Blocker Slice。
-- verification: targeted checks として `nix develop -c cargo check -p btbc-cli` と
-  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_writes_real_entry_first_block_report -- --nocapture`
+  entry source を public `LC_MAIN` entry に切り替えた。B8-G3 として `push rbp`
+  (`0x55`) を通過できるようにした。現在の generated `blocker.json` は
+  `unsupported_instruction` / `DecodeUnsupportedOpcode { opcode: 72 }` を返し、
+  `decode.report.json` は `push_rbp` と次の unsupported `48 89 e5` を保存する。
+  `launch.report.json` の processed source PC range は `5632..5636` である。
+- remaining_work: B8-G3b。B8-G3 の blocker report に基づき、次の ISA blocker
+  である `48 89 e5` (`mov rbp,rsp`) prologue slice を focused fixture から実装し、
+  次 blocker まで進むことを debug bundle で確認する。
+- next_action: B8-G3 branch を commit / push し、draft PR を開いて review gate で
+  停止する。レビュー後の次 PR Gate は B8-G3b REX Mov RBP/RSP Prologue Slice。
+- verification: targeted check として `nix develop -c cargo test push_rbp -- --nocapture`
   が通過した。full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-11 18:00 JST: B8-G3 First ISA Blocker Slice を実装した。
+  x86_64 `push rbp` (`0x55`) を `PushRbp` として decode し、`IrOp::Push`
+  の `Rbp` operand へ lift し、ARM64 emit では `str x29, [sp, #-16]!` を生成する。
+  debug bundle は `push_rbp` を通過し、次 blocker として
+  `DecodeUnsupportedOpcode { opcode: 72 }` (`48 89 e5`, `mov rbp,rsp`) を
+  `blocker.json` と `launch.report.json` に保存する。targeted
+  `nix develop -c cargo test push_rbp -- --nocapture` と full
+  `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-11 17:37 JST: B8-G2 Real LC_MAIN First-Block Report を実装した。
   `generate-b8-debug-bundle <binary> <out-root>` は B8-G1 専用 translated host-trap
   sentinel ではなく、入力 Mach-O の public `LC_MAIN` entry bytes を保存し、その実

@@ -175,6 +175,15 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                 ));
                 offset += 1;
             }
+            0x55 => {
+                let end = instruction_end(input, at, offset + 1, 1)?;
+                instructions.push(DecodedInstruction::new(
+                    at,
+                    end,
+                    DecodedInstructionKind::PushRbp,
+                ));
+                offset += 1;
+            }
             0x58 => {
                 let end = instruction_end(input, at, offset + 1, 1)?;
                 instructions.push(DecodedInstruction::new(
