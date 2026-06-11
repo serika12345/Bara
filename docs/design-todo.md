@@ -299,6 +299,15 @@
   `ProgramImageMetadata` の mapped bytes / code / const-data range と B8 debug bundle
   は同じ Mach-O VM address space を report する。rebase / bind / import 解決は
   `loader.plan.json` の deferred step として残し、private dyld behavior には踏み込まない。
+- 2026-06-11 の B8-G4b として、`call r14` boundary を public Mach-O import metadata
+  boundary に接続した。debug bundle は `call_site=4294972996` / `return_to=4294972999`
+  の register-indirect call と、直前の
+  `mov r14, qword ptr [rip+disp32]` が読む `target_pointer_load.address=4294979672` を
+  `loader.plan.json` に保存する。現 fixture は public load command として
+  `LC_DYLD_CHAINED_FIXUPS dataoff=24576 datasize=584` を持つため、import symbol identity
+  はまだ解決せず、helper boundary request は
+  `import_symbol_identity_unresolved` の stable blocker とする。次の design slice は
+  private dyld behavior ではなく public chained fixups payload decoder の最小実装である。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、
