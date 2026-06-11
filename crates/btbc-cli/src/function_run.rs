@@ -560,6 +560,9 @@ impl FunctionVerifierReportArtifact {
 #[serde(tag = "kind", rename_all = "snake_case")]
 enum FunctionVerifierIssueArtifact {
     MissingPcMapSource { source: u64 },
+    FixupTargetMissingPcMapSource { target: u64 },
+    FixupOffsetOutOfCode { offset: u64 },
+    FixupSourceOutOfCode { source: u64 },
 }
 
 impl FunctionVerifierIssueArtifact {
@@ -567,6 +570,21 @@ impl FunctionVerifierIssueArtifact {
         match issue {
             EmittedFunctionVerificationIssue::MissingPcMapSource { source } => {
                 Self::MissingPcMapSource {
+                    source: source.value(),
+                }
+            }
+            EmittedFunctionVerificationIssue::FixupTargetMissingPcMapSource { target } => {
+                Self::FixupTargetMissingPcMapSource {
+                    target: target.value(),
+                }
+            }
+            EmittedFunctionVerificationIssue::FixupOffsetOutOfCode { offset } => {
+                Self::FixupOffsetOutOfCode {
+                    offset: offset.value(),
+                }
+            }
+            EmittedFunctionVerificationIssue::FixupSourceOutOfCode { source } => {
+                Self::FixupSourceOutOfCode {
                     source: source.value(),
                 }
             }

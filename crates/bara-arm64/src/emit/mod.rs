@@ -125,6 +125,16 @@ impl BranchFixup {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) const fn for_test(
+        offset: ArmPc,
+        source: ArmPc,
+        target: X86Va,
+        kind: BranchFixupKind,
+    ) -> Self {
+        Self::new(offset, source, target, kind)
+    }
+
     pub const fn offset(&self) -> ArmPc {
         self.offset
     }

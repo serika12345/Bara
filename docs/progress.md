@@ -9,35 +9,42 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 09:45 JST
+最終更新: 2026-06-11 09:52 JST
 
 状態:
 
-- project_state: completed。B7 の 13 個目の小ステップとして、Rust verifier report
-  を追加し、PC map が全 IR block start の source PC を保持していることを検査した。
+- project_state: completed。B7 の 14 個目の小ステップとして、Rust verifier report
+  が branch fixup の target / offset / source consistency を検査できるようにした。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B7:
   Oracle / Regression 基盤。
 - active_design_focus: B7 Rust verifier report。`bara-arm64` に pure
-  verifier report を追加し、`emit-fixture-artifacts` と `check-corpus --out` /
-  `check-blackbox --out` が `verifier.report.json` を保存する。
+  verifier report を置き、emit 後の PC map と branch fixup metadata の
+  consistency を stable report として保存する。
 - active_branch: `task/b7-x86_64-macho-fixture-generation`。base commit は
   `8d39a4a`。latest commit はこの小ステップの review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B7 の
   IR invariant、PC map invariant、fixup consistency、final state comparator を
-  verifier で検査できるようにする項目の最初の小分け。
-- completed_work: `bara-arm64::verify` が `Program` と `EmittedFunction` を受け取り、
-  missing PC map source を pure report として返す。`FunctionArtifactMetadata` は
-  `verifier.report.json` を出力し、空 issue report は `{"issues":[]}` になる。
-- remaining_work: B7 は継続中。fixup consistency、final state comparator、
-  property-based 小ケース生成、CI lane 分割は未実装。
-- next_action: fixup consistency を verifier report で検査する。
+  verifier で検査できるようにする項目の fixup consistency 小分け。
+- completed_work: `bara-arm64::verify` が missing PC map source に加えて、
+  branch fixup target が PC map source に存在すること、fixup offset / source の
+  ARM64 PC が生成 code 内の 4-byte instruction slot を指すことを検査する。
+  `verifier.report.json` の issue schema も同じ分類を保存する。
+- remaining_work: B7 は継続中。final state comparator、property-based 小ケース生成、
+  CI lane 分割、failure classification 拡張は未実装。
+- next_action: final state comparator を verifier report に接続する。
 - verification: targeted tests として
   `nix develop -c cargo test -p bara-arm64 verify::tests` と
   `nix develop -c cargo test -p btbc-cli emit_fixture_artifacts_writes_compilation_metadata_files`
-  が通過した。`nix develop -c ./scripts/check-domain-types` と
+  が通過した。`nix develop -c ./scripts/check-domain-types` も通過した。
   `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
+
+- 2026-06-11 09:52 JST: B7 の 14 個目の小ステップとして、
+  Rust verifier report が branch fixup consistency を検査できるようにした。
+  fixup target は PC map source に解決できる必要があり、fixup offset / source は
+  生成 code 内の 4-byte instruction slot を指す必要がある。検証は snapshot の
+  targeted tests と commit 前の full verification。
 
 - 2026-06-11 09:45 JST: B7 の 13 個目の小ステップとして、
   Rust verifier report を追加し、PC map が全 IR block start の source PC を
