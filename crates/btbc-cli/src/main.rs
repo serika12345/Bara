@@ -2358,15 +2358,20 @@ mod tests {
         assert!(report.contains("\"invoked_by\":\"translated_host_trap_request\""));
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
-    fn generate_b8_debug_bundle_writes_foundation_sidecar() {
-        let temp_dir = TestTempDir::new("generate_b8_debug_bundle_writes_foundation_sidecar");
-        let binary_path = temp_dir.write_binary_file(
-            "b8_gui_hello_world",
-            include_bytes!("../../../tests/binaries/mach_o_execute_header.bin"),
-        );
+    fn generate_b8_debug_bundle_writes_real_entry_first_block_report() {
+        let temp_dir =
+            TestTempDir::new("generate_b8_debug_bundle_writes_real_entry_first_block_report");
+        let binary_path = temp_dir.path.join("b8_gui_hello_world_x86_64");
         let output_root = temp_dir.path.join("b8-debug");
         let bundle_dir = output_root.join("b8_gui_hello_world");
+
+        run_cli(vec![
+            String::from("build-x86_64-gui-hello-world-fixture"),
+            binary_path.to_string_lossy().into_owned(),
+        ])
+        .expect("B8 GUI Hello World fixture is generated");
 
         let output = run_cli(vec![
             String::from("generate-b8-debug-bundle"),
@@ -2378,7 +2383,7 @@ mod tests {
         assert_eq!(
             output,
             format!(
-                "{{\"bundle_dir\":\"{}\",\"input_probe\":\"{}\",\"entry_bytes_bin\":\"{}\",\"entry_bytes_json\":\"{}\",\"decode_report\":\"{}\",\"lift_ir\":\"{}\",\"emit_report\":\"{}\",\"pcmap\":\"{}\",\"fixups\":\"{}\",\"helpers\":\"{}\",\"loader_plan\":\"{}\",\"runtime_attempt\":\"{}\",\"blocker\":\"{}\",\"repro\":\"{}\"}}",
+                "{{\"bundle_dir\":\"{}\",\"input_probe\":\"{}\",\"entry_bytes_bin\":\"{}\",\"entry_bytes_json\":\"{}\",\"decode_report\":\"{}\",\"lift_ir\":\"{}\",\"emit_report\":\"{}\",\"pcmap\":\"{}\",\"fixups\":\"{}\",\"helpers\":\"{}\",\"loader_plan\":\"{}\",\"runtime_attempt\":\"{}\",\"launch_report\":\"{}\",\"blocker\":\"{}\",\"repro\":\"{}\"}}",
                 bundle_dir.display(),
                 bundle_dir.join("input.probe.json").display(),
                 bundle_dir.join("entry.bytes.bin").display(),
@@ -2391,33 +2396,46 @@ mod tests {
                 bundle_dir.join("helpers.json").display(),
                 bundle_dir.join("loader.plan.json").display(),
                 bundle_dir.join("runtime-attempt.json").display(),
+                bundle_dir.join("launch.report.json").display(),
                 bundle_dir.join("blocker.json").display(),
                 bundle_dir.join("repro.sh").display(),
             )
         );
-        assert_eq!(
-            fs::read(bundle_dir.join("entry.bytes.bin")).expect("entry bytes are readable"),
+        let entry_bytes =
+            fs::read(bundle_dir.join("entry.bytes.bin")).expect("entry bytes are readable");
+        assert!(!entry_bytes.is_empty());
+        assert_ne!(
+            entry_bytes,
             vec![0x0f, 0x0b, b'B', b'8', b'G', b'1', 0x31, 0xc0, 0xc3]
         );
         assert!(read_file(&bundle_dir.join("input.probe.json"))
             .contains("\"format\":\"mach_o_64_little_endian\""));
         assert!(read_file(&bundle_dir.join("entry.bytes.json"))
-            .contains("\"source\":\"b8_g1_translated_host_trap_entry\""));
+            .contains("\"source\":\"public_lc_main_entryoff\""));
         assert!(read_file(&bundle_dir.join("decode.report.json"))
-            .contains("\"kind\":\"bara_app_kit_gui_hello_world_trap_sentinel\""));
-        assert!(read_file(&bundle_dir.join("lift.ir.json"))
-            .contains("\"trap\":\"app_kit_gui_hello_world\""));
-        assert!(read_file(&bundle_dir.join("emit.report.json"))
-            .contains("\"target_backend\":\"bara-arm64\""));
-        assert!(read_file(&bundle_dir.join("pcmap.json")).contains("\"entries\""));
-        assert!(read_file(&bundle_dir.join("fixups.json")).contains("\"fixups\""));
-        assert!(read_file(&bundle_dir.join("helpers.json")).contains("\"app_kit_gui_hello_world\""));
+            .contains("\"schema\":\"b8_debug_decode_report_v0\""));
+        assert!(read_file(&bundle_dir.join("lift.ir.json")).contains("\"status\":"));
+        assert!(read_file(&bundle_dir.join("emit.report.json")).contains("\"status\":"));
+        assert!(read_file(&bundle_dir.join("pcmap.json")).contains("\"status\":"));
+        assert!(read_file(&bundle_dir.join("fixups.json")).contains("\"status\":"));
+        assert!(read_file(&bundle_dir.join("helpers.json")).contains("\"status\":"));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"next_entry_source\":\"public_lc_main_entryoff\""));
+            .contains("\"entry_source_for_this_bundle\":\"public_lc_main_entryoff\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_entry_source\":\"first_unsupported_boundary\""));
         assert!(read_file(&bundle_dir.join("runtime-attempt.json"))
-            .contains("\"run_scope\":\"translated_entry_only\""));
-        assert!(read_file(&bundle_dir.join("blocker.json"))
-            .contains("\"current_blocker\":\"real_lc_main_entry_not_attempted\""));
+            .contains("\"run_scope\":\"real_lc_main_entry_first_block\""));
+        let launch_report = read_file(&bundle_dir.join("launch.report.json"));
+        assert!(launch_report.contains("\"schema\":\"b8_debug_real_entry_launch_report_v0\""));
+        assert!(launch_report.contains("\"entry_source\":\"public_lc_main_entryoff\""));
+        assert!(launch_report.contains("\"processed_source_pc_range\":{\"start\":"));
+        assert!(launch_report.contains("\"b8_g1_host_trap_path\":\"not_used\""));
+        let blocker_report = read_file(&bundle_dir.join("blocker.json"));
+        assert!(blocker_report.contains("\"status\":\"blocked\""));
+        assert!(blocker_report.contains("\"current_blocker\":\"unsupported_instruction\""));
+        assert!(blocker_report.contains("\"unsupported_instruction\":{\"start\":"));
+        assert!(blocker_report.contains("DecodeUnsupportedOpcode { opcode: 85"));
+        assert!(blocker_report.contains("\"next_action\":\"advance_to_b8_g3_first_isa_blocker\""));
         assert!(read_file(&bundle_dir.join("repro.sh")).contains("generate-b8-debug-bundle"));
     }
 

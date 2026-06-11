@@ -26,7 +26,7 @@ pub(crate) struct FunctionCompileResult {
 }
 
 impl FunctionCompileResult {
-    fn new(program: Program, emitted: bara_arm64::EmittedFunction) -> Self {
+    pub(crate) fn new(program: Program, emitted: bara_arm64::EmittedFunction) -> Self {
         Self { program, emitted }
     }
 
@@ -157,7 +157,7 @@ pub(crate) struct FunctionCompiledIrArtifact {
 }
 
 impl FunctionCompiledIrArtifact {
-    fn from_program(program: &Program) -> Self {
+    pub(crate) fn from_program(program: &Program) -> Self {
         Self {
             entry: program.entry().value(),
             blocks: program
@@ -474,7 +474,7 @@ pub(crate) struct FunctionPcMapArtifact {
 }
 
 impl FunctionPcMapArtifact {
-    fn from_entries(entries: &[PcMapEntry]) -> Self {
+    pub(crate) fn from_entries(entries: &[PcMapEntry]) -> Self {
         Self {
             entries: entries
                 .iter()
@@ -505,7 +505,7 @@ pub(crate) struct FunctionFixupsArtifact {
 }
 
 impl FunctionFixupsArtifact {
-    fn from_fixups(fixups: &[BranchFixup]) -> Self {
+    pub(crate) fn from_fixups(fixups: &[BranchFixup]) -> Self {
         Self {
             fixups: fixups
                 .iter()
@@ -562,7 +562,7 @@ pub(crate) struct FunctionHelpersArtifact {
 }
 
 impl FunctionHelpersArtifact {
-    fn from_requests(requests: &EmittedHostTrapRequests) -> Self {
+    pub(crate) fn from_requests(requests: &EmittedHostTrapRequests) -> Self {
         let mut helpers = Vec::new();
         if requests.stdout_requested() {
             helpers.push(FunctionHelperArtifact::WriteStdout);
@@ -693,11 +693,18 @@ pub(crate) struct FunctionArtifactReport {
 
 impl FunctionArtifactReport {
     fn from_source_and_compile_result(source: &TestCase, result: &FunctionCompileResult) -> Self {
+        Self::from_source_and_emitted(source, &result.emitted)
+    }
+
+    pub(crate) fn from_source_and_emitted(
+        source: &TestCase,
+        emitted: &bara_arm64::EmittedFunction,
+    ) -> Self {
         Self {
             state_layout: FunctionStateLayoutArtifact::from_source(source),
             cache_validation_identity: FunctionCacheValidationIdentityArtifact::from_source(source),
             helper_requirements: FunctionHelperRequirementsArtifact::from_requests(
-                result.emitted.host_trap_requests(),
+                emitted.host_trap_requests(),
             )
             .into_values(),
         }
@@ -1317,20 +1324,29 @@ pub(crate) fn run_test_case_function_with_bundle(
     test_case: &TestCase,
 ) -> Result<FunctionRunBundle, FunctionRunError> {
     let compiled = compile_test_case_function(test_case)?;
-    let emitted = compiled.emitted();
+    run_compiled_test_case_function_with_bundle(test_case, compiled)
+}
+
+pub(crate) fn run_compiled_test_case_function_with_bundle(
+    test_case: &TestCase,
+    compiled: FunctionCompileResult,
+) -> Result<FunctionRunBundle, FunctionRunError> {
     let result = match test_case.abi() {
         TestCaseAbi::NoArgsU64 => run_no_args_u64_with_host_traps(
-            emitted.code().bytes(),
-            runtime_host_trap_plan(test_case.host_trap_plan(), emitted.host_trap_requests())?,
+            compiled.emitted().code().bytes(),
+            runtime_host_trap_plan(
+                test_case.host_trap_plan(),
+                compiled.emitted().host_trap_requests(),
+            )?,
         ),
         TestCaseAbi::OneU64ArgReturnsU64 { argument } => run_one_u64(
-            emitted.code().bytes(),
+            compiled.emitted().code().bytes(),
             RunArgumentU64::new(argument.value()),
         ),
         TestCaseAbi::OneInputMemoryPtrReturnsU64 { memory } => {
             let memory = InputMemory::from_bytes(memory.bytes().to_vec())
                 .map_err(FunctionRunError::InputMemory)?;
-            run_one_input_memory_ptr(emitted.code().bytes(), memory)
+            run_one_input_memory_ptr(compiled.emitted().code().bytes(), memory)
         }
     }
     .map_err(FunctionRunError::Run)?;
