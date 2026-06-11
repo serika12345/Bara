@@ -9,51 +9,54 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 15:29 JST
+最終更新: 2026-06-11 15:42 JST
 
 状態:
 
-- project_state: completed。B8 の self-authored x86_64 GUI Hello World input を
-  Bara actual path で受け取り、Objective-C runtime / AppKit lifecycle helper
-  capability の host execution によって Rosetta expected / Bara actual 比較を
-  matched にした。B8 は review gate に到達した。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8:
-  実 x86_64 macOS アプリ起動。
-- active_design_focus: B8 AppKit / Objective-C helper boundary。public AppKit
-  framework import blocker と Objective-C runtime blocker promotion を通過し、
-  host AppKit lifecycle helper capability execution で deterministic lifecycle event
-  を actual observation にする。
+- project_state: in_progress。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
+  reviewable GUI 起動 slice の積み上げとして再定義した。B8-H1 の helper
+  capability execution は到達済みだが、B8 全体は未完了である。
+- active_milestone: in_progress。[TODO.md](../TODO.md) の B8-G1:
+  GUI window に Hello World のフォント描画を行う最小アプリを、実際の変換レイヤーを
+  通して GUI 上で確認できるようにする。
+- active_design_focus: B8 translated GUI entry path。x86_64 entry path が
+  Bara の decode / lift / emit / runtime execution を通り、その結果として
+  AppKit lifecycle helper capability を呼ぶ境界を追加する。host AppKit helper は
+  public AppKit boundary として使えるが、helper 単独実行だけでは B8-G1 完了にしない。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
-  latest commit は B8 review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B8 の完了条件と「GUI Hello World actual result
-  を Rosetta expected と一致させる」小項目。
-- completed_work: `btbc-cli` の B8 actual path で input x86_64 Mach-O を probe し、
-  self-authored AppKit source を host helper capability として build/run する経路を
-  追加した。actual JSON は Rosetta expected と同じ lifecycle stdout / exit status 0
-  になり、launch report は `status: matched`、`blocker.classification: none`、
-  `runtime_preparation.status: helper_capability_executed`、
-  `helper_capability.status: executed` を保存する。feedback report は
-  `status: matched`、comparison issues 空、next action `review_b8_milestone` になった。
-- remaining_work: large milestone review。今回はユーザー指定により PR は作らず、
-  branch push と review package で停止する。
-- next_action: B8 review gate package を確認し、レビュー後に B9:
-  実 x86 32-bit アプリ対応へ進むか、B8 helper capability の制約を追加レビューする。
-- verification:
-  `nix develop -c cargo test -p bara-runtime user_space_launch_plan -- --nocapture` と
-  `nix develop -c cargo test -p btbc-cli gui_hello_world -- --nocapture`、
-  `nix develop -c cargo fmt --all -- --check`、
-  `nix develop -c cargo clippy -p bara-runtime -p btbc-cli --all-targets -- -D warnings`、
-  `git diff --check`、`nix develop -c ./scripts/check-no-invisible-chars`、
-  `nix develop -c ./scripts/verify` が通過した。
+  latest commit は `46b2bf0`。この milestone 再定義は同 branch 上の次 commit で
+  記録する。
+- related_todo: [TODO.md](../TODO.md) B8-H1 / B8-G1。
+- completed_work: B8-H1 として、`btbc-cli` の B8 actual path で input x86_64
+  Mach-O を probe し、self-authored AppKit source を host helper capability として
+  build/run する経路を追加した。actual JSON は Rosetta expected と同じ lifecycle
+  stdout / exit status 0 になり、feedback report は `matched` になった。
+- remaining_work: B8-G1。translated x86_64 entry path から AppKit lifecycle helper
+  capability を呼び、GUI window 上に `hello world` label のフォント描画を
+  developer-visible mode で確認できるようにする。
+- next_action: B8-G1 の最初の小ステップとして、自動判定用 stable JSON と手動可視確認
+  mode を分けた scope / report contract を固定する。
+- verification: documentation-only recut。`git diff --check` と
+  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 
 直近で完了した作業:
 
-- 2026-06-11 15:29 JST: B8 completion step として、Bara actual path に
+- 2026-06-11 15:42 JST: B8 milestone の切り方を再定義した。B8-H1 の
+  helper capability execution は reviewable intermediate slice として残し、
+  B8 全体の完了扱いから外した。次の active target は B8-G1:
+  x86_64 entry path が実際に Bara の変換レイヤーを通り、その結果として
+  AppKit lifecycle helper capability を呼び、GUI window 上の `hello world`
+  フォント描画を developer-visible mode で確認できる状態にすること。
+  documentation-only recut のため、`git diff --check` と
+  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
+- 2026-06-11 15:29 JST: B8-H1 helper execution slice として、Bara actual path に
   host AppKit lifecycle helper execution を接続した。input x86_64 GUI Mach-O は
   public probe され、self-authored AppKit source を host helper として build/run し、
   stdout lifecycle event を actual observation にした。B8 actual は Rosetta expected
   と一致し、feedback report は `matched`、comparison issues 空、current blocker
-  `none`、next action `review_b8_milestone` になった。targeted tests、
+  `none`、next action `review_b8_milestone` になった。この時点では B8 全体の
+  完了扱いとして記録したが、15:42 JST の milestone 再定義により B8-H1 の
+  reviewable intermediate slice として扱い直した。targeted tests、
   `bara-runtime` / `btbc-cli` clippy、full `nix develop -c ./scripts/verify` が
   通過した。
 - 2026-06-11 15:15 JST: B8 の helper capability contract step として、
