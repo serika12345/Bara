@@ -270,3 +270,8 @@ Haskell は、JSON schema が安定し、QuickCheck / Hedgehog による generat
 shrinker、または Rust 実装から独立した仕様モデルが必要になった時点で `spec/`
 配下に追加する。その change では Nix dev shell、package metadata、
 supply-chain 検証を同時に扱う。
+
+QuickCheck / Hedgehog 導入前の B7 では、Rust workspace 内の
+`bara_oracle::small_case` が deterministic な no-args/u64 小ケース集合と、
+`mov eax, imm32; ret` を `return 0` へ縮める最初の shrink candidate plan を
+提供する。この導線で JSON schema と failure package の形を先に固める。

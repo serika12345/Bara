@@ -9,37 +9,39 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 09:59 JST
+最終更新: 2026-06-11 10:04 JST
 
 状態:
 
-- project_state: completed。B7 の 15 個目の小ステップとして、final state
-  comparator report を failure package に構造化して保存するようにした。
+- project_state: completed。B7 の 16 個目の小ステップとして、QuickCheck /
+  Hedgehog 導入前の Rust deterministic 小ケース生成と shrink candidate plan を
+  追加した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B7:
   Oracle / Regression 基盤。
-- active_design_focus: B7 verifier report / failure package。emit 後の PC map と
-  branch fixup metadata の consistency に加えて、expected / actual final state
-  comparison を stable failure report として保存する。
+- active_design_focus: B7 verifier / generated small cases。emit metadata と
+  final state comparison の report に加えて、Rust workspace 内で deterministic な
+  no-args/u64 小ケース生成と shrink candidate plan を持つ。
 - active_branch: `task/b7-x86_64-macho-fixture-generation`。base commit は
   `8d39a4a`。latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B7 の
-  IR invariant、PC map invariant、fixup consistency、final state comparator を
-  verifier で検査できるようにする項目の final state comparator 小分け。
-- completed_work: comparison mismatch 時の `failure.json` が、message 文字列だけでなく
-  `final_state` field に `ComparisonReport` を保存する。`check-corpus --out` と
-  `check-blackbox --out` の comparison failure は同じ構造化 report を持つ。
-- remaining_work: B7 は継続中。property-based 小ケース生成、CI lane 分割、
-  failure classification 拡張は未実装。
-- next_action: QuickCheck / Hedgehog の前段として小ケース生成と shrink の最小導線を
-  Rust workspace 内で始める。
-- verification: targeted tests として
-  `nix develop -c cargo test -p btbc-cli check_corpus_writes_failure_package_for_comparison_mismatch`
-  と
-  `nix develop -c cargo test -p btbc-cli check_blackbox_reports_raw_manifest_mach_o_and_probe_fixtures`
-  が通過した。`nix develop -c ./scripts/check-domain-types` も通過した。
+- related_todo: [TODO.md](../TODO.md) B7 の QuickCheck / Hedgehog 導入前の
+  Rust deterministic 小ケース生成と failing case shrink 開始項目。
+- completed_work: `bara_oracle::small_case` が deterministic な no-args/u64
+  `SmallCaseSet` と、非ゼロ `mov eax, imm32; ret` を `return 0` 候補へ縮める
+  `SmallCaseShrinkPlan` を返す。
+- remaining_work: B7 は継続中。CI lane 分割と failure classification 拡張は未実装。
+- next_action: quick tests と host-specific native artifact tests を分ける。
+- verification: targeted test として
+  `nix develop -c cargo test -p bara-oracle small_case::tests` が通過した。
+  `nix develop -c ./scripts/check-domain-types` と
   `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
+
+- 2026-06-11 10:04 JST: B7 の 16 個目の小ステップとして、
+  Rust deterministic 小ケース生成と shrink candidate plan を追加した。
+  `bara_oracle::small_case` は no-args/u64 の小ケース集合と expected final state、
+  非ゼロ immediate return の `return 0` shrink 候補を pure に返す。検証は
+  snapshot の targeted test と commit 前の full verification。
 
 - 2026-06-11 09:59 JST: B7 の 15 個目の小ステップとして、
   expected / actual final state comparator report を failure package に接続した。
