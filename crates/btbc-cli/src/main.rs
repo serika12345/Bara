@@ -2360,10 +2360,9 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn generate_b8_debug_bundle_advances_rip_relative_load_batch_to_next_indirect_call_blocker() {
-        let temp_dir = TestTempDir::new(
-            "generate_b8_debug_bundle_advances_rip_relative_load_batch_to_next_indirect_call_blocker",
-        );
+    fn generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary() {
+        let temp_dir =
+            TestTempDir::new("generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary");
         let binary_path = temp_dir.path.join("b8_gui_hello_world_x86_64");
         let output_root = temp_dir.path.join("b8-debug");
         let bundle_dir = output_root.join("b8_gui_hello_world");
@@ -2428,9 +2427,10 @@ mod tests {
         assert!(decode_report.contains("\"kind\":\"mov_rdi_qword_ptr_rip_relative\""));
         assert!(decode_report.contains("\"kind\":\"mov_rsi_qword_ptr_rip_relative\""));
         assert!(decode_report.contains("\"kind\":\"mov_r14_qword_ptr_rip_relative\""));
+        assert!(decode_report.contains("\"kind\":\"call_r14\""));
         assert!(decode_report.contains("\"kind\":\"call_rel32\""));
         assert!(decode_report.contains("\"width\":\"bits64\""));
-        assert!(decode_report.contains("DecodeUnsupportedOpcode { opcode: 65"));
+        assert!(!decode_report.contains("DecodeUnsupportedOpcode { opcode: 65"));
         assert!(read_file(&bundle_dir.join("lift.ir.json")).contains("\"status\":"));
         assert!(read_file(&bundle_dir.join("emit.report.json")).contains("\"status\":"));
         assert!(read_file(&bundle_dir.join("pcmap.json")).contains("\"status\":"));
@@ -2450,11 +2450,17 @@ mod tests {
         let blocker_report = read_file(&bundle_dir.join("blocker.json"));
         assert!(blocker_report.contains("\"status\":\"blocked\""));
         assert!(blocker_report.contains("\"current_blocker\":\"unsupported_instruction\""));
-        assert!(blocker_report.contains("\"unsupported_instruction\":{\"start\":"));
+        assert!(blocker_report.contains("\"unsupported_instruction\":null"));
         assert!(!blocker_report.contains("DecodeUnsupportedOpcode { opcode: 85"));
         assert!(!blocker_report.contains("DecodeUnsupportedOpcode { opcode: 83"));
         assert!(!blocker_report.contains("DecodeUnsupportedOpcode { opcode: 72"));
-        assert!(blocker_report.contains("DecodeUnsupportedOpcode { opcode: 65"));
+        assert!(!blocker_report.contains("DecodeUnsupportedOpcode { opcode: 65"));
+        assert!(blocker_report.contains("register_indirect_call"));
+        assert!(blocker_report.contains("r14"));
+        assert!(blocker_report.contains("call_site"));
+        assert!(blocker_report.contains("5700"));
+        assert!(blocker_report.contains("return_to"));
+        assert!(blocker_report.contains("5703"));
         assert!(blocker_report.contains("\"next_action\":\"advance_to_next_isa_blocker\""));
         assert!(read_file(&bundle_dir.join("repro.sh")).contains("generate-b8-debug-bundle"));
     }

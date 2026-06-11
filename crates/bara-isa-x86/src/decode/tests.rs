@@ -548,12 +548,9 @@ fn decodes_prologue_and_rip_relative_load_batch_before_next_unsupported_opcode()
             ),
             DecodedInstruction::new(
                 X86Va::new(0x163e),
-                X86Va::new(0x163f),
-                DecodedInstructionKind::Unsupported {
-                    reason: UnsupportedReason::DecodeUnsupportedOpcode {
-                        opcode: 0x41,
-                        at: X86Va::new(0x163e),
-                    }
+                X86Va::new(0x1641),
+                DecodedInstructionKind::CallR14 {
+                    return_to: X86Va::new(0x1641),
                 }
             )
         ]
@@ -815,6 +812,25 @@ fn decodes_mov_r14_qword_ptr_rip_relative_then_ret() {
 }
 
 #[test]
+fn decodes_call_r14_as_indirect_call_terminator() {
+    let input = X86Bytes::new(X86Va::new(0x2000), vec![0x41, 0xff, 0xd6, 0xc3])
+        .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[DecodedInstruction::new(
+            X86Va::new(0x2000),
+            X86Va::new(0x2003),
+            DecodedInstructionKind::CallR14 {
+                return_to: X86Va::new(0x2003),
+            }
+        )]
+    );
+}
+
+#[test]
 fn truncated_mov_rax_qword_ptr_rip_relative_is_reported() {
     let input = X86Bytes::new(X86Va::new(0x160c), vec![0x48, 0x8b, 0x05])
         .expect("test bytes are non-empty");
@@ -871,6 +887,20 @@ fn truncated_mov_r14_qword_ptr_rip_relative_is_reported() {
 }
 
 #[test]
+fn truncated_call_r14_is_reported() {
+    let input =
+        X86Bytes::new(X86Va::new(0x163e), vec![0x41, 0xff]).expect("test bytes are non-empty");
+
+    assert_eq!(
+        decode_function(&input),
+        Err(DecodeError::TruncatedInstruction {
+            at: X86Va::new(0x163e),
+            opcode: 0x41
+        })
+    );
+}
+
+#[test]
 fn decodes_rex_mov_unsupported_when_rip_relative_operand_does_not_match() {
     let input = X86Bytes::new(X86Va::new(0x160c), vec![0x48, 0x8b, 0x11, 0xc3])
         .expect("test bytes are non-empty");
@@ -908,6 +938,28 @@ fn decodes_rex_r_mov_unsupported_when_rip_relative_operand_does_not_match() {
                 reason: UnsupportedReason::DecodeUnsupportedOpcode {
                     opcode: 0x4c,
                     at: X86Va::new(0x1637),
+                }
+            }
+        )]
+    );
+}
+
+#[test]
+fn decodes_rex_b_call_unsupported_when_indirect_target_does_not_match() {
+    let input = X86Bytes::new(X86Va::new(0x163e), vec![0x41, 0xff, 0xd7])
+        .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("unsupported opcode decodes as instruction");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[DecodedInstruction::new(
+            X86Va::new(0x163e),
+            X86Va::new(0x1641),
+            DecodedInstructionKind::Unsupported {
+                reason: UnsupportedReason::DecodeUnsupportedOpcode {
+                    opcode: 0x41,
+                    at: X86Va::new(0x163e),
                 }
             }
         )]

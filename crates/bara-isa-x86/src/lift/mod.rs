@@ -238,6 +238,15 @@ fn lift_instruction(
                 },
             }))
         }
+        DecodedInstructionKind::CallR14 { return_to } => {
+            Ok(LiftedInstruction::Terminator(Terminator::Unsupported {
+                reason: UnsupportedReason::RegisterIndirectCallUnsupported {
+                    target: X86Reg::R14,
+                    call_site: instruction.start(),
+                    return_to: *return_to,
+                },
+            }))
+        }
         DecodedInstructionKind::JccRel8 {
             condition,
             taken,
@@ -976,12 +985,9 @@ mod tests {
                 ),
                 DecodedInstruction::new(
                     X86Va::new(0x1639),
-                    X86Va::new(0x163a),
-                    DecodedInstructionKind::Unsupported {
-                        reason: UnsupportedReason::DecodeUnsupportedOpcode {
-                            opcode: 0x41,
-                            at: X86Va::new(0x1639),
-                        },
+                    X86Va::new(0x163c),
+                    DecodedInstructionKind::CallR14 {
+                        return_to: X86Va::new(0x163c),
                     },
                 ),
             ],
@@ -1065,9 +1071,10 @@ mod tests {
         assert_eq!(
             program.blocks()[0].terminator(),
             &Terminator::Unsupported {
-                reason: UnsupportedReason::DecodeUnsupportedOpcode {
-                    opcode: 0x41,
-                    at: X86Va::new(0x1639),
+                reason: UnsupportedReason::RegisterIndirectCallUnsupported {
+                    target: X86Reg::R14,
+                    call_site: X86Va::new(0x1639),
+                    return_to: X86Va::new(0x163c),
                 }
             }
         );
@@ -1537,6 +1544,35 @@ mod tests {
             program.blocks()[0].terminator(),
             &Terminator::Unsupported {
                 reason: UnsupportedReason::DirectCallUnsupported { target, return_to }
+            }
+        );
+    }
+
+    #[test]
+    fn lifts_call_r14_to_register_indirect_call_unsupported_terminator() {
+        let return_to = X86Va::new(0x1003);
+        let decoded = DecodedFunction::new(
+            X86Va::new(0x1000),
+            vec![DecodedInstruction::new(
+                X86Va::new(0x1000),
+                return_to,
+                DecodedInstructionKind::CallR14 { return_to },
+            )],
+        )
+        .expect("decoded function has instructions");
+
+        let program =
+            lift_decoded_function(&decoded).expect("indirect call lifts to unsupported IR");
+
+        assert_eq!(program.blocks()[0].ops(), &[]);
+        assert_eq!(
+            program.blocks()[0].terminator(),
+            &Terminator::Unsupported {
+                reason: UnsupportedReason::RegisterIndirectCallUnsupported {
+                    target: X86Reg::R14,
+                    call_site: X86Va::new(0x1000),
+                    return_to,
+                }
             }
         );
     }

@@ -318,6 +318,11 @@ pub enum UnsupportedReason {
         target: X86Va,
         return_to: X86Va,
     },
+    RegisterIndirectCallUnsupported {
+        target: X86Reg,
+        call_site: X86Va,
+        return_to: X86Va,
+    },
     RegisterIndirectMemoryReadUnsupported {
         base: X86Reg,
         width: MemoryReadWidth,

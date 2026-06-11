@@ -173,6 +173,26 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                         ));
                         offset = end_offset;
                     }
+                    0xff => {
+                        let operand = read_u8(input, offset + 2, at, opcode)?;
+                        let end_offset = offset + 3;
+                        let end = instruction_end(input, at, end_offset, 3)?;
+
+                        match operand {
+                            0xd6 => {
+                                instructions.push(DecodedInstruction::new(
+                                    at,
+                                    end,
+                                    DecodedInstructionKind::CallR14 { return_to: end },
+                                ));
+                                return DecodedFunction::new(input.entry(), instructions);
+                            }
+                            _ => {
+                                instructions.push(unsupported_instruction(at, end, opcode));
+                                return DecodedFunction::new(input.entry(), instructions);
+                            }
+                        }
+                    }
                     _ => {
                         let end = instruction_end(input, at, offset + 1, 1)?;
                         instructions.push(unsupported_instruction(at, end, opcode));
@@ -538,6 +558,7 @@ fn decoded_stream_ends_with_terminator(instructions: &[DecodedInstruction]) -> b
     matches!(
         instruction.kind(),
         DecodedInstructionKind::CallRel32 { .. }
+            | DecodedInstructionKind::CallR14 { .. }
             | DecodedInstructionKind::JccRel8 { .. }
             | DecodedInstructionKind::JccRel32 { .. }
             | DecodedInstructionKind::JmpRel8 { .. }

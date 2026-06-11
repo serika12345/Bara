@@ -4,8 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use bara_arm64::emit_program;
-use bara_ir::ProgramImageMetadata;
+use bara_arm64::{emit_program, EmitError};
+use bara_ir::{Program, ProgramImageMetadata, Terminator, UnsupportedReason};
 use bara_isa_x86::{
     decode_function, lift_decoded_function_with_image_metadata, DecodeError, DecodedFunction,
     DecodedInstructionKind, LiftError,
@@ -231,6 +231,30 @@ impl B8RealEntryAttempt {
 
         let lift_ir =
             B8DebugArtifactReport::available(FunctionCompiledIrArtifact::from_program(&program));
+        if let Some(reason) = frontier_unsupported_terminator_reason(&program) {
+            let run_error = FunctionRunError::Emit(EmitError::UnsupportedIr {
+                reason: reason.clone(),
+            });
+            let blocker_report = B8DebugBlockerReport::from_function_error(&run_error);
+            return Self {
+                decode_report,
+                lift_ir,
+                emit_report: B8DebugArtifactReport::failed(run_error.to_string()),
+                pcmap: B8DebugArtifactReport::skipped("unsupported IR terminator"),
+                fixups: B8DebugArtifactReport::skipped("unsupported IR terminator"),
+                helpers: B8DebugArtifactReport::skipped("unsupported IR terminator"),
+                runtime_report: B8DebugRuntimeAttemptReport::skipped(
+                    "unsupported IR terminator",
+                    B8DebugRuntimeRunScope::RealLcMainEntryFirstBlock,
+                ),
+                launch_report: B8DebugLaunchReport::from_attempt(
+                    test_case,
+                    processed_pc_range,
+                    &blocker_report,
+                ),
+                blocker_report,
+            };
+        }
         let emitted = match emit_program(&program) {
             Ok(emitted) => emitted,
             Err(error) => {
@@ -345,6 +369,22 @@ impl B8RealEntryAttempt {
             blocker_report,
         }
     }
+}
+
+fn frontier_unsupported_terminator_reason(program: &Program) -> Option<&UnsupportedReason> {
+    program
+        .blocks()
+        .iter()
+        .rev()
+        .find_map(|block| match block.terminator() {
+            Terminator::Unsupported { reason } => Some(reason),
+            Terminator::Return
+            | Terminator::BoundaryRequest { .. }
+            | Terminator::Fallthrough { .. }
+            | Terminator::DirectJump { .. }
+            | Terminator::DirectCall { .. }
+            | Terminator::CondJump { .. } => None,
+        })
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -644,6 +684,9 @@ enum B8DebugDecodedInstructionKindReport {
         target: u64,
         return_to: u64,
     },
+    CallR14 {
+        return_to: u64,
+    },
     Syscall,
     BaraHostTrapSentinel,
     BaraAppKitGuiHelloWorldTrapSentinel,
@@ -757,6 +800,9 @@ impl B8DebugDecodedInstructionKindReport {
             },
             DecodedInstructionKind::CallRel32 { target, return_to } => Self::CallRel32 {
                 target: target.value(),
+                return_to: return_to.value(),
+            },
+            DecodedInstructionKind::CallR14 { return_to } => Self::CallR14 {
                 return_to: return_to.value(),
             },
             DecodedInstructionKind::Syscall => Self::Syscall,
