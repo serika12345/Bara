@@ -6,7 +6,7 @@ pub mod validate;
 
 pub use block::{
     BasicBlock, BasicBlockError, BlockId, HostTrapKind, IrOp, Operand, Terminator,
-    UnsupportedReason, X86Cond, X86Reg,
+    UnsupportedReason, X86Cond, X86Reg, X86RegFamily, X86RegWidth,
 };
 pub use boundary::{
     BoundaryRequest, ExternalCallRequest, ExternalCallRequestError, ExternalImportTarget,

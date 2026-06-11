@@ -147,9 +147,13 @@ B8 は次の小ステップで進める。
    B9 の x86_32 対応を public API から閉じ出さない。これは
    `runtime_preparation.source_isa_profile` に固定済みで、x86_32 decode /
    lift 実装は B9 で扱う。
-13. unsupported import、unsupported loader feature、unsupported Objective-C
+13. register model は `rax` だけでなく、`eax` / `ax` / `al` などの
+   partial register view を表現できる形にする。これは `bara-ir::X86Reg` の
+   register family / width model に固定済みで、既存 `eax` 命令の semantic
+   normalization を partial-register semantics へ変える作業は後続 step で扱う。
+14. unsupported import、unsupported loader feature、unsupported Objective-C
    runtime boundary を stable classification として report する。
-14. helper boundary または runtime support を追加し、expected / actual 比較を
+15. helper boundary または runtime support を追加し、expected / actual 比較を
    通す。
 
 ## Clean-room 境界

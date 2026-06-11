@@ -9,44 +9,48 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 13:43 JST
+最終更新: 2026-06-11 13:54 JST
 
 状態:
 
-- project_state: completed。B8 の source ISA profile step として、source ISA
-  mode、address size、default operand size、stack width を user-space launch plan
-  と actual launch report に typed profile として載せた。
+- project_state: completed。B8 の register model guardrail step として、
+  `bara-ir::X86Reg` が 64-bit register だけでなく partial register view を
+  表現できるようにした。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8:
   実 x86_64 macOS アプリ起動。
-- active_design_focus: B8 source ISA mode / width guardrail。self-authored
-  AppKit fixture の launch preparation で x86_64 long mode、address size 64-bit、
-  default operand size 32-bit、stack width 64-bit を明示し、B9 の x86_32 対応を
-  report / runtime 境界から閉じ出さないようにする。
+- active_design_focus: B8 partial register model guardrail。IR register model が
+  `rax` 固定ではなく、`eax` / `ax` / `al` と `edi` / `di` / `dil` などを
+  family / width 付き view として表現できるようにする。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
   latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B8 の「source ISA mode、address size、
-  operand size、stack width を型で表せるようにし、B9 の x86_32 対応の妨げに
-  しない」。
-- completed_work: `bara-runtime::UserSpaceLaunchPlan` は `source_isa_profile` を
-  持ち、mode を `x86_64_long_mode`、address size を `bits_64`、default operand
-  size を `bits_32`、stack width を `bits_64` として保持する。B8 actual launch
-  report は `runtime_preparation.source_isa_profile` として同じ profile を保存する。
-  profile model は B9 guardrail として x86_32 protected mode も表現できる。
-- remaining_work: 次の小ステップは register model を `rax` だけでなく、
-  部分レジスタへ拡張できる形にすること。
-- next_action: commit / push 後、次の B8 小ステップで register model /
-  partial register guardrail を runtime / report / IR 境界のどこへ置くかを
-  固定する。
+- related_todo: [TODO.md](../TODO.md) B8 の「register model は `rax` だけでなく、
+  部分レジスタへ拡張できる形にする」。
+- completed_work: `bara-ir::X86Reg` は accumulator family の `rax` / `eax` /
+  `ax` / `al` と destination-index family の `rdi` / `edi` / `di` / `dil` を
+  表現し、`family`、`width`、`full_width`、`is_partial_view` accessor を持つ。
+  `btbc-cli` の function artifact projection も partial register view を stable
+  JSON 名へ変換できる。
+- remaining_work: 次の小ステップは signal / exception / thread / TLS /
+  memory protection を user-space loader model として段階的に扱うこと。
+- next_action: commit / push 後、次の B8 小ステップで signal / exception /
+  thread / TLS / memory protection の initial user-space loader model を固定する。
 - verification: targeted tests として
-  `nix develop -c cargo test -p bara-runtime user_space_launch_plan -- --nocapture`、
-  `nix develop -c cargo test -p bara-runtime source_isa_profile_can_model_x86_32_widths_without_changing_b8_target -- --nocapture`、
-  `nix develop -c cargo test -p btbc-cli gui_hello_world_actual -- --nocapture`
-  が通過した。`nix develop -c cargo fmt --all -- --check`、
-  `nix develop -c cargo clippy -p bara-runtime -p btbc-cli --all-targets -- -D warnings`、
+  `nix develop -c cargo test -p bara-ir x86_register_model_exposes_partial_register_views_by_family_and_width -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli function_register_artifact_serializes_partial_register_views -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli function_run -- --nocapture` が通過した。
+  `nix develop -c cargo fmt --all -- --check`、
+  `nix develop -c cargo clippy -p bara-ir -p bara-arm64 -p btbc-cli --all-targets -- -D warnings`、
   `git diff --check`、full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-11 13:54 JST: B8 の register model guardrail step として、
+  `bara-ir::X86Reg` に `rax` / `eax` / `ax` / `al` と `rdi` / `edi` / `di` /
+  `dil` を追加し、register family、view width、full-width register、
+  partial view 判定を domain model として公開した。`btbc-cli` の function
+  artifact projection も partial register view を stable JSON 名へ変換できる。
+  targeted tests、`bara-ir` / `bara-arm64` / `btbc-cli` clippy、full
+  `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-11 13:43 JST: B8 の source ISA profile step として、
   `bara-runtime::UserSpaceLaunchPlan` に `source_isa_profile` を追加した。
   現在は x86_64 long mode、address size 64-bit、default operand size 32-bit、

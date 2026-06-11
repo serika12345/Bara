@@ -139,7 +139,56 @@ pub enum Operand {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum X86Reg {
     Rax,
+    Eax,
+    Ax,
+    Al,
     Rdi,
+    Edi,
+    Di,
+    Dil,
+}
+
+impl X86Reg {
+    pub const fn family(self) -> X86RegFamily {
+        match self {
+            Self::Rax | Self::Eax | Self::Ax | Self::Al => X86RegFamily::Accumulator,
+            Self::Rdi | Self::Edi | Self::Di | Self::Dil => X86RegFamily::DestinationIndex,
+        }
+    }
+
+    pub const fn width(self) -> X86RegWidth {
+        match self {
+            Self::Al | Self::Dil => X86RegWidth::Bits8,
+            Self::Ax | Self::Di => X86RegWidth::Bits16,
+            Self::Eax | Self::Edi => X86RegWidth::Bits32,
+            Self::Rax | Self::Rdi => X86RegWidth::Bits64,
+        }
+    }
+
+    pub const fn full_width(self) -> Self {
+        match self.family() {
+            X86RegFamily::Accumulator => Self::Rax,
+            X86RegFamily::DestinationIndex => Self::Rdi,
+        }
+    }
+
+    pub const fn is_partial_view(self) -> bool {
+        !matches!(self.width(), X86RegWidth::Bits64)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum X86RegFamily {
+    Accumulator,
+    DestinationIndex,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum X86RegWidth {
+    Bits8,
+    Bits16,
+    Bits32,
+    Bits64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -169,7 +218,8 @@ pub enum UnsupportedReason {
 mod tests {
     use crate::{
         BasicBlock, BasicBlockError, BlockId, HostHelperName, HostHelperRequest,
-        HostHelperSignature, HostTrapKind, IrOp, Operand, Terminator, X86Cond, X86Reg, X86Va,
+        HostHelperSignature, HostTrapKind, IrOp, Operand, Terminator, X86Cond, X86Reg,
+        X86RegFamily, X86RegWidth, X86Va,
     };
 
     #[test]
@@ -321,6 +371,35 @@ mod tests {
                 dst: Operand::Reg(X86Reg::Rax),
             }
         );
+    }
+
+    #[test]
+    fn x86_register_model_exposes_partial_register_views_by_family_and_width() {
+        assert_eq!(X86Reg::Rax.family(), X86RegFamily::Accumulator);
+        assert_eq!(X86Reg::Eax.family(), X86RegFamily::Accumulator);
+        assert_eq!(X86Reg::Ax.family(), X86RegFamily::Accumulator);
+        assert_eq!(X86Reg::Al.family(), X86RegFamily::Accumulator);
+        assert_eq!(X86Reg::Rax.width(), X86RegWidth::Bits64);
+        assert_eq!(X86Reg::Eax.width(), X86RegWidth::Bits32);
+        assert_eq!(X86Reg::Ax.width(), X86RegWidth::Bits16);
+        assert_eq!(X86Reg::Al.width(), X86RegWidth::Bits8);
+        assert_eq!(X86Reg::Eax.full_width(), X86Reg::Rax);
+        assert_eq!(X86Reg::Ax.full_width(), X86Reg::Rax);
+        assert_eq!(X86Reg::Al.full_width(), X86Reg::Rax);
+        assert!(X86Reg::Eax.is_partial_view());
+
+        assert_eq!(X86Reg::Rdi.family(), X86RegFamily::DestinationIndex);
+        assert_eq!(X86Reg::Edi.family(), X86RegFamily::DestinationIndex);
+        assert_eq!(X86Reg::Di.family(), X86RegFamily::DestinationIndex);
+        assert_eq!(X86Reg::Dil.family(), X86RegFamily::DestinationIndex);
+        assert_eq!(X86Reg::Rdi.width(), X86RegWidth::Bits64);
+        assert_eq!(X86Reg::Edi.width(), X86RegWidth::Bits32);
+        assert_eq!(X86Reg::Di.width(), X86RegWidth::Bits16);
+        assert_eq!(X86Reg::Dil.width(), X86RegWidth::Bits8);
+        assert_eq!(X86Reg::Edi.full_width(), X86Reg::Rdi);
+        assert_eq!(X86Reg::Di.full_width(), X86Reg::Rdi);
+        assert_eq!(X86Reg::Dil.full_width(), X86Reg::Rdi);
+        assert!(!X86Reg::Rdi.is_partial_view());
     }
 
     #[test]

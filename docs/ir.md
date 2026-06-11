@@ -260,7 +260,39 @@ pub enum Operand {
 }
 ```
 
-現在の初期 corpus では `Reg`、`ImmU64`、`Mem8 { base: Rdi }` を使う。
+`X86Reg` は register family と view width を持つ。
+
+```rust
+pub enum X86Reg {
+    Rax,
+    Eax,
+    Ax,
+    Al,
+    Rdi,
+    Edi,
+    Di,
+    Dil,
+}
+
+pub enum X86RegFamily {
+    Accumulator,
+    DestinationIndex,
+}
+
+pub enum X86RegWidth {
+    Bits8,
+    Bits16,
+    Bits32,
+    Bits64,
+}
+```
+
+register view は `family()`、`width()`、`full_width()`、`is_partial_view()` で
+判定できる。現在の初期 corpus では `Reg`、`ImmU64`、`Mem8 { base: Rdi }` を
+使う。既存の `mov eax, imm32` などは、現時点の semantic IR では 32-bit write
+後の zero-extended `Rax` value として normalize している。`Eax` / `Ax` / `Al`
+などの partial view は、後続の decode / lift 拡張で source register view を
+失わないための model として保持する。
 
 ## Flags
 

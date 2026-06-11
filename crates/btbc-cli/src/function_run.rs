@@ -271,14 +271,26 @@ impl FunctionOperandArtifact {
 #[serde(rename_all = "snake_case")]
 enum FunctionRegisterArtifact {
     Rax,
+    Eax,
+    Ax,
+    Al,
     Rdi,
+    Edi,
+    Di,
+    Dil,
 }
 
 impl FunctionRegisterArtifact {
     const fn from_ir(reg: bara_ir::X86Reg) -> Self {
         match reg {
             bara_ir::X86Reg::Rax => Self::Rax,
+            bara_ir::X86Reg::Eax => Self::Eax,
+            bara_ir::X86Reg::Ax => Self::Ax,
+            bara_ir::X86Reg::Al => Self::Al,
             bara_ir::X86Reg::Rdi => Self::Rdi,
+            bara_ir::X86Reg::Edi => Self::Edi,
+            bara_ir::X86Reg::Di => Self::Di,
+            bara_ir::X86Reg::Dil => Self::Dil,
         }
     }
 }
@@ -1253,13 +1265,14 @@ fn runtime_host_trap_plan(
 mod tests {
     use bara_ir::{
         ExternalCallRequest, ExternalSymbolId, ExternalSymbolImport, PublicLibcSymbol,
-        PublicSymbolImport, SyscallAbi, SyscallRequest, UnsupportedReason, ValidationIssue, X86Va,
+        PublicSymbolImport, SyscallAbi, SyscallRequest, UnsupportedReason, ValidationIssue, X86Reg,
+        X86Va,
     };
     use bara_oracle::{test_case_from_json, FailureKind};
 
     use super::{
         compile_test_case_function, compile_test_case_function_standalone_artifact,
-        FunctionRunError, FunctionStandaloneArtifactError,
+        FunctionRegisterArtifact, FunctionRunError, FunctionStandaloneArtifactError,
     };
 
     #[test]
@@ -1359,6 +1372,25 @@ mod tests {
         });
 
         assert_eq!(error.failure_kind(), FailureKind::UnsupportedInstruction);
+    }
+
+    #[test]
+    fn function_register_artifact_serializes_partial_register_views() {
+        let registers = [
+            FunctionRegisterArtifact::from_ir(X86Reg::Rax),
+            FunctionRegisterArtifact::from_ir(X86Reg::Eax),
+            FunctionRegisterArtifact::from_ir(X86Reg::Ax),
+            FunctionRegisterArtifact::from_ir(X86Reg::Al),
+            FunctionRegisterArtifact::from_ir(X86Reg::Rdi),
+            FunctionRegisterArtifact::from_ir(X86Reg::Edi),
+            FunctionRegisterArtifact::from_ir(X86Reg::Di),
+            FunctionRegisterArtifact::from_ir(X86Reg::Dil),
+        ];
+
+        assert_eq!(
+            serde_json::to_string(&registers).expect("register artifacts serialize"),
+            "[\"rax\",\"eax\",\"ax\",\"al\",\"rdi\",\"edi\",\"di\",\"dil\"]"
+        );
     }
 
     #[test]

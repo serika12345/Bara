@@ -39,7 +39,7 @@
 - [x] source ISA mode を `x86_64` / `x86_32` として明示できる domain type を追加する。
 - [x] address size、operand size、stack width を source mode から決める。
 - [ ] calling convention を source mode から決める。
-- [ ] register model は 64-bit register だけでなく、partial register を表現できる形にする。
+- [x] register model は 64-bit register だけでなく、partial register を表現できる形にする。
 - [ ] decoder / lifter / metadata schema の public 名称を `x86_64` 固定にしすぎない。
 
 メモ:
@@ -57,6 +57,13 @@
   x86_32 protected mode、address size 32-bit、default operand size 32-bit、
   stack width 32-bit も表現できる。これは B9 の x86_32 decode / lift 実装ではなく、
   launch/report 境界から x86_32 を閉じ出さないための guardrail である。
+- 2026-06-11 の B8 小ステップとして、`bara-ir::X86Reg` に accumulator
+  family の `rax` / `eax` / `ax` / `al` と destination-index family の
+  `rdi` / `edi` / `di` / `dil` を追加し、`family`、`width`、`full_width`、
+  `is_partial_view` で register view を判定できるようにした。これは既存の
+  `eax` 命令 lift を即座に partial-register semantics へ変えるものではなく、
+  B9 と後続 decode / lift 拡張で partial register を public IR から表現できる
+  guardrail である。
 
 ## D4: Bara IR の責務
 
