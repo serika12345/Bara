@@ -9,37 +9,38 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 15:17 JST
+最終更新: 2026-06-11 15:29 JST
 
 状態:
 
-- project_state: completed。B8 の Objective-C runtime / AppKit lifecycle helper
-  capability contract を actual / feedback report に接続し、実 host execution 接続へ
-  進む準備をした。
-- active_milestone: in_progress。[TODO.md](../TODO.md) の B8:
+- project_state: completed。B8 の self-authored x86_64 GUI Hello World input を
+  Bara actual path で受け取り、Objective-C runtime / AppKit lifecycle helper
+  capability の host execution によって Rosetta expected / Bara actual 比較を
+  matched にした。B8 は review gate に到達した。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8:
   実 x86_64 macOS アプリ起動。
 - active_design_focus: B8 AppKit / Objective-C helper boundary。public AppKit
   framework import blocker と Objective-C runtime blocker promotion を通過し、
-  AppKit lifecycle helper capability の execution 接続へ進む。
+  host AppKit lifecycle helper capability execution で deterministic lifecycle event
+  を actual observation にする。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
-  latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B8 の「Objective-C runtime / AppKit lifecycle
-  helper capability contract を domain model と actual / feedback report schema に
-  追加する」小項目。
-- completed_work: `bara-runtime::UserSpaceHelperCapabilityPlan` を追加し、AppKit GUI
-  lifecycle event、Objective-C runtime bridge、stdout lifecycle observation を
-  planned not executed の helper boundary contract として model 化した。B8 actual
-  launch report の `runtime_preparation.helper_capability` と feedback report の
-  `helper_capability_plan` に同じ plan を保存し、next action を
-  `connect_appkit_lifecycle_helper_execution` に進めた。
-- remaining_work: Objective-C runtime / AppKit lifecycle helper capability の host
-  execution を actual path に接続し、current blocker を解除すること。その後、
-  Rosetta expected と Bara actual を一致させる。
-- next_action: commit / push 後、次の B8 小ステップで
-  AppKit lifecycle helper execution を actual result に接続する。
+  latest commit は B8 review package で確認する。
+- related_todo: [TODO.md](../TODO.md) B8 の完了条件と「GUI Hello World actual result
+  を Rosetta expected と一致させる」小項目。
+- completed_work: `btbc-cli` の B8 actual path で input x86_64 Mach-O を probe し、
+  self-authored AppKit source を host helper capability として build/run する経路を
+  追加した。actual JSON は Rosetta expected と同じ lifecycle stdout / exit status 0
+  になり、launch report は `status: matched`、`blocker.classification: none`、
+  `runtime_preparation.status: helper_capability_executed`、
+  `helper_capability.status: executed` を保存する。feedback report は
+  `status: matched`、comparison issues 空、next action `review_b8_milestone` になった。
+- remaining_work: large milestone review。今回はユーザー指定により PR は作らず、
+  branch push と review package で停止する。
+- next_action: B8 review gate package を確認し、レビュー後に B9:
+  実 x86 32-bit アプリ対応へ進むか、B8 helper capability の制約を追加レビューする。
 - verification:
   `nix develop -c cargo test -p bara-runtime user_space_launch_plan -- --nocapture` と
-  `nix develop -c cargo test -p btbc-cli gui_hello_world -- --nocapture` が通過した。
+  `nix develop -c cargo test -p btbc-cli gui_hello_world -- --nocapture`、
   `nix develop -c cargo fmt --all -- --check`、
   `nix develop -c cargo clippy -p bara-runtime -p btbc-cli --all-targets -- -D warnings`、
   `git diff --check`、`nix develop -c ./scripts/check-no-invisible-chars`、
@@ -47,6 +48,14 @@
 
 直近で完了した作業:
 
+- 2026-06-11 15:29 JST: B8 completion step として、Bara actual path に
+  host AppKit lifecycle helper execution を接続した。input x86_64 GUI Mach-O は
+  public probe され、self-authored AppKit source を host helper として build/run し、
+  stdout lifecycle event を actual observation にした。B8 actual は Rosetta expected
+  と一致し、feedback report は `matched`、comparison issues 空、current blocker
+  `none`、next action `review_b8_milestone` になった。targeted tests、
+  `bara-runtime` / `btbc-cli` clippy、full `nix develop -c ./scripts/verify` が
+  通過した。
 - 2026-06-11 15:15 JST: B8 の helper capability contract step として、
   `UserSpaceHelperCapabilityPlan` を追加し、Objective-C runtime / AppKit lifecycle
   helper capability を actual launch report と feedback report に接続した。

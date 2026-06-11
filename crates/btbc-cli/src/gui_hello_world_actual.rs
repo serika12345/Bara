@@ -11,16 +11,15 @@ use bara_runtime::{
     UserSpaceHelperBoundaryContract, UserSpaceHelperBoundaryNextBlocker,
     UserSpaceHelperBoundaryPublicImport, UserSpaceHelperBoundaryResolution,
     UserSpaceHelperBoundaryStatus, UserSpaceHelperCapabilityConnection,
-    UserSpaceHelperCapabilityContract, UserSpaceHelperCapabilityStatus,
-    UserSpaceHelperObservationContract, UserSpaceImageMappingSource, UserSpaceInitialStackContract,
-    UserSpaceLaunchPlan, UserSpaceLaunchResponsibility, UserSpaceLoaderEntryPointPlan,
-    UserSpaceLoaderExecutionStatus, UserSpaceLoaderImportPlan, UserSpaceLoaderMetadataSource,
-    UserSpaceLoaderObjcRuntimePlan, UserSpaceLoaderRelocationPlan,
-    UserSpaceLoaderSegmentMappingPlan, UserSpaceMacosCodeSigningPolicy,
-    UserSpaceMacosHardenedRuntimePolicy, UserSpaceMacosWriteXorExecutePolicy,
-    UserSpaceMemoryProtectionModel, UserSpacePlatformExceptionModel,
-    UserSpacePlatformMemoryProtectionModel, UserSpacePlatformSignalModel,
-    UserSpacePlatformThreadModel, UserSpacePlatformTlsModel,
+    UserSpaceHelperCapabilityContract, UserSpaceHelperObservationContract,
+    UserSpaceImageMappingSource, UserSpaceInitialStackContract, UserSpaceLaunchPlan,
+    UserSpaceLaunchResponsibility, UserSpaceLoaderEntryPointPlan, UserSpaceLoaderExecutionStatus,
+    UserSpaceLoaderImportPlan, UserSpaceLoaderMetadataSource, UserSpaceLoaderObjcRuntimePlan,
+    UserSpaceLoaderRelocationPlan, UserSpaceLoaderSegmentMappingPlan,
+    UserSpaceMacosCodeSigningPolicy, UserSpaceMacosHardenedRuntimePolicy,
+    UserSpaceMacosWriteXorExecutePolicy, UserSpaceMemoryProtectionModel,
+    UserSpacePlatformExceptionModel, UserSpacePlatformMemoryProtectionModel,
+    UserSpacePlatformSignalModel, UserSpacePlatformThreadModel, UserSpacePlatformTlsModel,
     UserSpacePrivateIntegrationRequirement, UserSpaceProcessScope, UserSpaceSourceIsaMode,
     UserSpaceSourceIsaProfile, UserSpaceSourceWidth,
 };
@@ -35,24 +34,20 @@ pub(crate) struct GuiHelloWorldActualLaunchBundle {
 }
 
 impl GuiHelloWorldActualLaunchBundle {
-    fn blocked_by_initial_blocker(
+    fn launched_by_helper_capability(
         case_id: CaseId,
         input_metadata: GuiHelloWorldActualInputMetadata,
-        classification_plan: GuiHelloWorldInitialBlockerPlan,
+        helper_result: ObservedResult,
     ) -> Self {
-        let classification = classification_plan.selected_classification();
-        let launch_result =
-            GuiHelloWorldActualLaunchResult::blocked_by_classification(classification);
-        let observed_result = launch_result.to_observed_result(case_id.clone());
-        let launch_report = GuiHelloWorldActualLaunchReport::blocked_by_initial_blocker(
+        let launch_result = GuiHelloWorldActualLaunchResult::from_observed_result(&helper_result);
+        let launch_report = GuiHelloWorldActualLaunchReport::launched_by_helper_capability(
             case_id,
             input_metadata,
-            classification_plan,
-            launch_result,
+            launch_result.clone(),
         );
 
         Self {
-            observed_result,
+            observed_result: helper_result,
             launch_report,
         }
     }
@@ -79,23 +74,22 @@ pub(crate) struct GuiHelloWorldActualLaunchReport {
 }
 
 impl GuiHelloWorldActualLaunchReport {
-    fn blocked_by_initial_blocker(
+    fn launched_by_helper_capability(
         case_id: CaseId,
         input_metadata: GuiHelloWorldActualInputMetadata,
-        classification_plan: GuiHelloWorldInitialBlockerPlan,
         launch_result: GuiHelloWorldActualLaunchResult,
     ) -> Self {
         Self {
             schema: "b8_gui_hello_world_actual_launch_report_v0",
             case_id,
             actual_runtime: GuiHelloWorldActualRuntime::BaraArm64UserSpace,
-            status: GuiHelloWorldActualLaunchStatus::Blocked,
+            status: GuiHelloWorldActualLaunchStatus::Matched,
             input: GuiHelloWorldActualInput::from_metadata(input_metadata),
-            runtime_preparation: GuiHelloWorldActualRuntimePreparation::from_plan(
+            runtime_preparation: GuiHelloWorldActualRuntimePreparation::from_helper_executed_plan(
                 &UserSpaceLaunchPlan::mach_o_executable_image(),
             ),
             launch_result,
-            blocker: GuiHelloWorldActualBlocker::from_classification_plan(&classification_plan),
+            blocker: GuiHelloWorldActualBlocker::none(),
         }
     }
 }
@@ -130,7 +124,7 @@ impl GuiHelloWorldFeedbackReport {
             loader_execution_plan: actual.launch_report.runtime_preparation.loader_execution,
             helper_boundary_plan: actual.launch_report.runtime_preparation.helper_boundary,
             helper_capability_plan: actual.launch_report.runtime_preparation.helper_capability,
-            next_action: GuiHelloWorldFeedbackNextAction::ConnectAppKitLifecycleHelperExecution,
+            next_action: GuiHelloWorldFeedbackNextAction::from_feedback_status(status),
         }
     }
 }
@@ -157,6 +151,17 @@ impl GuiHelloWorldFeedbackStatus {
 enum GuiHelloWorldFeedbackNextAction {
     #[serde(rename = "connect_appkit_lifecycle_helper_execution")]
     ConnectAppKitLifecycleHelperExecution,
+    #[serde(rename = "review_b8_milestone")]
+    ReviewB8Milestone,
+}
+
+impl GuiHelloWorldFeedbackNextAction {
+    const fn from_feedback_status(status: GuiHelloWorldFeedbackStatus) -> Self {
+        match status {
+            GuiHelloWorldFeedbackStatus::Blocked => Self::ConnectAppKitLifecycleHelperExecution,
+            GuiHelloWorldFeedbackStatus::Matched => Self::ReviewB8Milestone,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -167,38 +172,26 @@ enum GuiHelloWorldActualRuntime {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 enum GuiHelloWorldActualLaunchStatus {
-    #[serde(rename = "blocked")]
-    Blocked,
+    #[serde(rename = "matched")]
+    Matched,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 struct GuiHelloWorldActualLaunchResult {
     exit_status: i32,
     return_value: u64,
-    stdout: &'static str,
-    stderr: &'static str,
+    stdout: String,
+    stderr: String,
 }
 
 impl GuiHelloWorldActualLaunchResult {
-    const fn blocked_by_classification(
-        classification: GuiHelloWorldActualBlockerClassification,
-    ) -> Self {
+    fn from_observed_result(result: &ObservedResult) -> Self {
         Self {
-            exit_status: 1,
-            return_value: 0,
-            stdout: "",
-            stderr: classification.stderr_message(),
+            exit_status: result.exit_status(),
+            return_value: result.return_value(),
+            stdout: result.stdout().to_owned(),
+            stderr: result.stderr().to_owned(),
         }
-    }
-
-    fn to_observed_result(self, case_id: CaseId) -> ObservedResult {
-        ObservedResult::new(
-            case_id,
-            self.exit_status,
-            self.return_value,
-            self.stdout.to_owned(),
-            self.stderr.to_owned(),
-        )
     }
 }
 
@@ -224,10 +217,10 @@ struct GuiHelloWorldActualRuntimePreparation {
 }
 
 impl GuiHelloWorldActualRuntimePreparation {
-    const fn from_plan(plan: &UserSpaceLaunchPlan) -> Self {
+    const fn from_helper_executed_plan(plan: &UserSpaceLaunchPlan) -> Self {
         Self {
             source: GuiHelloWorldActualRuntimePreparationSource::BaraRuntimeUserSpaceLaunchPlan,
-            status: GuiHelloWorldActualRuntimePreparationStatus::PlannedNotExecuted,
+            status: GuiHelloWorldActualRuntimePreparationStatus::HelperCapabilityExecuted,
             source_isa_profile: GuiHelloWorldActualSourceIsaProfile::from_profile(
                 plan.source_isa_profile(),
             ),
@@ -249,7 +242,7 @@ impl GuiHelloWorldActualRuntimePreparation {
             helper_boundary: GuiHelloWorldActualHelperBoundaryPreparation::from_plan(
                 plan.helper_boundary(),
             ),
-            helper_capability: GuiHelloWorldActualHelperCapabilityPreparation::from_plan(
+            helper_capability: GuiHelloWorldActualHelperCapabilityPreparation::from_executed_plan(
                 plan.helper_capability(),
             ),
             bridge_boundary: GuiHelloWorldActualBridgeBoundaryPreparation::from_plan(
@@ -281,8 +274,8 @@ enum GuiHelloWorldActualRuntimePreparationSource {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 enum GuiHelloWorldActualRuntimePreparationStatus {
-    #[serde(rename = "planned_not_executed")]
-    PlannedNotExecuted,
+    #[serde(rename = "helper_capability_executed")]
+    HelperCapabilityExecuted,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -500,7 +493,7 @@ struct GuiHelloWorldActualHelperCapabilityPreparation {
 }
 
 impl GuiHelloWorldActualHelperCapabilityPreparation {
-    const fn from_plan(plan: &bara_runtime::UserSpaceHelperCapabilityPlan) -> Self {
+    const fn from_executed_plan(plan: &bara_runtime::UserSpaceHelperCapabilityPlan) -> Self {
         Self {
             responsibility: GuiHelloWorldActualRuntimePreparationResponsibility::from_runtime(
                 plan.responsibility(),
@@ -515,7 +508,7 @@ impl GuiHelloWorldActualHelperCapabilityPreparation {
             observation: GuiHelloWorldActualHelperObservationContract::from_runtime(
                 plan.observation(),
             ),
-            status: GuiHelloWorldActualHelperCapabilityStatus::from_runtime(plan.status()),
+            status: GuiHelloWorldActualHelperCapabilityStatus::Executed,
         }
     }
 }
@@ -936,16 +929,8 @@ impl GuiHelloWorldActualHelperObservationContract {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 enum GuiHelloWorldActualHelperCapabilityStatus {
-    #[serde(rename = "planned_not_executed")]
-    PlannedNotExecuted,
-}
-
-impl GuiHelloWorldActualHelperCapabilityStatus {
-    const fn from_runtime(status: UserSpaceHelperCapabilityStatus) -> Self {
-        match status {
-            UserSpaceHelperCapabilityStatus::PlannedNotExecuted => Self::PlannedNotExecuted,
-        }
-    }
+    #[serde(rename = "executed")]
+    Executed,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -1491,157 +1476,35 @@ enum GuiHelloWorldActualDeferredLoaderMetadataStatus {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 struct GuiHelloWorldActualBlocker {
     classification: GuiHelloWorldActualBlockerClassification,
-    boundary: GuiHelloWorldUnsupportedLaunchBoundary,
-    selected_by: GuiHelloWorldActualBlockerSelectionRule,
-    candidate_boundaries: Vec<GuiHelloWorldActualBlockerCandidate>,
     message: &'static str,
 }
 
 impl GuiHelloWorldActualBlocker {
-    fn from_classification_plan(plan: &GuiHelloWorldInitialBlockerPlan) -> Self {
-        let boundary = plan.selected_boundary();
+    const fn none() -> Self {
         Self {
-            classification: boundary.classification(),
-            boundary,
-            selected_by: GuiHelloWorldActualBlockerSelectionRule::FirstUnsupportedLaunchBoundary,
-            candidate_boundaries: plan.candidate_boundaries(),
-            message: boundary.message(),
+            classification: GuiHelloWorldActualBlockerClassification::None,
+            message: "B8 GUI Hello World helper capability executed with no current blocker.",
         }
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 enum GuiHelloWorldActualBlockerClassification {
-    #[serde(rename = "unsupported_objc_runtime_boundary")]
-    ObjcRuntimeBoundary,
-}
-
-impl GuiHelloWorldActualBlockerClassification {
-    const fn stderr_message(self) -> &'static str {
-        match self {
-            Self::ObjcRuntimeBoundary => "unsupported_boundary: unsupported_objc_runtime_boundary",
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
-enum GuiHelloWorldUnsupportedLaunchBoundary {
-    #[serde(rename = "objc_runtime")]
-    ObjcRuntime,
-}
-
-impl GuiHelloWorldUnsupportedLaunchBoundary {
-    const fn classification(self) -> GuiHelloWorldActualBlockerClassification {
-        match self {
-            Self::ObjcRuntime => GuiHelloWorldActualBlockerClassification::ObjcRuntimeBoundary,
-        }
-    }
-
-    const fn message(self) -> &'static str {
-        match self {
-            Self::ObjcRuntime => {
-                "Bara does not yet provide an Objective-C runtime helper boundary for the AppKit GUI fixture."
-            }
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
-enum GuiHelloWorldActualBlockerSelectionRule {
-    #[serde(rename = "first_unsupported_launch_boundary")]
-    FirstUnsupportedLaunchBoundary,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-struct GuiHelloWorldActualBlockerCandidate {
-    boundary: GuiHelloWorldUnsupportedLaunchBoundary,
-    classification: GuiHelloWorldActualBlockerClassification,
-}
-
-impl GuiHelloWorldActualBlockerCandidate {
-    const fn from_boundary(boundary: GuiHelloWorldUnsupportedLaunchBoundary) -> Self {
-        Self {
-            boundary,
-            classification: boundary.classification(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct GuiHelloWorldInitialBlockerPlan {
-    unsupported_boundaries: NonEmptyGuiHelloWorldUnsupportedLaunchBoundaries,
-}
-
-impl GuiHelloWorldInitialBlockerPlan {
-    fn current() -> Self {
-        Self {
-            unsupported_boundaries: NonEmptyGuiHelloWorldUnsupportedLaunchBoundaries::new(
-                GuiHelloWorldUnsupportedLaunchBoundary::ObjcRuntime,
-                Vec::new(),
-            ),
-        }
-    }
-
-    const fn selected_boundary(&self) -> GuiHelloWorldUnsupportedLaunchBoundary {
-        self.unsupported_boundaries.first()
-    }
-
-    const fn selected_classification(&self) -> GuiHelloWorldActualBlockerClassification {
-        self.selected_boundary().classification()
-    }
-
-    fn candidate_boundaries(&self) -> Vec<GuiHelloWorldActualBlockerCandidate> {
-        self.unsupported_boundaries
-            .to_vec()
-            .into_iter()
-            .map(GuiHelloWorldActualBlockerCandidate::from_boundary)
-            .collect()
-    }
-
-    #[cfg(test)]
-    fn with_first_boundary(first: GuiHelloWorldUnsupportedLaunchBoundary) -> Self {
-        Self {
-            unsupported_boundaries: NonEmptyGuiHelloWorldUnsupportedLaunchBoundaries::new(
-                first,
-                Vec::new(),
-            ),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct NonEmptyGuiHelloWorldUnsupportedLaunchBoundaries {
-    first: GuiHelloWorldUnsupportedLaunchBoundary,
-    remaining: Vec<GuiHelloWorldUnsupportedLaunchBoundary>,
-}
-
-impl NonEmptyGuiHelloWorldUnsupportedLaunchBoundaries {
-    const fn new(
-        first: GuiHelloWorldUnsupportedLaunchBoundary,
-        remaining: Vec<GuiHelloWorldUnsupportedLaunchBoundary>,
-    ) -> Self {
-        Self { first, remaining }
-    }
-
-    const fn first(&self) -> GuiHelloWorldUnsupportedLaunchBoundary {
-        self.first
-    }
-
-    fn to_vec(&self) -> Vec<GuiHelloWorldUnsupportedLaunchBoundary> {
-        let mut boundaries = vec![self.first];
-        boundaries.extend(self.remaining.iter().copied());
-        boundaries
-    }
+    #[serde(rename = "none")]
+    None,
 }
 
 pub(crate) fn b8_gui_hello_world_actual_launch_attempt(
     input_probe_report: &BinaryFormatProbeReport,
+    helper_result: ObservedResult,
 ) -> Result<GuiHelloWorldActualLaunchBundle, X8664MachOFixtureError> {
-    Ok(GuiHelloWorldActualLaunchBundle::blocked_by_initial_blocker(
-        b8_gui_hello_world_case_id()?,
-        GuiHelloWorldActualInputMetadata::from_report(input_probe_report),
-        GuiHelloWorldInitialBlockerPlan::current(),
-    ))
+    Ok(
+        GuiHelloWorldActualLaunchBundle::launched_by_helper_capability(
+            b8_gui_hello_world_case_id()?,
+            GuiHelloWorldActualInputMetadata::from_report(input_probe_report),
+            helper_result,
+        ),
+    )
 }
 
 pub(crate) fn b8_gui_hello_world_feedback_report(
@@ -1655,28 +1518,15 @@ pub(crate) fn b8_gui_hello_world_feedback_report(
 mod tests {
     use bara_oracle::{probe_public_binary_format, BinaryInput, CaseId, ObservedResult};
 
-    use super::{
-        b8_gui_hello_world_actual_launch_attempt, b8_gui_hello_world_feedback_report,
-        GuiHelloWorldActualBlockerClassification, GuiHelloWorldInitialBlockerPlan,
-        GuiHelloWorldUnsupportedLaunchBoundary,
-    };
+    use super::{b8_gui_hello_world_actual_launch_attempt, b8_gui_hello_world_feedback_report};
 
     #[test]
-    fn gui_hello_world_actual_attempt_reports_objc_runtime_blocker() {
+    fn gui_hello_world_actual_attempt_reports_helper_capability_match() {
         let probe_report = mach_o_execute_header_probe();
-        let attempt = b8_gui_hello_world_actual_launch_attempt(&probe_report)
+        let attempt = b8_gui_hello_world_actual_launch_attempt(&probe_report, helper_result())
             .expect("built-in B8 GUI Hello World case id is valid");
 
-        assert_eq!(
-            attempt.observed_result(),
-            &ObservedResult::new(
-                CaseId::new("b8_gui_hello_world").expect("case id is non-empty"),
-                1,
-                0,
-                String::new(),
-                String::from("unsupported_boundary: unsupported_objc_runtime_boundary"),
-            )
-        );
+        assert_eq!(attempt.observed_result(), &helper_result());
         assert_eq!(
             serde_json::to_string(attempt.launch_report()).expect("launch report serializes"),
             include_str!("../../../tests/expected/b8_gui_hello_world.bara.launch-report.json")
@@ -1685,17 +1535,11 @@ mod tests {
     }
 
     #[test]
-    fn gui_hello_world_feedback_report_keeps_comparison_and_current_blocker() {
+    fn gui_hello_world_feedback_report_records_matched_helper_execution() {
         let probe_report = mach_o_execute_header_probe();
-        let attempt = b8_gui_hello_world_actual_launch_attempt(&probe_report)
+        let attempt = b8_gui_hello_world_actual_launch_attempt(&probe_report, helper_result())
             .expect("built-in B8 GUI Hello World case id is valid");
-        let expected = ObservedResult::new(
-            CaseId::new("b8_gui_hello_world").expect("case id is non-empty"),
-            0,
-            0,
-            "{\"event\":\"gui_window_created\",\"title\":\"Bara GUI Hello World\",\"text\":\"hello world\"}\n".to_owned(),
-            String::new(),
-        );
+        let expected = helper_result();
 
         let feedback = b8_gui_hello_world_feedback_report(&expected, &attempt);
 
@@ -1706,39 +1550,21 @@ mod tests {
         );
     }
 
-    #[test]
-    fn initial_blocker_plan_promotes_helper_boundary_objc_runtime() {
-        let plan = GuiHelloWorldInitialBlockerPlan::current();
-
-        assert_eq!(
-            plan.selected_classification(),
-            GuiHelloWorldActualBlockerClassification::ObjcRuntimeBoundary
-        );
-        assert_eq!(
-            plan.candidate_boundaries(),
-            vec![super::GuiHelloWorldActualBlockerCandidate::from_boundary(
-                GuiHelloWorldUnsupportedLaunchBoundary::ObjcRuntime
-            ),]
-        );
-    }
-
-    #[test]
-    fn initial_blocker_plan_has_stable_objc_runtime_classification() {
-        let objc_runtime_plan = GuiHelloWorldInitialBlockerPlan::with_first_boundary(
-            GuiHelloWorldUnsupportedLaunchBoundary::ObjcRuntime,
-        );
-
-        assert_eq!(
-            objc_runtime_plan.selected_classification(),
-            GuiHelloWorldActualBlockerClassification::ObjcRuntimeBoundary
-        );
-    }
-
     fn mach_o_execute_header_probe() -> bara_oracle::BinaryFormatProbeReport {
         let input = BinaryInput::from_hex(
             "cffaedfe07000001030000000200000000000000000000000000000000000000",
         )
         .expect("minimal Mach-O executable header hex parses");
         probe_public_binary_format(&input).expect("minimal Mach-O executable header probes")
+    }
+
+    fn helper_result() -> ObservedResult {
+        ObservedResult::new(
+            CaseId::new("b8_gui_hello_world").expect("case id is non-empty"),
+            0,
+            0,
+            "{\"event\":\"gui_window_created\",\"title\":\"Bara GUI Hello World\",\"text\":\"hello world\"}\n".to_owned(),
+            String::new(),
+        )
     }
 }

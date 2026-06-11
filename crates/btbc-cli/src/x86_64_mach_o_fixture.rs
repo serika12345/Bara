@@ -852,6 +852,26 @@ impl X8664MachOFixtureToolchainCommand {
         }
     }
 
+    fn clang_host_gui_appkit_helper_build(
+        source_path: &Path,
+        output_path: &X8664MachOFixtureOutputPath,
+    ) -> Self {
+        Self {
+            program: "clang",
+            args: vec![
+                String::from("-x"),
+                X8664MachOFixtureSourceLanguage::ObjectiveC
+                    .as_clang_arg()
+                    .to_owned(),
+                source_path.to_string_lossy().into_owned(),
+                String::from("-framework"),
+                String::from("AppKit"),
+                String::from("-o"),
+                output_path.as_path().to_string_lossy().into_owned(),
+            ],
+        }
+    }
+
     fn to_command(&self) -> Command {
         let mut command = Command::new(self.program);
         command.args(&self.args);
@@ -958,6 +978,67 @@ pub(crate) fn observe_x86_64_gui_hello_world_expected(
     let _ = fs::remove_file(&runner_path);
 
     RosettaGuiHelloWorldObservation::from_process_output(output?).into_expected_bundle(&runner_path)
+}
+
+pub(crate) fn observe_appkit_gui_hello_world_helper_actual(
+) -> Result<ObservedResult, X8664MachOFixtureError> {
+    ensure_supported_host()?;
+
+    let helper_path = temporary_path("bara-appkit-gui-hello-world-helper", "exe")?;
+    if let Err(error) = build_appkit_gui_hello_world_helper(&helper_path) {
+        let _ = fs::remove_file(&helper_path);
+        return Err(error);
+    }
+
+    let output =
+        Command::new(&helper_path)
+            .output()
+            .map_err(|source| X8664MachOFixtureError::RunnerSpawn {
+                path: helper_path.clone(),
+                source,
+            });
+    let _ = fs::remove_file(&helper_path);
+
+    AppKitGuiHelloWorldHelperObservation::from_process_output(output?)
+        .into_observed_result(&helper_path)
+}
+
+fn build_appkit_gui_hello_world_helper(output_path: &Path) -> Result<(), X8664MachOFixtureError> {
+    let source_path = temporary_path("bara-appkit-gui-hello-world-helper", "m")?;
+    let source = X8664GuiHelloWorldSource::new();
+    fs::write(&source_path, source.as_str()).map_err(|source| {
+        X8664MachOFixtureError::WriteSource {
+            path: source_path.clone(),
+            source,
+        }
+    })?;
+
+    let output_path = X8664MachOFixtureOutputPath::from_path(output_path);
+    let toolchain_command = X8664MachOFixtureToolchainCommand::clang_host_gui_appkit_helper_build(
+        &source_path,
+        &output_path,
+    );
+    let output = toolchain_command
+        .to_command()
+        .output()
+        .map_err(|source| X8664MachOFixtureError::ClangSpawn { source });
+
+    let _ = fs::remove_file(&source_path);
+
+    let output = output?;
+    if !output.status.success() {
+        return Err(X8664MachOFixtureError::ClangFailed {
+            status: output.status.to_string(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        });
+    }
+    if !output_path.as_path().exists() {
+        return Err(X8664MachOFixtureError::MissingOutput {
+            path: output_path.to_path_buf(),
+        });
+    }
+
+    Ok(())
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1082,6 +1163,54 @@ impl RosettaGuiHelloWorldObservation {
         Ok(X8664GuiHelloWorldExpectedBundle::new(
             observed_result,
             X8664GuiHelloWorldLaunchMetadata::expected()?,
+        ))
+    }
+}
+
+struct AppKitGuiHelloWorldHelperObservation {
+    helper_succeeded: bool,
+    helper_status: String,
+    helper_exit_code: Option<i32>,
+    stdout: String,
+    stderr: String,
+}
+
+impl AppKitGuiHelloWorldHelperObservation {
+    fn from_process_output(output: Output) -> Self {
+        Self {
+            helper_succeeded: output.status.success(),
+            helper_status: output.status.to_string(),
+            helper_exit_code: output.status.code(),
+            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        }
+    }
+
+    fn into_observed_result(
+        self,
+        helper_path: &Path,
+    ) -> Result<ObservedResult, X8664MachOFixtureError> {
+        if !self.helper_succeeded {
+            return Err(X8664MachOFixtureError::RunnerFailed {
+                path: helper_path.to_path_buf(),
+                status: self.helper_status,
+                stdout: self.stdout,
+                stderr: self.stderr,
+            });
+        }
+        if self.stdout != B8_GUI_HELLO_WORLD_STDOUT {
+            return Err(X8664MachOFixtureError::InvalidGuiLaunchStdout {
+                path: helper_path.to_path_buf(),
+                stdout: self.stdout,
+            });
+        }
+
+        Ok(ObservedResult::new(
+            b8_gui_hello_world_case_id()?,
+            self.helper_exit_code.unwrap_or(0),
+            0,
+            self.stdout,
+            self.stderr,
         ))
     }
 }

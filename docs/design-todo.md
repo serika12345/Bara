@@ -141,6 +141,14 @@
   helper boundary model であり、Objective-C runtime や AppKit の内部構造を
   core IR / emit へ混ぜない。実 host execution、GUI helper process、current blocker
   解除は次 step に残す。
+- 2026-06-11 の B8 completion step として、Bara actual path が x86_64 Mach-O GUI
+  fixture を入力として probe したうえで、self-authored AppKit source を host AppKit
+  helper capability として build/run し、deterministic lifecycle event を
+  actual observation にする経路を追加した。これは public AppKit API と自作 fixture
+  に基づく helper boundary execution であり、Objective-C runtime / AppKit の内部再実装、
+  private dyld behavior、任意 GUI app の full process translation ではない。
+  current blocker は `none`、feedback report は `matched` となり、B8 は review gate に
+  到達した。
 - wasm2c platform adapter / NDA target adapter は本流 TODO ではなく、
   [将来構想メモ](future-research-concepts.md) の未確立構想として扱う。
 

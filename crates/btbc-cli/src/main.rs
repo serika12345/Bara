@@ -46,8 +46,8 @@ use native_artifact::{
 };
 use x86_64_mach_o_fixture::{
     build_x86_64_gui_hello_world_fixture, build_x86_64_mach_o_fixture, build_x86_64_oracle_runner,
-    observe_x86_64_gui_hello_world_expected, observe_x86_64_oracle_expected,
-    X8664MachOFixtureError,
+    observe_appkit_gui_hello_world_helper_actual, observe_x86_64_gui_hello_world_expected,
+    observe_x86_64_oracle_expected, X8664MachOFixtureError,
 };
 
 fn main() -> ExitCode {
@@ -401,7 +401,10 @@ fn run_b8_gui_hello_world_actual_attempt(
     let bytes = read_binary_file(binary_path)?;
     let input = BinaryInput::from_file_bytes(BinaryFileBytes::from_untrusted_file_contents(bytes));
     let input_probe = probe_public_binary_format(&input).map_err(CliError::BinaryFormatProbe)?;
-    b8_gui_hello_world_actual_launch_attempt(&input_probe).map_err(CliError::X8664MachOFixture)
+    let helper_result =
+        observe_appkit_gui_hello_world_helper_actual().map_err(CliError::X8664MachOFixture)?;
+    b8_gui_hello_world_actual_launch_attempt(&input_probe, helper_result)
+        .map_err(CliError::X8664MachOFixture)
 }
 
 #[derive(Serialize)]
@@ -2059,7 +2062,7 @@ mod tests {
             actual_path.to_string_lossy().into_owned(),
             launch_report_path.to_string_lossy().into_owned(),
         ])
-        .expect("B8 GUI Hello World actual blocker report is generated");
+        .expect("B8 GUI Hello World actual matched report is generated");
 
         assert_eq!(
             output,
@@ -2073,7 +2076,7 @@ mod tests {
             "../../../tests/expected/b8_gui_hello_world.bara.actual.json"
         ))
         .and_then(|result| observed_result_to_json(&result))
-        .expect("B8 GUI actual blocker fixture normalizes to output json");
+        .expect("B8 GUI actual matched fixture normalizes to output json");
         assert_eq!(read_file(&actual_path), expected_actual);
         assert_eq!(
             read_file(&launch_report_path),
@@ -2083,10 +2086,9 @@ mod tests {
     }
 
     #[test]
-    fn generate_arm64_gui_hello_world_feedback_writes_current_blocker_report() {
-        let temp_dir = TestTempDir::new(
-            "generate_arm64_gui_hello_world_feedback_writes_current_blocker_report",
-        );
+    fn generate_arm64_gui_hello_world_feedback_writes_matched_report() {
+        let temp_dir =
+            TestTempDir::new("generate_arm64_gui_hello_world_feedback_writes_matched_report");
         let binary_path = temp_dir.write_binary_file(
             "b8_gui_hello_world",
             include_bytes!("../../../tests/binaries/mach_o_execute_header.bin"),
@@ -2128,7 +2130,7 @@ mod tests {
             "../../../tests/expected/b8_gui_hello_world.bara.actual.json"
         ))
         .and_then(|result| observed_result_to_json(&result))
-        .expect("B8 GUI actual blocker fixture normalizes to output json");
+        .expect("B8 GUI actual matched fixture normalizes to output json");
         assert_eq!(read_file(&actual_path), expected_actual);
         assert_eq!(
             read_file(&launch_report_path),

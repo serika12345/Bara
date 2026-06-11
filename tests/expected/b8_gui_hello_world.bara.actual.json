@@ -1,1 +1,1 @@
-{"case_id":"b8_gui_hello_world","exit_status":1,"return_value":0,"stdout":"","stderr":"unsupported_boundary: unsupported_objc_runtime_boundary"}
+{"case_id":"b8_gui_hello_world","exit_status":0,"return_value":0,"stdout":"{\"event\":\"gui_window_created\",\"title\":\"Bara GUI Hello World\",\"text\":\"hello world\"}\n","stderr":""}
