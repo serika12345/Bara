@@ -12,11 +12,12 @@ use bara_oracle::{
     mach_o_entry_function_test_case_with_embedded_host_traps,
     mach_o_entry_function_test_case_with_host_traps, observed_result_from_json,
     observed_result_to_json, probe_public_binary_format, test_case_from_json, BinaryFileBytes,
-    BinaryFormatProbeError, BinaryFormatProbeReport, BinaryInput, CaseId, ComparisonReport,
-    CorpusReport, ExecutableManifest, ExpectedResult, FailureKind, FailureMessage, FixtureOutcome,
-    FixtureReport, MachOEntryFunctionInput, MachOEntryFunctionTestCaseError, ObservedResult,
-    TestCase,
+    BinaryFormatProbeError, BinaryFormatProbeReport, BinaryInput, CaseId, ComparisonIssue,
+    ComparisonReport, CorpusReport, ExecutableManifest, ExpectedResult, FailureKind,
+    FailureMessage, FixtureOutcome, FixtureReport, JsonError, MachOEntryFunctionInput,
+    MachOEntryFunctionTestCaseError, ObservedResult, TestCase,
 };
+use serde::Serialize;
 
 mod blackbox_run;
 mod executable_run;
@@ -24,19 +25,24 @@ mod function_run;
 mod native_artifact;
 #[cfg(test)]
 mod native_artifact_cli_tests;
+mod x86_64_mach_o_fixture;
 
 use blackbox_run::run_check_blackbox;
 use executable_run::{run_executable_manifest, ExecutableRunError};
 use function_run::{
     compile_mach_o_entry_function, compile_mach_o_entry_function_standalone_artifact,
     compile_test_case_function, compile_test_case_function_standalone_artifact,
-    run_test_case_function, FunctionRunError,
+    run_test_case_function, FunctionArtifactMetadata, FunctionRunError,
 };
 use native_artifact::{
     link_arm64_main_executable, link_arm64_main_executable_with_source_metadata,
     link_arm64_stdout_main_executable, link_arm64_stdout_main_executable_with_source_metadata,
     native_artifact_metadata_to_json, observe_native_executable_artifact, NativeArtifactError,
     NativeSourceImageMetadata, NativeSourceImageMetadataError,
+};
+use x86_64_mach_o_fixture::{
+    build_x86_64_mach_o_fixture, build_x86_64_oracle_runner, observe_x86_64_oracle_expected,
+    X8664MachOFixtureError,
 };
 
 fn main() -> ExitCode {
@@ -87,6 +93,24 @@ fn run_cli(args: Vec<String>) -> Result<String, CliError> {
         }
         [command, case_path, output_path] if command == "link-fixture-arm64-main" => {
             run_link_fixture_arm64_main(Path::new(case_path), Path::new(output_path))
+        }
+        [command, case_path, output_path] if command == "build-x86_64-macho-fixture" => {
+            run_build_x86_64_mach_o_fixture(Path::new(case_path), Path::new(output_path))
+        }
+        [command, case_path, output_path] if command == "build-x86_64-oracle-runner" => {
+            run_build_x86_64_oracle_runner(Path::new(case_path), Path::new(output_path))
+        }
+        [command, case_path, expected_path] if command == "generate-x86_64-expected" => {
+            run_generate_x86_64_expected(Path::new(case_path), Path::new(expected_path))
+        }
+        [command, case_path, actual_path] if command == "generate-arm64-actual" => {
+            run_generate_arm64_actual(Path::new(case_path), Path::new(actual_path))
+        }
+        [command, case_path, output_dir] if command == "emit-fixture-artifacts" => {
+            run_emit_fixture_artifacts(Path::new(case_path), Path::new(output_dir))
+        }
+        [command, expected_path, actual_path] if command == "compare-expected-actual" => {
+            run_compare_expected_actual(Path::new(expected_path), Path::new(actual_path))
         }
         [command, binary_path, output_path] if command == "link-mach-o-arm64-main" => {
             run_link_mach_o_arm64_main(Path::new(binary_path), Path::new(output_path))
@@ -171,6 +195,187 @@ fn run_link_fixture_arm64_main(case_path: &Path, output_path: &Path) -> Result<S
         .map_err(CliError::NativeArtifact)?;
 
     native_artifact_metadata_to_json(artifact.metadata()).map_err(CliError::Json)
+}
+
+fn run_build_x86_64_mach_o_fixture(
+    case_path: &Path,
+    output_path: &Path,
+) -> Result<String, CliError> {
+    let case_json = read_text_file(case_path)?;
+    let test_case = test_case_from_json(&case_json).map_err(CliError::TestCase)?;
+    let fixture = build_x86_64_mach_o_fixture(&test_case, output_path)
+        .map_err(CliError::X8664MachOFixture)?;
+
+    serde_json::to_string(fixture.metadata())
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)
+}
+
+fn run_build_x86_64_oracle_runner(
+    case_path: &Path,
+    output_path: &Path,
+) -> Result<String, CliError> {
+    let case_json = read_text_file(case_path)?;
+    let test_case = test_case_from_json(&case_json).map_err(CliError::TestCase)?;
+    let runner =
+        build_x86_64_oracle_runner(&test_case, output_path).map_err(CliError::X8664MachOFixture)?;
+
+    serde_json::to_string(runner.metadata())
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)
+}
+
+fn run_generate_x86_64_expected(
+    case_path: &Path,
+    expected_path: &Path,
+) -> Result<String, CliError> {
+    let case_json = read_text_file(case_path)?;
+    let test_case = test_case_from_json(&case_json).map_err(CliError::TestCase)?;
+    let expected =
+        observe_x86_64_oracle_expected(&test_case).map_err(CliError::X8664MachOFixture)?;
+    let expected_json = observed_result_to_json(&expected).map_err(CliError::Json)?;
+    create_output_parent_dir(expected_path)?;
+    write_text_file(expected_path, &expected_json)?;
+
+    Ok(expected_json)
+}
+
+fn run_generate_arm64_actual(case_path: &Path, actual_path: &Path) -> Result<String, CliError> {
+    let case_json = read_text_file(case_path)?;
+    let test_case = test_case_from_json(&case_json).map_err(CliError::TestCase)?;
+    let actual = observe_test_case(&test_case)?;
+    let actual_json = observed_result_to_json(&actual).map_err(CliError::Json)?;
+    create_output_parent_dir(actual_path)?;
+    write_text_file(actual_path, &actual_json)?;
+
+    Ok(actual_json)
+}
+
+fn run_emit_fixture_artifacts(case_path: &Path, output_dir: &Path) -> Result<String, CliError> {
+    let case_json = read_text_file(case_path)?;
+    let test_case = test_case_from_json(&case_json).map_err(CliError::TestCase)?;
+    let compiled = compile_test_case_function(&test_case).map_err(CliError::FunctionRun)?;
+    let artifacts = compiled.artifact_metadata(&test_case);
+    let output_paths = write_fixture_artifacts(output_dir, &artifacts)?;
+
+    serde_json::to_string(&output_paths)
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)
+}
+
+fn write_fixture_artifacts(
+    output_dir: &Path,
+    artifacts: &FunctionArtifactMetadata,
+) -> Result<FixtureArtifactOutputPaths, CliError> {
+    let output_paths = FixtureArtifactOutputPaths::from_dir(output_dir);
+    let compiled_ir_json = serde_json::to_string(artifacts.compiled_ir())
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)?;
+    let pcmap_json = serde_json::to_string(artifacts.pcmap())
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)?;
+    let fixups_json = serde_json::to_string(artifacts.fixups())
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)?;
+    let helpers_json = serde_json::to_string(artifacts.helpers())
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)?;
+    let artifact_report_json = serde_json::to_string(artifacts.artifact_report())
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)?;
+    let verifier_report_json = serde_json::to_string(artifacts.verifier_report())
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)?;
+
+    create_dir(output_dir)?;
+    write_text_file(&output_paths.compiled_ir_path(), &compiled_ir_json)?;
+    write_text_file(&output_paths.pcmap_path(), &pcmap_json)?;
+    write_text_file(&output_paths.fixups_path(), &fixups_json)?;
+    write_text_file(&output_paths.helpers_path(), &helpers_json)?;
+    write_text_file(&output_paths.artifact_report_path(), &artifact_report_json)?;
+    write_text_file(&output_paths.verifier_report_path(), &verifier_report_json)?;
+
+    Ok(output_paths)
+}
+
+fn run_compare_expected_actual(
+    expected_path: &Path,
+    actual_path: &Path,
+) -> Result<String, CliError> {
+    let expected_json = read_text_file(expected_path)?;
+    let actual_json = read_text_file(actual_path)?;
+    let expected = observed_result_from_json(&expected_json).map_err(CliError::ExpectedJson)?;
+    let actual = observed_result_from_json(&actual_json).map_err(CliError::ExpectedJson)?;
+    let comparison = compare_observed_results(&expected, &actual);
+    if !comparison.is_match() {
+        return Err(CliError::Comparison(comparison));
+    }
+
+    serde_json::to_string(&comparison)
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize)]
+struct FixtureArtifactOutputPaths {
+    compiled_ir: String,
+    pcmap: String,
+    fixups: String,
+    helpers: String,
+    artifact_report: String,
+    verifier_report: String,
+}
+
+impl FixtureArtifactOutputPaths {
+    fn from_dir(output_dir: &Path) -> Self {
+        Self {
+            compiled_ir: output_dir
+                .join("compiled.ir.json")
+                .to_string_lossy()
+                .into_owned(),
+            pcmap: output_dir.join("pcmap.json").to_string_lossy().into_owned(),
+            fixups: output_dir
+                .join("fixups.json")
+                .to_string_lossy()
+                .into_owned(),
+            helpers: output_dir
+                .join("helpers.json")
+                .to_string_lossy()
+                .into_owned(),
+            artifact_report: output_dir
+                .join("artifact.report.json")
+                .to_string_lossy()
+                .into_owned(),
+            verifier_report: output_dir
+                .join("verifier.report.json")
+                .to_string_lossy()
+                .into_owned(),
+        }
+    }
+
+    fn compiled_ir_path(&self) -> PathBuf {
+        PathBuf::from(&self.compiled_ir)
+    }
+
+    fn pcmap_path(&self) -> PathBuf {
+        PathBuf::from(&self.pcmap)
+    }
+
+    fn fixups_path(&self) -> PathBuf {
+        PathBuf::from(&self.fixups)
+    }
+
+    fn helpers_path(&self) -> PathBuf {
+        PathBuf::from(&self.helpers)
+    }
+
+    fn artifact_report_path(&self) -> PathBuf {
+        PathBuf::from(&self.artifact_report)
+    }
+
+    fn verifier_report_path(&self) -> PathBuf {
+        PathBuf::from(&self.verifier_report)
+    }
 }
 
 fn run_link_mach_o_arm64_main(binary_path: &Path, output_path: &Path) -> Result<String, CliError> {
@@ -473,7 +678,12 @@ fn run_corpus_fixture(case_path: &Path, expected_dir: &Path) -> FixtureRun {
                 fallback_case_id,
                 FailureKind::InvalidTestCase,
                 error.to_string(),
-            );
+            )
+            .with_failure_artifacts(FixtureFailureArtifacts::new(
+                Some(case_json),
+                None,
+                None,
+            ));
         }
     };
     let case_id = test_case.case_id().clone();
@@ -481,33 +691,68 @@ fn run_corpus_fixture(case_path: &Path, expected_dir: &Path) -> FixtureRun {
     let expected_json = match read_text_file(&expected_path) {
         Ok(expected_json) => expected_json,
         Err(error) => {
-            return FixtureRun::failed(case_id, FailureKind::MissingExpected, error.to_string());
+            return FixtureRun::failed(case_id, FailureKind::MissingExpected, error.to_string())
+                .with_failure_artifacts(FixtureFailureArtifacts::new(Some(case_json), None, None));
         }
     };
     let expected = match observed_result_from_json(&expected_json) {
         Ok(expected) => expected,
         Err(error) => {
-            return FixtureRun::failed(case_id, FailureKind::InvalidExpected, error.to_string());
+            return FixtureRun::failed(case_id, FailureKind::InvalidExpected, error.to_string())
+                .with_failure_artifacts(FixtureFailureArtifacts::new(
+                    Some(case_json),
+                    Some(expected_json),
+                    None,
+                ));
         }
     };
 
     let actual = match observe_test_case(&test_case) {
         Ok(actual) => actual,
         Err(error) => {
-            return FixtureRun::failed(case_id, error.failure_kind(), error.to_string());
+            return FixtureRun::failed(case_id, error.failure_kind(), error.to_string())
+                .with_failure_artifacts(FixtureFailureArtifacts::new(
+                    Some(case_json),
+                    Some(expected_json),
+                    None,
+                ));
+        }
+    };
+    let artifact_metadata = match fixture_artifact_metadata(&test_case) {
+        Ok(artifact_metadata) => artifact_metadata,
+        Err(error) => {
+            return FixtureRun::failed_with_actual(
+                case_id,
+                error.failure_kind(),
+                error.to_string(),
+                actual.clone(),
+            )
+            .with_failure_artifacts(FixtureFailureArtifacts::new(
+                Some(case_json),
+                Some(expected_json),
+                Some(actual),
+            ));
         }
     };
     let comparison = compare_observed_results(&expected, &actual);
     if !comparison.is_match() {
-        return FixtureRun::failed_with_actual(
+        let message = format!("comparison failed: {comparison:?}");
+        return FixtureRun::failed_with_actual_and_artifacts(
             case_id,
-            FailureKind::ComparisonMismatch,
-            format!("comparison failed: {comparison:?}"),
-            actual,
-        );
+            failure_kind_from_comparison_report(&comparison),
+            message,
+            actual.clone(),
+            artifact_metadata,
+        )
+        .with_final_state_report(comparison)
+        .with_failure_artifacts(FixtureFailureArtifacts::new(
+            Some(case_json),
+            Some(expected_json),
+            Some(actual),
+        ));
     }
 
-    FixtureRun::passed_observed(case_id, actual)
+    FixtureRun::passed_observed_with_artifacts(case_id, actual, artifact_metadata)
 }
 
 fn run_test_case(test_case: TestCase, expected: ExpectedResult) -> Result<String, CliError> {
@@ -524,6 +769,12 @@ fn observe_test_case(test_case: &TestCase) -> Result<ObservedResult, CliError> {
     run_test_case_function(test_case)
         .map_err(CliError::FunctionRun)
         .map(|result| result.into_observed_result(test_case.case_id().clone()))
+}
+
+fn fixture_artifact_metadata(test_case: &TestCase) -> Result<FunctionArtifactMetadata, CliError> {
+    compile_test_case_function(test_case)
+        .map_err(CliError::FunctionRun)
+        .map(|compiled| compiled.artifact_metadata(test_case))
 }
 
 fn run_executable(
@@ -545,6 +796,9 @@ fn run_executable(
 struct FixtureRun {
     report: FixtureReport,
     output: Option<FixtureOutput>,
+    artifact_metadata: Option<FunctionArtifactMetadata>,
+    final_state_report: Option<ComparisonReport>,
+    failure_artifacts: Option<FixtureFailureArtifacts>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -553,18 +807,49 @@ enum FixtureOutput {
     Probe(BinaryFormatProbeReport),
 }
 
-impl FixtureRun {
-    fn passed(case_id: CaseId) -> Self {
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct FixtureFailureArtifacts {
+    testcase_json: Option<String>,
+    expected_json: Option<String>,
+    actual: Option<ObservedResult>,
+}
+
+impl FixtureFailureArtifacts {
+    const fn new(
+        testcase_json: Option<String>,
+        expected_json: Option<String>,
+        actual: Option<ObservedResult>,
+    ) -> Self {
         Self {
-            report: FixtureReport::new(case_id, FixtureOutcome::Passed),
-            output: None,
+            testcase_json,
+            expected_json,
+            actual,
         }
     }
+}
 
+impl FixtureRun {
     fn passed_observed(case_id: CaseId, actual: ObservedResult) -> Self {
         Self {
             report: FixtureReport::new(case_id, FixtureOutcome::Passed),
             output: Some(FixtureOutput::Observed(actual)),
+            artifact_metadata: None,
+            final_state_report: None,
+            failure_artifacts: None,
+        }
+    }
+
+    fn passed_observed_with_artifacts(
+        case_id: CaseId,
+        actual: ObservedResult,
+        artifact_metadata: FunctionArtifactMetadata,
+    ) -> Self {
+        Self {
+            report: FixtureReport::new(case_id, FixtureOutcome::Passed),
+            output: Some(FixtureOutput::Observed(actual)),
+            artifact_metadata: Some(artifact_metadata),
+            final_state_report: None,
+            failure_artifacts: None,
         }
     }
 
@@ -572,6 +857,9 @@ impl FixtureRun {
         Self {
             report: FixtureReport::new(case_id, FixtureOutcome::Passed),
             output: Some(FixtureOutput::Probe(actual)),
+            artifact_metadata: None,
+            final_state_report: None,
+            failure_artifacts: None,
         }
     }
 
@@ -579,6 +867,9 @@ impl FixtureRun {
         Self {
             report: failed_fixture_report(case_id, kind, message),
             output: None,
+            artifact_metadata: None,
+            final_state_report: None,
+            failure_artifacts: None,
         }
     }
 
@@ -591,7 +882,36 @@ impl FixtureRun {
         Self {
             report: failed_fixture_report(case_id, kind, message),
             output: Some(FixtureOutput::Observed(actual)),
+            artifact_metadata: None,
+            final_state_report: None,
+            failure_artifacts: None,
         }
+    }
+
+    fn failed_with_actual_and_artifacts(
+        case_id: CaseId,
+        kind: FailureKind,
+        message: String,
+        actual: ObservedResult,
+        artifact_metadata: FunctionArtifactMetadata,
+    ) -> Self {
+        Self {
+            report: failed_fixture_report(case_id, kind, message),
+            output: Some(FixtureOutput::Observed(actual)),
+            artifact_metadata: Some(artifact_metadata),
+            final_state_report: None,
+            failure_artifacts: None,
+        }
+    }
+
+    fn with_final_state_report(mut self, final_state_report: ComparisonReport) -> Self {
+        self.final_state_report = Some(final_state_report);
+        self
+    }
+
+    fn with_failure_artifacts(mut self, failure_artifacts: FixtureFailureArtifacts) -> Self {
+        self.failure_artifacts = Some(failure_artifacts);
+        self
     }
 }
 
@@ -609,15 +929,34 @@ fn write_corpus_outputs(
 ) -> Result<(), CliError> {
     create_dir(output_dir)?;
     let actual_dir = output_dir.join("actual");
+    let compiled_dir = output_dir.join("compiled");
     create_dir(&actual_dir)?;
-    create_dir(&output_dir.join("compiled"))?;
-    create_dir(&output_dir.join("ir"))?;
-    create_dir(&output_dir.join("pcmap"))?;
+    create_dir(&compiled_dir)?;
 
     let report_json = corpus_report_to_json(report).map_err(CliError::Json)?;
     write_text_file(&output_dir.join("report.json"), &report_json)?;
 
     for run in fixture_runs {
+        if let FixtureOutcome::Failed { kind, message } = run.report.outcome() {
+            write_fixture_failure_package(
+                &output_dir
+                    .join("failures")
+                    .join(run.report.case_id().as_str()),
+                run.report.case_id(),
+                *kind,
+                message.as_str(),
+                run.final_state_report.as_ref(),
+                run.failure_artifacts.as_ref(),
+            )?;
+        }
+
+        if let Some(artifact_metadata) = &run.artifact_metadata {
+            write_fixture_artifacts(
+                &compiled_dir.join(run.report.case_id().as_str()),
+                artifact_metadata,
+            )?;
+        }
+
         if let Some(output) = &run.output {
             let (case_id, actual_json) = match output {
                 FixtureOutput::Observed(actual) => (
@@ -636,11 +975,187 @@ fn write_corpus_outputs(
     Ok(())
 }
 
+fn write_fixture_failure_package(
+    failure_dir: &Path,
+    case_id: &CaseId,
+    kind: FailureKind,
+    message: &str,
+    final_state_report: Option<&ComparisonReport>,
+    artifacts: Option<&FixtureFailureArtifacts>,
+) -> Result<(), CliError> {
+    create_dir(failure_dir)?;
+    let report =
+        FixtureFailurePackageJson::new(case_id, kind, message, final_state_report, artifacts);
+    let report_json = serde_json::to_string(&report)
+        .map_err(JsonError::new)
+        .map_err(CliError::Json)?;
+    write_text_file(&failure_dir.join("failure.json"), &report_json)?;
+
+    if let Some(artifacts) = artifacts {
+        if let Some(testcase_json) = &artifacts.testcase_json {
+            write_text_file(&failure_dir.join("testcase.json"), testcase_json)?;
+        }
+        if let Some(expected_json) = &artifacts.expected_json {
+            write_text_file(&failure_dir.join("expected.json"), expected_json)?;
+        }
+        if let Some(actual) = &artifacts.actual {
+            let actual_json = observed_result_to_json(actual).map_err(CliError::Json)?;
+            write_text_file(&failure_dir.join("actual.json"), &actual_json)?;
+        }
+    }
+
+    Ok(())
+}
+
+#[derive(Serialize)]
+struct FixtureFailurePackageJson<'a> {
+    case_id: &'a str,
+    kind: FailureKind,
+    message: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    final_state: Option<&'a ComparisonReport>,
+    shrink: FixtureFailureShrinkJson,
+    corpus_update: FixtureCorpusUpdateJson,
+}
+
+impl<'a> FixtureFailurePackageJson<'a> {
+    fn new(
+        case_id: &'a CaseId,
+        kind: FailureKind,
+        message: &'a str,
+        final_state_report: Option<&'a ComparisonReport>,
+        artifacts: Option<&FixtureFailureArtifacts>,
+    ) -> Self {
+        Self {
+            case_id: case_id.as_str(),
+            kind,
+            message,
+            final_state: final_state_report,
+            shrink: FixtureFailureShrinkJson {
+                status: FixtureShrinkStatus::NotAttempted,
+                recommended_next_step: format!(
+                    "minimize testcase while preserving failure kind {}",
+                    failure_kind_label(kind)
+                ),
+            },
+            corpus_update: FixtureCorpusUpdateJson::from_artifacts(artifacts),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct FixtureFailureShrinkJson {
+    status: FixtureShrinkStatus,
+    recommended_next_step: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FixtureShrinkStatus {
+    NotAttempted,
+}
+
+#[derive(Serialize)]
+struct FixtureCorpusUpdateJson {
+    action: FixtureCorpusUpdateAction,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    candidate_testcase: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    candidate_expected: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    candidate_actual: Option<&'static str>,
+}
+
+impl FixtureCorpusUpdateJson {
+    fn from_artifacts(artifacts: Option<&FixtureFailureArtifacts>) -> Self {
+        Self {
+            action: FixtureCorpusUpdateAction::ReviewFailurePackage,
+            candidate_testcase: artifacts
+                .and_then(|artifacts| artifacts.testcase_json.as_ref())
+                .map(|_| "testcase.json"),
+            candidate_expected: artifacts
+                .and_then(|artifacts| artifacts.expected_json.as_ref())
+                .map(|_| "expected.json"),
+            candidate_actual: artifacts
+                .and_then(|artifacts| artifacts.actual.as_ref())
+                .map(|_| "actual.json"),
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FixtureCorpusUpdateAction {
+    ReviewFailurePackage,
+}
+
+fn failure_kind_label(kind: FailureKind) -> &'static str {
+    match kind {
+        FailureKind::InvalidTestCase => "invalid_test_case",
+        FailureKind::MissingExpected => "missing_expected",
+        FailureKind::InvalidExpected => "invalid_expected",
+        FailureKind::DecodeError => "decode_error",
+        FailureKind::LiftError => "lift_error",
+        FailureKind::EmitError => "emit_error",
+        FailureKind::RunError => "run_error",
+        FailureKind::ComparisonMismatch => "comparison_mismatch",
+        FailureKind::UnsupportedInstruction => "unsupported_instruction",
+        FailureKind::WrongReturnValue => "wrong_return_value",
+        FailureKind::WrongRegisterValue => "wrong_register_value",
+        FailureKind::WrongFlags => "wrong_flags",
+        FailureKind::WrongMemory => "wrong_memory",
+        FailureKind::WrongBranchTarget => "wrong_branch_target",
+        FailureKind::WrongCallReturn => "wrong_call_return",
+        FailureKind::WrongExternalCall => "wrong_external_call",
+        FailureKind::RunnerCrash => "runner_crash",
+        FailureKind::OracleCrash => "oracle_crash",
+    }
+}
+
+pub(crate) fn failure_kind_from_comparison_report(report: &ComparisonReport) -> FailureKind {
+    if report
+        .issues()
+        .iter()
+        .any(|issue| matches!(issue, ComparisonIssue::ReturnValueMismatch { .. }))
+    {
+        return FailureKind::WrongRegisterValue;
+    }
+
+    if report
+        .issues()
+        .iter()
+        .any(|issue| matches!(issue, ComparisonIssue::StdoutMismatch { .. }))
+    {
+        return FailureKind::WrongExternalCall;
+    }
+
+    if report
+        .issues()
+        .iter()
+        .any(|issue| matches!(issue, ComparisonIssue::ExitStatusMismatch { .. }))
+    {
+        return FailureKind::WrongCallReturn;
+    }
+
+    FailureKind::ComparisonMismatch
+}
+
 fn create_dir(path: &Path) -> Result<(), CliError> {
     fs::create_dir_all(path).map_err(|source| CliError::CreateDir {
         path: path.to_path_buf(),
         source,
     })
+}
+
+fn create_output_parent_dir(path: &Path) -> Result<(), CliError> {
+    if let Some(parent) = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        create_dir(parent)?;
+    }
+
+    Ok(())
 }
 
 fn read_text_file(path: &Path) -> Result<String, CliError> {
@@ -742,6 +1257,7 @@ enum CliError {
     },
     FunctionRun(FunctionRunError),
     NativeArtifact(NativeArtifactError),
+    X8664MachOFixture(X8664MachOFixtureError),
     NativeSourceImageMetadata(NativeSourceImageMetadataError),
     ExecutableRun(ExecutableRunError),
     Comparison(ComparisonReport),
@@ -762,9 +1278,10 @@ impl CliError {
             Self::BinaryProbeComparisonMismatch { .. } => FailureKind::ComparisonMismatch,
             Self::FunctionRun(error) => error.failure_kind(),
             Self::NativeArtifact(error) => error.failure_kind(),
+            Self::X8664MachOFixture(error) => error.failure_kind(),
             Self::NativeSourceImageMetadata(_) => FailureKind::InvalidTestCase,
             Self::ExecutableRun(error) => error.failure_kind(),
-            Self::Comparison(_) => FailureKind::ComparisonMismatch,
+            Self::Comparison(report) => failure_kind_from_comparison_report(report),
             Self::ReadFile { .. } | Self::WriteFile { .. } | Self::CreateDir { .. } => {
                 FailureKind::InvalidTestCase
             }
@@ -783,7 +1300,7 @@ impl std::fmt::Display for CliError {
         match self {
             Self::Usage => write!(
                 formatter,
-                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | link-fixture-arm64-main <case.json> <out-exe> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
+                "usage: btbc-cli check-m1 | check-fixture <case.json> <expected.json> | check-executable <manifest.json> <expected.json> | check-mach-o <binary> <expected.json> | check-mach-o-host-traps <binary> <expected.json> | check-mach-o-host-traps <binary> <host-traps.json> <expected.json> | check-corpus <cases-dir> <expected-dir> [--out <dir>] | probe-binary <path> | check-binary-probe <binary> <expected.json> | emit-fixture-arm64 <case.json> <out.bin> | emit-fixture-artifacts <case.json> <out-dir> | link-fixture-arm64-main <case.json> <out-exe> | build-x86_64-macho-fixture <case.json> <out-exe> | build-x86_64-oracle-runner <case.json> <out-exe> | generate-x86_64-expected <case.json> <expected.json> | generate-arm64-actual <case.json> <actual.json> | compare-expected-actual <expected.json> <actual.json> | link-mach-o-arm64-main <binary> <out-exe> | link-fixture-arm64-stdout-main <case.json> <out-exe> | link-mach-o-arm64-stdout-main <binary> <out-exe> | link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe> | check-blackbox [--out <dir>]"
             ),
             Self::ReadFile { path, source } => {
                 write!(formatter, "failed to read file {}: {source}", path.display())
@@ -846,6 +1363,9 @@ impl std::fmt::Display for CliError {
             }
             Self::FunctionRun(error) => write!(formatter, "function run error: {error}"),
             Self::NativeArtifact(error) => write!(formatter, "native artifact error: {error}"),
+            Self::X8664MachOFixture(error) => {
+                write!(formatter, "x86_64 Mach-O fixture error: {error}")
+            }
             Self::NativeSourceImageMetadata(error) => {
                 write!(formatter, "native source image metadata error: {error}")
             }
@@ -1132,6 +1652,405 @@ mod tests {
         );
     }
 
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn build_x86_64_macho_fixture_writes_return_42_executable() {
+        let temp_dir = TestTempDir::new("build_x86_64_macho_fixture_writes_return_42_executable");
+        let case_path = temp_dir.write_file(
+            "return_42.json",
+            include_str!("../../../tests/cases/return_42.json"),
+        );
+        let output_path = temp_dir.path.join("return_42_x86_64");
+
+        let output = run_cli(vec![
+            String::from("build-x86_64-macho-fixture"),
+            case_path.to_string_lossy().into_owned(),
+            output_path.to_string_lossy().into_owned(),
+        ])
+        .expect("return_42 builds as an x86_64 Mach-O fixture");
+
+        assert!(output_path.exists());
+        assert_eq!(
+            output,
+            format!(
+                "{{\"artifact_kind\":\"mach_o_executable\",\"case_id\":\"return_42\",\"target_triple\":\"x86_64-apple-macos13\",\"toolchain\":\"clang\",\"output_path\":\"{}\"}}",
+                output_path.display()
+            )
+        );
+
+        let binary = fs::read(&output_path).expect("generated x86_64 Mach-O is readable");
+        assert_eq!(&binary[..4], &[0xcf, 0xfa, 0xed, 0xfe]);
+        assert_eq!(&binary[4..8], &[0x07, 0x00, 0x00, 0x01]);
+        let probe_output = run_cli(vec![
+            String::from("probe-binary"),
+            output_path.to_string_lossy().into_owned(),
+        ])
+        .expect("generated x86_64 Mach-O probes as public Mach-O");
+        assert!(probe_output.contains("\"format\":\"mach_o_64_little_endian\""));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn build_x86_64_oracle_runner_writes_return_42_runner_executable() {
+        let temp_dir =
+            TestTempDir::new("build_x86_64_oracle_runner_writes_return_42_runner_executable");
+        let case_path = temp_dir.write_file(
+            "return_42.json",
+            include_str!("../../../tests/cases/return_42.json"),
+        );
+        let output_path = temp_dir.path.join("return_42_oracle");
+
+        let output = run_cli(vec![
+            String::from("build-x86_64-oracle-runner"),
+            case_path.to_string_lossy().into_owned(),
+            output_path.to_string_lossy().into_owned(),
+        ])
+        .expect("return_42 builds as an x86_64 oracle runner");
+
+        assert!(output_path.exists());
+        assert_eq!(
+            output,
+            format!(
+                "{{\"artifact_kind\":\"oracle_runner_executable\",\"case_id\":\"return_42\",\"target_triple\":\"x86_64-apple-macos13\",\"toolchain\":\"clang\",\"output_path\":\"{}\"}}",
+                output_path.display()
+            )
+        );
+
+        let binary = fs::read(&output_path).expect("generated x86_64 oracle runner is readable");
+        assert_eq!(&binary[..4], &[0xcf, 0xfa, 0xed, 0xfe]);
+        assert_eq!(&binary[4..8], &[0x07, 0x00, 0x00, 0x01]);
+        let probe_output = run_cli(vec![
+            String::from("probe-binary"),
+            output_path.to_string_lossy().into_owned(),
+        ])
+        .expect("generated x86_64 oracle runner probes as public Mach-O");
+        assert!(probe_output.contains("\"format\":\"mach_o_64_little_endian\""));
+    }
+
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    #[test]
+    fn generate_x86_64_expected_writes_return_42_expected_json() {
+        let temp_dir = TestTempDir::new("generate_x86_64_expected_writes_return_42_expected_json");
+        let case_path = temp_dir.write_file(
+            "return_42.json",
+            include_str!("../../../tests/cases/return_42.json"),
+        );
+        let expected_path = temp_dir.path.join("expected").join("return_42.json");
+
+        let output = run_cli(vec![
+            String::from("generate-x86_64-expected"),
+            case_path.to_string_lossy().into_owned(),
+            expected_path.to_string_lossy().into_owned(),
+        ])
+        .expect("return_42 expected JSON is generated under Rosetta");
+        let expected =
+            observed_result_from_json(include_str!("../../../tests/expected/return_42.json"))
+                .and_then(|result| observed_result_to_json(&result))
+                .expect("return_42 expected fixture normalizes to output json");
+
+        assert_eq!(output, expected);
+        assert_eq!(read_file(&expected_path), expected);
+    }
+
+    #[cfg(all(unix, target_arch = "aarch64"))]
+    #[test]
+    fn generate_arm64_actual_writes_return_42_actual_json() {
+        let temp_dir = TestTempDir::new("generate_arm64_actual_writes_return_42_actual_json");
+        let case_path = temp_dir.write_file(
+            "return_42.json",
+            include_str!("../../../tests/cases/return_42.json"),
+        );
+        let actual_path = temp_dir.path.join("actual").join("return_42.json");
+
+        let output = run_cli(vec![
+            String::from("generate-arm64-actual"),
+            case_path.to_string_lossy().into_owned(),
+            actual_path.to_string_lossy().into_owned(),
+        ])
+        .expect("return_42 actual JSON is generated by the ARM64 native runner");
+        let expected =
+            observed_result_from_json(include_str!("../../../tests/expected/return_42.json"))
+                .and_then(|result| observed_result_to_json(&result))
+                .expect("return_42 expected fixture normalizes to output json");
+
+        assert_eq!(output, expected);
+        assert_eq!(read_file(&actual_path), expected);
+    }
+
+    #[test]
+    fn compare_expected_actual_reports_matching_observations() {
+        let temp_dir = TestTempDir::new("compare_expected_actual_reports_matching_observations");
+        let expected_path = temp_dir.write_file(
+            "expected.json",
+            include_str!("../../../tests/expected/return_42.json"),
+        );
+        let actual_path = temp_dir.write_file(
+            "actual.json",
+            include_str!("../../../tests/expected/return_42.json"),
+        );
+
+        let output = run_cli(vec![
+            String::from("compare-expected-actual"),
+            expected_path.to_string_lossy().into_owned(),
+            actual_path.to_string_lossy().into_owned(),
+        ])
+        .expect("matching expected and actual JSON compare successfully");
+
+        assert_eq!(output, "{\"issues\":[]}");
+    }
+
+    #[test]
+    fn compare_expected_actual_reports_return_value_mismatch() -> Result<(), String> {
+        let temp_dir = TestTempDir::new("compare_expected_actual_reports_return_value_mismatch");
+        let expected_path = temp_dir.write_file(
+            "expected.json",
+            include_str!("../../../tests/expected/return_42.json"),
+        );
+        let actual_path = temp_dir.write_file(
+            "actual.json",
+            "{\"case_id\":\"return_42\",\"exit_status\":0,\"return_value\":41,\"stdout\":\"\",\"stderr\":\"\"}",
+        );
+
+        let error = run_cli(vec![
+            String::from("compare-expected-actual"),
+            expected_path.to_string_lossy().into_owned(),
+            actual_path.to_string_lossy().into_owned(),
+        ])
+        .expect_err("mismatched expected and actual JSON fail comparison");
+
+        let report = match error {
+            CliError::Comparison(report) => report,
+            other => return Err(format!("unexpected error: {other:?}")),
+        };
+        assert_eq!(
+            report.issues(),
+            &[bara_oracle::ComparisonIssue::ReturnValueMismatch {
+                expected: 42,
+                actual: 41,
+            }]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn comparison_report_maps_to_specific_failure_kinds() {
+        assert_eq!(
+            super::failure_kind_from_comparison_report(&bara_oracle::ComparisonReport::new(vec![
+                bara_oracle::ComparisonIssue::ReturnValueMismatch {
+                    expected: 42,
+                    actual: 41,
+                },
+            ])),
+            FailureKind::WrongRegisterValue
+        );
+        assert_eq!(
+            super::failure_kind_from_comparison_report(&bara_oracle::ComparisonReport::new(vec![
+                bara_oracle::ComparisonIssue::StdoutMismatch {
+                    expected: String::from("expected"),
+                    actual: String::from("actual"),
+                },
+            ])),
+            FailureKind::WrongExternalCall
+        );
+        assert_eq!(
+            super::failure_kind_from_comparison_report(&bara_oracle::ComparisonReport::new(vec![
+                bara_oracle::ComparisonIssue::ExitStatusMismatch {
+                    expected: 0,
+                    actual: 42,
+                },
+            ])),
+            FailureKind::WrongCallReturn
+        );
+    }
+
+    #[test]
+    fn emit_fixture_artifacts_writes_compilation_metadata_files() {
+        let temp_dir = TestTempDir::new("emit_fixture_artifacts_writes_compilation_metadata_files");
+        let case_path = temp_dir.write_file(
+            "branch_eq_return_42.json",
+            include_str!("../../../tests/cases/branch_eq_return_42.json"),
+        );
+        let output_dir = temp_dir.path.join("artifacts");
+
+        let output = run_cli(vec![
+            String::from("emit-fixture-artifacts"),
+            case_path.to_string_lossy().into_owned(),
+            output_dir.to_string_lossy().into_owned(),
+        ])
+        .expect("fixture artifact metadata is emitted");
+
+        assert_eq!(
+            output,
+            format!(
+                "{{\"compiled_ir\":\"{}\",\"pcmap\":\"{}\",\"fixups\":\"{}\",\"helpers\":\"{}\",\"artifact_report\":\"{}\",\"verifier_report\":\"{}\"}}",
+                output_dir.join("compiled.ir.json").display(),
+                output_dir.join("pcmap.json").display(),
+                output_dir.join("fixups.json").display(),
+                output_dir.join("helpers.json").display(),
+                output_dir.join("artifact.report.json").display(),
+                output_dir.join("verifier.report.json").display(),
+            )
+        );
+        assert_eq!(
+            read_file(&output_dir.join("compiled.ir.json")),
+            "{\"entry\":0,\"blocks\":[{\"id\":0,\"start\":0,\"end\":9,\"ops\":[{\"kind\":\"mov\",\"dst\":{\"kind\":\"reg\",\"reg\":\"rax\"},\"src\":{\"kind\":\"imm_u64\",\"value\":0}},{\"kind\":\"test\",\"lhs\":{\"kind\":\"reg\",\"reg\":\"rax\"},\"rhs\":{\"kind\":\"reg\",\"reg\":\"rax\"}}],\"terminator\":{\"kind\":\"cond_jump\",\"condition\":\"equal\",\"taken\":15,\"fallthrough\":9}},{\"id\":1,\"start\":9,\"end\":15,\"ops\":[{\"kind\":\"mov\",\"dst\":{\"kind\":\"reg\",\"reg\":\"rax\"},\"src\":{\"kind\":\"imm_u64\",\"value\":7}}],\"terminator\":{\"kind\":\"return\"}},{\"id\":2,\"start\":15,\"end\":21,\"ops\":[{\"kind\":\"mov\",\"dst\":{\"kind\":\"reg\",\"reg\":\"rax\"},\"src\":{\"kind\":\"imm_u64\",\"value\":42}}],\"terminator\":{\"kind\":\"return\"}}]}"
+        );
+        assert_eq!(
+            read_file(&output_dir.join("pcmap.json")),
+            "{\"entries\":[{\"source\":0,\"target\":0},{\"source\":9,\"target\":16},{\"source\":15,\"target\":24}]}"
+        );
+        assert_eq!(
+            read_file(&output_dir.join("fixups.json")),
+            "{\"fixups\":[{\"offset\":8,\"source\":8,\"target\":15,\"kind\":{\"kind\":\"conditional\",\"condition\":\"equal\"}},{\"offset\":12,\"source\":12,\"target\":9,\"kind\":{\"kind\":\"unconditional\"}}]}"
+        );
+        assert_eq!(
+            read_file(&output_dir.join("helpers.json")),
+            "{\"helpers\":[]}"
+        );
+        assert_eq!(
+            read_file(&output_dir.join("artifact.report.json")),
+            "{\"state_layout\":{\"kind\":\"function_level_v0\",\"source_isa\":\"x86_64\",\"target_isa\":\"arm64\",\"abi\":{\"args\":[],\"return\":\"u64\"},\"return_register\":\"rax\",\"stack\":{\"kind\":\"none\"}},\"cache_validation_identity\":{\"kind\":\"fixture_function_v0\",\"case_id\":\"branch_eq_return_42\",\"source_entry\":0,\"source_bytes\":\"b80000000085c07406b807000000c3b82a000000c3\",\"source_abi\":{\"args\":[],\"return\":\"u64\"},\"target_backend\":\"bara-arm64\"},\"helper_requirements\":[]}"
+        );
+        assert_eq!(
+            read_file(&output_dir.join("verifier.report.json")),
+            "{\"issues\":[]}"
+        );
+    }
+
+    #[test]
+    fn emit_fixture_artifacts_report_records_stdout_helper_requirement() {
+        let temp_dir =
+            TestTempDir::new("emit_fixture_artifacts_report_records_stdout_helper_requirement");
+        let case_path = temp_dir.write_file(
+            "stdout_trap_return_0.json",
+            include_str!("../../../tests/cases/stdout_trap_return_0.json"),
+        );
+        let output_dir = temp_dir.path.join("artifacts");
+
+        run_cli(vec![
+            String::from("emit-fixture-artifacts"),
+            case_path.to_string_lossy().into_owned(),
+            output_dir.to_string_lossy().into_owned(),
+        ])
+        .expect("fixture artifact metadata is emitted");
+
+        assert_eq!(
+            read_file(&output_dir.join("artifact.report.json")),
+            "{\"state_layout\":{\"kind\":\"function_level_v0\",\"source_isa\":\"x86_64\",\"target_isa\":\"arm64\",\"abi\":{\"args\":[],\"return\":\"u64\"},\"return_register\":\"rax\",\"stack\":{\"kind\":\"none\"}},\"cache_validation_identity\":{\"kind\":\"fixture_function_v0\",\"case_id\":\"stdout_trap_return_0\",\"source_entry\":0,\"source_bytes\":\"0f0b31c0c3\",\"source_abi\":{\"args\":[],\"return\":\"u64\"},\"target_backend\":\"bara-arm64\"},\"helper_requirements\":[{\"name\":\"write_stdout\",\"signature\":\"ptr_len_to_unit\"}]}"
+        );
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn build_x86_64_macho_fixture_reports_unsupported_host() {
+        let temp_dir = TestTempDir::new("build_x86_64_macho_fixture_reports_unsupported_host");
+        let case_path = temp_dir.write_file(
+            "return_42.json",
+            include_str!("../../../tests/cases/return_42.json"),
+        );
+        let output_path = temp_dir.path.join("return_42_x86_64");
+
+        let error = run_cli(vec![
+            String::from("build-x86_64-macho-fixture"),
+            case_path.to_string_lossy().into_owned(),
+            output_path.to_string_lossy().into_owned(),
+        ])
+        .expect_err("non-macOS hosts cannot build x86_64 Mach-O fixtures");
+
+        assert!(matches!(
+            error,
+            CliError::X8664MachOFixture(
+                super::x86_64_mach_o_fixture::X8664MachOFixtureError::UnsupportedHost { .. }
+            )
+        ));
+        assert_eq!(error.failure_kind(), FailureKind::EmitError);
+        assert!(!output_path.exists());
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn build_x86_64_oracle_runner_reports_unsupported_host() {
+        let temp_dir = TestTempDir::new("build_x86_64_oracle_runner_reports_unsupported_host");
+        let case_path = temp_dir.write_file(
+            "return_42.json",
+            include_str!("../../../tests/cases/return_42.json"),
+        );
+        let output_path = temp_dir.path.join("return_42_oracle");
+
+        let error = run_cli(vec![
+            String::from("build-x86_64-oracle-runner"),
+            case_path.to_string_lossy().into_owned(),
+            output_path.to_string_lossy().into_owned(),
+        ])
+        .expect_err("non-macOS hosts cannot build x86_64 oracle runners");
+
+        assert!(matches!(
+            error,
+            CliError::X8664MachOFixture(
+                super::x86_64_mach_o_fixture::X8664MachOFixtureError::UnsupportedHost { .. }
+            )
+        ));
+        assert_eq!(error.failure_kind(), FailureKind::EmitError);
+        assert!(!output_path.exists());
+    }
+
+    #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
+    #[test]
+    fn generate_x86_64_expected_reports_unsupported_rosetta_host() {
+        let temp_dir =
+            TestTempDir::new("generate_x86_64_expected_reports_unsupported_rosetta_host");
+        let case_path = temp_dir.write_file(
+            "return_42.json",
+            include_str!("../../../tests/cases/return_42.json"),
+        );
+        let expected_path = temp_dir.path.join("return_42_expected.json");
+
+        let error = run_cli(vec![
+            String::from("generate-x86_64-expected"),
+            case_path.to_string_lossy().into_owned(),
+            expected_path.to_string_lossy().into_owned(),
+        ])
+        .expect_err("Rosetta expected generation requires arm64 macOS");
+
+        assert!(matches!(
+            error,
+            CliError::X8664MachOFixture(
+                super::x86_64_mach_o_fixture::X8664MachOFixtureError::UnsupportedRosettaHost { .. }
+            )
+        ));
+        assert_eq!(error.failure_kind(), FailureKind::RunError);
+        assert!(!expected_path.exists());
+    }
+
+    #[cfg(not(all(unix, target_arch = "aarch64")))]
+    #[test]
+    fn generate_arm64_actual_reports_unsupported_native_runner_host() {
+        let temp_dir =
+            TestTempDir::new("generate_arm64_actual_reports_unsupported_native_runner_host");
+        let case_path = temp_dir.write_file(
+            "return_42.json",
+            include_str!("../../../tests/cases/return_42.json"),
+        );
+        let actual_path = temp_dir.path.join("return_42_actual.json");
+
+        let error = run_cli(vec![
+            String::from("generate-arm64-actual"),
+            case_path.to_string_lossy().into_owned(),
+            actual_path.to_string_lossy().into_owned(),
+        ])
+        .expect_err("ARM64 actual generation requires an aarch64 Unix runner host");
+
+        assert!(matches!(
+            error,
+            CliError::FunctionRun(super::function_run::FunctionRunError::Run(
+                bara_runtime::RunError::UnsupportedHost
+            ))
+        ));
+        assert_eq!(error.failure_kind(), FailureKind::RunError);
+        assert!(!actual_path.exists());
+    }
+
     #[test]
     fn probe_binary_reports_short_input_as_classified_error() {
         let temp_dir = TestTempDir::new("probe_binary_reports_short_input_as_classified_error");
@@ -1194,6 +2113,24 @@ mod tests {
         assert!(error
             .to_string()
             .contains("link-fixture-arm64-main <case.json> <out-exe>"));
+        assert!(error
+            .to_string()
+            .contains("build-x86_64-macho-fixture <case.json> <out-exe>"));
+        assert!(error
+            .to_string()
+            .contains("build-x86_64-oracle-runner <case.json> <out-exe>"));
+        assert!(error
+            .to_string()
+            .contains("generate-x86_64-expected <case.json> <expected.json>"));
+        assert!(error
+            .to_string()
+            .contains("generate-arm64-actual <case.json> <actual.json>"));
+        assert!(error
+            .to_string()
+            .contains("compare-expected-actual <expected.json> <actual.json>"));
+        assert!(error
+            .to_string()
+            .contains("emit-fixture-artifacts <case.json> <out-dir>"));
         assert!(error
             .to_string()
             .contains("link-fixture-arm64-stdout-main <case.json> <out-exe>"));
@@ -1284,9 +2221,24 @@ mod tests {
             read_file(&output_dir.join("actual").join("return_42.json")),
             "{\"case_id\":\"return_42\",\"exit_status\":0,\"return_value\":42,\"stdout\":\"\",\"stderr\":\"\"}"
         );
-        assert!(output_dir.join("compiled").is_dir());
-        assert!(output_dir.join("ir").is_dir());
-        assert!(output_dir.join("pcmap").is_dir());
+        assert_eq!(
+            read_file(
+                &output_dir
+                    .join("compiled")
+                    .join("return_42")
+                    .join("artifact.report.json")
+            ),
+            "{\"state_layout\":{\"kind\":\"function_level_v0\",\"source_isa\":\"x86_64\",\"target_isa\":\"arm64\",\"abi\":{\"args\":[],\"return\":\"u64\"},\"return_register\":\"rax\",\"stack\":{\"kind\":\"none\"}},\"cache_validation_identity\":{\"kind\":\"fixture_function_v0\",\"case_id\":\"return_42\",\"source_entry\":0,\"source_bytes\":\"b82a000000c3\",\"source_abi\":{\"args\":[],\"return\":\"u64\"},\"target_backend\":\"bara-arm64\"},\"helper_requirements\":[]}"
+        );
+        assert_eq!(
+            read_file(
+                &output_dir
+                    .join("compiled")
+                    .join("return_42")
+                    .join("compiled.ir.json")
+            ),
+            "{\"entry\":0,\"blocks\":[{\"id\":0,\"start\":0,\"end\":6,\"ops\":[{\"kind\":\"mov\",\"dst\":{\"kind\":\"reg\",\"reg\":\"rax\"},\"src\":{\"kind\":\"imm_u64\",\"value\":42}}],\"terminator\":{\"kind\":\"return\"}}]}"
+        );
     }
 
     #[test]
@@ -1338,6 +2290,31 @@ mod tests {
                     .join("mach_o_hello_world_stdout_native_executable.json")
             ),
             "{\"case_id\":\"mach_o_hello_world_stdout_native_executable\",\"exit_status\":0,\"return_value\":0,\"stdout\":\"hello world\\n\",\"stderr\":\"\"}"
+        );
+        assert_eq!(
+            read_file(
+                &output_dir
+                    .join("actual")
+                    .join("return_42_native_executable_smoke.json")
+            ),
+            "{\"case_id\":\"return_42_native_executable_smoke\",\"exit_status\":42,\"return_value\":42,\"stdout\":\"\",\"stderr\":\"\"}"
+        );
+        assert_eq!(
+            read_file(
+                &output_dir
+                    .join("actual")
+                    .join("mach_o_return_42_native_executable_smoke.json")
+            ),
+            "{\"case_id\":\"mach_o_return_42_native_executable_smoke\",\"exit_status\":42,\"return_value\":42,\"stdout\":\"\",\"stderr\":\"\"}"
+        );
+        assert_eq!(
+            read_file(
+                &output_dir
+                    .join("compiled")
+                    .join("stdout_trap_return_0")
+                    .join("artifact.report.json")
+            ),
+            "{\"state_layout\":{\"kind\":\"function_level_v0\",\"source_isa\":\"x86_64\",\"target_isa\":\"arm64\",\"abi\":{\"args\":[],\"return\":\"u64\"},\"return_register\":\"rax\",\"stack\":{\"kind\":\"none\"}},\"cache_validation_identity\":{\"kind\":\"fixture_function_v0\",\"case_id\":\"stdout_trap_return_0\",\"source_entry\":0,\"source_bytes\":\"0f0b31c0c3\",\"source_abi\":{\"args\":[],\"return\":\"u64\"},\"target_backend\":\"bara-arm64\"},\"helper_requirements\":[{\"name\":\"write_stdout\",\"signature\":\"ptr_len_to_unit\"}]}"
         );
         assert!(output_dir
             .join("native-artifacts")
@@ -1404,6 +2381,49 @@ mod tests {
         );
         assert_eq!(report.fixtures()[1].case_id().as_str(), "return_42");
         assert_eq!(report.fixtures()[1].outcome(), &FixtureOutcome::Passed);
+
+        Ok(())
+    }
+
+    #[test]
+    fn check_corpus_classifies_return_value_mismatch_as_wrong_register() -> Result<(), String> {
+        let temp_dir =
+            TestTempDir::new("check_corpus_classifies_return_value_mismatch_as_wrong_register");
+        let cases_dir = temp_dir.create_dir("cases");
+        let expected_dir = temp_dir.create_dir("expected");
+        let output_dir = temp_dir.create_dir("out");
+        let testcase_json = include_str!("../../../tests/cases/return_42.json");
+        let expected_json =
+            "{\"case_id\":\"return_42\",\"exit_status\":0,\"return_value\":41,\"stdout\":\"\",\"stderr\":\"\"}";
+        write_file(&cases_dir.join("return_42.json"), testcase_json);
+        write_file(&expected_dir.join("return_42.json"), expected_json);
+
+        let error = run_cli(vec![
+            String::from("check-corpus"),
+            cases_dir.to_string_lossy().into_owned(),
+            expected_dir.to_string_lossy().into_owned(),
+            String::from("--out"),
+            output_dir.to_string_lossy().into_owned(),
+        ])
+        .expect_err("corpus check reports comparison mismatch");
+
+        let report = match error {
+            CliError::CorpusFailures(report) => report,
+            other => return Err(format!("unexpected error: {other:?}")),
+        };
+        assert!(!report.is_success());
+
+        let failure_dir = output_dir.join("failures").join("return_42");
+        assert_eq!(
+            read_file(&failure_dir.join("failure.json")),
+            "{\"case_id\":\"return_42\",\"kind\":\"wrong_register_value\",\"message\":\"comparison failed: ComparisonReport { issues: [ReturnValueMismatch { expected: 41, actual: 42 }] }\",\"final_state\":{\"issues\":[{\"return_value_mismatch\":{\"expected\":41,\"actual\":42}}]},\"shrink\":{\"status\":\"not_attempted\",\"recommended_next_step\":\"minimize testcase while preserving failure kind wrong_register_value\"},\"corpus_update\":{\"action\":\"review_failure_package\",\"candidate_testcase\":\"testcase.json\",\"candidate_expected\":\"expected.json\",\"candidate_actual\":\"actual.json\"}}"
+        );
+        assert_eq!(read_file(&failure_dir.join("testcase.json")), testcase_json);
+        assert_eq!(read_file(&failure_dir.join("expected.json")), expected_json);
+        assert_eq!(
+            read_file(&failure_dir.join("actual.json")),
+            "{\"case_id\":\"return_42\",\"exit_status\":0,\"return_value\":42,\"stdout\":\"\",\"stderr\":\"\"}"
+        );
 
         Ok(())
     }

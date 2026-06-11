@@ -9,78 +9,171 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-09 21:55 JST
+最終更新: 2026-06-11 10:22 JST
 
 状態:
 
-- project_state: completed。B6 の最後の小ステップとして、output Mach-O の
-  layout / serialization parity を公開仕様ベースで検証し、B6 の実装 TODO が
-  完了した。
-- active_milestone: completed。[TODO.md](../TODO.md) の B6:
-  実 Mach-O 入力からの standalone 実行。
-- active_design_focus: in_progress。[docs/design-todo.md](design-todo.md) の
-  D7: Binary format input/output の分離に沿って、Mach-O 入力変換は
-  `bara-oracle` の既存 pipeline に留め、native artifact packaging は
-  `btbc-cli` の出力境界へ接続した。
-- active_branch: `task/b6-macho-return42-artifact`。base commit は `31dbc29`。
-  latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B6 の output Mach-O の layout /
-  serialization parity を公開仕様ベースで検証する項目。
-- completed_work: `link-mach-o-arm64-main <binary> <out-exe>` を追加し、
-  `tests/binaries/mach_o_return_42.bin` を既存の Mach-O entry function
-  pipeline、standalone ARM64 emit、`clang` native artifact packaging へ通した。
-  `link-mach-o-arm64-stdout-main <binary> <host-traps.json> <out-exe>` も追加し、
-  `tests/binaries/mach_o_hello_world_stdout.bin` を既存の Mach-O host trap
-  pipeline、stdout helper-aware ARM64 emit、native stdout artifact packaging へ
-  通した。現在のデフォルト経路では、同 binary の選択 segment entry 前にある
-  self-authored `BARA_STDOUT\0` payload から stdout host trap plan を作り、
-  `check-mach-o-host-traps <binary> <expected.json>` と
-  `link-mach-o-arm64-stdout-main <binary> <out-exe>` は host-traps JSON を
-  要求しない。明示 host-traps JSON 経路は後方互換の検証用として残す。
-  `check-blackbox` には `mach_o_return_42_native_executable_smoke` と
-  `mach_o_hello_world_stdout_native_executable` を追加し、生成 executable を
-  実プロセスとして実行する。Mach-O artifact 経路では
-  `NativeSourceImageMetadata::MachOExecutable` を package request に渡し、
-  metadata JSON に `LC_MAIN` 由来の `entryoff` / `stacksize` と selected
-  segment の `name` / `vmaddr` / `fileoff` / `filesize` を含める。artifact
-  CLI は native linking に進む前に Mach-O entry function pipeline を通すため、
-  malformed input は `MachOEntryFunctionTestCaseError::Probe`、unsupported
-  conversion は `MachOEntryFunctionTestCaseError::Plan(NotConvertible { blocker })`
-  として保持される。`MachOEntryFunctionInput` は Mach-O から materialize した
-  `ExecutableImage` と entry-derived `TestCase` を同じ domain value として保持し、
-  `btbc-cli` の Mach-O native artifact 入力はこの型を通して compile に進む。
-  `ProgramImageMetadata` は code section、symbol、relocation、import、unwind
-  metadata collection を持ち、Mach-O entry pipeline は selected code segment
-  range を code section として `MachOEntryFunctionInput` に添付する。Mach-O
-  native artifact compile 経路は、この metadata を `Program` へ渡してから ARM64
-  emit に進む。Program metadata の code section range は Mach-O entry offset
-  以降になり、entry 前の self-authored `BARA_STDOUT\0` payload は
-  `ConstData` section と stdout host trap request として binary metadata 由来で
-  解決される。`bara-mach-o` の pure writer は Mach-O 64 header、
-  `LC_SEGMENT_64`、section table、`LC_MAIN`、payload bytes を型付き layout と
-  serialized bytes として作る。`btbc-cli` の実 Mach-O stdout fixture 入力経路は
-  compile 済み ARM64 main bytes と binary metadata 由来 stdout const bytes を
-  writer serialization plan へ渡す regression を持つ。serialized output Mach-O は
-  既存の public Mach-O probe へ渡され、writer layout の `LC_MAIN` entryoff、
-  `LC_SEGMENT_64` command size、segment file size と probe report が一致する。
-- remaining_work: B6 の実装 TODO は完了。large milestone review gate として
-  branch を commit / push し、pull request を開く。
-- next_action: B6 完了 branch の review package と pull request を作成する。
-- verification: 新規 regression の red/green を確認し、`nix develop -c cargo test
-  -p bara-ir program_preserves_image_metadata_collections`、`nix develop -c cargo test
-  -p bara-isa-x86 lifts_decoded_function_with_image_metadata`、`nix develop -c cargo test
-  -p bara-oracle builds_entry_function_input_from_full_mach_o_executable_image`、および
-  `nix develop -c cargo test -p bara-oracle
-  derives_const_data_and_stdout_request_from_mach_o_embedded_metadata`、
-  `nix develop -c cargo test -p bara-mach-o
-  serializes_main_only_offsets_sizes_and_payload_bytes`、`nix develop -c cargo test
-  -p bara-mach-o serializes_const_payload_offsets_sizes_and_payload_bytes`、
-  `nix develop -c cargo test -p bara-mach-o`、`nix develop -c cargo test -p btbc-cli
-  mach_o_stdout_input_reaches_pure_writer_serialization_plan`、および
-  `nix develop -c ./scripts/check-domain-types`、`nix develop -c ./scripts/verify-supply-chain`、
-  `nix develop -c ./scripts/verify` が通過した。
+- project_state: completed。B7 の 19 個目の小ステップとして、IR invariant を
+  Rust verifier report に接続し、B7: Oracle / Regression 基盤の implementation
+  TODO を完了した。
+- active_milestone: completed。[TODO.md](../TODO.md) の B7:
+  Oracle / Regression 基盤。
+- active_design_focus: B7 verifier completion。`bara_ir::validate_program` の
+  issue を `verifier.report.json` の stable `ir_*` issue として保存し、
+  PC map / fixup / final-state comparison report と同じ verifier 導線に含める。
+- active_branch: `task/b7-x86_64-macho-fixture-generation`。base commit は
+  `8d39a4a`。latest commit はこの小ステップの review package で確認する。
+- related_todo: [TODO.md](../TODO.md) B7 の verifier 項目。
+- completed_work: `verify_emitted_function` は IR invariant、PC map invariant、
+  branch fixup consistency を 1 つの report にまとめる。CLI artifact DTO は
+  IR validation issue を `ir_empty_program`、`ir_block_range_overlap`、
+  `ir_unsupported_terminator`、`ir_missing_block_target` として serializes する。
+- remaining_work: B7 は implementation 完了。large milestone review gate として
+  full verification 後に branch を push し、PR を開く。
+- next_action: full verification、commit / push、pull request 作成。
+- verification: targeted tests として
+  `nix develop -c cargo test -p bara-arm64 verifier_reports_ir_invariant_issues`、
+  `nix develop -c cargo test -p btbc-cli verifier_issue_artifact_serializes_ir_invariant_issue`
+  が通過した。`nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
+
+- 2026-06-11 10:22 JST: B7 の 19 個目の小ステップとして、IR invariant を
+  Rust verifier report に接続した。`validate_program` の validation issue は
+  `EmittedFunctionVerificationIssue::IrInvariant` として report に入り、CLI artifact
+  では stable `ir_*` issue に変換される。これで B7 の implementation TODO は完了し、
+  次は large milestone review gate として PR を開く。検証は snapshot の targeted
+  test と commit 前の full verification。
+
+- 2026-06-11 10:10 JST: B7 の 18 個目の小ステップとして、
+  stable failure classification kind を追加し、final-state mismatch から具体分類へ
+  接続した。`return_value_mismatch` は `WrongRegisterValue`、`stdout_mismatch` は
+  `WrongExternalCall`、`exit_status_mismatch` は `WrongCallReturn` になる。
+  `UnsupportedReason::DecodeUnsupportedOpcode` などの未対応命令系 emit error は
+  `UnsupportedInstruction` に分類する。検証は snapshot の targeted test と
+  commit 前の full verification。
+
+- 2026-06-11 10:10 JST: B7 の 17 個目の小ステップとして、
+  verification lane scripts を分離した。`verify-quick` は format / security /
+  domain / check / clippy / library unit tests、`verify-native` は workspace tests、
+  `verify-oracle` は blackbox oracle、`verify-nightly` は small-case shrink tests と
+  nightly output directory への failure package 保存を担当する。検証は snapshot の
+  lane scripts と commit 前の full verification。
+
+- 2026-06-11 10:04 JST: B7 の 16 個目の小ステップとして、
+  Rust deterministic 小ケース生成と shrink candidate plan を追加した。
+  `bara_oracle::small_case` は no-args/u64 の小ケース集合と expected final state、
+  非ゼロ immediate return の `return 0` shrink 候補を pure に返す。検証は
+  snapshot の targeted test と commit 前の full verification。
+
+- 2026-06-11 09:59 JST: B7 の 15 個目の小ステップとして、
+  expected / actual final state comparator report を failure package に接続した。
+  comparison mismatch 時の `failure.json` は `final_state` field に
+  `ComparisonReport` を保存する。検証は snapshot の targeted test と commit 前の
+  full verification。
+
+- 2026-06-11 09:52 JST: B7 の 14 個目の小ステップとして、
+  Rust verifier report が branch fixup consistency を検査できるようにした。
+  fixup target は PC map source に解決できる必要があり、fixup offset / source は
+  生成 code 内の 4-byte instruction slot を指す必要がある。検証は snapshot の
+  targeted tests と commit 前の full verification。
+
+- 2026-06-11 09:45 JST: B7 の 13 個目の小ステップとして、
+  Rust verifier report を追加し、PC map が全 IR block start の source PC を
+  保持していることを検査できるようにした。`bara-arm64::verify` は I/O を持たない
+  pure report を返し、`emit-fixture-artifacts` / `check-corpus --out` /
+  `check-blackbox --out` は `verifier.report.json` を保存する。検証は snapshot の
+  targeted tests と最終 `nix develop -c ./scripts/verify`。
+
+- 2026-06-11 09:32 JST: B7 の 12 個目の小ステップとして、
+  Haskell verifier package / schema reader / small x86 semantics interpreter の
+  導入可否を判断した。B7 では Haskell を追加せず、既存 Rust workspace 内で
+  verifier report を先に整える。Haskell は schema が安定し、QuickCheck /
+  Hedgehog generator / shrinker または独立仕様モデルが必要になった時点で
+  `spec/` と Nix toolchain を同じ change で追加する。検証は snapshot の
+  documentation-only checks と最終 `nix develop -c ./scripts/verify`。
+
+- 2026-06-11 09:27 JST: B7 の 11 個目の小ステップとして、
+  fixture shrink / failure classification / corpus update の初期運用 package を
+  追加した。`check-corpus --out` / `check-blackbox --out` は失敗 fixture ごとに
+  `failures/<case_id>/failure.json` を保存し、raw testcase の comparison mismatch
+  では `testcase.json`、`expected.json`、`actual.json` も保存する。
+  `failure.json` には failure kind、message、shrink `not_attempted`、corpus update
+  action を含める。検証は snapshot の targeted test と最終
+  `nix develop -c ./scripts/verify`。
+
+- 2026-06-11 09:18 JST: B7 の 10 個目の小ステップとして、
+  Rosetta black-box oracle 経路を clean-room ルール内で再検討した。
+  `x86_64_mach_o_fixture` は `RosettaOracleObservation` を介して runner
+  subprocess の status / stdout / stderr だけを扱い、`expected.json` の
+  testcase behavior は runner stdout の `ObservedResult` JSON だけから作る。
+  `docs/clean-room.md` と `docs/test-oracle.md` に同じ境界を記録した。
+  検証は snapshot の targeted test と最終 `nix develop -c ./scripts/verify`。
+
+- 2026-06-11 09:09 JST: B7 の 9 つ目の小ステップとして、
+  `check-corpus --out` / `check-blackbox --out` が raw testcase fixture の
+  compile artifact metadata を `compiled/<case_id>/` に保存するようにした。
+  `actual/<case_id>.json` は外部観測結果の stdout、stderr、exit status、
+  return value を保持し、artifact metadata は sidecar として同じ regression
+  output bundle に含める。検証は snapshot の targeted tests と最終
+  `nix develop -c ./scripts/verify`。
+
+- 2026-06-10 23:01 JST: B7 の 8 つ目の小ステップとして、
+  generated executable smoke を `ObservedResult` regression gate に昇格した。
+  `check-blackbox --out` は `return_42_native_executable_smoke` と
+  `mach_o_return_42_native_executable_smoke` の process execution result を
+  `actual/*.json` に保存する。検証は snapshot の targeted tests と最終
+  `nix develop -c ./scripts/verify`。
+
+- 2026-06-10 22:51 JST: B7 の 7 つ目の小ステップとして、
+  `emit-fixture-artifacts` が `artifact.report.json` を保存するようにした。
+  report は function-level v0 state layout、fixture function v0 cache validation
+  identity、helper requirements を含む。stdout host trap fixture では
+  `write_stdout(ptr_len_to_unit)` requirement が記録される。検証は snapshot の
+  targeted test と最終 `nix develop -c ./scripts/verify`。
+
+- 2026-06-10 22:35 JST: B7 の 6 つ目の小ステップとして、
+  `emit-fixture-artifacts` CLI を追加した。testcase を Bara の decode / lift /
+  ARM64 emit pipeline に通し、`compiled.ir.json`、`pcmap.json`、`fixups.json`、
+  `helpers.json` を指定 directory に保存する。ARM64 emitter は branch lowering で
+  適用した fixup の offset / source / target / kind を `EmittedFunction` に保持し、
+  CLI 側の stable JSON DTO へ写す。検証は snapshot の targeted tests と最終
+  `nix develop -c ./scripts/verify`。
+
+- 2026-06-10 21:36 JST: B7 の 5 つ目の小ステップとして、
+  `compare-expected-actual` CLI を追加した。保存済みの `expected.json` と
+  `actual.json` を `ObservedResult` として parse し、M1 の比較対象フィールドを
+  `ComparisonReport` で比較する。一致時は空 issue report を stdout に出し、
+  不一致時は `ComparisonMismatch` として非ゼロ終了する。検証は snapshot の
+  targeted tests と最終 `nix develop -c ./scripts/verify`。
+
+- 2026-06-10 21:19 JST: B7 の 4 つ目の小ステップとして、
+  `generate-arm64-actual` CLI を追加した。testcase を Bara の decode / lift /
+  ARM64 emit / native runner pipeline に通し、`ObservedResult` JSON を
+  `actual.json` として保存する。比較は次ステップに残した。検証は snapshot の
+  targeted test と最終 `nix develop -c ./scripts/verify`。
+
+- 2026-06-10 21:00 JST: B7 の 3 つ目の小ステップとして、
+  `generate-x86_64-expected` CLI を追加した。一時 x86_64 oracle runner を
+  build して Rosetta 上で実行し、stdout の `ObservedResult` JSON を
+  `expected.json` として保存する。Rosetta host 非対応時は `RunError` として
+  分類する。検証は snapshot の targeted tests と最終
+  `nix develop -c ./scripts/verify`。
+
+- 2026-06-10 20:40 JST: B7 の 2 つ目の小ステップとして、
+  `build-x86_64-oracle-runner` CLI を追加した。runner は testcase bytes を
+  executable memory に配置して no-args / `u64` function として呼び出し、
+  `ObservedResult` 互換 JSON を stdout に出す x86_64 Mach-O executable として
+  build される。Rosetta 実行と `expected.json` 保存は次ステップに残した。検証は
+  snapshot の targeted tests と最終 `nix develop -c ./scripts/verify`。
+
+- 2026-06-09 22:22 JST: B7 の先頭小ステップとして、
+  `build-x86_64-macho-fixture` CLI を追加した。`return_42` testcase は
+  x86_64 Mach-O `_main` として assemble / link され、生成 binary の Mach-O
+  magic と public header 上の x86_64 cputype を regression で確認する。引数 ABI
+  と host trap fixture は後続 runner harness へ分離し、現時点では classified
+  unsupported とした。検証は snapshot の targeted tests と最終
+  `nix develop -c ./scripts/verify`。
 
 - 2026-06-09 21:55 JST: B6 の最後の小ステップとして、pure writer の
   serialized output Mach-O を既存の public Mach-O probe に通す regression を

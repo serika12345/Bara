@@ -4,6 +4,7 @@ pub mod executable_manifest;
 pub mod json;
 pub mod observation;
 pub mod report;
+pub mod small_case;
 pub mod testcase;
 
 pub use binary_format::{
@@ -38,6 +39,10 @@ pub use json::{
 };
 pub use observation::{CaseId, CaseIdError, ExpectedResult, ObservedResult};
 pub use report::{CorpusReport, FailureKind, FailureMessage, FixtureOutcome, FixtureReport};
+pub use small_case::{
+    shrink_no_args_u64_case, small_no_args_u64_cases, SmallCase, SmallCaseError, SmallCaseSet,
+    SmallCaseShrinkPlan,
+};
 pub use testcase::{
     host_trap_plan_from_json, test_case_from_json, TestCase, TestCaseAbi, TestCaseHostTrapPlan,
     TestCaseInputMemory, TestCaseInputMemoryError, TestCaseJsonError, TestCaseStackSize,

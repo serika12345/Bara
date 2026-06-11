@@ -61,6 +61,11 @@
 
 - 未確立な副出力研究は本流 TODO ではなく、
   [将来構想メモ](future-research-concepts.md) の構想として扱う。
+- 2026-06-11 の B7 判断として、Haskell verifier はまだ導入しない。
+  まず Rust 側で IR invariant、PC map invariant、fixup consistency、
+  final state comparator を stable report として整える。Haskell は
+  `spec/` 配下の独立仕様モデルと property/shrink が必要になり、schema と
+  Nix toolchain 追加の必要性がテストで示された時点で導入する。
 
 ## D5: Host helper / OS boundary
 
@@ -132,7 +137,7 @@
 
 ## D8: Clean-room research boundary
 
-- [ ] Rosetta は black-box oracle としてのみ扱い、内部構造を設計根拠にしない。
+- [x] Rosetta は black-box oracle としてのみ扱い、内部構造を設計根拠にしない。
 - [ ] FEX-Emu / Box64 / QEMU user-mode は問題領域と外部挙動の比較対象に限定する。
 - [ ] 研究メモには、実装根拠、比較対象、禁止情報の区別を明記する。
 - [ ] 新しい設計判断を追加するときは public spec、自前 test、外部観測のどれに基づくかを記録する。

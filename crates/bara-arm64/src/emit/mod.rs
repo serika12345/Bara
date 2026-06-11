@@ -28,22 +28,25 @@ impl Arm64MachineCode {
 pub struct EmittedFunction {
     code: Arm64MachineCode,
     pc_map: Vec<PcMapEntry>,
+    branch_fixups: Vec<BranchFixup>,
     host_trap_requests: EmittedHostTrapRequests,
 }
 
 impl EmittedFunction {
     pub fn new(code: Arm64MachineCode, pc_map: Vec<PcMapEntry>) -> Self {
-        Self::with_host_trap_requests(code, pc_map, EmittedHostTrapRequests::none())
+        Self::with_metadata(code, pc_map, Vec::new(), EmittedHostTrapRequests::none())
     }
 
-    pub const fn with_host_trap_requests(
+    pub const fn with_metadata(
         code: Arm64MachineCode,
         pc_map: Vec<PcMapEntry>,
+        branch_fixups: Vec<BranchFixup>,
         host_trap_requests: EmittedHostTrapRequests,
     ) -> Self {
         Self {
             code,
             pc_map,
+            branch_fixups,
             host_trap_requests,
         }
     }
@@ -54,6 +57,10 @@ impl EmittedFunction {
 
     pub fn pc_map(&self) -> &[PcMapEntry] {
         &self.pc_map
+    }
+
+    pub fn branch_fixups(&self) -> &[BranchFixup] {
+        &self.branch_fixups
     }
 
     pub const fn host_trap_requests(&self) -> &EmittedHostTrapRequests {
@@ -101,15 +108,15 @@ impl BlockOffset {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct BranchFixup {
-    offset: usize,
+pub struct BranchFixup {
+    offset: ArmPc,
     source: ArmPc,
     target: X86Va,
     kind: BranchFixupKind,
 }
 
 impl BranchFixup {
-    const fn new(offset: usize, source: ArmPc, target: X86Va, kind: BranchFixupKind) -> Self {
+    const fn new(offset: ArmPc, source: ArmPc, target: X86Va, kind: BranchFixupKind) -> Self {
         Self {
             offset,
             source,
@@ -117,10 +124,36 @@ impl BranchFixup {
             kind,
         }
     }
+
+    #[cfg(test)]
+    pub(crate) const fn for_test(
+        offset: ArmPc,
+        source: ArmPc,
+        target: X86Va,
+        kind: BranchFixupKind,
+    ) -> Self {
+        Self::new(offset, source, target, kind)
+    }
+
+    pub const fn offset(&self) -> ArmPc {
+        self.offset
+    }
+
+    pub const fn source(&self) -> ArmPc {
+        self.source
+    }
+
+    pub const fn target(&self) -> X86Va {
+        self.target
+    }
+
+    pub const fn kind(&self) -> BranchFixupKind {
+        self.kind
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum BranchFixupKind {
+pub enum BranchFixupKind {
     Unconditional,
     Call,
     Conditional { condition: X86Cond },
@@ -314,9 +347,10 @@ pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
     apply_branch_fixups(&mut code, &branch_fixups, &block_offsets)?;
 
     let machine_code = Arm64MachineCode::new(code)?;
-    Ok(EmittedFunction::with_host_trap_requests(
+    Ok(EmittedFunction::with_metadata(
         machine_code,
         pc_map,
+        branch_fixups,
         host_trap_requests,
     ))
 }
@@ -453,7 +487,7 @@ fn emit_branch_placeholder(
     kind: BranchFixupKind,
 ) -> Result<(), EmitError> {
     let source = current_arm_pc(code)?;
-    let offset = code.len();
+    let offset = current_arm_pc(code)?;
     emit_u32_le(code, 0);
     branch_fixups.push(BranchFixup::new(offset, source, target, kind));
     Ok(())
@@ -469,8 +503,9 @@ fn apply_branch_fixups(
             return Err(unsupported_ir());
         };
         let instruction = encode_branch(fixup.source, target, fixup.kind)?;
-        let end = fixup.offset.checked_add(4).ok_or_else(unsupported_ir)?;
-        let Some(slot) = code.get_mut(fixup.offset..end) else {
+        let offset = usize::try_from(fixup.offset.value()).map_err(|_| unsupported_ir())?;
+        let end = offset.checked_add(4).ok_or_else(unsupported_ir)?;
+        let Some(slot) = code.get_mut(offset..end) else {
             return Err(unsupported_ir());
         };
         slot.copy_from_slice(&instruction.to_le_bytes());
