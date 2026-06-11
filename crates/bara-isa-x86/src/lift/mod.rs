@@ -139,6 +139,9 @@ fn lift_instruction(
         DecodedInstructionKind::PushRbp => Ok(LiftedInstruction::Op(IrOp::Push {
             src: Operand::Reg(X86Reg::Rbp),
         })),
+        DecodedInstructionKind::PushR14 => Ok(LiftedInstruction::Op(IrOp::Push {
+            src: Operand::Reg(X86Reg::R14),
+        })),
         DecodedInstructionKind::PushR15 => Ok(LiftedInstruction::Op(IrOp::Push {
             src: Operand::Reg(X86Reg::R15),
         })),
@@ -821,7 +824,7 @@ mod tests {
     }
 
     #[test]
-    fn lifts_push_rbp_mov_rbp_rsp_push_r15_before_next_unsupported_prologue_byte() {
+    fn lifts_push_rbp_mov_rbp_rsp_push_r15_push_r14_before_next_unsupported_prologue_byte() {
         let decoded = DecodedFunction::new(
             X86Va::new(0x1600),
             vec![
@@ -842,11 +845,16 @@ mod tests {
                 ),
                 DecodedInstruction::new(
                     X86Va::new(0x1606),
-                    X86Va::new(0x1607),
+                    X86Va::new(0x1608),
+                    DecodedInstructionKind::PushR14,
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(0x1608),
+                    X86Va::new(0x1609),
                     DecodedInstructionKind::Unsupported {
                         reason: UnsupportedReason::DecodeUnsupportedOpcode {
-                            opcode: 0x41,
-                            at: X86Va::new(0x1606),
+                            opcode: 0x53,
+                            at: X86Va::new(0x1608),
                         },
                     },
                 ),
@@ -868,6 +876,9 @@ mod tests {
                 },
                 IrOp::Push {
                     src: Operand::Reg(X86Reg::R15)
+                },
+                IrOp::Push {
+                    src: Operand::Reg(X86Reg::R14)
                 }
             ]
         );
@@ -875,8 +886,8 @@ mod tests {
             program.blocks()[0].terminator(),
             &Terminator::Unsupported {
                 reason: UnsupportedReason::DecodeUnsupportedOpcode {
-                    opcode: 0x41,
-                    at: X86Va::new(0x1606),
+                    opcode: 0x53,
+                    at: X86Va::new(0x1608),
                 }
             }
         );
