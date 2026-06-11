@@ -1,4 +1,5 @@
 mod mach_o;
+mod mach_o_chained_fixups;
 mod mach_o_dylib_command;
 mod mach_o_entry_point_command;
 mod mach_o_executable_image_conversion;
@@ -9,6 +10,10 @@ mod mach_o_segment_command;
 mod probe;
 
 pub use mach_o::{MachOFileType, MachOLoadCommands, MachOMetadata};
+pub use mach_o_chained_fixups::{
+    decode_mach_o_chained_fixups_for_target, MachOChainedFixupTargetAddress,
+    MachOChainedFixupsBlocker, MachOChainedFixupsTargetReport, MachOChainedFixupsTargetStatus,
+};
 pub use mach_o_dylib_command::{
     MachODylibImportCommandKind, MachODylibPath, MachODylibTimestamp, MachODylibVersion,
     RecognizedMachODylibImportCommand,

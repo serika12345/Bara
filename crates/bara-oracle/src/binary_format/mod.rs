@@ -4,11 +4,13 @@ mod mach_o_executable_image_entry_function;
 mod output;
 
 pub use input::{
-    probe_public_binary_format, BinaryFileBytes, BinaryFormat, BinaryFormatProbeError,
-    BinaryFormatProbeMetadata, BinaryFormatProbeReport, BinaryFormatProbeStatus, BinaryInput,
-    BinaryInputError, MachODyldInfoCommandKind, MachODylibImportCommandKind, MachODylibPath,
-    MachODylibTimestamp, MachODylibVersion, MachOEntryPointCommandMetadata,
-    MachOEntryPointFileOffset, MachOEntryPointStackSize, MachOExecutableImageConversion,
+    decode_mach_o_chained_fixups_for_target, probe_public_binary_format, BinaryFileBytes,
+    BinaryFormat, BinaryFormatProbeError, BinaryFormatProbeMetadata, BinaryFormatProbeReport,
+    BinaryFormatProbeStatus, BinaryInput, BinaryInputError, MachOChainedFixupTargetAddress,
+    MachOChainedFixupsBlocker, MachOChainedFixupsTargetReport, MachOChainedFixupsTargetStatus,
+    MachODyldInfoCommandKind, MachODylibImportCommandKind, MachODylibPath, MachODylibTimestamp,
+    MachODylibVersion, MachOEntryPointCommandMetadata, MachOEntryPointFileOffset,
+    MachOEntryPointStackSize, MachOExecutableImageConversion,
     MachOExecutableImageConversionBlocker, MachOExecutableImageConversionStatus, MachOFileType,
     MachOLinkeditByteSize, MachOLinkeditDataCommandKind, MachOLinkeditDataRange,
     MachOLinkeditEntryCount, MachOLinkeditFileOffset, MachOLoadCommandByteSize,

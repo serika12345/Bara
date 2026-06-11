@@ -308,6 +308,15 @@
   はまだ解決せず、helper boundary request は
   `import_symbol_identity_unresolved` の stable blocker とする。次の design slice は
   private dyld behavior ではなく public chained fixups payload decoder の最小実装である。
+- 2026-06-12 の B8-G4c として、public `LC_DYLD_CHAINED_FIXUPS` payload の
+  header、starts-in-image / starts-in-segment、`DYLD_CHAINED_IMPORT` table、
+  uncompressed symbol strings、現 fixture に必要な `DYLD_CHAINED_PTR_64_OFFSET`
+  bind chain entry を typed report として decode した。`call r14` の
+  `target_pointer_load.address=4294979672` は `__DATA_CONST` chain の import ordinal
+  11 へ解決され、`/usr/lib/libobjc.A.dylib` の `_objc_msgSend` import identity として
+  `loader.plan.json` に保存される。これは import helper execution や Objective-C /
+  AppKit bridge の実装ではなく、次の B8-G5 で helper boundary request と marshaling
+  blocker へ接続するための public metadata decode boundary である。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、
