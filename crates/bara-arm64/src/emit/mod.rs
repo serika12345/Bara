@@ -71,19 +71,51 @@ impl EmittedFunction {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct EmittedHostTrapRequests {
     stdout: bool,
+    appkit_gui_hello_world: bool,
 }
 
 impl EmittedHostTrapRequests {
     pub const fn none() -> Self {
-        Self { stdout: false }
+        Self {
+            stdout: false,
+            appkit_gui_hello_world: false,
+        }
     }
 
     pub const fn stdout() -> Self {
-        Self { stdout: true }
+        Self {
+            stdout: true,
+            appkit_gui_hello_world: false,
+        }
+    }
+
+    pub const fn appkit_gui_hello_world() -> Self {
+        Self {
+            stdout: false,
+            appkit_gui_hello_world: true,
+        }
+    }
+
+    const fn with_stdout_requested(self) -> Self {
+        Self {
+            stdout: true,
+            appkit_gui_hello_world: self.appkit_gui_hello_world,
+        }
+    }
+
+    const fn with_appkit_gui_hello_world_requested(self) -> Self {
+        Self {
+            stdout: self.stdout,
+            appkit_gui_hello_world: true,
+        }
     }
 
     pub const fn stdout_requested(self) -> bool {
         self.stdout
+    }
+
+    pub const fn appkit_gui_hello_world_requested(self) -> bool {
+        self.appkit_gui_hello_world
     }
 }
 
@@ -183,7 +215,12 @@ pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
                 IrOp::HostTrap {
                     kind: HostTrapKind::Stdout,
                 } => {
-                    host_trap_requests = EmittedHostTrapRequests::stdout();
+                    host_trap_requests = host_trap_requests.with_stdout_requested();
+                }
+                IrOp::HostTrap {
+                    kind: HostTrapKind::AppKitGuiHelloWorld,
+                } => {
+                    host_trap_requests = host_trap_requests.with_appkit_gui_hello_world_requested();
                 }
                 IrOp::Mov {
                     dst: Operand::Reg(X86Reg::Rax),
@@ -770,6 +807,33 @@ mod tests {
         let emitted = emit_program(&program).expect("host trap IR emits");
 
         assert!(emitted.host_trap_requests().stdout_requested());
+        assert_eq!(
+            emitted.code().bytes(),
+            &[0x00, 0x00, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]
+        );
+    }
+
+    #[test]
+    fn records_appkit_gui_host_trap_request_without_emitting_code_for_it() {
+        let program = program_with_ops(
+            vec![
+                IrOp::HostTrap {
+                    kind: HostTrapKind::AppKitGuiHelloWorld,
+                },
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(0),
+                },
+            ],
+            Terminator::Return,
+        );
+
+        let emitted = emit_program(&program).expect("appkit GUI host trap IR emits");
+
+        assert!(emitted
+            .host_trap_requests()
+            .appkit_gui_hello_world_requested());
+        assert!(!emitted.host_trap_requests().stdout_requested());
         assert_eq!(
             emitted.code().bytes(),
             &[0x00, 0x00, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]

@@ -102,6 +102,7 @@ pub enum DecodedInstructionKind {
     },
     Syscall,
     BaraHostTrapSentinel,
+    BaraAppKitGuiHelloWorldTrapSentinel,
     Ret,
     Unsupported {
         reason: UnsupportedReason,

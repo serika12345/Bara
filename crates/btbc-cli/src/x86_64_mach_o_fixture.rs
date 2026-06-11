@@ -905,20 +905,26 @@ impl X8664MachOFixtureToolchainCommand {
     fn clang_host_gui_appkit_helper_build(
         source_path: &Path,
         output_path: &X8664MachOFixtureOutputPath,
+        run_mode: X8664GuiHelloWorldRunMode,
     ) -> Self {
+        let mut args = vec![
+            String::from("-x"),
+            X8664MachOFixtureSourceLanguage::ObjectiveC
+                .as_clang_arg()
+                .to_owned(),
+        ];
+        args.extend(run_mode.clang_defines());
+        args.extend([
+            source_path.to_string_lossy().into_owned(),
+            String::from("-framework"),
+            String::from("AppKit"),
+            String::from("-o"),
+            output_path.as_path().to_string_lossy().into_owned(),
+        ]);
+
         Self {
             program: "clang",
-            args: vec![
-                String::from("-x"),
-                X8664MachOFixtureSourceLanguage::ObjectiveC
-                    .as_clang_arg()
-                    .to_owned(),
-                source_path.to_string_lossy().into_owned(),
-                String::from("-framework"),
-                String::from("AppKit"),
-                String::from("-o"),
-                output_path.as_path().to_string_lossy().into_owned(),
-            ],
+            args,
         }
     }
 
@@ -1041,10 +1047,25 @@ pub(crate) fn observe_x86_64_gui_hello_world_expected(
 
 pub(crate) fn observe_appkit_gui_hello_world_helper_actual(
 ) -> Result<ObservedResult, X8664MachOFixtureError> {
+    observe_appkit_gui_hello_world_helper_actual_with_run_mode(
+        X8664GuiHelloWorldRunMode::AutomatedOracle,
+    )
+}
+
+pub(crate) fn observe_appkit_gui_hello_world_manual_visible_helper_actual(
+) -> Result<ObservedResult, X8664MachOFixtureError> {
+    observe_appkit_gui_hello_world_helper_actual_with_run_mode(
+        X8664GuiHelloWorldRunMode::ManualVisible,
+    )
+}
+
+fn observe_appkit_gui_hello_world_helper_actual_with_run_mode(
+    run_mode: X8664GuiHelloWorldRunMode,
+) -> Result<ObservedResult, X8664MachOFixtureError> {
     ensure_supported_host()?;
 
     let helper_path = temporary_path("bara-appkit-gui-hello-world-helper", "exe")?;
-    if let Err(error) = build_appkit_gui_hello_world_helper(&helper_path) {
+    if let Err(error) = build_appkit_gui_hello_world_helper(&helper_path, run_mode) {
         let _ = fs::remove_file(&helper_path);
         return Err(error);
     }
@@ -1062,7 +1083,10 @@ pub(crate) fn observe_appkit_gui_hello_world_helper_actual(
         .into_observed_result(&helper_path)
 }
 
-fn build_appkit_gui_hello_world_helper(output_path: &Path) -> Result<(), X8664MachOFixtureError> {
+fn build_appkit_gui_hello_world_helper(
+    output_path: &Path,
+    run_mode: X8664GuiHelloWorldRunMode,
+) -> Result<(), X8664MachOFixtureError> {
     let source_path = temporary_path("bara-appkit-gui-hello-world-helper", "m")?;
     let source = X8664GuiHelloWorldSource::new();
     fs::write(&source_path, source.as_str()).map_err(|source| {
@@ -1076,6 +1100,7 @@ fn build_appkit_gui_hello_world_helper(output_path: &Path) -> Result<(), X8664Ma
     let toolchain_command = X8664MachOFixtureToolchainCommand::clang_host_gui_appkit_helper_build(
         &source_path,
         &output_path,
+        run_mode,
     );
     let output = toolchain_command
         .to_command()

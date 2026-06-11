@@ -194,12 +194,14 @@ pub enum X86RegWidth {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HostTrapKind {
     Stdout,
+    AppKitGuiHelloWorld,
 }
 
 impl HostTrapKind {
     pub const fn host_helper_request(self) -> HostHelperRequest {
         match self {
             Self::Stdout => HostHelperRequest::WriteStdout,
+            Self::AppKitGuiHelloWorld => HostHelperRequest::AppKitGuiHelloWorld,
         }
     }
 }
@@ -412,5 +414,22 @@ mod tests {
         );
         assert_eq!(abi.name(), HostHelperName::WriteStdout);
         assert_eq!(abi.signature(), HostHelperSignature::PtrLenToUnit);
+    }
+
+    #[test]
+    fn appkit_gui_host_trap_maps_to_gui_lifecycle_host_helper_request() {
+        let abi = HostTrapKind::AppKitGuiHelloWorld
+            .host_helper_request()
+            .abi();
+
+        assert_eq!(
+            HostTrapKind::AppKitGuiHelloWorld.host_helper_request(),
+            HostHelperRequest::AppKitGuiHelloWorld
+        );
+        assert_eq!(abi.name(), HostHelperName::AppKitGuiHelloWorld);
+        assert_eq!(
+            abi.signature(),
+            HostHelperSignature::NoArgsToGuiLifecycleEvent
+        );
     }
 }

@@ -85,6 +85,46 @@ arch -x86_64 target/b8/b8_gui_hello_world_visible_x86_64
 で終了する。これは B8-G1 の入力 binary と GUI 描画要件の確認であり、
 Bara の変換レイヤー経由実行は後続 step で接続する。
 
+## B8-G1 translated GUI launch
+
+B8-G1 の完了時点では、Rosetta 確認済みの x86_64 GUI binary を入力として public
+Mach-O probe を行い、Bara 側では B8-G1 専用の x86_64 entry
+`0f0b4238473131c0c3` を decode / lift / emit / runtime execution に通す。この entry
+は Bara-defined `appkit_gui_hello_world` host trap を要求し、その request を
+AppKit lifecycle helper capability に接続する。これにより、helper 単独実行ではなく、
+translated entry path から GUI helper capability が起動されたことを launch report に
+保存する。
+
+automated stable comparison:
+
+```sh
+nix develop -c cargo run -p btbc-cli -- \
+  generate-arm64-gui-hello-world-translated-actual \
+  target/b8/b8_gui_hello_world_visible_x86_64 \
+  target/b8/b8_gui_hello_world.translated.actual.json \
+  target/b8/b8_gui_hello_world.translated.launch-report.json
+
+nix develop -c cargo run -p btbc-cli -- \
+  compare-expected-actual \
+  tests/expected/b8_gui_hello_world.json \
+  target/b8/b8_gui_hello_world.translated.actual.json
+```
+
+manual visible translated launch:
+
+```sh
+nix develop -c cargo run -p btbc-cli -- \
+  run-arm64-gui-hello-world-translated-visible \
+  target/b8/b8_gui_hello_world_visible_x86_64 \
+  target/b8/b8_gui_hello_world.translated.visible.launch-report.json
+```
+
+manual visible translated launch は AppKit window が閉じられるまで戻らない。
+window close または `Command-Q` で終了すると launch report が保存される。
+この G1 は B8-G1 専用 host trap contract 経由の最小 GUI launch であり、
+full Objective-C runtime / AppKit call translation や任意 x86_64 GUI app 実行を
+意味しない。
+
 ## 初期 launch metadata schema
 
 Rosetta black-box oracle から生成する初期 sidecar は

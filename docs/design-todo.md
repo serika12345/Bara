@@ -163,6 +163,16 @@
   auto-close timer を無効化して window close / `Command-Q` まで event loop を維持する。
   これは変換レイヤー接続前の test binary 固定であり、次 step では translated
   x86_64 entry path から AppKit lifecycle helper capability を呼ぶ境界を設計する。
+- 2026-06-11 の B8-G1 completion step として、Bara-defined
+  `appkit_gui_hello_world` host trap contract を追加した。専用 x86_64 entry
+  `0f0b4238473131c0c3` は decode / lift / emit / runtime execution を通り、
+  emitted host trap request として AppKit lifecycle helper capability を要求する。
+  CLI は Rosetta 確認済み x86_64 GUI binary を public Mach-O probe したうえで、
+  translated entry request によって automated helper または manual-visible helper を
+  起動し、launch report に translated path、helper request、runtime result、
+  helper capability invocation を保存する。これは B8-G1 専用 host trap 経由の
+  最小 GUI launch であり、Objective-C runtime / AppKit call translation や
+  任意 GUI app 実行を意味しない。
 - wasm2c platform adapter / NDA target adapter は本流 TODO ではなく、
   [将来構想メモ](future-research-concepts.md) の未確立構想として扱う。
 

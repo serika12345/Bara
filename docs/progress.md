@@ -9,45 +9,52 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 15:53 JST
+最終更新: 2026-06-11 16:18 JST
 
 状態:
 
 - project_state: in_progress。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
-  reviewable GUI 起動 slice の積み上げとして再定義した。B8-H1 の helper
-  capability execution は到達済みで、B8-G1 の Rosetta 手動可視確認用 x86_64
-  GUI test binary を生成できるようになったが、B8 全体は未完了である。
-- active_milestone: in_progress。[TODO.md](../TODO.md) の B8-G1:
+  reviewable GUI 起動 slice の積み上げとして扱う。B8-G1 は到達済みで、B8 全体は
+  B8-G2 以降で self-authored fixture から一般の x86_64 macOS GUI application に
+  近づける長期拡張として継続する。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G1:
   GUI window に Hello World のフォント描画を行う最小アプリを、実際の変換レイヤーを
-  通して GUI 上で確認できるようにする。
-- active_design_focus: B8 translated GUI entry path。まず automated oracle 用 fixture と
-  Rosetta 手動可視確認用 fixture を分けた。次は x86_64 entry path が Bara の
-  decode / lift / emit / runtime execution を通り、その結果として AppKit lifecycle
-  helper capability を呼ぶ境界を追加する。
+  通して GUI 上で確認できるようにした。
+- active_design_focus: B8 translated GUI entry path。Rosetta 確認済みの
+  self-authored x86_64 GUI binary を input probe 対象にし、Bara-defined
+  `appkit_gui_hello_world` host trap を要求する x86_64 entry
+  `0f0b4238473131c0c3` を decode / lift / emit / runtime execution に通す。
+  host AppKit helper は public AppKit API boundary として呼ぶが、helper 単独実行
+  ではなく translated entry path からの request として launch report に保存する。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
-  latest commit はこの B8-G1 step の review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B8-H1 / B8-G1。
-- completed_work: B8-H1 として、`btbc-cli` の B8 actual path で input x86_64
-  Mach-O を probe し、self-authored AppKit source を host helper capability として
-  build/run する経路を追加した。B8-G1 first step として、同じ source から
-  `build-x86_64-gui-hello-world-visible-fixture` で manual-visible x86_64 GUI
-  test binary を build できるようにし、`target/b8/b8_gui_hello_world_visible_x86_64`
-  を生成した。
-- remaining_work: B8-G1。translated x86_64 entry path から AppKit lifecycle helper
-  capability を呼び、GUI window 上に `hello world` label のフォント描画を
-  developer-visible mode で確認できるようにする。生成済み test binary の Rosetta
-  手動確認はユーザー確認待ち。
-- next_action: Rosetta で
-  `arch -x86_64 target/b8/b8_gui_hello_world_visible_x86_64` を実行し、
-  window と `hello world` label が問題なく表示されることを確認する。その後、
-  translated entry path から helper capability を呼ぶ最小 helper ABI / host trap
-  contract を定義する。
-- verification: targeted tests、generated binary checks、`git diff --check`、
-  `nix develop -c ./scripts/check-no-invisible-chars`、
-  full `nix develop -c ./scripts/verify` が通過した。
+  latest commit はこの B8-G1 completion step の review package で確認する。
+- related_todo: [TODO.md](../TODO.md) B8-G1 / B8-G2。
+- completed_work: B8-G1 として、Rosetta 手動確認済みの
+  `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
+  translated entry path が `appkit_gui_hello_world` host trap request を発行し、
+  AppKit lifecycle helper capability を automated oracle mode / manual visible mode
+  の両方から呼べるようにした。automated mode は Rosetta expected と actual の
+  stable comparison が空 issue で一致する。manual visible mode は window close /
+  `Command-Q` まで戻らず、GUI window 上の `hello world` label を目視確認できる。
+- remaining_work: B8-G2 以降。B8-G1 専用 host trap contract から、self-authored
+  fixture を少しずつ一般の x86_64 macOS GUI application に近づける。full
+  Objective-C runtime / AppKit call translation や任意 GUI app 対応は未完了である。
+- next_action: B8-G1 の review package を確認したうえで、B8-G2 の最小 slice を
+  再文化する。
+- verification: targeted tests、automated translated actual / comparison、full
+  `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-11 16:18 JST: B8-G1 を完了した。self-authored x86_64 GUI binary の
+  Rosetta manual visible check はユーザー確認済み。Bara 側には
+  `appkit_gui_hello_world` host trap contract を追加し、専用 x86_64 entry
+  `0f0b4238473131c0c3` を decode / lift / emit / runtime execution に通したうえで
+  AppKit lifecycle helper capability を呼ぶ。CLI に automated stable comparison 用
+  `generate-arm64-gui-hello-world-translated-actual` と、GUI 目視確認用
+  `run-arm64-gui-hello-world-translated-visible` を追加した。targeted tests と
+  automated translated actual / comparison、full `nix develop -c ./scripts/verify` が
+  通過した。
 - 2026-06-11 15:53 JST: B8-G1 の最初の実装 step として、GUI Hello World fixture に
   manual-visible run mode を追加した。automated oracle 用 binary は従来どおり
   short-lived deterministic stdout を維持し、manual-visible binary は public AppKit

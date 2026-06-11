@@ -45,13 +45,18 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                         return DecodedFunction::new(input.entry(), instructions);
                     }
                     0x0b => {
-                        let end_offset = offset + 2;
-                        let end = instruction_end(input, at, end_offset, 2)?;
-                        instructions.push(DecodedInstruction::new(
-                            at,
-                            end,
-                            DecodedInstructionKind::BaraHostTrapSentinel,
-                        ));
+                        let (end_offset, instruction_len, kind) =
+                            if has_b8_g1_host_trap_tag(input.bytes(), offset) {
+                                (
+                                    offset + 6,
+                                    6,
+                                    DecodedInstructionKind::BaraAppKitGuiHelloWorldTrapSentinel,
+                                )
+                            } else {
+                                (offset + 2, 2, DecodedInstructionKind::BaraHostTrapSentinel)
+                            };
+                        let end = instruction_end(input, at, end_offset, instruction_len)?;
+                        instructions.push(DecodedInstruction::new(at, end, kind));
                         offset = end_offset;
                     }
                     0xb6 => {
@@ -331,6 +336,12 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
         },
     ));
     DecodedFunction::new(input.entry(), instructions)
+}
+
+fn has_b8_g1_host_trap_tag(bytes: &[u8], offset: usize) -> bool {
+    bytes
+        .get(offset + 2..offset + 6)
+        .is_some_and(|tag| tag == b"B8G1")
 }
 
 fn decoded_stream_ends_with_terminator(instructions: &[DecodedInstruction]) -> bool {

@@ -22,6 +22,7 @@ impl HelperRequest {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HostHelperRequest {
     WriteStdout,
+    AppKitGuiHelloWorld,
 }
 
 impl HostHelperRequest {
@@ -30,6 +31,10 @@ impl HostHelperRequest {
             Self::WriteStdout => HostHelperAbi::new(
                 HostHelperName::WriteStdout,
                 HostHelperSignature::PtrLenToUnit,
+            ),
+            Self::AppKitGuiHelloWorld => HostHelperAbi::new(
+                HostHelperName::AppKitGuiHelloWorld,
+                HostHelperSignature::NoArgsToGuiLifecycleEvent,
             ),
         }
     }
@@ -58,11 +63,13 @@ impl HostHelperAbi {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HostHelperName {
     WriteStdout,
+    AppKitGuiHelloWorld,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HostHelperSignature {
     PtrLenToUnit,
+    NoArgsToGuiLifecycleEvent,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

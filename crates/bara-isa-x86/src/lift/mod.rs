@@ -142,6 +142,11 @@ fn lift_instruction(
         DecodedInstructionKind::BaraHostTrapSentinel => Ok(LiftedInstruction::Op(IrOp::HostTrap {
             kind: HostTrapKind::Stdout,
         })),
+        DecodedInstructionKind::BaraAppKitGuiHelloWorldTrapSentinel => {
+            Ok(LiftedInstruction::Op(IrOp::HostTrap {
+                kind: HostTrapKind::AppKitGuiHelloWorld,
+            }))
+        }
         DecodedInstructionKind::CallRel32 { target, return_to }
             if instruction_starts.contains(target) =>
         {
@@ -441,6 +446,44 @@ mod tests {
             &[
                 IrOp::HostTrap {
                     kind: HostTrapKind::Stdout
+                },
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(0)
+                }
+            ]
+        );
+        assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_bara_appkit_gui_host_trap_sentinel_to_appkit_gui_host_trap() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(6),
+                    DecodedInstructionKind::BaraAppKitGuiHelloWorldTrapSentinel,
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(6),
+                    X86Va::new(8),
+                    DecodedInstructionKind::XorEaxEax,
+                ),
+                DecodedInstruction::new(X86Va::new(8), X86Va::new(9), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded trap function lifts");
+        let block = &program.blocks()[0];
+
+        assert_eq!(
+            block.ops(),
+            &[
+                IrOp::HostTrap {
+                    kind: HostTrapKind::AppKitGuiHelloWorld
                 },
                 IrOp::Mov {
                     dst: Operand::Reg(X86Reg::Rax),

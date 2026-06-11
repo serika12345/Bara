@@ -42,6 +42,16 @@ impl FunctionCompileResult {
         FunctionStdoutHostTrapRequest::new(self.emitted.host_trap_requests().stdout_requested())
     }
 
+    pub(crate) fn appkit_gui_hello_world_host_trap_request(
+        &self,
+    ) -> FunctionAppKitGuiHelloWorldHostTrapRequest {
+        FunctionAppKitGuiHelloWorldHostTrapRequest::new(
+            self.emitted
+                .host_trap_requests()
+                .appkit_gui_hello_world_requested(),
+        )
+    }
+
     pub(crate) fn artifact_metadata(&self, source: &TestCase) -> FunctionArtifactMetadata {
         FunctionArtifactMetadata::from_compile_result(source, self)
     }
@@ -63,6 +73,21 @@ impl<'a> FunctionArm64Bytes<'a> {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct FunctionStdoutHostTrapRequest {
     requested: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct FunctionAppKitGuiHelloWorldHostTrapRequest {
+    requested: bool,
+}
+
+impl FunctionAppKitGuiHelloWorldHostTrapRequest {
+    const fn new(requested: bool) -> Self {
+        Self { requested }
+    }
+
+    pub(crate) const fn is_requested(self) -> bool {
+        self.requested
+    }
 }
 
 impl FunctionStdoutHostTrapRequest {
@@ -387,12 +412,14 @@ impl FunctionUnsupportedReasonArtifact {
 #[serde(rename_all = "snake_case")]
 enum FunctionHostTrapArtifact {
     Stdout,
+    AppKitGuiHelloWorld,
 }
 
 impl FunctionHostTrapArtifact {
     const fn from_ir(kind: bara_ir::HostTrapKind) -> Self {
         match kind {
             bara_ir::HostTrapKind::Stdout => Self::Stdout,
+            bara_ir::HostTrapKind::AppKitGuiHelloWorld => Self::AppKitGuiHelloWorld,
         }
     }
 }
@@ -540,6 +567,9 @@ impl FunctionHelpersArtifact {
         if requests.stdout_requested() {
             helpers.push(FunctionHelperArtifact::WriteStdout);
         }
+        if requests.appkit_gui_hello_world_requested() {
+            helpers.push(FunctionHelperArtifact::AppKitGuiHelloWorld);
+        }
 
         Self { helpers }
     }
@@ -549,6 +579,7 @@ impl FunctionHelpersArtifact {
 #[serde(tag = "kind", rename_all = "snake_case")]
 enum FunctionHelperArtifact {
     WriteStdout,
+    AppKitGuiHelloWorld,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -817,6 +848,9 @@ impl FunctionHelperRequirementsArtifact {
         if requests.stdout_requested() {
             values.push(FunctionHelperRequirementArtifact::write_stdout());
         }
+        if requests.appkit_gui_hello_world_requested() {
+            values.push(FunctionHelperRequirementArtifact::appkit_gui_hello_world());
+        }
 
         Self { values }
     }
@@ -839,18 +873,27 @@ impl FunctionHelperRequirementArtifact {
             signature: FunctionHelperSignatureArtifact::PtrLenToUnit,
         }
     }
+
+    const fn appkit_gui_hello_world() -> Self {
+        Self {
+            name: FunctionHelperNameArtifact::AppKitGuiHelloWorld,
+            signature: FunctionHelperSignatureArtifact::NoArgsToGuiLifecycleEvent,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum FunctionHelperNameArtifact {
     WriteStdout,
+    AppKitGuiHelloWorld,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum FunctionHelperSignatureArtifact {
     PtrLenToUnit,
+    NoArgsToGuiLifecycleEvent,
 }
 
 fn encode_lower_hex(bytes: &[u8]) -> String {
@@ -870,6 +913,26 @@ pub(crate) struct FunctionRunResult {
     stdout: FunctionStdout,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct FunctionRunBundle {
+    compiled: FunctionCompileResult,
+    result: FunctionRunResult,
+}
+
+impl FunctionRunBundle {
+    fn new(compiled: FunctionCompileResult, result: FunctionRunResult) -> Self {
+        Self { compiled, result }
+    }
+
+    pub(crate) const fn compiled(&self) -> &FunctionCompileResult {
+        &self.compiled
+    }
+
+    pub(crate) const fn result(&self) -> &FunctionRunResult {
+        &self.result
+    }
+}
+
 impl FunctionRunResult {
     fn from_runtime(result: &bara_runtime::RunResult) -> Self {
         Self {
@@ -887,6 +950,14 @@ impl FunctionRunResult {
             String::new(),
         )
     }
+
+    pub(crate) const fn return_value(&self) -> u64 {
+        self.return_value.as_raw()
+    }
+
+    pub(crate) fn stdout(&self) -> &str {
+        self.stdout.as_str()
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -898,6 +969,10 @@ impl FunctionReturnValue {
     }
 
     fn into_raw(self) -> u64 {
+        self.0
+    }
+
+    const fn as_raw(&self) -> u64 {
         self.0
     }
 }
@@ -912,6 +987,10 @@ impl FunctionStdout {
 
     fn into_text(self) -> String {
         self.0
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
@@ -1195,6 +1274,10 @@ pub(crate) fn compile_test_case_function_standalone_artifact(
     let compiled = compile_test_case_function(test_case)?;
     if !test_case.host_trap_plan().is_empty()
         || compiled.emitted().host_trap_requests().stdout_requested()
+        || compiled
+            .emitted()
+            .host_trap_requests()
+            .appkit_gui_hello_world_requested()
     {
         return Err(FunctionRunError::StandaloneArtifact(
             FunctionStandaloneArtifactError::HostTrapRequested,
@@ -1211,6 +1294,10 @@ pub(crate) fn compile_mach_o_entry_function_standalone_artifact(
     let test_case = entry_function.test_case();
     if !test_case.host_trap_plan().is_empty()
         || compiled.emitted().host_trap_requests().stdout_requested()
+        || compiled
+            .emitted()
+            .host_trap_requests()
+            .appkit_gui_hello_world_requested()
     {
         return Err(FunctionRunError::StandaloneArtifact(
             FunctionStandaloneArtifactError::HostTrapRequested,
@@ -1223,6 +1310,12 @@ pub(crate) fn compile_mach_o_entry_function_standalone_artifact(
 pub(crate) fn run_test_case_function(
     test_case: &TestCase,
 ) -> Result<FunctionRunResult, FunctionRunError> {
+    Ok(run_test_case_function_with_bundle(test_case)?.result)
+}
+
+pub(crate) fn run_test_case_function_with_bundle(
+    test_case: &TestCase,
+) -> Result<FunctionRunBundle, FunctionRunError> {
     let compiled = compile_test_case_function(test_case)?;
     let emitted = compiled.emitted();
     let result = match test_case.abi() {
@@ -1242,7 +1335,10 @@ pub(crate) fn run_test_case_function(
     }
     .map_err(FunctionRunError::Run)?;
 
-    Ok(FunctionRunResult::from_runtime(&result))
+    Ok(FunctionRunBundle::new(
+        compiled,
+        FunctionRunResult::from_runtime(&result),
+    ))
 }
 
 fn runtime_host_trap_plan(

@@ -176,6 +176,33 @@ fn decodes_bara_host_trap_sentinel_then_ret() {
 }
 
 #[test]
+fn decodes_bara_appkit_gui_host_trap_sentinel_then_ret() {
+    let input = X86Bytes::new(
+        X86Va::new(0x1000),
+        vec![0x0f, 0x0b, b'B', b'8', b'G', b'1', 0xc3],
+    )
+    .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0x1000),
+                X86Va::new(0x1006),
+                DecodedInstructionKind::BaraAppKitGuiHelloWorldTrapSentinel
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x1006),
+                X86Va::new(0x1007),
+                DecodedInstructionKind::Ret
+            )
+        ]
+    );
+}
+
+#[test]
 fn decodes_add_eax_imm8_between_mov_and_ret() {
     let input = X86Bytes::new(
         X86Va::new(0),
