@@ -570,6 +570,11 @@ enum B8DebugDecodedInstructionKindReport {
     },
     MovRaxRdi,
     MovRbxRax,
+    MovRaxQwordPtrRipRelative {
+        displacement: String,
+        address: u64,
+        width: B8DebugMemoryReadWidthReport,
+    },
     MovzxEaxBytePtrRdi,
     AddEaxImm32 {
         imm: String,
@@ -630,6 +635,14 @@ impl B8DebugDecodedInstructionKindReport {
             DecodedInstructionKind::MovEaxImm32 { imm } => Self::MovEaxImm32 { imm: *imm },
             DecodedInstructionKind::MovRaxRdi => Self::MovRaxRdi,
             DecodedInstructionKind::MovRbxRax => Self::MovRbxRax,
+            DecodedInstructionKind::MovRaxQwordPtrRipRelative {
+                displacement,
+                address,
+            } => Self::MovRaxQwordPtrRipRelative {
+                displacement: format!("{displacement:?}"),
+                address: address.value(),
+                width: B8DebugMemoryReadWidthReport::Bits64,
+            },
             DecodedInstructionKind::MovzxEaxBytePtrRdi => Self::MovzxEaxBytePtrRdi,
             DecodedInstructionKind::AddEaxImm32 { imm } => Self::AddEaxImm32 {
                 imm: format!("{imm:?}"),
@@ -694,6 +707,12 @@ impl B8DebugDecodedInstructionKindReport {
             },
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugMemoryReadWidthReport {
+    Bits64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]

@@ -273,9 +273,19 @@ impl FunctionIrOpArtifact {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 enum FunctionOperandArtifact {
-    Reg { reg: FunctionRegisterArtifact },
-    ImmU64 { value: u64 },
-    Mem8 { base: FunctionRegisterArtifact },
+    Reg {
+        reg: FunctionRegisterArtifact,
+    },
+    ImmU64 {
+        value: u64,
+    },
+    Mem8 {
+        base: FunctionRegisterArtifact,
+    },
+    MemRipRelative {
+        address: u64,
+        width: FunctionMemoryReadWidthArtifact,
+    },
 }
 
 impl FunctionOperandArtifact {
@@ -288,6 +298,24 @@ impl FunctionOperandArtifact {
             bara_ir::Operand::Mem8 { base } => Self::Mem8 {
                 base: FunctionRegisterArtifact::from_ir(*base),
             },
+            bara_ir::Operand::MemRipRelative { address, width } => Self::MemRipRelative {
+                address: address.value(),
+                width: FunctionMemoryReadWidthArtifact::from_ir(*width),
+            },
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FunctionMemoryReadWidthArtifact {
+    Bits64,
+}
+
+impl FunctionMemoryReadWidthArtifact {
+    const fn from_ir(width: bara_ir::MemoryReadWidth) -> Self {
+        match width {
+            bara_ir::MemoryReadWidth::Bits64 => Self::Bits64,
         }
     }
 }

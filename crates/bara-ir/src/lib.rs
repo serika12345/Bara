@@ -5,7 +5,7 @@ pub mod program;
 pub mod validate;
 
 pub use block::{
-    BasicBlock, BasicBlockError, BlockId, HostTrapKind, IrOp, Operand, Terminator,
+    BasicBlock, BasicBlockError, BlockId, HostTrapKind, IrOp, MemoryReadWidth, Operand, Terminator,
     UnsupportedReason, X86Cond, X86Reg, X86RegFamily, X86RegWidth,
 };
 pub use boundary::{
@@ -17,10 +17,10 @@ pub use boundary::{
 };
 pub use flags::{FlagValue, Flags};
 pub use program::{
-    Program, ProgramError, ProgramImageImport, ProgramImageImports, ProgramImageMetadata,
-    ProgramImageMetadataError, ProgramImageRange, ProgramImageRelocation,
-    ProgramImageRelocationTarget, ProgramImageRelocations, ProgramImageSection,
-    ProgramImageSectionKind, ProgramImageSections, ProgramImageSymbol, ProgramImageSymbols,
-    ProgramUnwindEntry, ProgramUnwindMetadata, X86Va,
+    Program, ProgramError, ProgramImageImport, ProgramImageImports, ProgramImageMappedByteSegment,
+    ProgramImageMappedBytes, ProgramImageMetadata, ProgramImageMetadataError, ProgramImageRange,
+    ProgramImageRelocation, ProgramImageRelocationTarget, ProgramImageRelocations,
+    ProgramImageSection, ProgramImageSectionKind, ProgramImageSections, ProgramImageSymbol,
+    ProgramImageSymbols, ProgramUnwindEntry, ProgramUnwindMetadata, X86Va,
 };
 pub use validate::{validate_program, ValidationIssue, ValidationReport};

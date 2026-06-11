@@ -4,9 +4,10 @@ use crate::{
 };
 
 use bara_ir::{
-    ProgramImageImports, ProgramImageMetadata, ProgramImageMetadataError, ProgramImageRange,
-    ProgramImageRelocations, ProgramImageSection, ProgramImageSectionKind, ProgramImageSections,
-    ProgramImageSymbols, ProgramUnwindMetadata,
+    ProgramImageImports, ProgramImageMappedByteSegment, ProgramImageMappedBytes,
+    ProgramImageMetadata, ProgramImageMetadataError, ProgramImageRange, ProgramImageRelocations,
+    ProgramImageSection, ProgramImageSectionKind, ProgramImageSections, ProgramImageSymbols,
+    ProgramUnwindMetadata,
 };
 
 use super::{
@@ -173,6 +174,12 @@ fn program_image_metadata_from_executable_image(
         .entry()
         .checked_add(code_len)
         .map_err(|_| ProgramImageMetadataError::AddressOverflow)?;
+    let mapped_code_range = ProgramImageRange::new(code.entry(), code_end)?;
+    let mapped_bytes =
+        ProgramImageMappedBytes::from_segments([ProgramImageMappedByteSegment::new(
+            mapped_code_range,
+            code.bytes().to_vec(),
+        )?]);
     let code_range = ProgramImageRange::new(code_start, code_end)?;
     let mut sections = vec![ProgramImageSection::new(
         ProgramImageSectionKind::Code,
@@ -186,8 +193,9 @@ fn program_image_metadata_from_executable_image(
         ));
     }
 
-    Ok(ProgramImageMetadata::new(
+    Ok(ProgramImageMetadata::new_with_mapped_bytes(
         ProgramImageSections::from_items(sections),
+        mapped_bytes,
         ProgramImageSymbols::empty(),
         ProgramImageRelocations::empty(),
         ProgramImageImports::empty(),

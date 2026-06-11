@@ -6,6 +6,7 @@ use crate::{
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ProgramImageMetadata {
     sections: ProgramImageSections,
+    mapped_bytes: ProgramImageMappedBytes,
     symbols: ProgramImageSymbols,
     relocations: ProgramImageRelocations,
     imports: ProgramImageImports,
@@ -26,6 +27,25 @@ impl ProgramImageMetadata {
     ) -> Self {
         Self {
             sections,
+            mapped_bytes: ProgramImageMappedBytes::empty(),
+            symbols,
+            relocations,
+            imports,
+            unwind,
+        }
+    }
+
+    pub const fn new_with_mapped_bytes(
+        sections: ProgramImageSections,
+        mapped_bytes: ProgramImageMappedBytes,
+        symbols: ProgramImageSymbols,
+        relocations: ProgramImageRelocations,
+        imports: ProgramImageImports,
+        unwind: ProgramUnwindMetadata,
+    ) -> Self {
+        Self {
+            sections,
+            mapped_bytes,
             symbols,
             relocations,
             imports,
@@ -35,6 +55,7 @@ impl ProgramImageMetadata {
 
     pub fn is_empty(&self) -> bool {
         self.sections.is_empty()
+            && self.mapped_bytes.is_empty()
             && self.symbols.is_empty()
             && self.relocations.is_empty()
             && self.imports.is_empty()
@@ -43,6 +64,10 @@ impl ProgramImageMetadata {
 
     pub const fn sections(&self) -> &ProgramImageSections {
         &self.sections
+    }
+
+    pub const fn mapped_bytes(&self) -> &ProgramImageMappedBytes {
+        &self.mapped_bytes
     }
 
     pub const fn symbols(&self) -> &ProgramImageSymbols {
@@ -107,6 +132,77 @@ impl ProgramImageSection {
     }
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ProgramImageMappedBytes {
+    segments: Vec<ProgramImageMappedByteSegment>,
+}
+
+impl ProgramImageMappedBytes {
+    pub const fn empty() -> Self {
+        Self {
+            segments: Vec::new(),
+        }
+    }
+
+    pub fn from_segments(
+        segments: impl IntoIterator<Item = ProgramImageMappedByteSegment>,
+    ) -> Self {
+        Self {
+            segments: segments.into_iter().collect(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.segments.is_empty()
+    }
+
+    pub fn read_u64_le(&self, address: X86Va) -> Option<u64> {
+        self.segments
+            .iter()
+            .find_map(|segment| segment.read_u64_le(address))
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProgramImageMappedByteSegment {
+    range: ProgramImageRange,
+    bytes: Vec<u8>,
+}
+
+impl ProgramImageMappedByteSegment {
+    pub fn new(
+        range: ProgramImageRange,
+        bytes: Vec<u8>,
+    ) -> Result<Self, ProgramImageMetadataError> {
+        let byte_len =
+            u64::try_from(bytes.len()).map_err(|_| ProgramImageMetadataError::AddressOverflow)?;
+        if range.byte_len() != byte_len {
+            return Err(ProgramImageMetadataError::MappedBytesLengthMismatch);
+        }
+
+        Ok(Self { range, bytes })
+    }
+
+    pub const fn range(&self) -> ProgramImageRange {
+        self.range
+    }
+
+    fn read_u64_le(&self, address: X86Va) -> Option<u64> {
+        let read_end = u128::from(address.value()).checked_add(8)?;
+        if address.value() < self.range.start().value()
+            || read_end > u128::from(self.range.end().value())
+        {
+            return None;
+        }
+
+        let offset = usize::try_from(address.value() - self.range.start().value()).ok()?;
+        let bytes = self.bytes.get(offset..offset.checked_add(8)?)?;
+        Some(u64::from_le_bytes([
+            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+        ]))
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProgramImageSectionKind {
     Code,
@@ -134,6 +230,10 @@ impl ProgramImageRange {
 
     pub const fn end(self) -> X86Va {
         self.end
+    }
+
+    const fn byte_len(self) -> u64 {
+        self.end.value() - self.start.value()
     }
 }
 
@@ -308,4 +408,5 @@ impl ProgramUnwindEntry {
 pub enum ProgramImageMetadataError {
     EmptyOrReversedRange,
     AddressOverflow,
+    MappedBytesLengthMismatch,
 }

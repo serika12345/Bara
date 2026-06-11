@@ -133,7 +133,18 @@ pub enum X86Cond {
 pub enum Operand {
     Reg(X86Reg),
     ImmU64(u64),
-    Mem8 { base: X86Reg },
+    Mem8 {
+        base: X86Reg,
+    },
+    MemRipRelative {
+        address: X86Va,
+        width: MemoryReadWidth,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MemoryReadWidth {
+    Bits64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

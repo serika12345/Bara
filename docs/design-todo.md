@@ -237,6 +237,15 @@
   `48 8b 05 disp32` の RIP-relative memory load になった時点で停止する。これは
   単なる opcode 追加を超えて image-relative address calculation、read width、
   mapped bytes / loader metadata 境界を要求するため、次の focused PR Gate として扱う。
+- 2026-06-11 の B8-G3f として、`48 8b 05 disp32`
+  (`mov rax, qword ptr [rip+disp32]`) を RIP-relative 64-bit load slice として追加した。
+  IR は source address と read width を `MemRipRelative` として保持し、Mach-O entry
+  pipeline は materialized executable segment bytes を `ProgramImageMetadata` の mapped
+  bytes として渡す。ARM64 emit はこの slice では rebase / bind 適用後の runtime memory
+  ではなく、public Mach-O から得た mapped bytes の qword を AOT immediate として
+  materialize する。次 blocker は `48 8b 10`
+  (`mov rdx, qword ptr [rax]`) であり、register-indirect memory、`rdx` register、
+  loader / mapped runtime memory boundary を含むため opcode-only batch では扱わない。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、
