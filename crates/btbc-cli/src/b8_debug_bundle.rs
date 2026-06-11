@@ -580,6 +580,10 @@ enum B8DebugDecodedInstructionKindReport {
         displacement: String,
         address: u64,
     },
+    LeaRsiRipRelative {
+        displacement: String,
+        address: u64,
+    },
     MovzxEaxBytePtrRdi,
     AddEaxImm32 {
         imm: String,
@@ -653,6 +657,13 @@ impl B8DebugDecodedInstructionKindReport {
                 displacement,
                 address,
             } => Self::LeaRdiRipRelative {
+                displacement: format!("{displacement:?}"),
+                address: address.value(),
+            },
+            DecodedInstructionKind::LeaRsiRipRelative {
+                displacement,
+                address,
+            } => Self::LeaRsiRipRelative {
                 displacement: format!("{displacement:?}"),
                 address: address.value(),
             },

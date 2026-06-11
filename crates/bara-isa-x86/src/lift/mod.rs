@@ -123,6 +123,12 @@ fn lift_instruction(
                 src: Operand::AddressRipRelative { address: *address },
             }))
         }
+        DecodedInstructionKind::LeaRsiRipRelative { address, .. } => {
+            Ok(LiftedInstruction::Op(IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rsi),
+                src: Operand::AddressRipRelative { address: *address },
+            }))
+        }
         DecodedInstructionKind::MovRbpRsp => Ok(LiftedInstruction::Op(IrOp::Mov {
             dst: Operand::Reg(X86Reg::Rbp),
             src: Operand::Reg(X86Reg::Rsp),
@@ -854,7 +860,7 @@ mod tests {
     }
 
     #[test]
-    fn lifts_prologue_and_rip_relative_lea_before_next_unsupported_opcode() {
+    fn lifts_prologue_and_rip_relative_lea_rsi_before_next_unsupported_opcode() {
         let decoded = DecodedFunction::new(
             X86Va::new(0x1600),
             vec![
@@ -911,11 +917,19 @@ mod tests {
                 ),
                 DecodedInstruction::new(
                     X86Va::new(0x161d),
-                    X86Va::new(0x1620),
+                    X86Va::new(0x1624),
+                    DecodedInstructionKind::LeaRsiRipRelative {
+                        displacement: crate::decode::X86Imm32::new(0x10b6),
+                        address: X86Va::new(0x26da),
+                    },
+                ),
+                DecodedInstruction::new(
+                    X86Va::new(0x1624),
+                    X86Va::new(0x1627),
                     DecodedInstructionKind::Unsupported {
                         reason: UnsupportedReason::DecodeUnsupportedOpcode {
                             opcode: 0x48,
-                            at: X86Va::new(0x161d),
+                            at: X86Va::new(0x1624),
                         },
                     },
                 ),
@@ -967,6 +981,12 @@ mod tests {
                     src: Operand::AddressRipRelative {
                         address: X86Va::new(0x26d0),
                     }
+                },
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rsi),
+                    src: Operand::AddressRipRelative {
+                        address: X86Va::new(0x26da),
+                    }
                 }
             ]
         );
@@ -975,7 +995,7 @@ mod tests {
             &Terminator::Unsupported {
                 reason: UnsupportedReason::DecodeUnsupportedOpcode {
                     opcode: 0x48,
-                    at: X86Va::new(0x161d),
+                    at: X86Va::new(0x1624),
                 }
             }
         );
@@ -1008,6 +1028,39 @@ mod tests {
                 dst: Operand::Reg(X86Reg::Rdi),
                 src: Operand::AddressRipRelative {
                     address: X86Va::new(0x10ba),
+                }
+            }]
+        );
+        assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_lea_rsi_rip_relative_to_address_materialization() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(7),
+                    DecodedInstructionKind::LeaRsiRipRelative {
+                        displacement: crate::decode::X86Imm32::new(0x10b6),
+                        address: X86Va::new(0x10bd),
+                    },
+                ),
+                DecodedInstruction::new(X86Va::new(7), X86Va::new(8), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded RIP-relative RSI LEA lifts");
+        let block = &program.blocks()[0];
+
+        assert_eq!(
+            block.ops(),
+            &[IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rsi),
+                src: Operand::AddressRipRelative {
+                    address: X86Va::new(0x10bd),
                 }
             }]
         );

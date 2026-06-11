@@ -437,13 +437,14 @@ fn decodes_push_rax_pop_rax_between_mov_and_ret() {
 }
 
 #[test]
-fn decodes_prologue_and_rip_relative_lea_before_next_unsupported_opcode() {
+fn decodes_prologue_and_rip_relative_lea_rsi_before_next_unsupported_opcode() {
     let input = X86Bytes::new(
         X86Va::new(0x1600),
         vec![
             0x55, 0x48, 0x89, 0xe5, 0x41, 0x57, 0x41, 0x56, 0x53, 0x48, 0x89, 0xc3, 0x48, 0x8b,
             0x05, 0xff, 0x19, 0x00, 0x00, 0x48, 0x8b, 0x10, 0x48, 0x8d, 0x3d, 0xb3, 0x10, 0x00,
-            0x00, 0x48, 0x8d, 0x35,
+            0x00, 0x48, 0x8d, 0x35, 0xb6, 0x10, 0x00, 0x00, 0xe8, 0x79, 0x00, 0x00, 0x00, 0x48,
+            0x8b, 0x3d,
         ],
     )
     .expect("test bytes are non-empty");
@@ -506,11 +507,27 @@ fn decodes_prologue_and_rip_relative_lea_before_next_unsupported_opcode() {
             ),
             DecodedInstruction::new(
                 X86Va::new(0x161d),
-                X86Va::new(0x1620),
+                X86Va::new(0x1624),
+                DecodedInstructionKind::LeaRsiRipRelative {
+                    displacement: crate::decode::X86Imm32::new(0x10b6),
+                    address: X86Va::new(0x26da),
+                }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x1624),
+                X86Va::new(0x1629),
+                DecodedInstructionKind::CallRel32 {
+                    target: X86Va::new(0x16a2),
+                    return_to: X86Va::new(0x1629),
+                }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x1629),
+                X86Va::new(0x162c),
                 DecodedInstructionKind::Unsupported {
                     reason: UnsupportedReason::DecodeUnsupportedOpcode {
                         opcode: 0x48,
-                        at: X86Va::new(0x161d),
+                        at: X86Va::new(0x1629),
                     }
                 }
             )
@@ -549,6 +566,36 @@ fn decodes_lea_rdi_rip_relative_then_ret() {
 }
 
 #[test]
+fn decodes_lea_rsi_rip_relative_then_ret() {
+    let input = X86Bytes::new(
+        X86Va::new(0x2000),
+        vec![0x48, 0x8d, 0x35, 0xf9, 0xff, 0xff, 0xff, 0xc3],
+    )
+    .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0x2000),
+                X86Va::new(0x2007),
+                DecodedInstructionKind::LeaRsiRipRelative {
+                    displacement: crate::decode::X86Imm32::new(-7),
+                    address: X86Va::new(0x2000),
+                }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x2007),
+                X86Va::new(0x2008),
+                DecodedInstructionKind::Ret
+            )
+        ]
+    );
+}
+
+#[test]
 fn truncated_lea_rdi_rip_relative_is_reported() {
     let input = X86Bytes::new(X86Va::new(0x1616), vec![0x48, 0x8d, 0x3d])
         .expect("test bytes are non-empty");
@@ -563,8 +610,22 @@ fn truncated_lea_rdi_rip_relative_is_reported() {
 }
 
 #[test]
-fn decodes_rex_lea_unsupported_when_destination_operand_does_not_match() {
+fn truncated_lea_rsi_rip_relative_is_reported() {
     let input = X86Bytes::new(X86Va::new(0x161d), vec![0x48, 0x8d, 0x35])
+        .expect("test bytes are non-empty");
+
+    assert_eq!(
+        decode_function(&input),
+        Err(DecodeError::TruncatedInstruction {
+            at: X86Va::new(0x161d),
+            opcode: 0x48
+        })
+    );
+}
+
+#[test]
+fn decodes_rex_lea_unsupported_when_destination_operand_does_not_match() {
+    let input = X86Bytes::new(X86Va::new(0x161d), vec![0x48, 0x8d, 0x34])
         .expect("test bytes are non-empty");
 
     let decoded = decode_function(&input).expect("unsupported opcode decodes as instruction");

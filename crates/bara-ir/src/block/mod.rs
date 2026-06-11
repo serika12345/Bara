@@ -188,6 +188,10 @@ pub enum X86Reg {
     Edi,
     Di,
     Dil,
+    Rsi,
+    Esi,
+    Si,
+    Sil,
 }
 
 impl X86Reg {
@@ -201,6 +205,7 @@ impl X86Reg {
             Self::R14 | Self::R14d | Self::R14w | Self::R14b => X86RegFamily::Extended14,
             Self::R15 | Self::R15d | Self::R15w | Self::R15b => X86RegFamily::Extended15,
             Self::Rdi | Self::Edi | Self::Di | Self::Dil => X86RegFamily::DestinationIndex,
+            Self::Rsi | Self::Esi | Self::Si | Self::Sil => X86RegFamily::SourceIndex,
         }
     }
 
@@ -213,7 +218,8 @@ impl X86Reg {
             | Self::Spl
             | Self::R14b
             | Self::R15b
-            | Self::Dil => X86RegWidth::Bits8,
+            | Self::Dil
+            | Self::Sil => X86RegWidth::Bits8,
             Self::Ax
             | Self::Dx
             | Self::Bx
@@ -221,7 +227,8 @@ impl X86Reg {
             | Self::Sp
             | Self::R14w
             | Self::R15w
-            | Self::Di => X86RegWidth::Bits16,
+            | Self::Di
+            | Self::Si => X86RegWidth::Bits16,
             Self::Eax
             | Self::Edx
             | Self::Ebx
@@ -229,7 +236,8 @@ impl X86Reg {
             | Self::Esp
             | Self::R14d
             | Self::R15d
-            | Self::Edi => X86RegWidth::Bits32,
+            | Self::Edi
+            | Self::Esi => X86RegWidth::Bits32,
             Self::Rax
             | Self::Rdx
             | Self::Rbx
@@ -237,7 +245,8 @@ impl X86Reg {
             | Self::Rsp
             | Self::R14
             | Self::R15
-            | Self::Rdi => X86RegWidth::Bits64,
+            | Self::Rdi
+            | Self::Rsi => X86RegWidth::Bits64,
         }
     }
 
@@ -251,6 +260,7 @@ impl X86Reg {
             X86RegFamily::Extended14 => Self::R14,
             X86RegFamily::Extended15 => Self::R15,
             X86RegFamily::DestinationIndex => Self::Rdi,
+            X86RegFamily::SourceIndex => Self::Rsi,
         }
     }
 
@@ -269,6 +279,7 @@ pub enum X86RegFamily {
     Extended14,
     Extended15,
     DestinationIndex,
+    SourceIndex,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -588,6 +599,19 @@ mod tests {
         assert_eq!(X86Reg::Di.full_width(), X86Reg::Rdi);
         assert_eq!(X86Reg::Dil.full_width(), X86Reg::Rdi);
         assert!(!X86Reg::Rdi.is_partial_view());
+
+        assert_eq!(X86Reg::Rsi.family(), X86RegFamily::SourceIndex);
+        assert_eq!(X86Reg::Esi.family(), X86RegFamily::SourceIndex);
+        assert_eq!(X86Reg::Si.family(), X86RegFamily::SourceIndex);
+        assert_eq!(X86Reg::Sil.family(), X86RegFamily::SourceIndex);
+        assert_eq!(X86Reg::Rsi.width(), X86RegWidth::Bits64);
+        assert_eq!(X86Reg::Esi.width(), X86RegWidth::Bits32);
+        assert_eq!(X86Reg::Si.width(), X86RegWidth::Bits16);
+        assert_eq!(X86Reg::Sil.width(), X86RegWidth::Bits8);
+        assert_eq!(X86Reg::Esi.full_width(), X86Reg::Rsi);
+        assert_eq!(X86Reg::Si.full_width(), X86Reg::Rsi);
+        assert_eq!(X86Reg::Sil.full_width(), X86Reg::Rsi);
+        assert!(!X86Reg::Rsi.is_partial_view());
     }
 
     #[test]

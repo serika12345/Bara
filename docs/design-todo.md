@@ -262,6 +262,14 @@
   materialize し、その後は `rax` value を available とみなさない。次 blocker は
   `48 8d 35 b6 10 00 00` (`lea rsi, [rip+disp32]`) であり、`rsi` register family と
   2 番目の argument register materialization を次の focused PR Gate で扱う。
+- 2026-06-11 の B8-G3i として、`48 8d 35 disp32`
+  (`lea rsi, [rip+disp32]`) を RIP-relative address materialization slice として追加した。
+  IR は B8-G3h と同じ `AddressRipRelative` operand を使い、destination は新規
+  source-index register family の `rsi` として保持する。ARM64 emit は ABI-focused mapping
+  に合わせて `rsi` を `x1` に materialize し、`rax` value availability は維持する。
+  次 blocker は `48 8b 3d 22 3b 00 00` (`mov rdi, qword ptr [rip+disp32]`) であり、
+  address materialization ではなく RIP-relative 64-bit memory load into argument register
+  として次の focused PR Gate で扱う。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、

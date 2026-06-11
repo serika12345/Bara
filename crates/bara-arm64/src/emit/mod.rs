@@ -301,6 +301,12 @@ pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
                     rax_known_value = None;
                 }
                 IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rsi),
+                    src: Operand::AddressRipRelative { address },
+                } => {
+                    emit_mov_x1_u64(&mut code, address.value());
+                }
+                IrOp::Mov {
                     dst: Operand::Reg(X86Reg::Rbx),
                     src: Operand::Reg(X86Reg::Rax),
                 } => {
@@ -715,6 +721,10 @@ fn emit_mov_x0_u64(code: &mut Vec<u8>, value: u64) -> usize {
     emit_mov_reg_u64(code, value, 0)
 }
 
+fn emit_mov_x1_u64(code: &mut Vec<u8>, value: u64) -> usize {
+    emit_mov_reg_u64(code, value, 1)
+}
+
 fn emit_mov_x2_u64(code: &mut Vec<u8>, value: u64) -> usize {
     emit_mov_reg_u64(code, value, 2)
 }
@@ -1066,6 +1076,32 @@ mod tests {
         );
 
         assert_eq!(emit_program(&program), Err(EmitError::UnsupportedShape));
+    }
+
+    #[test]
+    fn emits_rsi_rip_relative_address_as_x1_immediate_without_clobbering_rax() {
+        let program = program_with_ops(
+            vec![
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(42),
+                },
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rsi),
+                    src: Operand::AddressRipRelative {
+                        address: X86Va::new(0x26da),
+                    },
+                },
+            ],
+            Terminator::Return,
+        );
+
+        let emitted = emit_program(&program).expect("RIP-relative RSI LEA IR emits");
+
+        assert_eq!(
+            emitted.code().bytes(),
+            &[0x40, 0x05, 0x80, 0xd2, 0x41, 0xdb, 0x84, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]
+        );
     }
 
     #[test]
