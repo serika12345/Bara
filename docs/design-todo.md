@@ -36,8 +36,9 @@
 
 ## D3: Source ISA mode と x86 bit-width
 
-- [ ] source ISA mode を `x86_64` / `x86_32` として明示する domain type を追加する。
-- [ ] address size、operand size、stack width、calling convention を source mode から決める。
+- [x] source ISA mode を `x86_64` / `x86_32` として明示できる domain type を追加する。
+- [x] address size、operand size、stack width を source mode から決める。
+- [ ] calling convention を source mode から決める。
 - [ ] register model は 64-bit register だけでなく、partial register を表現できる形にする。
 - [ ] decoder / lifter / metadata schema の public 名称を `x86_64` 固定にしすぎない。
 
@@ -49,6 +50,13 @@
   閉じ出さない。
 - B9 は B10 の PE / Wine 接続前に先に処理するのが望ましいが、blocker が
   大きい場合は記録したうえで飛ばしてよい推奨ステップとする。
+- 2026-06-11 の B8 小ステップとして、`bara-runtime::UserSpaceLaunchPlan` に
+  `source_isa_profile` を追加した。現在は x86_64 long mode、address size
+  64-bit、default operand size 32-bit、stack width 64-bit を typed profile
+  として保持し、B8 actual launch report に projection する。profile model は
+  x86_32 protected mode、address size 32-bit、default operand size 32-bit、
+  stack width 32-bit も表現できる。これは B9 の x86_32 decode / lift 実装ではなく、
+  launch/report 境界から x86_32 を閉じ出さないための guardrail である。
 
 ## D4: Bara IR の責務
 

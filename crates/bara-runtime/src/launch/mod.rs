@@ -1,5 +1,6 @@
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UserSpaceLaunchPlan {
+    source_isa_profile: UserSpaceSourceIsaProfile,
     image_mapping: UserSpaceImageMappingPlan,
     entry_trampoline: UserSpaceEntryTrampolinePlan,
     initial_stack: UserSpaceInitialStackPlan,
@@ -14,6 +15,7 @@ pub struct UserSpaceLaunchPlan {
 impl UserSpaceLaunchPlan {
     pub const fn mach_o_executable_image() -> Self {
         Self {
+            source_isa_profile: UserSpaceSourceIsaProfile::x86_64_long_mode(),
             image_mapping: UserSpaceImageMappingPlan::mach_o_executable_image(),
             entry_trampoline: UserSpaceEntryTrampolinePlan::mach_o_entry_point(),
             initial_stack: UserSpaceInitialStackPlan::argv_envp_initial_stack(),
@@ -24,6 +26,10 @@ impl UserSpaceLaunchPlan {
             integration_policy: UserSpaceIntegrationPolicy::current_user_space_process(),
             process_boundary: UserSpaceProcessBoundary::current_user_space_process(),
         }
+    }
+
+    pub const fn source_isa_profile(&self) -> &UserSpaceSourceIsaProfile {
+        &self.source_isa_profile
     }
 
     pub const fn image_mapping(&self) -> &UserSpaceImageMappingPlan {
@@ -61,6 +67,62 @@ impl UserSpaceLaunchPlan {
     pub const fn process_boundary(&self) -> &UserSpaceProcessBoundary {
         &self.process_boundary
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UserSpaceSourceIsaProfile {
+    mode: UserSpaceSourceIsaMode,
+    address_size: UserSpaceSourceWidth,
+    default_operand_size: UserSpaceSourceWidth,
+    stack_width: UserSpaceSourceWidth,
+}
+
+impl UserSpaceSourceIsaProfile {
+    pub const fn x86_64_long_mode() -> Self {
+        Self {
+            mode: UserSpaceSourceIsaMode::X8664LongMode,
+            address_size: UserSpaceSourceWidth::Bits64,
+            default_operand_size: UserSpaceSourceWidth::Bits32,
+            stack_width: UserSpaceSourceWidth::Bits64,
+        }
+    }
+
+    pub const fn x86_32_protected_mode() -> Self {
+        Self {
+            mode: UserSpaceSourceIsaMode::X8632ProtectedMode,
+            address_size: UserSpaceSourceWidth::Bits32,
+            default_operand_size: UserSpaceSourceWidth::Bits32,
+            stack_width: UserSpaceSourceWidth::Bits32,
+        }
+    }
+
+    pub const fn mode(self) -> UserSpaceSourceIsaMode {
+        self.mode
+    }
+
+    pub const fn address_size(self) -> UserSpaceSourceWidth {
+        self.address_size
+    }
+
+    pub const fn default_operand_size(self) -> UserSpaceSourceWidth {
+        self.default_operand_size
+    }
+
+    pub const fn stack_width(self) -> UserSpaceSourceWidth {
+        self.stack_width
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceSourceIsaMode {
+    X8664LongMode,
+    X8632ProtectedMode,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceSourceWidth {
+    Bits32,
+    Bits64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -453,7 +515,8 @@ mod tests {
         UserSpaceHelperBoundaryContract, UserSpaceImageMappingSource,
         UserSpaceInitialStackContract, UserSpaceLaunchPlan, UserSpaceLaunchResponsibility,
         UserSpaceMemoryProtectionModel, UserSpacePrivateIntegrationRequirement,
-        UserSpaceProcessScope,
+        UserSpaceProcessScope, UserSpaceSourceIsaMode, UserSpaceSourceIsaProfile,
+        UserSpaceSourceWidth,
     };
 
     #[test]
@@ -616,5 +679,34 @@ mod tests {
             bridge_boundary.arm64_emit_implementation(),
             UserSpaceBridgeCoreImplementation::NotEmbedded
         );
+    }
+
+    #[test]
+    fn user_space_launch_plan_keeps_source_isa_mode_and_widths_typed() {
+        let source_isa = *UserSpaceLaunchPlan::mach_o_executable_image().source_isa_profile();
+
+        assert_eq!(source_isa.mode(), UserSpaceSourceIsaMode::X8664LongMode);
+        assert_eq!(source_isa.address_size(), UserSpaceSourceWidth::Bits64);
+        assert_eq!(
+            source_isa.default_operand_size(),
+            UserSpaceSourceWidth::Bits32
+        );
+        assert_eq!(source_isa.stack_width(), UserSpaceSourceWidth::Bits64);
+    }
+
+    #[test]
+    fn source_isa_profile_can_model_x86_32_widths_without_changing_b8_target() {
+        let source_isa = UserSpaceSourceIsaProfile::x86_32_protected_mode();
+
+        assert_eq!(
+            source_isa.mode(),
+            UserSpaceSourceIsaMode::X8632ProtectedMode
+        );
+        assert_eq!(source_isa.address_size(), UserSpaceSourceWidth::Bits32);
+        assert_eq!(
+            source_isa.default_operand_size(),
+            UserSpaceSourceWidth::Bits32
+        );
+        assert_eq!(source_isa.stack_width(), UserSpaceSourceWidth::Bits32);
     }
 }

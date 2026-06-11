@@ -17,6 +17,7 @@ pub use launch::{
     UserSpaceInitialStackPlan, UserSpaceIntegrationPolicy, UserSpaceLaunchPlan,
     UserSpaceLaunchResponsibility, UserSpaceMemoryProtectionModel,
     UserSpacePrivateIntegrationRequirement, UserSpaceProcessBoundary, UserSpaceProcessScope,
+    UserSpaceSourceIsaMode, UserSpaceSourceIsaProfile, UserSpaceSourceWidth,
 };
 pub use runner::{
     run_no_args_u64, run_no_args_u64_with_host_traps, run_one_input_memory_ptr, run_one_u64,

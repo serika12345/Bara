@@ -9,40 +9,52 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 13:34 JST
+最終更新: 2026-06-11 13:43 JST
 
 状態:
 
-- project_state: completed。B8 の syscall / OS API bridge boundary step として、
-  syscall bridge と OS API bridge を helper boundary の責務として user-space
-  launch plan と actual launch report に載せた。
+- project_state: completed。B8 の source ISA profile step として、source ISA
+  mode、address size、default operand size、stack width を user-space launch plan
+  と actual launch report に typed profile として載せた。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8:
   実 x86_64 macOS アプリ起動。
-- active_design_focus: B8 syscall / OS API bridge boundary。self-authored
-  AppKit fixture の launch preparation で syscall bridge と OS API bridge が
-  helper boundary にあり、bridge 実装が core IR / ARM64 emit に埋め込まれないことを
-  report 境界へ残す。
+- active_design_focus: B8 source ISA mode / width guardrail。self-authored
+  AppKit fixture の launch preparation で x86_64 long mode、address size 64-bit、
+  default operand size 32-bit、stack width 64-bit を明示し、B9 の x86_32 対応を
+  report / runtime 境界から閉じ出さないようにする。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
   latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B8 の「syscall / OS API bridge は
-  helper boundary として明示し、core IR / emit へ混ぜない」。
-- completed_work: `bara-runtime::UserSpaceLaunchPlan` は `bridge_boundary` を
-  持ち、syscall bridge と OS API bridge を `helper_boundary`、core IR /
-  ARM64 emit の bridge 実装を `not_embedded` として保持する。B8 actual launch
-  report は `runtime_preparation.bridge_boundary` として同じ boundary policy を
-  保存する。
-- remaining_work: 次の小ステップは source ISA mode、address size、operand size、
-  stack width を型で表し、B9 の x86_32 対応の妨げにしないこと。
-- next_action: commit / push 後、次の B8 小ステップで source ISA / mode /
-  width model を report / runtime 境界に固定する。
+- related_todo: [TODO.md](../TODO.md) B8 の「source ISA mode、address size、
+  operand size、stack width を型で表せるようにし、B9 の x86_32 対応の妨げに
+  しない」。
+- completed_work: `bara-runtime::UserSpaceLaunchPlan` は `source_isa_profile` を
+  持ち、mode を `x86_64_long_mode`、address size を `bits_64`、default operand
+  size を `bits_32`、stack width を `bits_64` として保持する。B8 actual launch
+  report は `runtime_preparation.source_isa_profile` として同じ profile を保存する。
+  profile model は B9 guardrail として x86_32 protected mode も表現できる。
+- remaining_work: 次の小ステップは register model を `rax` だけでなく、
+  部分レジスタへ拡張できる形にすること。
+- next_action: commit / push 後、次の B8 小ステップで register model /
+  partial register guardrail を runtime / report / IR 境界のどこへ置くかを
+  固定する。
 - verification: targeted tests として
   `nix develop -c cargo test -p bara-runtime user_space_launch_plan -- --nocapture`、
+  `nix develop -c cargo test -p bara-runtime source_isa_profile_can_model_x86_32_widths_without_changing_b8_target -- --nocapture`、
   `nix develop -c cargo test -p btbc-cli gui_hello_world_actual -- --nocapture`
-  が通過した。`nix develop -c cargo clippy -p bara-runtime -p btbc-cli
-  --all-targets -- -D warnings` と full `nix develop -c ./scripts/verify` も通過した。
+  が通過した。`nix develop -c cargo fmt --all -- --check`、
+  `nix develop -c cargo clippy -p bara-runtime -p btbc-cli --all-targets -- -D warnings`、
+  `git diff --check`、full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-11 13:43 JST: B8 の source ISA profile step として、
+  `bara-runtime::UserSpaceLaunchPlan` に `source_isa_profile` を追加した。
+  現在は x86_64 long mode、address size 64-bit、default operand size 32-bit、
+  stack width 64-bit を typed profile として保持し、B8 actual launch report の
+  `runtime_preparation.source_isa_profile` に保存する。profile model は
+  x86_32 protected mode も表現できる。targeted tests、
+  `bara-runtime` / `btbc-cli` clippy、full `nix develop -c ./scripts/verify` が
+  通過した。
 - 2026-06-11 13:34 JST: B8 の syscall / OS API bridge boundary step として、
   `bara-runtime::UserSpaceLaunchPlan` に `bridge_boundary` を追加した。
   syscall bridge と OS API bridge は helper boundary の責務として B8 actual

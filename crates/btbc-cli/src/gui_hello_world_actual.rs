@@ -9,7 +9,8 @@ use bara_runtime::{
     UserSpaceExecutionStrategyAvailability, UserSpaceExecutionStrategyBoundary,
     UserSpaceHelperBoundaryContract, UserSpaceImageMappingSource, UserSpaceInitialStackContract,
     UserSpaceLaunchPlan, UserSpaceLaunchResponsibility, UserSpaceMemoryProtectionModel,
-    UserSpacePrivateIntegrationRequirement, UserSpaceProcessScope,
+    UserSpacePrivateIntegrationRequirement, UserSpaceProcessScope, UserSpaceSourceIsaMode,
+    UserSpaceSourceIsaProfile, UserSpaceSourceWidth,
 };
 use serde::Serialize;
 
@@ -103,6 +104,7 @@ enum GuiHelloWorldActualLaunchStatus {
 struct GuiHelloWorldActualRuntimePreparation {
     source: GuiHelloWorldActualRuntimePreparationSource,
     status: GuiHelloWorldActualRuntimePreparationStatus,
+    source_isa_profile: GuiHelloWorldActualSourceIsaProfile,
     image_mapping: GuiHelloWorldActualImageMappingPreparation,
     executable_memory: GuiHelloWorldActualExecutableMemoryPreparation,
     execution_strategy: GuiHelloWorldActualExecutionStrategyPreparation,
@@ -119,6 +121,9 @@ impl GuiHelloWorldActualRuntimePreparation {
         Self {
             source: GuiHelloWorldActualRuntimePreparationSource::BaraRuntimeUserSpaceLaunchPlan,
             status: GuiHelloWorldActualRuntimePreparationStatus::PlannedNotExecuted,
+            source_isa_profile: GuiHelloWorldActualSourceIsaProfile::from_profile(
+                plan.source_isa_profile(),
+            ),
             image_mapping: GuiHelloWorldActualImageMappingPreparation::from_plan(
                 plan.image_mapping(),
             ),
@@ -160,6 +165,61 @@ enum GuiHelloWorldActualRuntimePreparationSource {
 enum GuiHelloWorldActualRuntimePreparationStatus {
     #[serde(rename = "planned_not_executed")]
     PlannedNotExecuted,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+struct GuiHelloWorldActualSourceIsaProfile {
+    mode: GuiHelloWorldActualSourceIsaMode,
+    address_size: GuiHelloWorldActualSourceWidth,
+    default_operand_size: GuiHelloWorldActualSourceWidth,
+    stack_width: GuiHelloWorldActualSourceWidth,
+}
+
+impl GuiHelloWorldActualSourceIsaProfile {
+    const fn from_profile(profile: &UserSpaceSourceIsaProfile) -> Self {
+        Self {
+            mode: GuiHelloWorldActualSourceIsaMode::from_runtime((*profile).mode()),
+            address_size: GuiHelloWorldActualSourceWidth::from_runtime((*profile).address_size()),
+            default_operand_size: GuiHelloWorldActualSourceWidth::from_runtime(
+                (*profile).default_operand_size(),
+            ),
+            stack_width: GuiHelloWorldActualSourceWidth::from_runtime((*profile).stack_width()),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualSourceIsaMode {
+    #[serde(rename = "x86_64_long_mode")]
+    X8664LongMode,
+    #[serde(rename = "x86_32_protected_mode")]
+    X8632ProtectedMode,
+}
+
+impl GuiHelloWorldActualSourceIsaMode {
+    const fn from_runtime(mode: UserSpaceSourceIsaMode) -> Self {
+        match mode {
+            UserSpaceSourceIsaMode::X8664LongMode => Self::X8664LongMode,
+            UserSpaceSourceIsaMode::X8632ProtectedMode => Self::X8632ProtectedMode,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualSourceWidth {
+    #[serde(rename = "bits_32")]
+    Bits32,
+    #[serde(rename = "bits_64")]
+    Bits64,
+}
+
+impl GuiHelloWorldActualSourceWidth {
+    const fn from_runtime(width: UserSpaceSourceWidth) -> Self {
+        match width {
+            UserSpaceSourceWidth::Bits32 => Self::Bits32,
+            UserSpaceSourceWidth::Bits64 => Self::Bits64,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -949,7 +1009,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_string(attempt.launch_report()).expect("launch report serializes"),
-            "{\"schema\":\"b8_gui_hello_world_actual_launch_report_v0\",\"case_id\":\"b8_gui_hello_world\",\"actual_runtime\":\"bara_arm64_user_space\",\"status\":\"blocked\",\"input\":{\"kind\":\"mach_o_executable_image\",\"source_isa\":\"x86_64\",\"binary_format\":\"mach_o\",\"target_triple\":\"x86_64-apple-macos13\",\"gui_framework\":\"appkit\",\"probe\":{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\"},\"loader_metadata\":{\"source\":\"public_mach_o_probe\",\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":0,\"byte_size\":0,\"recognized_entry_points\":[],\"recognized_segments\":[],\"unsupported_commands\":[]},\"executable_image_conversion\":{\"status\":\"not_convertible\",\"blocker\":\"missing_entry_point\"}},\"sections\":{\"status\":\"modeled_from_lc_segment_64_section_table\"},\"imports\":{\"status\":\"modeled_from_dylib_load_commands\"},\"relocations\":{\"status\":\"modeled_from_linkedit_relocation_and_bind_commands\"}}},\"runtime_preparation\":{\"source\":\"bara_runtime_user_space_launch_plan\",\"status\":\"planned_not_executed\",\"image_mapping\":{\"responsibility\":\"loader\",\"source\":\"mach_o_executable_image\",\"memory_protection\":\"public_os_virtual_memory\"},\"executable_memory\":{\"responsibility\":\"runtime\",\"allocation_api\":\"mmap_private_anonymous\",\"protection_transition\":\"mprotect_read_write_to_read_execute\",\"release_api\":\"munmap\"},\"execution_strategy\":{\"responsibility\":\"runtime\",\"boundary\":\"user_space_runtime\",\"jit\":\"selectable\",\"aot\":\"selectable\",\"fallback_interpreter\":\"selectable\"},\"entry_trampoline\":{\"responsibility\":\"runtime\",\"target\":\"mach_o_entry_point\"},\"initial_stack\":{\"responsibility\":\"runtime\",\"contract\":\"argv_envp_initial_stack\"},\"helper_boundary\":{\"responsibility\":\"helper_boundary\",\"contract\":\"imports_objc_os_api_requests\"},\"bridge_boundary\":{\"responsibility\":\"helper_boundary\",\"syscall_bridge\":\"helper_boundary\",\"os_api_bridge\":\"helper_boundary\",\"core_ir_implementation\":\"not_embedded\",\"arm64_emit_implementation\":\"not_embedded\"},\"integration_policy\":{\"process_scope\":\"current_user_space_process\",\"kernel_extension\":\"not_required\",\"private_kernel_hook\":\"not_required\",\"private_dyld_behavior\":\"not_required\"},\"process_boundary\":{\"loader\":\"current_user_space_process\",\"translation_cache\":\"current_user_space_process\",\"runtime_helper\":\"current_user_space_process\",\"artifact_cache\":\"current_user_space_process\"}},\"blocker\":{\"classification\":\"unsupported_loader_feature\",\"boundary\":\"loader\",\"selected_by\":\"first_unsupported_launch_boundary\",\"candidate_boundaries\":[{\"boundary\":\"loader\",\"classification\":\"unsupported_loader_feature\"},{\"boundary\":\"import\",\"classification\":\"unsupported_import\"},{\"boundary\":\"objc_runtime\",\"classification\":\"unsupported_objc_runtime_boundary\"}],\"message\":\"Bara does not yet load a complete x86_64 Mach-O GUI executable with dynamic loader, AppKit import, and Objective-C runtime requirements.\"}}"
+            "{\"schema\":\"b8_gui_hello_world_actual_launch_report_v0\",\"case_id\":\"b8_gui_hello_world\",\"actual_runtime\":\"bara_arm64_user_space\",\"status\":\"blocked\",\"input\":{\"kind\":\"mach_o_executable_image\",\"source_isa\":\"x86_64\",\"binary_format\":\"mach_o\",\"target_triple\":\"x86_64-apple-macos13\",\"gui_framework\":\"appkit\",\"probe\":{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\"},\"loader_metadata\":{\"source\":\"public_mach_o_probe\",\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":0,\"byte_size\":0,\"recognized_entry_points\":[],\"recognized_segments\":[],\"unsupported_commands\":[]},\"executable_image_conversion\":{\"status\":\"not_convertible\",\"blocker\":\"missing_entry_point\"}},\"sections\":{\"status\":\"modeled_from_lc_segment_64_section_table\"},\"imports\":{\"status\":\"modeled_from_dylib_load_commands\"},\"relocations\":{\"status\":\"modeled_from_linkedit_relocation_and_bind_commands\"}}},\"runtime_preparation\":{\"source\":\"bara_runtime_user_space_launch_plan\",\"status\":\"planned_not_executed\",\"source_isa_profile\":{\"mode\":\"x86_64_long_mode\",\"address_size\":\"bits_64\",\"default_operand_size\":\"bits_32\",\"stack_width\":\"bits_64\"},\"image_mapping\":{\"responsibility\":\"loader\",\"source\":\"mach_o_executable_image\",\"memory_protection\":\"public_os_virtual_memory\"},\"executable_memory\":{\"responsibility\":\"runtime\",\"allocation_api\":\"mmap_private_anonymous\",\"protection_transition\":\"mprotect_read_write_to_read_execute\",\"release_api\":\"munmap\"},\"execution_strategy\":{\"responsibility\":\"runtime\",\"boundary\":\"user_space_runtime\",\"jit\":\"selectable\",\"aot\":\"selectable\",\"fallback_interpreter\":\"selectable\"},\"entry_trampoline\":{\"responsibility\":\"runtime\",\"target\":\"mach_o_entry_point\"},\"initial_stack\":{\"responsibility\":\"runtime\",\"contract\":\"argv_envp_initial_stack\"},\"helper_boundary\":{\"responsibility\":\"helper_boundary\",\"contract\":\"imports_objc_os_api_requests\"},\"bridge_boundary\":{\"responsibility\":\"helper_boundary\",\"syscall_bridge\":\"helper_boundary\",\"os_api_bridge\":\"helper_boundary\",\"core_ir_implementation\":\"not_embedded\",\"arm64_emit_implementation\":\"not_embedded\"},\"integration_policy\":{\"process_scope\":\"current_user_space_process\",\"kernel_extension\":\"not_required\",\"private_kernel_hook\":\"not_required\",\"private_dyld_behavior\":\"not_required\"},\"process_boundary\":{\"loader\":\"current_user_space_process\",\"translation_cache\":\"current_user_space_process\",\"runtime_helper\":\"current_user_space_process\",\"artifact_cache\":\"current_user_space_process\"}},\"blocker\":{\"classification\":\"unsupported_loader_feature\",\"boundary\":\"loader\",\"selected_by\":\"first_unsupported_launch_boundary\",\"candidate_boundaries\":[{\"boundary\":\"loader\",\"classification\":\"unsupported_loader_feature\"},{\"boundary\":\"import\",\"classification\":\"unsupported_import\"},{\"boundary\":\"objc_runtime\",\"classification\":\"unsupported_objc_runtime_boundary\"}],\"message\":\"Bara does not yet load a complete x86_64 Mach-O GUI executable with dynamic loader, AppKit import, and Objective-C runtime requirements.\"}}"
         );
     }
 
