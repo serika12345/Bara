@@ -9,34 +9,41 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 10:10 JST
+最終更新: 2026-06-11 10:22 JST
 
 状態:
 
-- project_state: completed。B7 の 18 個目の小ステップとして、B7 の stable
-  failure classification kind を追加し、final-state mismatch を具体分類へ接続した。
-- active_milestone: in_progress。[TODO.md](../TODO.md) の B7:
+- project_state: completed。B7 の 19 個目の小ステップとして、IR invariant を
+  Rust verifier report に接続し、B7: Oracle / Regression 基盤の implementation
+  TODO を完了した。
+- active_milestone: completed。[TODO.md](../TODO.md) の B7:
   Oracle / Regression 基盤。
-- active_design_focus: B7 failure classification。comparison failure を
-  `ComparisonMismatch` へ潰さず、観測できる範囲で wrong register / call return /
-  external call などの stable failure kind に分類する。
+- active_design_focus: B7 verifier completion。`bara_ir::validate_program` の
+  issue を `verifier.report.json` の stable `ir_*` issue として保存し、
+  PC map / fixup / final-state comparison report と同じ verifier 導線に含める。
 - active_branch: `task/b7-x86_64-macho-fixture-generation`。base commit は
   `8d39a4a`。latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B7 の wrong register / flags / memory /
-  branch target / call return / external call failure classification 項目。
-- completed_work: `FailureKind` に B7 の stable classification kind を追加した。
-  `return_value_mismatch` は `WrongRegisterValue`、`stdout_mismatch` は
-  `WrongExternalCall`、`exit_status_mismatch` は `WrongCallReturn` に分類する。
-- remaining_work: B7 は継続中。IR invariant を verifier report に明示接続してから
-  B7 完了候補を確認する。
-- next_action: IR invariant を verifier report で検査する。
+- related_todo: [TODO.md](../TODO.md) B7 の verifier 項目。
+- completed_work: `verify_emitted_function` は IR invariant、PC map invariant、
+  branch fixup consistency を 1 つの report にまとめる。CLI artifact DTO は
+  IR validation issue を `ir_empty_program`、`ir_block_range_overlap`、
+  `ir_unsupported_terminator`、`ir_missing_block_target` として serializes する。
+- remaining_work: B7 は implementation 完了。large milestone review gate として
+  full verification 後に branch を push し、PR を開く。
+- next_action: full verification、commit / push、pull request 作成。
 - verification: targeted tests として
-  `nix develop -c cargo test -p btbc-cli comparison_report_maps_to_specific_failure_kinds`、
-  `nix develop -c cargo test -p btbc-cli check_corpus_classifies_return_value_mismatch_as_wrong_register`、
-  `nix develop -c cargo test -p btbc-cli unsupported_instruction_emit_error_uses_stable_failure_kind`
+  `nix develop -c cargo test -p bara-arm64 verifier_reports_ir_invariant_issues`、
+  `nix develop -c cargo test -p btbc-cli verifier_issue_artifact_serializes_ir_invariant_issue`
   が通過した。`nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
+
+- 2026-06-11 10:22 JST: B7 の 19 個目の小ステップとして、IR invariant を
+  Rust verifier report に接続した。`validate_program` の validation issue は
+  `EmittedFunctionVerificationIssue::IrInvariant` として report に入り、CLI artifact
+  では stable `ir_*` issue に変換される。これで B7 の implementation TODO は完了し、
+  次は large milestone review gate として PR を開く。検証は snapshot の targeted
+  test と commit 前の full verification。
 
 - 2026-06-11 10:10 JST: B7 の 18 個目の小ステップとして、
   stable failure classification kind を追加し、final-state mismatch から具体分類へ

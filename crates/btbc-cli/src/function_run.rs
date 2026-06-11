@@ -7,7 +7,7 @@ use bara_arm64::{
 };
 use bara_ir::{
     ExternalImportTarget, Program, PublicDyldSymbol, PublicLibcSymbol, PublicSymbolImport,
-    SyscallAbi, UnsupportedReason,
+    SyscallAbi, UnsupportedReason, ValidationIssue,
 };
 use bara_isa_x86::{decode_function, lift_decoded_function_with_image_metadata};
 use bara_oracle::{
@@ -559,15 +559,40 @@ impl FunctionVerifierReportArtifact {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 enum FunctionVerifierIssueArtifact {
-    MissingPcMapSource { source: u64 },
-    FixupTargetMissingPcMapSource { target: u64 },
-    FixupOffsetOutOfCode { offset: u64 },
-    FixupSourceOutOfCode { source: u64 },
+    IrEmptyProgram,
+    IrBlockRangeOverlap {
+        first_start: u64,
+        first_end: u64,
+        second_start: u64,
+        second_end: u64,
+    },
+    IrUnsupportedTerminator {
+        at: u64,
+    },
+    IrMissingBlockTarget {
+        at: u64,
+        target: u64,
+    },
+    MissingPcMapSource {
+        source: u64,
+    },
+    FixupTargetMissingPcMapSource {
+        target: u64,
+    },
+    FixupOffsetOutOfCode {
+        offset: u64,
+    },
+    FixupSourceOutOfCode {
+        source: u64,
+    },
 }
 
 impl FunctionVerifierIssueArtifact {
     const fn from_issue(issue: &EmittedFunctionVerificationIssue) -> Self {
         match issue {
+            EmittedFunctionVerificationIssue::IrInvariant { issue } => {
+                Self::from_ir_validation_issue(issue)
+            }
             EmittedFunctionVerificationIssue::MissingPcMapSource { source } => {
                 Self::MissingPcMapSource {
                     source: source.value(),
@@ -588,6 +613,30 @@ impl FunctionVerifierIssueArtifact {
                     source: source.value(),
                 }
             }
+        }
+    }
+
+    const fn from_ir_validation_issue(issue: &ValidationIssue) -> Self {
+        match issue {
+            ValidationIssue::EmptyProgram => Self::IrEmptyProgram,
+            ValidationIssue::BlockRangeOverlap {
+                first_start,
+                first_end,
+                second_start,
+                second_end,
+            } => Self::IrBlockRangeOverlap {
+                first_start: first_start.value(),
+                first_end: first_end.value(),
+                second_start: second_start.value(),
+                second_end: second_end.value(),
+            },
+            ValidationIssue::UnsupportedTerminator { at } => {
+                Self::IrUnsupportedTerminator { at: at.value() }
+            }
+            ValidationIssue::MissingBlockTarget { at, target } => Self::IrMissingBlockTarget {
+                at: at.value(),
+                target: target.value(),
+            },
         }
     }
 }
@@ -1204,7 +1253,7 @@ fn runtime_host_trap_plan(
 mod tests {
     use bara_ir::{
         ExternalCallRequest, ExternalSymbolId, ExternalSymbolImport, PublicLibcSymbol,
-        PublicSymbolImport, SyscallAbi, SyscallRequest, UnsupportedReason, X86Va,
+        PublicSymbolImport, SyscallAbi, SyscallRequest, UnsupportedReason, ValidationIssue, X86Va,
     };
     use bara_oracle::{test_case_from_json, FailureKind};
 
@@ -1310,5 +1359,22 @@ mod tests {
         });
 
         assert_eq!(error.failure_kind(), FailureKind::UnsupportedInstruction);
+    }
+
+    #[test]
+    fn verifier_issue_artifact_serializes_ir_invariant_issue() {
+        let issue = super::FunctionVerifierIssueArtifact::from_issue(
+            &bara_arm64::EmittedFunctionVerificationIssue::IrInvariant {
+                issue: ValidationIssue::MissingBlockTarget {
+                    at: X86Va::new(4),
+                    target: X86Va::new(8),
+                },
+            },
+        );
+
+        assert_eq!(
+            serde_json::to_string(&issue).expect("verifier issue serializes"),
+            "{\"kind\":\"ir_missing_block_target\",\"at\":4,\"target\":8}"
+        );
     }
 }

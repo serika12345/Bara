@@ -1,4 +1,4 @@
-use bara_ir::{Program, X86Va};
+use bara_ir::{validate_program, Program, ValidationIssue, X86Va};
 
 use crate::{ArmPc, EmittedFunction};
 
@@ -25,6 +25,7 @@ impl EmittedFunctionVerificationReport {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EmittedFunctionVerificationIssue {
+    IrInvariant { issue: ValidationIssue },
     MissingPcMapSource { source: X86Va },
     FixupTargetMissingPcMapSource { target: X86Va },
     FixupOffsetOutOfCode { offset: ArmPc },
@@ -36,6 +37,13 @@ pub fn verify_emitted_function(
     emitted: &EmittedFunction,
 ) -> EmittedFunctionVerificationReport {
     let mut issues = Vec::new();
+
+    for issue in validate_program(program).issues() {
+        issues.push(EmittedFunctionVerificationIssue::IrInvariant {
+            issue: issue.clone(),
+        });
+    }
+
     let pc_map_sources = emitted
         .pc_map()
         .iter()
@@ -89,7 +97,9 @@ fn arm64_instruction_slot_exists(pc: ArmPc, code_len: usize) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use bara_ir::{BasicBlock, BlockId, Program, Terminator, X86Va};
+    use bara_ir::{
+        BasicBlock, BlockId, Program, Terminator, UnsupportedReason, ValidationIssue, X86Va,
+    };
 
     use crate::{
         Arm64MachineCode, ArmPc, BranchFixup, BranchFixupKind, EmittedFunction,
@@ -137,6 +147,35 @@ mod tests {
             verify_emitted_function(&program, &emitted).issues(),
             &[EmittedFunctionVerificationIssue::MissingPcMapSource {
                 source: X86Va::new(4)
+            }]
+        );
+    }
+
+    #[test]
+    fn verifier_reports_ir_invariant_issues() {
+        let program = Program::new(
+            X86Va::new(0),
+            vec![BasicBlock::new(
+                BlockId::new(0),
+                X86Va::new(0),
+                X86Va::new(1),
+                Vec::new(),
+                Terminator::Unsupported {
+                    reason: UnsupportedReason::MissingReturnTerminator { at: X86Va::new(1) },
+                },
+            )
+            .expect("test block range is valid")],
+        )
+        .expect("program has entry block");
+        let emitted = EmittedFunction::new(
+            Arm64MachineCode::new(vec![0xc0, 0x03, 0x5f, 0xd6]).expect("test code is non-empty"),
+            vec![PcMapEntry::new(X86Va::new(0), ArmPc::new(0))],
+        );
+
+        assert_eq!(
+            verify_emitted_function(&program, &emitted).issues(),
+            &[EmittedFunctionVerificationIssue::IrInvariant {
+                issue: ValidationIssue::UnsupportedTerminator { at: X86Va::new(1) }
             }]
         );
     }

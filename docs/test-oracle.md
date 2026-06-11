@@ -266,10 +266,11 @@ supply-chain 検証範囲が広がるため、まず既存 Rust workspace 内で
 fixup consistency、final state comparison を stable report として返す。
 
 B7 の初期 Rust verifier report は `verifier.report.json` として保存する。
-現在の検査は、emit 後の PC map が全 IR block start の source PC を保持している
-ことと、branch fixup の target が PC map source に解決でき、offset / source の
-ARM64 PC が生成 code 内の命令 slot を指していること、比較失敗時の
-`failure.json` が final state comparison report を保持することに限定する。
+現在の検査は、`bara_ir::validate_program` の IR invariant issue、emit 後の
+PC map が全 IR block start の source PC を保持していること、branch fixup の
+target が PC map source に解決でき、offset / source の ARM64 PC が生成 code 内の
+命令 slot を指していること、比較失敗時の `failure.json` が final state
+comparison report を保持することを扱う。
 
 Haskell は、JSON schema が安定し、QuickCheck / Hedgehog による generator と
 shrinker、または Rust 実装から独立した仕様モデルが必要になった時点で `spec/`
