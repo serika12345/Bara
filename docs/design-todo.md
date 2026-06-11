@@ -107,7 +107,7 @@
 
 - [ ] AOT、JIT、fallback interpreter、translation cache、artifact cache を同じ user-space runtime 境界から扱う。
 - [ ] executable memory、signal、exception、thread、TLS、memory protection を public OS API の範囲で整理する。
-- [ ] kernel extension、private dyld behavior、private OS hook を前提にしない。
+- [x] kernel extension、private dyld behavior、private OS hook を前提にしない。
 - [ ] Rosetta 2 型の OS 統合ではなく、Bara は user-space binary translation runtime として設計する。
 
 メモ:
@@ -124,6 +124,11 @@
   分けて置いた。actual launch report はこの plan を `runtime_preparation` として
   JSON projection する。これは実 loader 実行、private dyld behavior、AppKit /
   Objective-C runtime 内部の再実装を意味しない。
+- 2026-06-11 の B8 小ステップとして、`UserSpaceLaunchPlan` に
+  `integration_policy` を追加した。B8 GUI Hello World actual launch report は
+  process scope を current user-space process とし、kernel extension、
+  private kernel hook、private dyld behavior をすべて `not_required` として
+  記録する。
 
 ## D7: Binary format input/output の分離
 

@@ -4,6 +4,7 @@ pub struct UserSpaceLaunchPlan {
     entry_trampoline: UserSpaceEntryTrampolinePlan,
     initial_stack: UserSpaceInitialStackPlan,
     helper_boundary: UserSpaceHelperBoundaryPlan,
+    integration_policy: UserSpaceIntegrationPolicy,
 }
 
 impl UserSpaceLaunchPlan {
@@ -13,6 +14,7 @@ impl UserSpaceLaunchPlan {
             entry_trampoline: UserSpaceEntryTrampolinePlan::mach_o_entry_point(),
             initial_stack: UserSpaceInitialStackPlan::argv_envp_initial_stack(),
             helper_boundary: UserSpaceHelperBoundaryPlan::imports_objc_os_api_requests(),
+            integration_policy: UserSpaceIntegrationPolicy::current_user_space_process(),
         }
     }
 
@@ -30,6 +32,10 @@ impl UserSpaceLaunchPlan {
 
     pub const fn helper_boundary(&self) -> &UserSpaceHelperBoundaryPlan {
         &self.helper_boundary
+    }
+
+    pub const fn integration_policy(&self) -> &UserSpaceIntegrationPolicy {
+        &self.integration_policy
     }
 }
 
@@ -163,12 +169,58 @@ pub enum UserSpaceHelperBoundaryContract {
     ImportsObjcOsApiRequests,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UserSpaceIntegrationPolicy {
+    process_scope: UserSpaceProcessScope,
+    kernel_extension: UserSpacePrivateIntegrationRequirement,
+    private_kernel_hook: UserSpacePrivateIntegrationRequirement,
+    private_dyld_behavior: UserSpacePrivateIntegrationRequirement,
+}
+
+impl UserSpaceIntegrationPolicy {
+    const fn current_user_space_process() -> Self {
+        Self {
+            process_scope: UserSpaceProcessScope::CurrentUserSpaceProcess,
+            kernel_extension: UserSpacePrivateIntegrationRequirement::NotRequired,
+            private_kernel_hook: UserSpacePrivateIntegrationRequirement::NotRequired,
+            private_dyld_behavior: UserSpacePrivateIntegrationRequirement::NotRequired,
+        }
+    }
+
+    pub const fn process_scope(self) -> UserSpaceProcessScope {
+        self.process_scope
+    }
+
+    pub const fn kernel_extension(self) -> UserSpacePrivateIntegrationRequirement {
+        self.kernel_extension
+    }
+
+    pub const fn private_kernel_hook(self) -> UserSpacePrivateIntegrationRequirement {
+        self.private_kernel_hook
+    }
+
+    pub const fn private_dyld_behavior(self) -> UserSpacePrivateIntegrationRequirement {
+        self.private_dyld_behavior
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceProcessScope {
+    CurrentUserSpaceProcess,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpacePrivateIntegrationRequirement {
+    NotRequired,
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         UserSpaceEntryTrampolineTarget, UserSpaceHelperBoundaryContract,
         UserSpaceImageMappingSource, UserSpaceInitialStackContract, UserSpaceLaunchPlan,
         UserSpaceLaunchResponsibility, UserSpaceMemoryProtectionModel,
+        UserSpacePrivateIntegrationRequirement, UserSpaceProcessScope,
     };
 
     #[test]
@@ -210,6 +262,28 @@ mod tests {
         assert_eq!(
             plan.helper_boundary().contract(),
             UserSpaceHelperBoundaryContract::ImportsObjcOsApiRequests
+        );
+    }
+
+    #[test]
+    fn user_space_launch_plan_requires_no_private_kernel_or_dyld_integration() {
+        let policy = *UserSpaceLaunchPlan::mach_o_executable_image().integration_policy();
+
+        assert_eq!(
+            policy.process_scope(),
+            UserSpaceProcessScope::CurrentUserSpaceProcess
+        );
+        assert_eq!(
+            policy.kernel_extension(),
+            UserSpacePrivateIntegrationRequirement::NotRequired
+        );
+        assert_eq!(
+            policy.private_kernel_hook(),
+            UserSpacePrivateIntegrationRequirement::NotRequired
+        );
+        assert_eq!(
+            policy.private_dyld_behavior(),
+            UserSpacePrivateIntegrationRequirement::NotRequired
         );
     }
 }

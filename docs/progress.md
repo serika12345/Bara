@@ -9,40 +9,45 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 12:50 JST
+最終更新: 2026-06-11 13:01 JST
 
 状態:
 
-- project_state: completed。B8 の user-space loader/runtime preparation step
-  として、image mapping、entry trampoline、initial stack、helper boundary の
-  準備責務を typed launch plan と actual launch report へ載せた。
+- project_state: completed。B8 の private kernel / dyld assumption exclusion
+  step として、user-space launch plan と actual launch report に
+  integration policy を載せた。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8:
   実 x86_64 macOS アプリ起動。
-- active_design_focus: B8 user-space launch preparation model。self-authored
-  AppKit fixture の input Mach-O executable image を user-space runtime で
-  起動する前段として、準備責務を pure runtime plan と report 境界へ分ける。
+- active_design_focus: B8 user-space launch integration policy。self-authored
+  AppKit fixture の input Mach-O executable image を current user-space
+  process 内で扱い、kernel extension、private kernel hook、private dyld
+  behavior を前提にしないことを report 境界へ残す。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
   latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B8 の「user-space loader / runtime が
-  image mapping、entry trampoline、stack / argv / envp、helper boundary を
-  準備する責務を分ける」。
-- completed_work: `bara-runtime::UserSpaceLaunchPlan` は Mach-O executable image
-  launch preparation を image mapping、entry trampoline、initial stack、
-  helper boundary に分ける。B8 actual launch report は `runtime_preparation`
-  としてこの plan の JSON projection を保存し、現時点では
-  `planned_not_executed` として記録する。
-- remaining_work: 次の小ステップは kernel extension、private kernel hook、
-  private dyld behavior を前提にしないことを B8 runtime/loader 境界で明示すること。
-- next_action: commit / push 後、次の B8 小ステップで private kernel / dyld
-  assumption を排除する runtime boundary を固定する。
+- related_todo: [TODO.md](../TODO.md) B8 の「kernel extension、
+  private kernel hook、private dyld behavior を前提にしない」。
+- completed_work: `bara-runtime::UserSpaceLaunchPlan` は `integration_policy` を
+  持ち、process scope を current user-space process とする。B8 actual launch
+  report は kernel extension、private kernel hook、private dyld behavior を
+  すべて `not_required` として保存する。
+- remaining_work: 次の小ステップは loader、translation cache、runtime helper、
+  artifact cache を user-space process 内に閉じること。
+- next_action: commit / push 後、次の B8 小ステップで user-space process 内の
+  loader/cache/helper/artifact cache boundary を固定する。
 - verification: targeted tests として
-  `nix develop -c cargo test -p bara-runtime user_space_launch_plan_splits_loader_runtime_stack_and_helper_responsibilities -- --nocapture`、
+  `nix develop -c cargo test -p bara-runtime user_space_launch_plan -- --nocapture`、
   `nix develop -c cargo test -p btbc-cli gui_hello_world_actual -- --nocapture`
   が通過した。`nix develop -c cargo clippy -p bara-runtime -p btbc-cli --all-targets -- -D warnings`
   も通過した。full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-11 13:01 JST: B8 の private kernel / dyld assumption exclusion
+  step として、`bara-runtime::UserSpaceLaunchPlan` に `integration_policy` を
+  追加した。B8 actual launch report は current user-space process を scope とし、
+  kernel extension、private kernel hook、private dyld behavior をすべて
+  `not_required` として保存する。targeted tests、`bara-runtime` / `btbc-cli`
+  clippy、full `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-11 12:50 JST: B8 の user-space loader/runtime preparation step として、
   `bara-runtime::UserSpaceLaunchPlan` を追加し、image mapping、entry trampoline、
   initial stack、helper boundary の準備責務を分けた。B8 actual launch report は
