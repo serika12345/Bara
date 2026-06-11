@@ -192,17 +192,103 @@ fn mach_o_stdout_input_reaches_pure_writer_serialization_plan() {
     let output_probe_json =
         binary_format_probe_report_to_json(&output_probe).expect("probe report serializes");
     assert_eq!(
-        output_probe_json,
-        format!(
-            "{{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\",\"metadata\":{{\"mach_o\":{{\"file_type\":\"executable\",\"load_commands\":{{\"count\":2,\"byte_size\":{},\"recognized_entry_points\":[{{\"byte_size\":24,\"entryoff\":{},\"stacksize\":0}}],\"recognized_segments\":[{{\"byte_size\":{},\"name\":\"__TEXT\",\"vmaddr\":4294967296,\"fileoff\":0,\"filesize\":{}}}],\"unsupported_commands\":[]}},\"executable_image_conversion\":{{\"status\":\"convertible\",\"entry_point\":{{\"byte_size\":24,\"entryoff\":{},\"stacksize\":0}},\"segment\":{{\"byte_size\":{},\"name\":\"__TEXT\",\"vmaddr\":4294967296,\"fileoff\":0,\"filesize\":{}}}}}}}}}}}",
-            layout.load_commands().size().value(),
-            layout.text_section().offset().value(),
-            layout.load_commands().size().value() - 24,
-            layout.total_size().value(),
-            layout.text_section().offset().value(),
-            layout.load_commands().size().value() - 24,
-            layout.total_size().value()
-        )
+        serde_json::from_str::<serde_json::Value>(&output_probe_json)
+            .expect("probe report output is json"),
+        serde_json::json!({
+            "format": "mach_o_64_little_endian",
+            "status": "recognized_but_unsupported",
+            "metadata": {
+                "mach_o": {
+                    "file_type": "executable",
+                    "load_commands": {
+                        "count": 2,
+                        "byte_size": layout.load_commands().size().value(),
+                        "recognized_entry_points": [
+                            {
+                                "byte_size": 24,
+                                "entryoff": layout.text_section().offset().value(),
+                                "stacksize": 0
+                            }
+                        ],
+                        "recognized_segments": [
+                            {
+                                "byte_size": layout.load_commands().size().value() - 24,
+                                "name": "__TEXT",
+                                "vmaddr": 4_294_967_296_u64,
+                                "fileoff": 0,
+                                "filesize": layout.total_size().value(),
+                                "sections": [
+                                    {
+                                        "name": "__text",
+                                        "segment_name": "__TEXT",
+                                        "addr": 4_294_967_296_u64
+                                            + layout.text_section().offset().value(),
+                                        "size": layout.text_section().size().value(),
+                                        "offset": layout.text_section().offset().value(),
+                                        "align": 2,
+                                        "reloff": 0,
+                                        "nreloc": 0,
+                                        "flags": 2_147_484_672_u32
+                                    },
+                                    {
+                                        "name": "__const",
+                                        "segment_name": "__TEXT",
+                                        "addr": 4_294_967_296_u64 + const_section.offset().value(),
+                                        "size": const_section.size().value(),
+                                        "offset": const_section.offset().value(),
+                                        "align": 0,
+                                        "reloff": 0,
+                                        "nreloc": 0,
+                                        "flags": 0
+                                    }
+                                ]
+                            }
+                        ],
+                        "unsupported_commands": []
+                    },
+                    "executable_image_conversion": {
+                        "status": "convertible",
+                        "entry_point": {
+                            "byte_size": 24,
+                            "entryoff": layout.text_section().offset().value(),
+                            "stacksize": 0
+                        },
+                        "segment": {
+                            "byte_size": layout.load_commands().size().value() - 24,
+                            "name": "__TEXT",
+                            "vmaddr": 4_294_967_296_u64,
+                            "fileoff": 0,
+                            "filesize": layout.total_size().value(),
+                            "sections": [
+                                {
+                                    "name": "__text",
+                                    "segment_name": "__TEXT",
+                                    "addr": 4_294_967_296_u64
+                                        + layout.text_section().offset().value(),
+                                    "size": layout.text_section().size().value(),
+                                    "offset": layout.text_section().offset().value(),
+                                    "align": 2,
+                                    "reloff": 0,
+                                    "nreloc": 0,
+                                    "flags": 2_147_484_672_u32
+                                },
+                                {
+                                    "name": "__const",
+                                    "segment_name": "__TEXT",
+                                    "addr": 4_294_967_296_u64 + const_section.offset().value(),
+                                    "size": const_section.size().value(),
+                                    "offset": const_section.offset().value(),
+                                    "align": 0,
+                                    "reloff": 0,
+                                    "nreloc": 0,
+                                    "flags": 0
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        })
     );
 }
 

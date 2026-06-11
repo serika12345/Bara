@@ -2,6 +2,7 @@ mod mach_o;
 mod mach_o_entry_point_command;
 mod mach_o_executable_image_conversion;
 mod mach_o_load_command;
+mod mach_o_section;
 mod mach_o_segment_command;
 mod probe;
 
@@ -16,6 +17,11 @@ pub use mach_o_executable_image_conversion::{
 pub use mach_o_load_command::{
     MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommandSummary, MachOLoadCommandType,
     RecognizedMachOEntryPointCommand, RecognizedMachOSegmentCommand, UnsupportedMachOLoadCommand,
+};
+pub use mach_o_section::{
+    MachOSectionAddress, MachOSectionAlignment, MachOSectionByteSize, MachOSectionFileOffset,
+    MachOSectionFlags, MachOSectionMetadata, MachOSectionName, MachOSectionRelocationCount,
+    MachOSectionRelocationFileOffset,
 };
 pub use mach_o_segment_command::{
     MachOSegmentCommandHeaderMetadata, MachOSegmentFileOffset, MachOSegmentFileSize,

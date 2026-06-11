@@ -185,7 +185,9 @@ impl GuiHelloWorldActualLoaderMetadata {
         Self {
             source: GuiHelloWorldActualLoaderMetadataSource::PublicMachOProbe,
             mach_o: report.metadata().mach_o_metadata().clone(),
-            sections: GuiHelloWorldActualDeferredLoaderMetadata::not_modeled(),
+            sections:
+                GuiHelloWorldActualDeferredLoaderMetadata::modeled_from_lc_segment_64_section_table(
+                ),
             imports: GuiHelloWorldActualDeferredLoaderMetadata::not_modeled(),
             relocations: GuiHelloWorldActualDeferredLoaderMetadata::not_modeled(),
         }
@@ -204,6 +206,13 @@ struct GuiHelloWorldActualDeferredLoaderMetadata {
 }
 
 impl GuiHelloWorldActualDeferredLoaderMetadata {
+    const fn modeled_from_lc_segment_64_section_table() -> Self {
+        Self {
+            status:
+                GuiHelloWorldActualDeferredLoaderMetadataStatus::ModeledFromLcSegment64SectionTable,
+        }
+    }
+
     const fn not_modeled() -> Self {
         Self {
             status: GuiHelloWorldActualDeferredLoaderMetadataStatus::NotModeled,
@@ -213,6 +222,8 @@ impl GuiHelloWorldActualDeferredLoaderMetadata {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 enum GuiHelloWorldActualDeferredLoaderMetadataStatus {
+    #[serde(rename = "modeled_from_lc_segment_64_section_table")]
+    ModeledFromLcSegment64SectionTable,
     #[serde(rename = "not_modeled")]
     NotModeled,
 }
@@ -421,7 +432,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_string(attempt.launch_report()).expect("launch report serializes"),
-            "{\"schema\":\"b8_gui_hello_world_actual_launch_report_v0\",\"case_id\":\"b8_gui_hello_world\",\"actual_runtime\":\"bara_arm64_user_space\",\"status\":\"blocked\",\"input\":{\"kind\":\"mach_o_executable_image\",\"source_isa\":\"x86_64\",\"binary_format\":\"mach_o\",\"target_triple\":\"x86_64-apple-macos13\",\"gui_framework\":\"appkit\",\"probe\":{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\"},\"loader_metadata\":{\"source\":\"public_mach_o_probe\",\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":0,\"byte_size\":0,\"recognized_entry_points\":[],\"recognized_segments\":[],\"unsupported_commands\":[]},\"executable_image_conversion\":{\"status\":\"not_convertible\",\"blocker\":\"missing_entry_point\"}},\"sections\":{\"status\":\"not_modeled\"},\"imports\":{\"status\":\"not_modeled\"},\"relocations\":{\"status\":\"not_modeled\"}}},\"blocker\":{\"classification\":\"unsupported_loader_feature\",\"boundary\":\"loader\",\"selected_by\":\"first_unsupported_launch_boundary\",\"candidate_boundaries\":[{\"boundary\":\"loader\",\"classification\":\"unsupported_loader_feature\"},{\"boundary\":\"import\",\"classification\":\"unsupported_import\"},{\"boundary\":\"objc_runtime\",\"classification\":\"unsupported_objc_runtime_boundary\"}],\"message\":\"Bara does not yet load a complete x86_64 Mach-O GUI executable with dynamic loader, AppKit import, and Objective-C runtime requirements.\"}}"
+            "{\"schema\":\"b8_gui_hello_world_actual_launch_report_v0\",\"case_id\":\"b8_gui_hello_world\",\"actual_runtime\":\"bara_arm64_user_space\",\"status\":\"blocked\",\"input\":{\"kind\":\"mach_o_executable_image\",\"source_isa\":\"x86_64\",\"binary_format\":\"mach_o\",\"target_triple\":\"x86_64-apple-macos13\",\"gui_framework\":\"appkit\",\"probe\":{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\"},\"loader_metadata\":{\"source\":\"public_mach_o_probe\",\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":0,\"byte_size\":0,\"recognized_entry_points\":[],\"recognized_segments\":[],\"unsupported_commands\":[]},\"executable_image_conversion\":{\"status\":\"not_convertible\",\"blocker\":\"missing_entry_point\"}},\"sections\":{\"status\":\"modeled_from_lc_segment_64_section_table\"},\"imports\":{\"status\":\"not_modeled\"},\"relocations\":{\"status\":\"not_modeled\"}}},\"blocker\":{\"classification\":\"unsupported_loader_feature\",\"boundary\":\"loader\",\"selected_by\":\"first_unsupported_launch_boundary\",\"candidate_boundaries\":[{\"boundary\":\"loader\",\"classification\":\"unsupported_loader_feature\"},{\"boundary\":\"import\",\"classification\":\"unsupported_import\"},{\"boundary\":\"objc_runtime\",\"classification\":\"unsupported_objc_runtime_boundary\"}],\"message\":\"Bara does not yet load a complete x86_64 Mach-O GUI executable with dynamic loader, AppKit import, and Objective-C runtime requirements.\"}}"
         );
     }
 

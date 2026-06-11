@@ -10,8 +10,11 @@ pub use input::{
     MachOEntryPointStackSize, MachOExecutableImageConversion,
     MachOExecutableImageConversionBlocker, MachOExecutableImageConversionStatus, MachOFileType,
     MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommandSummary, MachOLoadCommandType,
-    MachOLoadCommands, MachOMetadata, MachOSegmentCommandHeaderMetadata, MachOSegmentFileOffset,
-    MachOSegmentFileSize, MachOSegmentName, MachOSegmentVmAddr, RecognizedMachOEntryPointCommand,
+    MachOLoadCommands, MachOMetadata, MachOSectionAddress, MachOSectionAlignment,
+    MachOSectionByteSize, MachOSectionFileOffset, MachOSectionFlags, MachOSectionMetadata,
+    MachOSectionName, MachOSectionRelocationCount, MachOSectionRelocationFileOffset,
+    MachOSegmentCommandHeaderMetadata, MachOSegmentFileOffset, MachOSegmentFileSize,
+    MachOSegmentName, MachOSegmentVmAddr, RecognizedMachOEntryPointCommand,
     RecognizedMachOSegmentCommand, UnsupportedMachOLoadCommand,
 };
 pub use mach_o_entry_function_pipeline::{

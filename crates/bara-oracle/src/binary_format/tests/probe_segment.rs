@@ -98,6 +98,83 @@ fn reads_mach_o_segment_64_command_header_metadata_as_typed_values() {
 }
 
 #[test]
+fn reads_mach_o_segment_64_section_metadata_as_typed_values() {
+    let input = BinaryInput::from_hex(concat!(
+        "cffaedfe07000001030000000200000001000000980000000000000000000000",
+        "1900000098000000",
+        "5f5f5445585400000000000000000000",
+        "0000000001000000",
+        "0000000000000000",
+        "b800000000000000",
+        "0400000000000000",
+        "0000000000000000",
+        "01000000",
+        "00000000",
+        "5f5f7465787400000000000000000000",
+        "5f5f5445585400000000000000000000",
+        "b800000001000000",
+        "0400000000000000",
+        "b8000000",
+        "02000000",
+        "00000000",
+        "00000000",
+        "00000480",
+        "00000000",
+        "00000000",
+        "00000000",
+        "2a000000",
+    ))
+    .expect("hex fixture is valid");
+
+    let report = probe_public_binary_format(&input).expect("probe succeeds");
+
+    assert_eq!(
+        serde_json::to_value(report).expect("probe report serializes"),
+        serde_json::json!({
+            "format": "mach_o_64_little_endian",
+            "status": "recognized_but_unsupported",
+            "metadata": {
+                "mach_o": {
+                    "file_type": "executable",
+                    "load_commands": {
+                        "count": 1,
+                        "byte_size": 152,
+                        "recognized_entry_points": [],
+                        "recognized_segments": [
+                            {
+                                "byte_size": 152,
+                                "name": "__TEXT",
+                                "vmaddr": 4294967296_u64,
+                                "fileoff": 184,
+                                "filesize": 4,
+                                "sections": [
+                                    {
+                                        "name": "__text",
+                                        "segment_name": "__TEXT",
+                                        "addr": 4294967480_u64,
+                                        "size": 4,
+                                        "offset": 184,
+                                        "align": 2,
+                                        "reloff": 0,
+                                        "nreloc": 0,
+                                        "flags": 2147745792_u32
+                                    }
+                                ]
+                            }
+                        ],
+                        "unsupported_commands": []
+                    },
+                    "executable_image_conversion": {
+                        "status": "not_convertible",
+                        "blocker": "missing_entry_point"
+                    }
+                }
+            }
+        })
+    );
+}
+
+#[test]
 fn accepts_mach_o_segment_64_zero_size_file_range_at_end_of_input() {
     let input = BinaryInput::from_hex(concat!(
         "cffaedfe07000001030000000200000001000000480000000000000000000000",

@@ -3,6 +3,7 @@ use super::{
         parse_entry_point_command_metadata, validate_entry_point_command_byte_size,
         MachOEntryPointCommandMetadata,
     },
+    mach_o_section::{parse_segment_64_sections_metadata, MachOSectionMetadata},
     mach_o_segment_command::{
         parse_segment_64_header_metadata, validate_segment_64_command_byte_size,
         MachOSegmentCommandHeaderMetadata,
@@ -156,6 +157,8 @@ pub struct RecognizedMachOSegmentCommand {
     byte_size: MachOLoadCommandByteSize,
     #[serde(flatten)]
     header: MachOSegmentCommandHeaderMetadata,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    sections: Vec<MachOSectionMetadata>,
 }
 
 impl RecognizedMachOSegmentCommand {
@@ -163,7 +166,23 @@ impl RecognizedMachOSegmentCommand {
         byte_size: MachOLoadCommandByteSize,
         header: MachOSegmentCommandHeaderMetadata,
     ) -> Self {
-        Self { byte_size, header }
+        Self {
+            byte_size,
+            header,
+            sections: Vec::new(),
+        }
+    }
+
+    pub(crate) fn with_sections(
+        byte_size: MachOLoadCommandByteSize,
+        header: MachOSegmentCommandHeaderMetadata,
+        sections: Vec<MachOSectionMetadata>,
+    ) -> Self {
+        Self {
+            byte_size,
+            header,
+            sections,
+        }
     }
 
     pub const fn byte_size(&self) -> MachOLoadCommandByteSize {
@@ -172,6 +191,10 @@ impl RecognizedMachOSegmentCommand {
 
     pub const fn header(&self) -> &MachOSegmentCommandHeaderMetadata {
         &self.header
+    }
+
+    pub fn sections(&self) -> &[MachOSectionMetadata] {
+        &self.sections
     }
 }
 
@@ -257,9 +280,10 @@ pub(crate) fn parse_mach_o_load_command_summary(
             ));
         } else if command.is_segment_64() {
             validate_segment_64_command_byte_size(byte_size.as_usize())?;
-            recognized_segments.push(RecognizedMachOSegmentCommand::new(
+            recognized_segments.push(RecognizedMachOSegmentCommand::with_sections(
                 byte_size,
                 parse_segment_64_header_metadata(input, command_offset)?,
+                parse_segment_64_sections_metadata(input, command_offset, byte_size.as_usize())?,
             ));
         } else {
             unsupported_commands.push(UnsupportedMachOLoadCommand::new(command, byte_size));

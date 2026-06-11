@@ -71,6 +71,7 @@ pub enum BinaryFormatProbeError {
     EntryPointFileOffsetOutOfBounds,
     InputTooShort,
     HeaderTooShort,
+    InvalidMachOSectionName,
     InvalidMachOSegmentName,
     LoadCommandTooSmall,
     LoadCommandsOutOfBounds,

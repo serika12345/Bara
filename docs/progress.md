@@ -9,41 +9,47 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 11:55 JST
+最終更新: 2026-06-11 12:13 JST
 
 状態:
 
-- project_state: completed。B8 の 7 つ目の小ステップとして、Bara 側の
-  GUI Hello World actual launch report に public Mach-O probe 由来の loader
-  metadata summary を保存するようにした。
+- project_state: completed。B8 の 8 つ目の小ステップとして、public
+  `LC_SEGMENT_64` section table から Mach-O sections metadata を model 化した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8:
   実 x86_64 macOS アプリ起動。
-- active_design_focus: B8 GUI loader metadata summary。self-authored AppKit
-  fixture の input Mach-O executable image から public parser が認識できる
-  loader metadata を actual launch report 境界へ渡す。
+- active_design_focus: B8 Mach-O section metadata。self-authored AppKit fixture の
+  input Mach-O executable image から public `section_64` metadata を parser/report
+  境界へ渡す。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
   latest commit はこの小ステップの review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B8 の「entry、segments、sections、imports、
   relocations、必要な loader metadata を public Mach-O 仕様ベースで model 化する」
-  のうち、actual launch report に public Mach-O probe 由来の loader metadata を
-  保存する小ステップ。
-- completed_work: `b8_gui_hello_world_actual_launch_report_v0` の `input` に
-  `loader_metadata` を追加した。metadata は `public_mach_o_probe` を source とし、
-  `MachOMetadata` の file type、load command table、recognized entry points /
-  segments、executable image conversion blocker を保持する。sections、imports、
-  relocations は parser 未対応のため `not_modeled` として明示する。
-- remaining_work: 次の小ステップは sections metadata を public `LC_SEGMENT_64` /
-  section table から model 化すること。
-- next_action: commit / push 後、次の B8 小ステップで public Mach-O section
+  のうち、sections metadata を public `LC_SEGMENT_64` / section table から model 化する
+  小ステップ。
+- completed_work: `bara-oracle` の Mach-O input parser に `section_64` metadata
+  model を追加した。recognized `LC_SEGMENT_64` は section table がある場合に
+  section name、segment name、addr、size、offset、align、reloff、nreloc、flags を
+  typed metadata として保持する。B8 actual launch report の `sections` status は
+  `modeled_from_lc_segment_64_section_table` になった。
+- remaining_work: 次の小ステップは imports metadata を public dynamic-link load
+  commands から model 化すること。
+- next_action: commit / push 後、次の B8 小ステップで public Mach-O import
   metadata を parser/report 境界へ追加する。
 - verification: targeted tests として
-  `nix develop -c cargo test -p btbc-cli gui_hello_world_actual -- --nocapture`、
-  `nix develop -c cargo test -p btbc-cli generate_arm64_gui_hello_world_actual_writes_actual_and_launch_report -- --nocapture`
-  が通過した。`nix develop -c cargo clippy -p btbc-cli --all-targets -- -D warnings`
+  `nix develop -c cargo test -p bara-oracle probe_segment -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli gui_hello_world_actual -- --nocapture`
+  が通過した。`nix develop -c cargo clippy -p bara-oracle -p btbc-cli --all-targets -- -D warnings`
   も通過した。full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-11 12:13 JST: B8 の 8 つ目の小ステップとして、public
+  `LC_SEGMENT_64` section table から Mach-O sections metadata を model 化した。
+  `section_64` の section name、segment name、addr、size、offset、align、
+  reloff、nreloc、flags を typed metadata として parser/report 境界に載せる。
+  B8 actual launch report の `sections` status は
+  `modeled_from_lc_segment_64_section_table` になった。targeted tests、`bara-oracle` /
+  `btbc-cli` clippy、full `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-11 11:55 JST: B8 の 7 つ目の小ステップとして、Bara 側の
   GUI Hello World actual launch report に public Mach-O probe 由来の loader
   metadata summary を保存するようにした。`input.loader_metadata` は

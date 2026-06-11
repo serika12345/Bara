@@ -22,9 +22,12 @@ pub use binary_format::{
     MachOExecutableImageEntryFunctionError, MachOExecutableImageMaterializationError,
     MachOExecutableImagePlan, MachOExecutableImagePlanError, MachOFileType,
     MachOLoadCommandByteSize, MachOLoadCommandCount, MachOLoadCommandSummary, MachOLoadCommandType,
-    MachOLoadCommands, MachOMetadata, MachOSegmentCommandHeaderMetadata, MachOSegmentFileOffset,
-    MachOSegmentFileRange, MachOSegmentFileSize, MachOSegmentName, MachOSegmentVmAddr,
-    RecognizedMachOEntryPointCommand, RecognizedMachOSegmentCommand, UnsupportedMachOLoadCommand,
+    MachOLoadCommands, MachOMetadata, MachOSectionAddress, MachOSectionAlignment,
+    MachOSectionByteSize, MachOSectionFileOffset, MachOSectionFlags, MachOSectionMetadata,
+    MachOSectionName, MachOSectionRelocationCount, MachOSectionRelocationFileOffset,
+    MachOSegmentCommandHeaderMetadata, MachOSegmentFileOffset, MachOSegmentFileRange,
+    MachOSegmentFileSize, MachOSegmentName, MachOSegmentVmAddr, RecognizedMachOEntryPointCommand,
+    RecognizedMachOSegmentCommand, UnsupportedMachOLoadCommand,
 };
 pub use compare::{compare_observed_results, ComparisonIssue, ComparisonReport};
 pub use executable_manifest::{
