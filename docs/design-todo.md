@@ -210,6 +210,13 @@
   である。現在の source of truth は `blocker.json` の
   `DecodeUnsupportedOpcode { opcode: 72 }` (`48 89 e5`, `mov rbp,rsp`) であり、次の
   PR Gate はこの REX.W register move を扱う。
+- 2026-06-11 の B8-G3b completion step として、`48 89 e5` (`mov rbp,rsp`) だけを
+  prologue slice として追加した。IR register model は stack pointer family を持ち、
+  decode は `MovRbpRsp`、lift は `IrOp::Mov { dst: Rbp, src: Rsp }`、ARM64 emit は
+  `mov x29, sp` として扱う。これは一般 register move や stack frame lowering の
+  実装ではない。現在の source of truth は `blocker.json` の
+  `DecodeUnsupportedOpcode { opcode: 65 }` (`41 57`, `push r15`) であり、次の
+  PR Gate はこの REX.B extended-register push を扱う。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、

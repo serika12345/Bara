@@ -242,6 +242,12 @@ pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
                     emit_ldrb_w0_x0(&mut code);
                     has_rax_value = true;
                 }
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rbp),
+                    src: Operand::Reg(X86Reg::Rsp),
+                } => {
+                    emit_mov_x29_sp(&mut code);
+                }
                 IrOp::Mov { .. } => {
                     return Err(unsupported_ir());
                 }
@@ -697,6 +703,10 @@ fn emit_push_x29(code: &mut Vec<u8>) -> usize {
     emit_u32_le(code, 0xf81f_0ffd)
 }
 
+fn emit_mov_x29_sp(code: &mut Vec<u8>) -> usize {
+    emit_u32_le(code, 0x9100_03fd)
+}
+
 fn emit_pop_x0(code: &mut Vec<u8>) -> usize {
     emit_u32_le(code, 0xf841_07e0)
 }
@@ -1006,6 +1016,30 @@ mod tests {
         assert_eq!(
             emitted.code().bytes(),
             &[0xfd, 0x0f, 0x1f, 0xf8, 0x40, 0x05, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]
+        );
+    }
+
+    #[test]
+    fn emits_mov_rbp_rsp_as_frame_pointer_assignment() {
+        let program = program_with_ops(
+            vec![
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rbp),
+                    src: Operand::Reg(X86Reg::Rsp),
+                },
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(42),
+                },
+            ],
+            Terminator::Return,
+        );
+
+        let emitted = emit_program(&program).expect("mov rbp,rsp IR emits");
+
+        assert_eq!(
+            emitted.code().bytes(),
+            &[0xfd, 0x03, 0x00, 0x91, 0x40, 0x05, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]
         );
     }
 
