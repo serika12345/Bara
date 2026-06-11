@@ -1,0 +1,78 @@
+# B8 GUI Hello World 起動スコープ
+
+この文書は、B8: 実 x86_64 macOS アプリ起動の最初のターゲットと成功条件を
+固定するための focused scope である。B8 の詳細実装順は
+[TODO.md](../TODO.md) を source of truth とし、この文書は scope と判定基準を
+補足する。
+
+## 起動ターゲット
+
+B8 の最初の起動ターゲットは、Bara repository 内で自作する single-binary
+GUI Hello World とする。
+
+- source は repository 内に置く self-authored fixture とする。
+- build target は `x86_64-apple-macos` の Mach-O `MH_EXECUTE` とする。
+- `.app` bundle、resource bundle、外部同梱ファイル、installer は初期対象にしない。
+- public system framework / dylib への dynamic link は許可する。これは
+  "single-binary" が「配布単位として自前ファイルが 1 executable」という意味であり、
+  macOS system framework への public import を禁止するものではないためである。
+- GUI は最小の AppKit-based surface とする。window または alert のどちらを
+  fixture として採用するかは、最初の buildable fixture step で deterministic
+  observation を優先して決める。
+- fixture は user input なしで短時間後に終了する。automated oracle が
+  画面操作や人手確認に依存してはならない。
+
+## 成功条件
+
+B8 完了時の成功条件は、arm64 macOS 上で self-authored x86_64 GUI Hello World
+が Bara 経由で起動し、Rosetta black-box oracle と Bara actual の決定的比較を
+通すことである。
+
+比較対象は少なくとも次を含む。
+
+- `stdout`
+- `stderr`
+- `exit_status`
+- `return_value` または process-level return equivalent
+- launch metadata
+- blocker classification
+
+初期 GUI fixture は、GUI surface creation 後に deterministic な lifecycle event
+を stdout または launch metadata へ出す。画面表示そのものは補助観測として扱い、
+自動判定は public process observation と stable JSON report に限定する。
+
+## 初期 non-goals
+
+次は B8 の最初の GUI Hello World target では扱わない。
+
+- 任意の third-party GUI app の起動
+- `.app` bundle layout、Info.plist、resource loading
+- user interaction を必要とする GUI test
+- private dyld behavior、private Apple ABI、kernel extension、kernel hook
+- system-wide binary translation integration
+- hardened runtime / notarization / production code signing policy の完全対応
+- Objective-C runtime と AppKit の内部構造の再実装
+
+## 実装の切り方
+
+B8 は次の小ステップで進める。
+
+1. この scope と成功条件を固定する。
+2. self-authored GUI Hello World fixture を x86_64 Mach-O executable として
+   build できるようにする。
+3. Rosetta black-box execution から `expected.json` と launch metadata を作る。
+4. Bara 側で同じ input Mach-O executable image を受け取り、actual launch report
+   または stable blocker report を出す CLI 境界を作る。
+5. Mach-O loader metadata を public format から段階的に増やす。
+6. user-space loader/runtime の image mapping、entry trampoline、
+   stack / argv / envp、helper boundary を分ける。
+7. unsupported import、unsupported loader feature、unsupported Objective-C
+   runtime boundary を stable classification として report する。
+8. helper boundary または runtime support を追加し、expected / actual 比較を
+   通す。
+
+## Clean-room 境界
+
+GUI Hello World の実装根拠は、public macOS / Mach-O / AppKit documentation、
+self-authored fixture、Rosetta black-box execution から得た外部観測結果に限定する。
+Rosetta の disassembly、internal symbol、private metadata、private ABI は使わない。

@@ -9,34 +9,42 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 10:22 JST
+最終更新: 2026-06-11 10:38 JST
 
 状態:
 
-- project_state: completed。B7 の 19 個目の小ステップとして、IR invariant を
-  Rust verifier report に接続し、B7: Oracle / Regression 基盤の implementation
-  TODO を完了した。
-- active_milestone: completed。[TODO.md](../TODO.md) の B7:
-  Oracle / Regression 基盤。
-- active_design_focus: B7 verifier completion。`bara_ir::validate_program` の
-  issue を `verifier.report.json` の stable `ir_*` issue として保存し、
-  PC map / fixup / final-state comparison report と同じ verifier 導線に含める。
-- active_branch: `task/b7-x86_64-macho-fixture-generation`。base commit は
-  `8d39a4a`。latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B7 の verifier 項目。
-- completed_work: `verify_emitted_function` は IR invariant、PC map invariant、
-  branch fixup consistency を 1 つの report にまとめる。CLI artifact DTO は
-  IR validation issue を `ir_empty_program`、`ir_block_range_overlap`、
-  `ir_unsupported_terminator`、`ir_missing_block_target` として serializes する。
-- remaining_work: B7 は implementation 完了。large milestone review gate として
-  full verification 後に branch を push し、PR を開く。
-- next_action: full verification、commit / push、pull request 作成。
-- verification: targeted tests として
-  `nix develop -c cargo test -p bara-arm64 verifier_reports_ir_invariant_issues`、
-  `nix develop -c cargo test -p btbc-cli verifier_issue_artifact_serializes_ir_invariant_issue`
-  が通過した。`nix develop -c ./scripts/verify` も通過した。
+- project_state: completed。B8 の最初の小ステップとして、実 x86_64 macOS
+  アプリ起動の初期ターゲットを self-authored single-binary GUI Hello World
+  に固定した。
+- active_milestone: in_progress。[TODO.md](../TODO.md) の B8:
+  実 x86_64 macOS アプリ起動。
+- active_design_focus: B8 GUI launch scope。`.app` bundle ではなく x86_64
+  Mach-O `MH_EXECUTE` の単一 executable を最初の target とし、public system
+  framework imports は loader/runtime/helper boundary で扱う。
+- active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
+  latest commit はこの小ステップの review package で確認する。
+- related_todo: [TODO.md](../TODO.md) B8 の「最初に起動対象とする実 x86_64
+  macOS アプリの scope と成功条件を定義する」。
+- completed_work: B8 scope 文書を追加し、起動 target、成功条件、non-goals、
+  初期小ステップ、clean-room 境界を整理した。`TODO.md` の B8 を小ステップへ
+  分割し、D5/D6 の design note に GUI helper / user-space runtime 境界を記録した。
+- remaining_work: 次の小ステップは self-authored GUI Hello World source を追加し、
+  x86_64 Mach-O executable としてビルドできる host-specific fixture にすること。
+- next_action: commit / push 後、次の B8 小ステップで GUI fixture build 経路を作る。
+- verification: docs-only verification として `git diff --check` と
+  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。code / script /
+  configuration 変更はないため、full `nix develop -c ./scripts/verify` は実行していない。
 
 直近で完了した作業:
+
+- 2026-06-11 10:38 JST: B8 の最初の小ステップとして、実 x86_64 macOS
+  アプリ起動の初期ターゲットを self-authored single-binary GUI Hello World
+  に固定した。`.app` bundle や private dyld integration を初期対象から外し、
+  public system framework imports は loader/runtime/helper boundary で扱う。
+  成功条件は stdout、stderr、exit status、return value または process-level
+  equivalent、launch metadata、blocker classification を含む stable JSON report
+  の Rosetta expected / Bara actual 比較とした。検証は snapshot の docs-only
+  checks。
 
 - 2026-06-11 10:22 JST: B7 の 19 個目の小ステップとして、IR invariant を
   Rust verifier report に接続した。`validate_program` の validation issue は

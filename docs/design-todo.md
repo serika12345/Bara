@@ -96,6 +96,10 @@
   libc 呼び出し、dyld import 解決を意味しない。
 - 今後は B8 の x86_64 macOS アプリ起動、B9 の x86 32-bit アプリ対応、
   B10 の Wine bridge が同じ helper boundary を使えるようにする。
+- B8 の最初の GUI Hello World は AppKit-based single-binary fixture とするが、
+  AppKit や Objective-C runtime の内部構造を core IR / emit へ混ぜない。
+  public import identity、helper capability、または unsupported boundary として
+  runtime 境界で扱う。
 - wasm2c platform adapter / NDA target adapter は本流 TODO ではなく、
   [将来構想メモ](future-research-concepts.md) の未確立構想として扱う。
 
@@ -111,6 +115,10 @@
 - ユーザー空間完結は Bara の重要な差別化点。
 - B8 の実 x86_64 macOS アプリ起動では、process-wide 互換性が必要な箇所も、
   まず loader/runtime metadata と helper boundary で表現する。
+- B8 の single-binary GUI Hello World は `.app` bundle や private dyld integration
+  を前提にしない。user-space runtime は input Mach-O executable image、
+  public system framework imports、entry trampoline、stack / argv / envp、
+  launch report をそれぞれ分けて扱う。
 
 ## D7: Binary format input/output の分離
 
