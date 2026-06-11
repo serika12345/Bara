@@ -153,6 +153,16 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                 };
 
                 match opcode2 {
+                    0x56 => {
+                        let end_offset = offset + 2;
+                        let end = instruction_end(input, at, end_offset, 2)?;
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::PushR14,
+                        ));
+                        offset = end_offset;
+                    }
                     0x57 => {
                         let end_offset = offset + 2;
                         let end = instruction_end(input, at, end_offset, 2)?;
