@@ -58,6 +58,33 @@ observation と stable JSON report を判定基準にする。開発者の B8-G1
 同じ fixture を一定時間表示できる mode で起動し、GUI window と `hello world`
 label の実描画を目視確認できるようにする。
 
+## B8-G1 手動可視確認用 binary
+
+B8-G1 の最初の test binary は、automated oracle 用 fixture と同じ self-authored
+AppKit source から build する x86_64 Mach-O executable である。automated oracle 用
+binary は deterministic stdout を出したあと短時間で終了する。手動可視確認用 binary は
+同じ window と `hello world` label を描画するが、auto-close timer を無効化し、
+ユーザーが window を閉じるまで AppKit event loop を維持する。
+
+build command:
+
+```sh
+nix develop -c cargo run -p btbc-cli -- \
+  build-x86_64-gui-hello-world-visible-fixture \
+  target/b8/b8_gui_hello_world_visible_x86_64
+```
+
+Rosetta manual check:
+
+```sh
+arch -x86_64 target/b8/b8_gui_hello_world_visible_x86_64
+```
+
+この手動確認では、single executable が Rosetta 上で起動し、AppKit window に
+`hello world` label が表示されることを確認する。window close または `Command-Q`
+で終了する。これは B8-G1 の入力 binary と GUI 描画要件の確認であり、
+Bara の変換レイヤー経由実行は後続 step で接続する。
+
 ## 初期 launch metadata schema
 
 Rosetta black-box oracle から生成する初期 sidecar は

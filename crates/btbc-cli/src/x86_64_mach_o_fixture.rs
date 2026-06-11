@@ -234,7 +234,7 @@ impl GeneratedX8664GuiHelloWorldFixture {
     fn from_request(request: X8664GuiHelloWorldBuildRequest) -> Self {
         Self {
             metadata: X8664MachOFixtureMetadata::new(
-                X8664MachOFixtureArtifactKind::GuiHelloWorldMachO,
+                request.run_mode.artifact_kind(),
                 request.case_id,
                 request.output_path,
             ),
@@ -401,6 +401,8 @@ enum X8664MachOFixtureArtifactKind {
     OracleRunner,
     #[serde(rename = "gui_hello_world_mach_o_executable")]
     GuiHelloWorldMachO,
+    #[serde(rename = "gui_hello_world_manual_visible_mach_o_executable")]
+    GuiHelloWorldManualVisibleMachO,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -605,15 +607,28 @@ impl X8664OracleRunnerBuildRequest {
 pub(crate) struct X8664GuiHelloWorldBuildRequest {
     case_id: CaseId,
     source: X8664GuiHelloWorldSource,
+    run_mode: X8664GuiHelloWorldRunMode,
     output_path: X8664MachOFixtureOutputPath,
 }
 
 impl X8664GuiHelloWorldBuildRequest {
     fn new(output_path: &Path) -> Result<Self, X8664MachOFixtureError> {
+        Self::with_run_mode(output_path, X8664GuiHelloWorldRunMode::AutomatedOracle)
+    }
+
+    fn manual_visible(output_path: &Path) -> Result<Self, X8664MachOFixtureError> {
+        Self::with_run_mode(output_path, X8664GuiHelloWorldRunMode::ManualVisible)
+    }
+
+    fn with_run_mode(
+        output_path: &Path,
+        run_mode: X8664GuiHelloWorldRunMode,
+    ) -> Result<Self, X8664MachOFixtureError> {
         let case_id = b8_gui_hello_world_case_id()?;
         Ok(Self {
             case_id,
             source: X8664GuiHelloWorldSource::new(),
+            run_mode,
             output_path: X8664MachOFixtureOutputPath::from_path(output_path),
         })
     }
@@ -624,6 +639,34 @@ impl X8664GuiHelloWorldBuildRequest {
 
     fn output_path(&self) -> &X8664MachOFixtureOutputPath {
         &self.output_path
+    }
+
+    const fn run_mode(&self) -> X8664GuiHelloWorldRunMode {
+        self.run_mode
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum X8664GuiHelloWorldRunMode {
+    AutomatedOracle,
+    ManualVisible,
+}
+
+impl X8664GuiHelloWorldRunMode {
+    const fn artifact_kind(self) -> X8664MachOFixtureArtifactKind {
+        match self {
+            Self::AutomatedOracle => X8664MachOFixtureArtifactKind::GuiHelloWorldMachO,
+            Self::ManualVisible => X8664MachOFixtureArtifactKind::GuiHelloWorldManualVisibleMachO,
+        }
+    }
+
+    fn clang_defines(self) -> Vec<String> {
+        match self {
+            Self::AutomatedOracle => Vec::new(),
+            Self::ManualVisible => {
+                vec![String::from("-DBARA_GUI_HELLO_WORLD_MANUAL_VISIBLE=1")]
+            }
+        }
     }
 }
 
@@ -775,6 +818,7 @@ impl X8664GuiHelloWorldPackager for ClangX8664GuiHelloWorldPackager {
         let toolchain_command = X8664MachOFixtureToolchainCommand::clang_gui_appkit_build(
             &source_path,
             request.output_path(),
+            request.run_mode(),
         );
         let output = toolchain_command
             .to_command()
@@ -831,24 +875,30 @@ impl X8664MachOFixtureToolchainCommand {
     fn clang_gui_appkit_build(
         source_path: &Path,
         output_path: &X8664MachOFixtureOutputPath,
+        run_mode: X8664GuiHelloWorldRunMode,
     ) -> Self {
+        let mut args = vec![
+            String::from("-target"),
+            X8664MachOFixtureTargetTriple::X8664AppleMacos13
+                .as_str()
+                .to_owned(),
+            String::from("-x"),
+            X8664MachOFixtureSourceLanguage::ObjectiveC
+                .as_clang_arg()
+                .to_owned(),
+        ];
+        args.extend(run_mode.clang_defines());
+        args.extend([
+            source_path.to_string_lossy().into_owned(),
+            String::from("-framework"),
+            String::from("AppKit"),
+            String::from("-o"),
+            output_path.as_path().to_string_lossy().into_owned(),
+        ]);
+
         Self {
             program: "clang",
-            args: vec![
-                String::from("-target"),
-                X8664MachOFixtureTargetTriple::X8664AppleMacos13
-                    .as_str()
-                    .to_owned(),
-                String::from("-x"),
-                X8664MachOFixtureSourceLanguage::ObjectiveC
-                    .as_clang_arg()
-                    .to_owned(),
-                source_path.to_string_lossy().into_owned(),
-                String::from("-framework"),
-                String::from("AppKit"),
-                String::from("-o"),
-                output_path.as_path().to_string_lossy().into_owned(),
-            ],
+            args,
         }
     }
 
@@ -932,6 +982,15 @@ pub(crate) fn build_x86_64_gui_hello_world_fixture(
     ensure_supported_host()?;
 
     let request = X8664GuiHelloWorldBuildRequest::new(output_path)?;
+    package_x86_64_gui_hello_world_fixture(&ClangX8664GuiHelloWorldPackager, request)
+}
+
+pub(crate) fn build_x86_64_gui_hello_world_manual_visible_fixture(
+    output_path: &Path,
+) -> Result<GeneratedX8664GuiHelloWorldFixture, X8664MachOFixtureError> {
+    ensure_supported_host()?;
+
+    let request = X8664GuiHelloWorldBuildRequest::manual_visible(output_path)?;
     package_x86_64_gui_hello_world_fixture(&ClangX8664GuiHelloWorldPackager, request)
 }
 
@@ -1342,11 +1401,11 @@ mod tests {
     use super::{
         json_string_literal, observe_x86_64_oracle_expected, package_x86_64_mach_o_fixture,
         package_x86_64_oracle_runner, GeneratedX8664MachOFixture, GeneratedX8664OracleRunner,
-        RosettaGuiHelloWorldObservation, RosettaOracleObservation, X8664GuiHelloWorldSource,
-        X8664MachOAssemblySource, X8664MachOFixtureBuildRequest, X8664MachOFixtureError,
-        X8664MachOFixtureOutputPath, X8664MachOFixturePackager, X8664MachOFixtureSourceLanguage,
-        X8664MachOFixtureToolchainCommand, X8664OracleRunnerBuildRequest,
-        X8664OracleRunnerPackager, X8664OracleRunnerSource,
+        RosettaGuiHelloWorldObservation, RosettaOracleObservation, X8664GuiHelloWorldRunMode,
+        X8664GuiHelloWorldSource, X8664MachOAssemblySource, X8664MachOFixtureBuildRequest,
+        X8664MachOFixtureError, X8664MachOFixtureOutputPath, X8664MachOFixturePackager,
+        X8664MachOFixtureSourceLanguage, X8664MachOFixtureToolchainCommand,
+        X8664OracleRunnerBuildRequest, X8664OracleRunnerPackager, X8664OracleRunnerSource,
     };
 
     #[test]
@@ -1424,6 +1483,9 @@ mod tests {
         assert!(source.contains("@interface BaraGuiHelloWorldDelegate"));
         assert!(source.contains("[NSApplication sharedApplication]"));
         assert!(source.contains("[_window setTitle:@\"Bara GUI Hello World\"]"));
+        assert!(source.contains("[label setStringValue:@\"hello world\"]"));
+        assert!(source.contains("#ifndef BARA_GUI_HELLO_WORLD_MANUAL_VISIBLE"));
+        assert!(source.contains("[NSApp activateIgnoringOtherApps:YES]"));
         assert!(source.contains("gui_window_created"));
     }
 
@@ -1569,6 +1631,7 @@ mod tests {
         let command = X8664MachOFixtureToolchainCommand::clang_gui_appkit_build(
             Path::new("/tmp/b8_gui_hello_world.m"),
             &output_path,
+            X8664GuiHelloWorldRunMode::AutomatedOracle,
         );
 
         assert_eq!(command.program(), "clang");
@@ -1584,6 +1647,34 @@ mod tests {
                 String::from("AppKit"),
                 String::from("-o"),
                 String::from("/tmp/b8_gui_hello_world"),
+            ]
+        );
+    }
+
+    #[test]
+    fn clang_objective_c_appkit_visible_command_defines_manual_visible_mode() {
+        let output_path =
+            X8664MachOFixtureOutputPath::from_path(Path::new("/tmp/b8_gui_hello_world_visible"));
+        let command = X8664MachOFixtureToolchainCommand::clang_gui_appkit_build(
+            Path::new("/tmp/b8_gui_hello_world.m"),
+            &output_path,
+            X8664GuiHelloWorldRunMode::ManualVisible,
+        );
+
+        assert_eq!(command.program(), "clang");
+        assert_eq!(
+            command.args(),
+            &[
+                String::from("-target"),
+                String::from("x86_64-apple-macos13"),
+                String::from("-x"),
+                String::from("objective-c"),
+                String::from("-DBARA_GUI_HELLO_WORLD_MANUAL_VISIBLE=1"),
+                String::from("/tmp/b8_gui_hello_world.m"),
+                String::from("-framework"),
+                String::from("AppKit"),
+                String::from("-o"),
+                String::from("/tmp/b8_gui_hello_world_visible"),
             ]
         );
     }

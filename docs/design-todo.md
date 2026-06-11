@@ -156,6 +156,13 @@
   developer-visible mode で確認できることを目標にする。host AppKit helper は
   public AppKit boundary として残してよいが、helper 単独実行だけを
   変換レイヤー通過とは扱わない。
+- 2026-06-11 の B8-G1 first step として、automated oracle 用の短時間終了 GUI
+  fixture と、Rosetta 手動可視確認用の manual-visible x86_64 GUI fixture を
+  同じ self-authored AppKit source から build できるように分けた。
+  manual-visible binary は public AppKit API で window と `hello world` label を描画し、
+  auto-close timer を無効化して window close / `Command-Q` まで event loop を維持する。
+  これは変換レイヤー接続前の test binary 固定であり、次 step では translated
+  x86_64 entry path から AppKit lifecycle helper capability を呼ぶ境界を設計する。
 - wasm2c platform adapter / NDA target adapter は本流 TODO ではなく、
   [将来構想メモ](future-research-concepts.md) の未確立構想として扱う。
 

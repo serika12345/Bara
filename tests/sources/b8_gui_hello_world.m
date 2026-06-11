@@ -1,7 +1,7 @@
 #import <AppKit/AppKit.h>
 #include <stdio.h>
 
-@interface BaraGuiHelloWorldDelegate : NSObject <NSApplicationDelegate> {
+@interface BaraGuiHelloWorldDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate> {
     NSWindow *_window;
 }
 @end
@@ -17,6 +17,7 @@
                   styleMask:(NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
                     backing:NSBackingStoreBuffered
                       defer:NO];
+    [_window setDelegate:self];
     [_window setTitle:@"Bara GUI Hello World"];
 
     NSTextField *label =
@@ -28,20 +29,28 @@
     [label setAlignment:NSTextAlignmentCenter];
     [[_window contentView] addSubview:label];
 
+    [NSApp activateIgnoringOtherApps:YES];
     [_window makeKeyAndOrderFront:nil];
 
     puts("{\"event\":\"gui_window_created\",\"title\":\"Bara GUI Hello World\",\"text\":\"hello world\"}");
     fflush(stdout);
 
+#ifndef BARA_GUI_HELLO_WORLD_MANUAL_VISIBLE
     [NSTimer scheduledTimerWithTimeInterval:0.1
                                      target:self
                                    selector:@selector(terminateApplication:)
                                    userInfo:nil
                                     repeats:NO];
+#endif
 }
 
 - (void)terminateApplication:(NSTimer *)timer {
     (void)timer;
+    [NSApp terminate:nil];
+}
+
+- (void)windowWillClose:(NSNotification *)notification {
+    (void)notification;
     [NSApp terminate:nil];
 }
 

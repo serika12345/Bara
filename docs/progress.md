@@ -9,38 +9,54 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 15:42 JST
+最終更新: 2026-06-11 15:53 JST
 
 状態:
 
 - project_state: in_progress。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
   reviewable GUI 起動 slice の積み上げとして再定義した。B8-H1 の helper
-  capability execution は到達済みだが、B8 全体は未完了である。
+  capability execution は到達済みで、B8-G1 の Rosetta 手動可視確認用 x86_64
+  GUI test binary を生成できるようになったが、B8 全体は未完了である。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8-G1:
   GUI window に Hello World のフォント描画を行う最小アプリを、実際の変換レイヤーを
   通して GUI 上で確認できるようにする。
-- active_design_focus: B8 translated GUI entry path。x86_64 entry path が
-  Bara の decode / lift / emit / runtime execution を通り、その結果として
-  AppKit lifecycle helper capability を呼ぶ境界を追加する。host AppKit helper は
-  public AppKit boundary として使えるが、helper 単独実行だけでは B8-G1 完了にしない。
+- active_design_focus: B8 translated GUI entry path。まず automated oracle 用 fixture と
+  Rosetta 手動可視確認用 fixture を分けた。次は x86_64 entry path が Bara の
+  decode / lift / emit / runtime execution を通り、その結果として AppKit lifecycle
+  helper capability を呼ぶ境界を追加する。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
-  latest commit は `46b2bf0`。この milestone 再定義は同 branch 上の次 commit で
-  記録する。
+  latest commit はこの B8-G1 step の review package で確認する。
 - related_todo: [TODO.md](../TODO.md) B8-H1 / B8-G1。
 - completed_work: B8-H1 として、`btbc-cli` の B8 actual path で input x86_64
   Mach-O を probe し、self-authored AppKit source を host helper capability として
-  build/run する経路を追加した。actual JSON は Rosetta expected と同じ lifecycle
-  stdout / exit status 0 になり、feedback report は `matched` になった。
+  build/run する経路を追加した。B8-G1 first step として、同じ source から
+  `build-x86_64-gui-hello-world-visible-fixture` で manual-visible x86_64 GUI
+  test binary を build できるようにし、`target/b8/b8_gui_hello_world_visible_x86_64`
+  を生成した。
 - remaining_work: B8-G1。translated x86_64 entry path から AppKit lifecycle helper
   capability を呼び、GUI window 上に `hello world` label のフォント描画を
-  developer-visible mode で確認できるようにする。
-- next_action: B8-G1 の最初の小ステップとして、自動判定用 stable JSON と手動可視確認
-  mode を分けた scope / report contract を固定する。
-- verification: documentation-only recut。`git diff --check` と
-  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
+  developer-visible mode で確認できるようにする。生成済み test binary の Rosetta
+  手動確認はユーザー確認待ち。
+- next_action: Rosetta で
+  `arch -x86_64 target/b8/b8_gui_hello_world_visible_x86_64` を実行し、
+  window と `hello world` label が問題なく表示されることを確認する。その後、
+  translated entry path から helper capability を呼ぶ最小 helper ABI / host trap
+  contract を定義する。
+- verification: targeted tests、generated binary checks、`git diff --check`、
+  `nix develop -c ./scripts/check-no-invisible-chars`、
+  full `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-11 15:53 JST: B8-G1 の最初の実装 step として、GUI Hello World fixture に
+  manual-visible run mode を追加した。automated oracle 用 binary は従来どおり
+  short-lived deterministic stdout を維持し、manual-visible binary は public AppKit
+  API で window と `hello world` label を描画したまま、window close / `Command-Q`
+  まで event loop を維持する。CLI に
+  `build-x86_64-gui-hello-world-visible-fixture` を追加し、
+  `target/b8/b8_gui_hello_world_visible_x86_64` を生成した。Rosetta 手動確認は
+  ユーザー確認待ち。targeted tests、generated binary checks、full
+  `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-11 15:42 JST: B8 milestone の切り方を再定義した。B8-H1 の
   helper capability execution は reviewable intermediate slice として残し、
   B8 全体の完了扱いから外した。次の active target は B8-G1:
