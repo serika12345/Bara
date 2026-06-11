@@ -9,41 +9,52 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 13:54 JST
+最終更新: 2026-06-11 14:05 JST
 
 状態:
 
-- project_state: completed。B8 の register model guardrail step として、
-  `bara-ir::X86Reg` が 64-bit register だけでなく partial register view を
-  表現できるようにした。
+- project_state: completed。B8 の Rosetta 比較フィードバックサイクル直前の
+  launch/report 境界として、platform model、macOS execution constraints、
+  fallback policy、process-level launch result を stable report に固定した。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8:
   実 x86_64 macOS アプリ起動。
-- active_design_focus: B8 partial register model guardrail。IR register model が
-  `rax` 固定ではなく、`eax` / `ax` / `al` と `edi` / `di` / `dil` などを
-  family / width 付き view として表現できるようにする。
+- active_design_focus: B8 pre-feedback launch boundary。user-space loader model、
+  public macOS constraint model、fallback decision、stable launch result を
+  actual launch report に保存し、次の step で Rosetta expected と Bara actual の
+  差分修正ループを始められる状態にする。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
   latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B8 の「register model は `rax` だけでなく、
-  部分レジスタへ拡張できる形にする」。
-- completed_work: `bara-ir::X86Reg` は accumulator family の `rax` / `eax` /
-  `ax` / `al` と destination-index family の `rdi` / `edi` / `di` / `dil` を
-  表現し、`family`、`width`、`full_width`、`is_partial_view` accessor を持つ。
-  `btbc-cli` の function artifact projection も partial register view を stable
-  JSON 名へ変換できる。
-- remaining_work: 次の小ステップは signal / exception / thread / TLS /
-  memory protection を user-space loader model として段階的に扱うこと。
-- next_action: commit / push 後、次の B8 小ステップで signal / exception /
-  thread / TLS / memory protection の initial user-space loader model を固定する。
+- related_todo: [TODO.md](../TODO.md) B8 の signal / exception / thread / TLS /
+  memory protection model、macOS code signing / W^X / hardened runtime 制約、
+  fallback 方針、stable launch result report。
+- completed_work: `bara-runtime::UserSpaceLaunchPlan` は `platform_model`、
+  `macos_constraints`、`fallback_policy` を保持する。`btbc-cli` の
+  B8 actual launch report はこれらを `runtime_preparation` へ projection し、
+  top-level `launch_result` と `actual.json` の stdout / stderr / exit status /
+  return value を同じ blocker classification から生成する。
+- remaining_work: 次の小ステップは Rosetta black-box oracle の expected と
+  Bara actual の比較を実際に回し、差分を blocker / loader / helper / runtime
+  support へ戻すフィードバックサイクルを開始すること。
+- next_action: commit / push 後、次の B8 小ステップで Rosetta 実行との比較を
+  回し、最初の actual 差分修正対象を特定する。
 - verification: targeted tests として
-  `nix develop -c cargo test -p bara-ir x86_register_model_exposes_partial_register_views_by_family_and_width -- --nocapture`、
-  `nix develop -c cargo test -p btbc-cli function_register_artifact_serializes_partial_register_views -- --nocapture`、
-  `nix develop -c cargo test -p btbc-cli function_run -- --nocapture` が通過した。
-  `nix develop -c cargo fmt --all -- --check`、
-  `nix develop -c cargo clippy -p bara-ir -p bara-arm64 -p btbc-cli --all-targets -- -D warnings`、
+  `nix develop -c cargo test -p bara-runtime user_space_launch_plan -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli gui_hello_world_actual -- --nocapture` が
+  通過した。`nix develop -c cargo fmt --all -- --check`、
+  `nix develop -c cargo clippy -p bara-runtime -p btbc-cli --all-targets -- -D warnings`、
   `git diff --check`、full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-11 14:05 JST: B8 の Rosetta 比較フィードバックサイクル直前の
+  boundary 固定として、`bara-runtime::UserSpaceLaunchPlan` に
+  `platform_model`、`macos_constraints`、`fallback_policy` を追加した。
+  B8 actual launch report は signal / exception / thread / TLS / memory
+  protection、macOS code signing / W^X / hardened runtime 制約、fallback
+  方針、top-level `launch_result` を stable JSON に保存する。interpreter
+  fallback と外部 fallback engine は候補だが未実装 / 未接続、feedback cycle は
+  ready not started として記録される。targeted tests、`bara-runtime` /
+  `btbc-cli` clippy、full `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-11 13:54 JST: B8 の register model guardrail step として、
   `bara-ir::X86Reg` に `rax` / `eax` / `ax` / `al` と `rdi` / `edi` / `di` /
   `dil` を追加し、register family、view width、full-width register、

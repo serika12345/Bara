@@ -10,6 +10,9 @@ pub struct UserSpaceLaunchPlan {
     execution_strategy: UserSpaceExecutionStrategyPlan,
     integration_policy: UserSpaceIntegrationPolicy,
     process_boundary: UserSpaceProcessBoundary,
+    platform_model: UserSpacePlatformModelPlan,
+    macos_constraints: UserSpaceMacosConstraints,
+    fallback_policy: UserSpaceFallbackPolicy,
 }
 
 impl UserSpaceLaunchPlan {
@@ -25,6 +28,9 @@ impl UserSpaceLaunchPlan {
             execution_strategy: UserSpaceExecutionStrategyPlan::user_space_runtime_selectable(),
             integration_policy: UserSpaceIntegrationPolicy::current_user_space_process(),
             process_boundary: UserSpaceProcessBoundary::current_user_space_process(),
+            platform_model: UserSpacePlatformModelPlan::initial_gui_loader_model(),
+            macos_constraints: UserSpaceMacosConstraints::public_documented_behavior(),
+            fallback_policy: UserSpaceFallbackPolicy::ready_for_feedback_cycle(),
         }
     }
 
@@ -66,6 +72,18 @@ impl UserSpaceLaunchPlan {
 
     pub const fn process_boundary(&self) -> &UserSpaceProcessBoundary {
         &self.process_boundary
+    }
+
+    pub const fn platform_model(&self) -> &UserSpacePlatformModelPlan {
+        &self.platform_model
+    }
+
+    pub const fn macos_constraints(&self) -> &UserSpaceMacosConstraints {
+        &self.macos_constraints
+    }
+
+    pub const fn fallback_policy(&self) -> &UserSpaceFallbackPolicy {
+        &self.fallback_policy
     }
 }
 
@@ -505,6 +523,179 @@ impl UserSpaceProcessBoundary {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UserSpacePlatformModelPlan {
+    signal_model: UserSpacePlatformSignalModel,
+    exception_model: UserSpacePlatformExceptionModel,
+    thread_model: UserSpacePlatformThreadModel,
+    tls_model: UserSpacePlatformTlsModel,
+    memory_protection: UserSpacePlatformMemoryProtectionModel,
+}
+
+impl UserSpacePlatformModelPlan {
+    const fn initial_gui_loader_model() -> Self {
+        Self {
+            signal_model: UserSpacePlatformSignalModel::UserSpaceLoaderBoundary,
+            exception_model: UserSpacePlatformExceptionModel::UserSpaceLoaderBoundary,
+            thread_model: UserSpacePlatformThreadModel::InitialThreadOnly,
+            tls_model: UserSpacePlatformTlsModel::Deferred,
+            memory_protection: UserSpacePlatformMemoryProtectionModel::PublicOsVirtualMemory,
+        }
+    }
+
+    pub const fn signal_model(self) -> UserSpacePlatformSignalModel {
+        self.signal_model
+    }
+
+    pub const fn exception_model(self) -> UserSpacePlatformExceptionModel {
+        self.exception_model
+    }
+
+    pub const fn thread_model(self) -> UserSpacePlatformThreadModel {
+        self.thread_model
+    }
+
+    pub const fn tls_model(self) -> UserSpacePlatformTlsModel {
+        self.tls_model
+    }
+
+    pub const fn memory_protection(self) -> UserSpacePlatformMemoryProtectionModel {
+        self.memory_protection
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpacePlatformSignalModel {
+    UserSpaceLoaderBoundary,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpacePlatformExceptionModel {
+    UserSpaceLoaderBoundary,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpacePlatformThreadModel {
+    InitialThreadOnly,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpacePlatformTlsModel {
+    Deferred,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpacePlatformMemoryProtectionModel {
+    PublicOsVirtualMemory,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UserSpaceMacosConstraints {
+    code_signing: UserSpaceMacosCodeSigningPolicy,
+    write_xor_execute: UserSpaceMacosWriteXorExecutePolicy,
+    hardened_runtime: UserSpaceMacosHardenedRuntimePolicy,
+}
+
+impl UserSpaceMacosConstraints {
+    const fn public_documented_behavior() -> Self {
+        Self {
+            code_signing: UserSpaceMacosCodeSigningPolicy::NoPrivateSigningBypass,
+            write_xor_execute: UserSpaceMacosWriteXorExecutePolicy::PublicMmapMprotectTransition,
+            hardened_runtime: UserSpaceMacosHardenedRuntimePolicy::DocumentedHostPolicyOnly,
+        }
+    }
+
+    pub const fn code_signing(self) -> UserSpaceMacosCodeSigningPolicy {
+        self.code_signing
+    }
+
+    pub const fn write_xor_execute(self) -> UserSpaceMacosWriteXorExecutePolicy {
+        self.write_xor_execute
+    }
+
+    pub const fn hardened_runtime(self) -> UserSpaceMacosHardenedRuntimePolicy {
+        self.hardened_runtime
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceMacosCodeSigningPolicy {
+    NoPrivateSigningBypass,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceMacosWriteXorExecutePolicy {
+    PublicMmapMprotectTransition,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceMacosHardenedRuntimePolicy {
+    DocumentedHostPolicyOnly,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UserSpaceFallbackPolicy {
+    unimplemented_instruction: UserSpaceFallbackPolicyAction,
+    unknown_indirect_target: UserSpaceFallbackPolicyAction,
+    unsupported_loader_feature: UserSpaceFallbackPolicyAction,
+    interpreter: UserSpaceFallbackEngineStatus,
+    external_engine: UserSpaceFallbackEngineStatus,
+    feedback_cycle: UserSpaceFeedbackCycleState,
+}
+
+impl UserSpaceFallbackPolicy {
+    const fn ready_for_feedback_cycle() -> Self {
+        Self {
+            unimplemented_instruction: UserSpaceFallbackPolicyAction::StableBlockerClassification,
+            unknown_indirect_target: UserSpaceFallbackPolicyAction::StableBlockerClassification,
+            unsupported_loader_feature: UserSpaceFallbackPolicyAction::StableBlockerClassification,
+            interpreter: UserSpaceFallbackEngineStatus::CandidateNotImplemented,
+            external_engine: UserSpaceFallbackEngineStatus::CandidateNotConnected,
+            feedback_cycle: UserSpaceFeedbackCycleState::ReadyNotStarted,
+        }
+    }
+
+    pub const fn unimplemented_instruction(self) -> UserSpaceFallbackPolicyAction {
+        self.unimplemented_instruction
+    }
+
+    pub const fn unknown_indirect_target(self) -> UserSpaceFallbackPolicyAction {
+        self.unknown_indirect_target
+    }
+
+    pub const fn unsupported_loader_feature(self) -> UserSpaceFallbackPolicyAction {
+        self.unsupported_loader_feature
+    }
+
+    pub const fn interpreter(self) -> UserSpaceFallbackEngineStatus {
+        self.interpreter
+    }
+
+    pub const fn external_engine(self) -> UserSpaceFallbackEngineStatus {
+        self.external_engine
+    }
+
+    pub const fn feedback_cycle(self) -> UserSpaceFeedbackCycleState {
+        self.feedback_cycle
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceFallbackPolicyAction {
+    StableBlockerClassification,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceFallbackEngineStatus {
+    CandidateNotImplemented,
+    CandidateNotConnected,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UserSpaceFeedbackCycleState {
+    ReadyNotStarted,
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
@@ -512,11 +703,15 @@ mod tests {
         UserSpaceEntryTrampolineTarget, UserSpaceExecutableMemoryAllocationApi,
         UserSpaceExecutableMemoryProtectionTransition, UserSpaceExecutableMemoryReleaseApi,
         UserSpaceExecutionStrategyAvailability, UserSpaceExecutionStrategyBoundary,
+        UserSpaceFallbackEngineStatus, UserSpaceFallbackPolicyAction, UserSpaceFeedbackCycleState,
         UserSpaceHelperBoundaryContract, UserSpaceImageMappingSource,
         UserSpaceInitialStackContract, UserSpaceLaunchPlan, UserSpaceLaunchResponsibility,
-        UserSpaceMemoryProtectionModel, UserSpacePrivateIntegrationRequirement,
-        UserSpaceProcessScope, UserSpaceSourceIsaMode, UserSpaceSourceIsaProfile,
-        UserSpaceSourceWidth,
+        UserSpaceMacosCodeSigningPolicy, UserSpaceMacosHardenedRuntimePolicy,
+        UserSpaceMacosWriteXorExecutePolicy, UserSpaceMemoryProtectionModel,
+        UserSpacePlatformExceptionModel, UserSpacePlatformMemoryProtectionModel,
+        UserSpacePlatformSignalModel, UserSpacePlatformThreadModel, UserSpacePlatformTlsModel,
+        UserSpacePrivateIntegrationRequirement, UserSpaceProcessScope, UserSpaceSourceIsaMode,
+        UserSpaceSourceIsaProfile, UserSpaceSourceWidth,
     };
 
     #[test]
@@ -708,5 +903,76 @@ mod tests {
             UserSpaceSourceWidth::Bits32
         );
         assert_eq!(source_isa.stack_width(), UserSpaceSourceWidth::Bits32);
+    }
+
+    #[test]
+    fn user_space_launch_plan_models_loader_platform_boundaries() {
+        let platform = *UserSpaceLaunchPlan::mach_o_executable_image().platform_model();
+
+        assert_eq!(
+            platform.signal_model(),
+            UserSpacePlatformSignalModel::UserSpaceLoaderBoundary
+        );
+        assert_eq!(
+            platform.exception_model(),
+            UserSpacePlatformExceptionModel::UserSpaceLoaderBoundary
+        );
+        assert_eq!(
+            platform.thread_model(),
+            UserSpacePlatformThreadModel::InitialThreadOnly
+        );
+        assert_eq!(platform.tls_model(), UserSpacePlatformTlsModel::Deferred);
+        assert_eq!(
+            platform.memory_protection(),
+            UserSpacePlatformMemoryProtectionModel::PublicOsVirtualMemory
+        );
+    }
+
+    #[test]
+    fn user_space_launch_plan_records_public_macos_execution_constraints() {
+        let constraints = *UserSpaceLaunchPlan::mach_o_executable_image().macos_constraints();
+
+        assert_eq!(
+            constraints.code_signing(),
+            UserSpaceMacosCodeSigningPolicy::NoPrivateSigningBypass
+        );
+        assert_eq!(
+            constraints.write_xor_execute(),
+            UserSpaceMacosWriteXorExecutePolicy::PublicMmapMprotectTransition
+        );
+        assert_eq!(
+            constraints.hardened_runtime(),
+            UserSpaceMacosHardenedRuntimePolicy::DocumentedHostPolicyOnly
+        );
+    }
+
+    #[test]
+    fn user_space_launch_plan_is_ready_for_rosetta_comparison_feedback_cycle() {
+        let fallback = *UserSpaceLaunchPlan::mach_o_executable_image().fallback_policy();
+
+        assert_eq!(
+            fallback.unimplemented_instruction(),
+            UserSpaceFallbackPolicyAction::StableBlockerClassification
+        );
+        assert_eq!(
+            fallback.unknown_indirect_target(),
+            UserSpaceFallbackPolicyAction::StableBlockerClassification
+        );
+        assert_eq!(
+            fallback.unsupported_loader_feature(),
+            UserSpaceFallbackPolicyAction::StableBlockerClassification
+        );
+        assert_eq!(
+            fallback.interpreter(),
+            UserSpaceFallbackEngineStatus::CandidateNotImplemented
+        );
+        assert_eq!(
+            fallback.external_engine(),
+            UserSpaceFallbackEngineStatus::CandidateNotConnected
+        );
+        assert_eq!(
+            fallback.feedback_cycle(),
+            UserSpaceFeedbackCycleState::ReadyNotStarted
+        );
     }
 }

@@ -7,8 +7,13 @@ use bara_runtime::{
     UserSpaceEntryTrampolineTarget, UserSpaceExecutableMemoryAllocationApi,
     UserSpaceExecutableMemoryProtectionTransition, UserSpaceExecutableMemoryReleaseApi,
     UserSpaceExecutionStrategyAvailability, UserSpaceExecutionStrategyBoundary,
+    UserSpaceFallbackEngineStatus, UserSpaceFallbackPolicyAction, UserSpaceFeedbackCycleState,
     UserSpaceHelperBoundaryContract, UserSpaceImageMappingSource, UserSpaceInitialStackContract,
-    UserSpaceLaunchPlan, UserSpaceLaunchResponsibility, UserSpaceMemoryProtectionModel,
+    UserSpaceLaunchPlan, UserSpaceLaunchResponsibility, UserSpaceMacosCodeSigningPolicy,
+    UserSpaceMacosHardenedRuntimePolicy, UserSpaceMacosWriteXorExecutePolicy,
+    UserSpaceMemoryProtectionModel, UserSpacePlatformExceptionModel,
+    UserSpacePlatformMemoryProtectionModel, UserSpacePlatformSignalModel,
+    UserSpacePlatformThreadModel, UserSpacePlatformTlsModel,
     UserSpacePrivateIntegrationRequirement, UserSpaceProcessScope, UserSpaceSourceIsaMode,
     UserSpaceSourceIsaProfile, UserSpaceSourceWidth,
 };
@@ -29,17 +34,14 @@ impl GuiHelloWorldActualLaunchBundle {
         classification_plan: GuiHelloWorldInitialBlockerPlan,
     ) -> Self {
         let classification = classification_plan.selected_classification();
-        let observed_result = ObservedResult::new(
-            case_id.clone(),
-            1,
-            0,
-            String::new(),
-            String::from(classification.stderr_message()),
-        );
+        let launch_result =
+            GuiHelloWorldActualLaunchResult::blocked_by_classification(classification);
+        let observed_result = launch_result.to_observed_result(case_id.clone());
         let launch_report = GuiHelloWorldActualLaunchReport::blocked_by_initial_blocker(
             case_id,
             input_metadata,
             classification_plan,
+            launch_result,
         );
 
         Self {
@@ -65,6 +67,7 @@ pub(crate) struct GuiHelloWorldActualLaunchReport {
     status: GuiHelloWorldActualLaunchStatus,
     input: GuiHelloWorldActualInput,
     runtime_preparation: GuiHelloWorldActualRuntimePreparation,
+    launch_result: GuiHelloWorldActualLaunchResult,
     blocker: GuiHelloWorldActualBlocker,
 }
 
@@ -73,6 +76,7 @@ impl GuiHelloWorldActualLaunchReport {
         case_id: CaseId,
         input_metadata: GuiHelloWorldActualInputMetadata,
         classification_plan: GuiHelloWorldInitialBlockerPlan,
+        launch_result: GuiHelloWorldActualLaunchResult,
     ) -> Self {
         Self {
             schema: "b8_gui_hello_world_actual_launch_report_v0",
@@ -83,6 +87,7 @@ impl GuiHelloWorldActualLaunchReport {
             runtime_preparation: GuiHelloWorldActualRuntimePreparation::from_plan(
                 &UserSpaceLaunchPlan::mach_o_executable_image(),
             ),
+            launch_result,
             blocker: GuiHelloWorldActualBlocker::from_classification_plan(&classification_plan),
         }
     }
@@ -101,6 +106,37 @@ enum GuiHelloWorldActualLaunchStatus {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+struct GuiHelloWorldActualLaunchResult {
+    exit_status: i32,
+    return_value: u64,
+    stdout: &'static str,
+    stderr: &'static str,
+}
+
+impl GuiHelloWorldActualLaunchResult {
+    const fn blocked_by_classification(
+        classification: GuiHelloWorldActualBlockerClassification,
+    ) -> Self {
+        Self {
+            exit_status: 1,
+            return_value: 0,
+            stdout: "",
+            stderr: classification.stderr_message(),
+        }
+    }
+
+    fn to_observed_result(self, case_id: CaseId) -> ObservedResult {
+        ObservedResult::new(
+            case_id,
+            self.exit_status,
+            self.return_value,
+            self.stdout.to_owned(),
+            self.stderr.to_owned(),
+        )
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 struct GuiHelloWorldActualRuntimePreparation {
     source: GuiHelloWorldActualRuntimePreparationSource,
     status: GuiHelloWorldActualRuntimePreparationStatus,
@@ -114,6 +150,9 @@ struct GuiHelloWorldActualRuntimePreparation {
     bridge_boundary: GuiHelloWorldActualBridgeBoundaryPreparation,
     integration_policy: GuiHelloWorldActualIntegrationPolicy,
     process_boundary: GuiHelloWorldActualProcessBoundary,
+    platform_model: GuiHelloWorldActualPlatformModel,
+    macos_constraints: GuiHelloWorldActualMacosConstraints,
+    fallback_policy: GuiHelloWorldActualFallbackPolicy,
 }
 
 impl GuiHelloWorldActualRuntimePreparation {
@@ -151,6 +190,11 @@ impl GuiHelloWorldActualRuntimePreparation {
             process_boundary: GuiHelloWorldActualProcessBoundary::from_boundary(
                 plan.process_boundary(),
             ),
+            platform_model: GuiHelloWorldActualPlatformModel::from_plan(plan.platform_model()),
+            macos_constraints: GuiHelloWorldActualMacosConstraints::from_constraints(
+                plan.macos_constraints(),
+            ),
+            fallback_policy: GuiHelloWorldActualFallbackPolicy::from_policy(plan.fallback_policy()),
         }
     }
 }
@@ -652,6 +696,256 @@ impl GuiHelloWorldActualProcessBoundary {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+struct GuiHelloWorldActualPlatformModel {
+    signal_model: GuiHelloWorldActualPlatformSignalModel,
+    exception_model: GuiHelloWorldActualPlatformExceptionModel,
+    thread_model: GuiHelloWorldActualPlatformThreadModel,
+    tls_model: GuiHelloWorldActualPlatformTlsModel,
+    memory_protection: GuiHelloWorldActualPlatformMemoryProtectionModel,
+}
+
+impl GuiHelloWorldActualPlatformModel {
+    const fn from_plan(plan: &bara_runtime::UserSpacePlatformModelPlan) -> Self {
+        Self {
+            signal_model: GuiHelloWorldActualPlatformSignalModel::from_runtime(plan.signal_model()),
+            exception_model: GuiHelloWorldActualPlatformExceptionModel::from_runtime(
+                plan.exception_model(),
+            ),
+            thread_model: GuiHelloWorldActualPlatformThreadModel::from_runtime(plan.thread_model()),
+            tls_model: GuiHelloWorldActualPlatformTlsModel::from_runtime(plan.tls_model()),
+            memory_protection: GuiHelloWorldActualPlatformMemoryProtectionModel::from_runtime(
+                plan.memory_protection(),
+            ),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualPlatformSignalModel {
+    #[serde(rename = "user_space_loader_boundary")]
+    UserSpaceLoaderBoundary,
+}
+
+impl GuiHelloWorldActualPlatformSignalModel {
+    const fn from_runtime(model: UserSpacePlatformSignalModel) -> Self {
+        match model {
+            UserSpacePlatformSignalModel::UserSpaceLoaderBoundary => Self::UserSpaceLoaderBoundary,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualPlatformExceptionModel {
+    #[serde(rename = "user_space_loader_boundary")]
+    UserSpaceLoaderBoundary,
+}
+
+impl GuiHelloWorldActualPlatformExceptionModel {
+    const fn from_runtime(model: UserSpacePlatformExceptionModel) -> Self {
+        match model {
+            UserSpacePlatformExceptionModel::UserSpaceLoaderBoundary => {
+                Self::UserSpaceLoaderBoundary
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualPlatformThreadModel {
+    #[serde(rename = "initial_thread_only")]
+    InitialThreadOnly,
+}
+
+impl GuiHelloWorldActualPlatformThreadModel {
+    const fn from_runtime(model: UserSpacePlatformThreadModel) -> Self {
+        match model {
+            UserSpacePlatformThreadModel::InitialThreadOnly => Self::InitialThreadOnly,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualPlatformTlsModel {
+    #[serde(rename = "deferred")]
+    Deferred,
+}
+
+impl GuiHelloWorldActualPlatformTlsModel {
+    const fn from_runtime(model: UserSpacePlatformTlsModel) -> Self {
+        match model {
+            UserSpacePlatformTlsModel::Deferred => Self::Deferred,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualPlatformMemoryProtectionModel {
+    #[serde(rename = "public_os_virtual_memory")]
+    PublicOsVirtualMemory,
+}
+
+impl GuiHelloWorldActualPlatformMemoryProtectionModel {
+    const fn from_runtime(model: UserSpacePlatformMemoryProtectionModel) -> Self {
+        match model {
+            UserSpacePlatformMemoryProtectionModel::PublicOsVirtualMemory => {
+                Self::PublicOsVirtualMemory
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+struct GuiHelloWorldActualMacosConstraints {
+    code_signing: GuiHelloWorldActualMacosCodeSigningPolicy,
+    write_xor_execute: GuiHelloWorldActualMacosWriteXorExecutePolicy,
+    hardened_runtime: GuiHelloWorldActualMacosHardenedRuntimePolicy,
+}
+
+impl GuiHelloWorldActualMacosConstraints {
+    const fn from_constraints(constraints: &bara_runtime::UserSpaceMacosConstraints) -> Self {
+        Self {
+            code_signing: GuiHelloWorldActualMacosCodeSigningPolicy::from_runtime(
+                constraints.code_signing(),
+            ),
+            write_xor_execute: GuiHelloWorldActualMacosWriteXorExecutePolicy::from_runtime(
+                constraints.write_xor_execute(),
+            ),
+            hardened_runtime: GuiHelloWorldActualMacosHardenedRuntimePolicy::from_runtime(
+                constraints.hardened_runtime(),
+            ),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualMacosCodeSigningPolicy {
+    #[serde(rename = "no_private_signing_bypass")]
+    NoPrivateSigningBypass,
+}
+
+impl GuiHelloWorldActualMacosCodeSigningPolicy {
+    const fn from_runtime(policy: UserSpaceMacosCodeSigningPolicy) -> Self {
+        match policy {
+            UserSpaceMacosCodeSigningPolicy::NoPrivateSigningBypass => Self::NoPrivateSigningBypass,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualMacosWriteXorExecutePolicy {
+    #[serde(rename = "public_mmap_mprotect_transition")]
+    PublicMmapMprotectTransition,
+}
+
+impl GuiHelloWorldActualMacosWriteXorExecutePolicy {
+    const fn from_runtime(policy: UserSpaceMacosWriteXorExecutePolicy) -> Self {
+        match policy {
+            UserSpaceMacosWriteXorExecutePolicy::PublicMmapMprotectTransition => {
+                Self::PublicMmapMprotectTransition
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualMacosHardenedRuntimePolicy {
+    #[serde(rename = "documented_host_policy_only")]
+    DocumentedHostPolicyOnly,
+}
+
+impl GuiHelloWorldActualMacosHardenedRuntimePolicy {
+    const fn from_runtime(policy: UserSpaceMacosHardenedRuntimePolicy) -> Self {
+        match policy {
+            UserSpaceMacosHardenedRuntimePolicy::DocumentedHostPolicyOnly => {
+                Self::DocumentedHostPolicyOnly
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+struct GuiHelloWorldActualFallbackPolicy {
+    unimplemented_instruction: GuiHelloWorldActualFallbackPolicyAction,
+    unknown_indirect_target: GuiHelloWorldActualFallbackPolicyAction,
+    unsupported_loader_feature: GuiHelloWorldActualFallbackPolicyAction,
+    interpreter: GuiHelloWorldActualFallbackEngineStatus,
+    external_engine: GuiHelloWorldActualFallbackEngineStatus,
+    feedback_cycle: GuiHelloWorldActualFeedbackCycleState,
+}
+
+impl GuiHelloWorldActualFallbackPolicy {
+    const fn from_policy(policy: &bara_runtime::UserSpaceFallbackPolicy) -> Self {
+        Self {
+            unimplemented_instruction: GuiHelloWorldActualFallbackPolicyAction::from_runtime(
+                policy.unimplemented_instruction(),
+            ),
+            unknown_indirect_target: GuiHelloWorldActualFallbackPolicyAction::from_runtime(
+                policy.unknown_indirect_target(),
+            ),
+            unsupported_loader_feature: GuiHelloWorldActualFallbackPolicyAction::from_runtime(
+                policy.unsupported_loader_feature(),
+            ),
+            interpreter: GuiHelloWorldActualFallbackEngineStatus::from_runtime(
+                policy.interpreter(),
+            ),
+            external_engine: GuiHelloWorldActualFallbackEngineStatus::from_runtime(
+                policy.external_engine(),
+            ),
+            feedback_cycle: GuiHelloWorldActualFeedbackCycleState::from_runtime(
+                policy.feedback_cycle(),
+            ),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualFallbackPolicyAction {
+    #[serde(rename = "stable_blocker_classification")]
+    StableBlockerClassification,
+}
+
+impl GuiHelloWorldActualFallbackPolicyAction {
+    const fn from_runtime(action: UserSpaceFallbackPolicyAction) -> Self {
+        match action {
+            UserSpaceFallbackPolicyAction::StableBlockerClassification => {
+                Self::StableBlockerClassification
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualFallbackEngineStatus {
+    #[serde(rename = "candidate_not_implemented")]
+    CandidateNotImplemented,
+    #[serde(rename = "candidate_not_connected")]
+    CandidateNotConnected,
+}
+
+impl GuiHelloWorldActualFallbackEngineStatus {
+    const fn from_runtime(status: UserSpaceFallbackEngineStatus) -> Self {
+        match status {
+            UserSpaceFallbackEngineStatus::CandidateNotImplemented => Self::CandidateNotImplemented,
+            UserSpaceFallbackEngineStatus::CandidateNotConnected => Self::CandidateNotConnected,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum GuiHelloWorldActualFeedbackCycleState {
+    #[serde(rename = "ready_not_started")]
+    ReadyNotStarted,
+}
+
+impl GuiHelloWorldActualFeedbackCycleState {
+    const fn from_runtime(state: UserSpaceFeedbackCycleState) -> Self {
+        match state {
+            UserSpaceFeedbackCycleState::ReadyNotStarted => Self::ReadyNotStarted,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 struct GuiHelloWorldActualInput {
     kind: GuiHelloWorldActualInputKind,
@@ -1009,7 +1303,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_string(attempt.launch_report()).expect("launch report serializes"),
-            "{\"schema\":\"b8_gui_hello_world_actual_launch_report_v0\",\"case_id\":\"b8_gui_hello_world\",\"actual_runtime\":\"bara_arm64_user_space\",\"status\":\"blocked\",\"input\":{\"kind\":\"mach_o_executable_image\",\"source_isa\":\"x86_64\",\"binary_format\":\"mach_o\",\"target_triple\":\"x86_64-apple-macos13\",\"gui_framework\":\"appkit\",\"probe\":{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\"},\"loader_metadata\":{\"source\":\"public_mach_o_probe\",\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":0,\"byte_size\":0,\"recognized_entry_points\":[],\"recognized_segments\":[],\"unsupported_commands\":[]},\"executable_image_conversion\":{\"status\":\"not_convertible\",\"blocker\":\"missing_entry_point\"}},\"sections\":{\"status\":\"modeled_from_lc_segment_64_section_table\"},\"imports\":{\"status\":\"modeled_from_dylib_load_commands\"},\"relocations\":{\"status\":\"modeled_from_linkedit_relocation_and_bind_commands\"}}},\"runtime_preparation\":{\"source\":\"bara_runtime_user_space_launch_plan\",\"status\":\"planned_not_executed\",\"source_isa_profile\":{\"mode\":\"x86_64_long_mode\",\"address_size\":\"bits_64\",\"default_operand_size\":\"bits_32\",\"stack_width\":\"bits_64\"},\"image_mapping\":{\"responsibility\":\"loader\",\"source\":\"mach_o_executable_image\",\"memory_protection\":\"public_os_virtual_memory\"},\"executable_memory\":{\"responsibility\":\"runtime\",\"allocation_api\":\"mmap_private_anonymous\",\"protection_transition\":\"mprotect_read_write_to_read_execute\",\"release_api\":\"munmap\"},\"execution_strategy\":{\"responsibility\":\"runtime\",\"boundary\":\"user_space_runtime\",\"jit\":\"selectable\",\"aot\":\"selectable\",\"fallback_interpreter\":\"selectable\"},\"entry_trampoline\":{\"responsibility\":\"runtime\",\"target\":\"mach_o_entry_point\"},\"initial_stack\":{\"responsibility\":\"runtime\",\"contract\":\"argv_envp_initial_stack\"},\"helper_boundary\":{\"responsibility\":\"helper_boundary\",\"contract\":\"imports_objc_os_api_requests\"},\"bridge_boundary\":{\"responsibility\":\"helper_boundary\",\"syscall_bridge\":\"helper_boundary\",\"os_api_bridge\":\"helper_boundary\",\"core_ir_implementation\":\"not_embedded\",\"arm64_emit_implementation\":\"not_embedded\"},\"integration_policy\":{\"process_scope\":\"current_user_space_process\",\"kernel_extension\":\"not_required\",\"private_kernel_hook\":\"not_required\",\"private_dyld_behavior\":\"not_required\"},\"process_boundary\":{\"loader\":\"current_user_space_process\",\"translation_cache\":\"current_user_space_process\",\"runtime_helper\":\"current_user_space_process\",\"artifact_cache\":\"current_user_space_process\"}},\"blocker\":{\"classification\":\"unsupported_loader_feature\",\"boundary\":\"loader\",\"selected_by\":\"first_unsupported_launch_boundary\",\"candidate_boundaries\":[{\"boundary\":\"loader\",\"classification\":\"unsupported_loader_feature\"},{\"boundary\":\"import\",\"classification\":\"unsupported_import\"},{\"boundary\":\"objc_runtime\",\"classification\":\"unsupported_objc_runtime_boundary\"}],\"message\":\"Bara does not yet load a complete x86_64 Mach-O GUI executable with dynamic loader, AppKit import, and Objective-C runtime requirements.\"}}"
+            "{\"schema\":\"b8_gui_hello_world_actual_launch_report_v0\",\"case_id\":\"b8_gui_hello_world\",\"actual_runtime\":\"bara_arm64_user_space\",\"status\":\"blocked\",\"input\":{\"kind\":\"mach_o_executable_image\",\"source_isa\":\"x86_64\",\"binary_format\":\"mach_o\",\"target_triple\":\"x86_64-apple-macos13\",\"gui_framework\":\"appkit\",\"probe\":{\"format\":\"mach_o_64_little_endian\",\"status\":\"recognized_but_unsupported\"},\"loader_metadata\":{\"source\":\"public_mach_o_probe\",\"mach_o\":{\"file_type\":\"executable\",\"load_commands\":{\"count\":0,\"byte_size\":0,\"recognized_entry_points\":[],\"recognized_segments\":[],\"unsupported_commands\":[]},\"executable_image_conversion\":{\"status\":\"not_convertible\",\"blocker\":\"missing_entry_point\"}},\"sections\":{\"status\":\"modeled_from_lc_segment_64_section_table\"},\"imports\":{\"status\":\"modeled_from_dylib_load_commands\"},\"relocations\":{\"status\":\"modeled_from_linkedit_relocation_and_bind_commands\"}}},\"runtime_preparation\":{\"source\":\"bara_runtime_user_space_launch_plan\",\"status\":\"planned_not_executed\",\"source_isa_profile\":{\"mode\":\"x86_64_long_mode\",\"address_size\":\"bits_64\",\"default_operand_size\":\"bits_32\",\"stack_width\":\"bits_64\"},\"image_mapping\":{\"responsibility\":\"loader\",\"source\":\"mach_o_executable_image\",\"memory_protection\":\"public_os_virtual_memory\"},\"executable_memory\":{\"responsibility\":\"runtime\",\"allocation_api\":\"mmap_private_anonymous\",\"protection_transition\":\"mprotect_read_write_to_read_execute\",\"release_api\":\"munmap\"},\"execution_strategy\":{\"responsibility\":\"runtime\",\"boundary\":\"user_space_runtime\",\"jit\":\"selectable\",\"aot\":\"selectable\",\"fallback_interpreter\":\"selectable\"},\"entry_trampoline\":{\"responsibility\":\"runtime\",\"target\":\"mach_o_entry_point\"},\"initial_stack\":{\"responsibility\":\"runtime\",\"contract\":\"argv_envp_initial_stack\"},\"helper_boundary\":{\"responsibility\":\"helper_boundary\",\"contract\":\"imports_objc_os_api_requests\"},\"bridge_boundary\":{\"responsibility\":\"helper_boundary\",\"syscall_bridge\":\"helper_boundary\",\"os_api_bridge\":\"helper_boundary\",\"core_ir_implementation\":\"not_embedded\",\"arm64_emit_implementation\":\"not_embedded\"},\"integration_policy\":{\"process_scope\":\"current_user_space_process\",\"kernel_extension\":\"not_required\",\"private_kernel_hook\":\"not_required\",\"private_dyld_behavior\":\"not_required\"},\"process_boundary\":{\"loader\":\"current_user_space_process\",\"translation_cache\":\"current_user_space_process\",\"runtime_helper\":\"current_user_space_process\",\"artifact_cache\":\"current_user_space_process\"},\"platform_model\":{\"signal_model\":\"user_space_loader_boundary\",\"exception_model\":\"user_space_loader_boundary\",\"thread_model\":\"initial_thread_only\",\"tls_model\":\"deferred\",\"memory_protection\":\"public_os_virtual_memory\"},\"macos_constraints\":{\"code_signing\":\"no_private_signing_bypass\",\"write_xor_execute\":\"public_mmap_mprotect_transition\",\"hardened_runtime\":\"documented_host_policy_only\"},\"fallback_policy\":{\"unimplemented_instruction\":\"stable_blocker_classification\",\"unknown_indirect_target\":\"stable_blocker_classification\",\"unsupported_loader_feature\":\"stable_blocker_classification\",\"interpreter\":\"candidate_not_implemented\",\"external_engine\":\"candidate_not_connected\",\"feedback_cycle\":\"ready_not_started\"}},\"launch_result\":{\"exit_status\":1,\"return_value\":0,\"stdout\":\"\",\"stderr\":\"unsupported_boundary: unsupported_loader_feature\"},\"blocker\":{\"classification\":\"unsupported_loader_feature\",\"boundary\":\"loader\",\"selected_by\":\"first_unsupported_launch_boundary\",\"candidate_boundaries\":[{\"boundary\":\"loader\",\"classification\":\"unsupported_loader_feature\"},{\"boundary\":\"import\",\"classification\":\"unsupported_import\"},{\"boundary\":\"objc_runtime\",\"classification\":\"unsupported_objc_runtime_boundary\"}],\"message\":\"Bara does not yet load a complete x86_64 Mach-O GUI executable with dynamic loader, AppKit import, and Objective-C runtime requirements.\"}}"
         );
     }
 

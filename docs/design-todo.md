@@ -120,10 +120,10 @@
 
 ## D6: User-space runtime
 
-- [ ] AOT、JIT、fallback interpreter、translation cache、artifact cache を同じ user-space runtime 境界から扱う。
-- [ ] executable memory、signal、exception、thread、TLS、memory protection を public OS API の範囲で整理する。
+- [x] AOT、JIT、fallback interpreter、translation cache、artifact cache を同じ user-space runtime 境界から扱う。
+- [x] executable memory、signal、exception、thread、TLS、memory protection を public OS API の範囲で整理する。
 - [x] kernel extension、private dyld behavior、private OS hook を前提にしない。
-- [ ] Rosetta 2 型の OS 統合ではなく、Bara は user-space binary translation runtime として設計する。
+- [x] Rosetta 2 型の OS 統合ではなく、Bara は user-space binary translation runtime として設計する。
 
 メモ:
 
@@ -164,6 +164,17 @@
   helper boundary の責務として report し、bridge 実装は core IR / ARM64 emit に
   埋め込まない。これは syscall 実行、OS API mapping、または helper 実装の追加
   ではない。
+- 2026-06-11 の B8 小ステップとして、`UserSpaceLaunchPlan` に
+  `platform_model`、`macos_constraints`、`fallback_policy` を追加した。
+  signal / exception は user-space loader boundary、thread は initial thread
+  only、TLS は deferred、memory protection は public OS virtual memory として
+  report する。macOS code signing、W^X、hardened runtime は private bypass なしの
+  documented behavior / public API 制約として扱う。fallback は unimplemented
+  instruction、unknown indirect target、unsupported loader feature を stable
+  blocker classification に落とし、interpreter と外部 fallback engine は候補だが
+  未実装 / 未接続として report する。これは Rosetta 比較フィードバックサイクルを
+  開始できる直前の境界固定であり、実 signal handler、thread/TLS 実行、
+  fallback engine 実装、または expected / actual 差分修正の開始ではない。
 
 ## D7: Binary format input/output の分離
 
