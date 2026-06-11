@@ -7,9 +7,13 @@ use std::{
 };
 
 use bara_oracle::{
-    observed_result_from_json, CaseId, FailureKind, ObservedResult, TestCase, TestCaseAbi,
+    observed_result_from_json, CaseId, CaseIdError, FailureKind, ObservedResult, TestCase,
+    TestCaseAbi,
 };
 use serde::{Serialize, Serializer};
+
+const B8_GUI_HELLO_WORLD_CASE_ID: &str = "b8_gui_hello_world";
+const B8_GUI_HELLO_WORLD_SOURCE: &str = include_str!("../../../tests/sources/b8_gui_hello_world.m");
 
 #[derive(Debug)]
 pub(crate) enum X8664MachOFixtureError {
@@ -26,6 +30,10 @@ pub(crate) enum X8664MachOFixtureError {
     },
     UnsupportedHostTrapPlan {
         case_id: CaseId,
+    },
+    InvalidBuiltInCaseId {
+        case_id: &'static str,
+        source: CaseIdError,
     },
     TempPath {
         source: std::time::SystemTimeError,
@@ -68,6 +76,7 @@ impl X8664MachOFixtureError {
                 FailureKind::InvalidTestCase
             }
             Self::UnsupportedHost { .. }
+            | Self::InvalidBuiltInCaseId { .. }
             | Self::TempPath { .. }
             | Self::WriteSource { .. }
             | Self::ClangSpawn { .. }
@@ -101,6 +110,10 @@ impl fmt::Display for X8664MachOFixtureError {
                 formatter,
                 "x86_64 Mach-O artifact generation does not support host trap testcases yet: {}",
                 case_id.as_str()
+            ),
+            Self::InvalidBuiltInCaseId { case_id, source } => write!(
+                formatter,
+                "invalid built-in x86_64 GUI fixture case id {case_id:?}: {source:?}"
             ),
             Self::TempPath { source } => {
                 write!(formatter, "failed to build temporary x86_64 path: {source}")
@@ -165,7 +178,7 @@ impl GeneratedX8664MachOFixture {
     fn from_request(request: X8664MachOFixtureBuildRequest) -> Self {
         Self {
             metadata: X8664MachOFixtureMetadata::new(
-                X8664MachOFixtureArtifactKind::MachOExecutable,
+                X8664MachOFixtureArtifactKind::MachO,
                 request.case_id,
                 request.output_path,
             ),
@@ -186,7 +199,28 @@ impl GeneratedX8664OracleRunner {
     fn from_request(request: X8664OracleRunnerBuildRequest) -> Self {
         Self {
             metadata: X8664MachOFixtureMetadata::new(
-                X8664MachOFixtureArtifactKind::OracleRunnerExecutable,
+                X8664MachOFixtureArtifactKind::OracleRunner,
+                request.case_id,
+                request.output_path,
+            ),
+        }
+    }
+
+    pub(crate) const fn metadata(&self) -> &X8664MachOFixtureMetadata {
+        &self.metadata
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct GeneratedX8664GuiHelloWorldFixture {
+    metadata: X8664MachOFixtureMetadata,
+}
+
+impl GeneratedX8664GuiHelloWorldFixture {
+    fn from_request(request: X8664GuiHelloWorldBuildRequest) -> Self {
+        Self {
+            metadata: X8664MachOFixtureMetadata::new(
+                X8664MachOFixtureArtifactKind::GuiHelloWorldMachO,
                 request.case_id,
                 request.output_path,
             ),
@@ -226,8 +260,12 @@ impl X8664MachOFixtureMetadata {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum X8664MachOFixtureArtifactKind {
-    MachOExecutable,
-    OracleRunnerExecutable,
+    #[serde(rename = "mach_o_executable")]
+    MachO,
+    #[serde(rename = "oracle_runner_executable")]
+    OracleRunner,
+    #[serde(rename = "gui_hello_world_mach_o_executable")]
+    GuiHelloWorldMachO,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -355,6 +393,23 @@ impl X8664OracleRunnerSource {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct X8664GuiHelloWorldSource {
+    source: &'static str,
+}
+
+impl X8664GuiHelloWorldSource {
+    const fn new() -> Self {
+        Self {
+            source: B8_GUI_HELLO_WORLD_SOURCE,
+        }
+    }
+
+    const fn as_str(self) -> &'static str {
+        self.source
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct X8664MachOFixtureBuildRequest {
     case_id: CaseId,
@@ -411,6 +466,37 @@ impl X8664OracleRunnerBuildRequest {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct X8664GuiHelloWorldBuildRequest {
+    case_id: CaseId,
+    source: X8664GuiHelloWorldSource,
+    output_path: X8664MachOFixtureOutputPath,
+}
+
+impl X8664GuiHelloWorldBuildRequest {
+    fn new(output_path: &Path) -> Result<Self, X8664MachOFixtureError> {
+        let case_id = CaseId::new(B8_GUI_HELLO_WORLD_CASE_ID).map_err(|source| {
+            X8664MachOFixtureError::InvalidBuiltInCaseId {
+                case_id: B8_GUI_HELLO_WORLD_CASE_ID,
+                source,
+            }
+        })?;
+        Ok(Self {
+            case_id,
+            source: X8664GuiHelloWorldSource::new(),
+            output_path: X8664MachOFixtureOutputPath::from_path(output_path),
+        })
+    }
+
+    fn source(&self) -> X8664GuiHelloWorldSource {
+        self.source
+    }
+
+    fn output_path(&self) -> &X8664MachOFixtureOutputPath {
+        &self.output_path
+    }
+}
+
 pub(crate) trait X8664MachOFixturePackager {
     fn package(
         &self,
@@ -436,6 +522,20 @@ pub(crate) fn package_x86_64_oracle_runner(
     packager: &impl X8664OracleRunnerPackager,
     request: X8664OracleRunnerBuildRequest,
 ) -> Result<GeneratedX8664OracleRunner, X8664MachOFixtureError> {
+    packager.package(request)
+}
+
+pub(crate) trait X8664GuiHelloWorldPackager {
+    fn package(
+        &self,
+        request: X8664GuiHelloWorldBuildRequest,
+    ) -> Result<GeneratedX8664GuiHelloWorldFixture, X8664MachOFixtureError>;
+}
+
+pub(crate) fn package_x86_64_gui_hello_world_fixture(
+    packager: &impl X8664GuiHelloWorldPackager,
+    request: X8664GuiHelloWorldBuildRequest,
+) -> Result<GeneratedX8664GuiHelloWorldFixture, X8664MachOFixtureError> {
     packager.package(request)
 }
 
@@ -527,6 +627,49 @@ impl X8664OracleRunnerPackager for ClangX8664OracleRunnerPackager {
     }
 }
 
+struct ClangX8664GuiHelloWorldPackager;
+
+impl X8664GuiHelloWorldPackager for ClangX8664GuiHelloWorldPackager {
+    fn package(
+        &self,
+        request: X8664GuiHelloWorldBuildRequest,
+    ) -> Result<GeneratedX8664GuiHelloWorldFixture, X8664MachOFixtureError> {
+        let source_path = temporary_path("bara-x86-64-gui-hello-world", "m")?;
+        fs::write(&source_path, request.source().as_str()).map_err(|source| {
+            X8664MachOFixtureError::WriteSource {
+                path: source_path.clone(),
+                source,
+            }
+        })?;
+
+        let toolchain_command = X8664MachOFixtureToolchainCommand::clang_gui_appkit_build(
+            &source_path,
+            request.output_path(),
+        );
+        let output = toolchain_command
+            .to_command()
+            .output()
+            .map_err(|source| X8664MachOFixtureError::ClangSpawn { source });
+
+        let _ = fs::remove_file(&source_path);
+
+        let output = output?;
+        if !output.status.success() {
+            return Err(X8664MachOFixtureError::ClangFailed {
+                status: output.status.to_string(),
+                stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+            });
+        }
+        if !request.output_path().as_path().exists() {
+            return Err(X8664MachOFixtureError::MissingOutput {
+                path: request.output_path().to_path_buf(),
+            });
+        }
+
+        Ok(GeneratedX8664GuiHelloWorldFixture::from_request(request))
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct X8664MachOFixtureToolchainCommand {
     program: &'static str,
@@ -555,6 +698,30 @@ impl X8664MachOFixtureToolchainCommand {
         }
     }
 
+    fn clang_gui_appkit_build(
+        source_path: &Path,
+        output_path: &X8664MachOFixtureOutputPath,
+    ) -> Self {
+        Self {
+            program: "clang",
+            args: vec![
+                String::from("-target"),
+                X8664MachOFixtureTargetTriple::X8664AppleMacos13
+                    .as_str()
+                    .to_owned(),
+                String::from("-x"),
+                X8664MachOFixtureSourceLanguage::ObjectiveC
+                    .as_clang_arg()
+                    .to_owned(),
+                source_path.to_string_lossy().into_owned(),
+                String::from("-framework"),
+                String::from("AppKit"),
+                String::from("-o"),
+                output_path.as_path().to_string_lossy().into_owned(),
+            ],
+        }
+    }
+
     fn to_command(&self) -> Command {
         let mut command = Command::new(self.program);
         command.args(&self.args);
@@ -576,6 +743,7 @@ impl X8664MachOFixtureToolchainCommand {
 enum X8664MachOFixtureSourceLanguage {
     Assembler,
     C,
+    ObjectiveC,
 }
 
 impl X8664MachOFixtureSourceLanguage {
@@ -583,6 +751,7 @@ impl X8664MachOFixtureSourceLanguage {
         match self {
             Self::Assembler => "assembler",
             Self::C => "c",
+            Self::ObjectiveC => "objective-c",
         }
     }
 }
@@ -605,6 +774,15 @@ pub(crate) fn build_x86_64_oracle_runner(
 
     let request = X8664OracleRunnerBuildRequest::from_test_case(test_case, output_path)?;
     package_x86_64_oracle_runner(&ClangX8664OracleRunnerPackager, request)
+}
+
+pub(crate) fn build_x86_64_gui_hello_world_fixture(
+    output_path: &Path,
+) -> Result<GeneratedX8664GuiHelloWorldFixture, X8664MachOFixtureError> {
+    ensure_supported_host()?;
+
+    let request = X8664GuiHelloWorldBuildRequest::new(output_path)?;
+    package_x86_64_gui_hello_world_fixture(&ClangX8664GuiHelloWorldPackager, request)
 }
 
 pub(crate) fn observe_x86_64_oracle_expected(
@@ -804,10 +982,11 @@ mod tests {
     use super::{
         json_string_literal, observe_x86_64_oracle_expected, package_x86_64_mach_o_fixture,
         package_x86_64_oracle_runner, GeneratedX8664MachOFixture, GeneratedX8664OracleRunner,
-        RosettaOracleObservation, X8664MachOAssemblySource, X8664MachOFixtureBuildRequest,
-        X8664MachOFixtureError, X8664MachOFixtureOutputPath, X8664MachOFixturePackager,
-        X8664MachOFixtureSourceLanguage, X8664MachOFixtureToolchainCommand,
-        X8664OracleRunnerBuildRequest, X8664OracleRunnerPackager, X8664OracleRunnerSource,
+        RosettaOracleObservation, X8664GuiHelloWorldSource, X8664MachOAssemblySource,
+        X8664MachOFixtureBuildRequest, X8664MachOFixtureError, X8664MachOFixtureOutputPath,
+        X8664MachOFixturePackager, X8664MachOFixtureSourceLanguage,
+        X8664MachOFixtureToolchainCommand, X8664OracleRunnerBuildRequest,
+        X8664OracleRunnerPackager, X8664OracleRunnerSource,
     };
 
     #[test]
@@ -876,6 +1055,16 @@ mod tests {
         assert!(source.contains("static const unsigned char BARA_TESTCASE_BYTES[] = {\n    0xb8, 0x2a, 0x00, 0x00, 0x00, 0xc3,\n};"));
         assert!(source.contains("static const char BARA_CASE_ID_JSON[] = \"\\\"return_42\\\"\";"));
         assert!(source.contains("printf(\"{\\\"case_id\\\":%s,\\\"exit_status\\\":0,\\\"return_value\\\":%llu,\\\"stdout\\\":\\\"\\\",\\\"stderr\\\":\\\"\\\"}\\n\""));
+    }
+
+    #[test]
+    fn gui_hello_world_source_is_self_authored_appkit_fixture() {
+        let source = X8664GuiHelloWorldSource::new().as_str();
+
+        assert!(source.contains("@interface BaraGuiHelloWorldDelegate"));
+        assert!(source.contains("[NSApplication sharedApplication]"));
+        assert!(source.contains("[_window setTitle:@\"Bara GUI Hello World\"]"));
+        assert!(source.contains("gui_window_created"));
     }
 
     #[test]
@@ -977,6 +1166,32 @@ mod tests {
                 String::from("/tmp/return_42_oracle.c"),
                 String::from("-o"),
                 String::from("/tmp/return_42_oracle"),
+            ]
+        );
+    }
+
+    #[test]
+    fn clang_objective_c_appkit_command_targets_x86_64_apple_macos() {
+        let output_path =
+            X8664MachOFixtureOutputPath::from_path(Path::new("/tmp/b8_gui_hello_world"));
+        let command = X8664MachOFixtureToolchainCommand::clang_gui_appkit_build(
+            Path::new("/tmp/b8_gui_hello_world.m"),
+            &output_path,
+        );
+
+        assert_eq!(command.program(), "clang");
+        assert_eq!(
+            command.args(),
+            &[
+                String::from("-target"),
+                String::from("x86_64-apple-macos13"),
+                String::from("-x"),
+                String::from("objective-c"),
+                String::from("/tmp/b8_gui_hello_world.m"),
+                String::from("-framework"),
+                String::from("AppKit"),
+                String::from("-o"),
+                String::from("/tmp/b8_gui_hello_world"),
             ]
         );
     }

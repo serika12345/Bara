@@ -9,33 +9,47 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-11 10:38 JST
+最終更新: 2026-06-11 10:52 JST
 
 状態:
 
-- project_state: completed。B8 の最初の小ステップとして、実 x86_64 macOS
-  アプリ起動の初期ターゲットを self-authored single-binary GUI Hello World
-  に固定した。
+- project_state: completed。B8 の 2 つ目の小ステップとして、self-authored
+  single-binary GUI Hello World source を追加し、x86_64 Mach-O executable
+  としてビルドできる host-specific fixture にした。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8:
   実 x86_64 macOS アプリ起動。
-- active_design_focus: B8 GUI launch scope。`.app` bundle ではなく x86_64
-  Mach-O `MH_EXECUTE` の単一 executable を最初の target とし、public system
-  framework imports は loader/runtime/helper boundary で扱う。
+- active_design_focus: B8 GUI fixture build。`.app` bundle ではなく x86_64
+  Mach-O `MH_EXECUTE` の単一 executable を self-authored AppKit source から
+  clang で生成する。
 - active_branch: `task/b8-gui-hello-launch-scope`。base commit は `3d9f1ba`。
   latest commit はこの小ステップの review package で確認する。
-- related_todo: [TODO.md](../TODO.md) B8 の「最初に起動対象とする実 x86_64
-  macOS アプリの scope と成功条件を定義する」。
-- completed_work: B8 scope 文書を追加し、起動 target、成功条件、non-goals、
-  初期小ステップ、clean-room 境界を整理した。`TODO.md` の B8 を小ステップへ
-  分割し、D5/D6 の design note に GUI helper / user-space runtime 境界を記録した。
-- remaining_work: 次の小ステップは self-authored GUI Hello World source を追加し、
-  x86_64 Mach-O executable としてビルドできる host-specific fixture にすること。
-- next_action: commit / push 後、次の B8 小ステップで GUI fixture build 経路を作る。
-- verification: docs-only verification として `git diff --check` と
-  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。code / script /
-  configuration 変更はないため、full `nix develop -c ./scripts/verify` は実行していない。
+- related_todo: [TODO.md](../TODO.md) B8 の「self-authored single-binary GUI
+  Hello World source を追加し、x86_64 Mach-O executable としてビルドできる
+  host-specific fixture にする」。
+- completed_work: `tests/sources/b8_gui_hello_world.m` に self-authored AppKit
+  source を追加した。`btbc-cli build-x86_64-gui-hello-world-fixture <out-exe>` は
+  macOS host で `x86_64-apple-macos13` Mach-O executable を生成し、非 macOS
+  host では既存の `UnsupportedHost` 分類を返す。
+- remaining_work: 次の小ステップは GUI Hello World fixture を Rosetta black-box
+  oracle で実行し、`expected.json` と launch metadata の初期 schema を固定すること。
+- next_action: commit / push 後、次の B8 小ステップで Rosetta expected generation
+  経路を作る。
+- verification: targeted tests として
+  `nix develop -c cargo test -p btbc-cli gui_hello_world -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli clang_objective_c_appkit_command_targets_x86_64_apple_macos -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli usage_includes_probe_binary_command -- --nocapture`
+  が通過した。full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
+
+- 2026-06-11 10:48 JST: B8 の 2 つ目の小ステップとして、self-authored
+  single-binary GUI Hello World source を追加し、x86_64 Mach-O executable
+  としてビルドできる host-specific fixture にした。AppKit source は
+  GUI window creation 後に deterministic lifecycle event を stdout へ出し、
+  短時間後に終了する。`btbc-cli build-x86_64-gui-hello-world-fixture` は
+  `gui_hello_world_mach_o_executable` metadata を返し、public Mach-O probe で
+  x86_64 Mach-O として認識できる。検証は snapshot の targeted tests と
+  commit 前の full verification。
 
 - 2026-06-11 10:38 JST: B8 の最初の小ステップとして、実 x86_64 macOS
   アプリ起動の初期ターゲットを self-authored single-binary GUI Hello World
