@@ -331,6 +331,40 @@
   selector、`rax` return destination を stable report として保存する。これは
   `_objc_msgSend` 実行ではなく、次の B8-G5b で receiver / selector / return value
   materialization blocker を扱うための ABI/helper boundary contract である。
+- 2026-06-12 の B8-G5b として、B8-G5a の marshaling contract から
+  `b8_objc_message_materialization_boundary_v0` を追加した。boundary は `call r14` の
+  直前にある `rdi` / `rsi` の materialization source を decode report から探し、
+  current fixture ではどちらも RIP-relative qword load として report する。その qword
+  value は `ProgramImageMetadata.mapped_bytes` から読むが、現 mapping は必要な data 側
+  address をまだ覆っていないため、`receiver_mapped_image_qword_unavailable` /
+  `selector_mapped_image_qword_unavailable` で止める。`rax` return destination は
+  `write_helper_return_to_x86_64_rax` plan と
+  `helper_return_value_materialization_unimplemented` blocker に留める。これは
+  Objective-C / AppKit bridge や `_objc_msgSend` host execution ではなく、次の B8-G5c
+  で public Mach-O mapped image metadata を広げるための materialization boundary である。
+- 2026-06-12 の B8-G5c として、`ProgramImageMetadata.mapped_bytes` を executable entry
+  segment だけでなく、public `LC_SEGMENT_64` の file-backed segment 全体から構成する
+  ようにした。これにより current fixture の `__DATA.__objc_classrefs` /
+  `__DATA.__objc_selrefs` にある receiver / selector qword load 元を stable report に
+  保存できる。保存される値は file-backed mapped raw qword であり、private dyld state
+  は使わない。current blocker は
+  `receiver_mapped_value_fixup_resolution_unimplemented` /
+  `selector_mapped_value_fixup_resolution_unimplemented` へ進むため、次の B8-G5d では
+  public chained fixups / rebase / bind metadata に基づく raw qword resolution を扱う。
+- 2026-06-12 の B8-G5d として、public `LC_DYLD_CHAINED_FIXUPS` metadata に基づき、
+  ObjC receiver / selector の mapped raw qword を bind import または rebase VM address
+  として解釈する report を追加した。current fixture では receiver が
+  `_OBJC_CLASS_$_NSApplication` import identity、selector が Mach-O image-base relative
+  rebase VM address `4294975648` として解決される。これは `_objc_msgSend` execution や
+  Objective-C / AppKit bridge ではなく、argument materialization blocker を return value
+  materialization blocker へ進めるための public loader/fixup boundary である。
+- 2026-06-12 の B8-G5e として、ObjC helper return value を x86_64 `rax` に書き戻す
+  `b8_objc_helper_return_writeback_boundary_v0` を stable report に追加した。boundary は
+  source を `objc_helper_return_value`、destination を `x86_64_rax`、width を 64-bit、
+  ordering を `after_helper_call_returns` として保存する。まだ helper result は生成せず、
+  remaining blocker は `objc_helper_execution_unimplemented` に進める。次の B8-G6a では
+  Objective-C / AppKit host execution ではなく、ObjC helper execution request boundary を
+  stable report として分離する。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、

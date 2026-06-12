@@ -2508,17 +2508,69 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register\":\"rsi\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"return_destination\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register\":\"rax\""));
-        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"objc_receiver_materialization_unimplemented\""));
-        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"objc_selector_materialization_unimplemented\""));
-        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"helper_return_value_materialization_unimplemented\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"next_action\":\"define_objc_receiver_selector_materialization\""));
+            .contains("\"schema\":\"b8_objc_helper_return_writeback_boundary_v0\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"objc_helper_return_value\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"destination\":\"x86_64_rax\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"writeback_plan\":\"write_helper_return_to_x86_64_rax\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"ordering\":\"after_helper_call_returns\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"objc_helper_execution_unimplemented\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"materialization_boundary\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_objc_message_materialization_boundary_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"receiver\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"selector\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"source_definition\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"kind\":\"rip_relative_qword_load\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"target_register\":\"rdi\"")
+        );
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"target_register\":\"rsi\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"mapped_value\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"program_image_metadata\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"address\":4294988120"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"value\":9227875636482146321"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"address\":4294988072"));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"value\":4503599627378848")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"fixup_resolution\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"public_dyld_chained_fixups\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"symbol_name\":\"_OBJC_CLASS_$_NSApplication\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"dylib_path\":\"/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit\""
+        ));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"resolved_vm_address\":4294975648"));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"receiver_mapped_value_fixup_resolution_unimplemented\""));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"selector_mapped_value_fixup_resolution_unimplemented\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"blocker\":null"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_action\":\"define_objc_runtime_helper_bridge\""));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"x86_64_argument_marshaling_unimplemented\""));
-        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"helper_return_marshaling_unimplemented\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"resolution\":\"resolved_public_dyld_chained_fixups_import\""));
@@ -2541,8 +2593,25 @@ mod tests {
         assert!(launch_report.contains("\"role\":\"objc_receiver\""));
         assert!(launch_report.contains("\"role\":\"objc_selector\""));
         assert!(launch_report.contains("\"return_destination\""));
-        assert!(launch_report.contains("\"helper_return_value_materialization_unimplemented\""));
-        assert!(launch_report.contains("\"x86_64_argument_marshaling_unimplemented\""));
+        assert!(!launch_report.contains("\"helper_return_value_materialization_unimplemented\""));
+        assert!(
+            launch_report.contains("\"schema\":\"b8_objc_helper_return_writeback_boundary_v0\"")
+        );
+        assert!(launch_report.contains("\"source\":\"objc_helper_return_value\""));
+        assert!(launch_report.contains("\"destination\":\"x86_64_rax\""));
+        assert!(launch_report.contains("\"writeback_plan\":\"write_helper_return_to_x86_64_rax\""));
+        assert!(launch_report.contains("\"ordering\":\"after_helper_call_returns\""));
+        assert!(launch_report.contains("\"objc_helper_execution_unimplemented\""));
+        assert!(
+            launch_report.contains("\"schema\":\"b8_objc_message_materialization_boundary_v0\"")
+        );
+        assert!(launch_report.contains("\"fixup_resolution\""));
+        assert!(launch_report.contains("\"symbol_name\":\"_OBJC_CLASS_$_NSApplication\""));
+        assert!(launch_report.contains("\"resolved_vm_address\":4294975648"));
+        assert!(!launch_report.contains("\"receiver_mapped_value_fixup_resolution_unimplemented\""));
+        assert!(!launch_report.contains("\"selector_mapped_value_fixup_resolution_unimplemented\""));
+        assert!(launch_report.contains("\"next_action\":\"define_objc_runtime_helper_bridge\""));
+        assert!(!launch_report.contains("\"x86_64_argument_marshaling_unimplemented\""));
         let blocker_report = read_file(&bundle_dir.join("blocker.json"));
         assert!(blocker_report.contains("\"status\":\"blocked\""));
         assert!(blocker_report.contains("\"current_blocker\":\"unsupported_instruction\""));

@@ -13,7 +13,7 @@ pub use mach_o::{MachOFileType, MachOLoadCommands, MachOMetadata};
 pub use mach_o_chained_fixups::{
     decode_mach_o_chained_fixups_for_target, MachOChainedFixupTargetAddress,
     MachOChainedFixupsBlocker, MachOChainedFixupsTargetReport, MachOChainedFixupsTargetStatus,
-    MachOChainedImportIdentityReport,
+    MachOChainedImportIdentityReport, MachOChainedRebaseTargetIdentityReport,
 };
 pub use mach_o_dylib_command::{
     MachODylibImportCommandKind, MachODylibPath, MachODylibTimestamp, MachODylibVersion,
