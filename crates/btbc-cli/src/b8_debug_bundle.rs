@@ -2053,6 +2053,7 @@ struct B8DebugObjcHelperExecutionRequestReport {
     selector_vm_address: Option<MachOChainedRebaseTargetIdentityReport>,
     return_writeback_boundary: B8DebugObjcHelperReturnWritebackBoundaryReport,
     required_capability: B8DebugObjcHelperExecutionCapability,
+    bridge_contract: B8DebugObjcRuntimeHelperBridgeContractReport,
     blockers: Vec<B8DebugObjcHelperExecutionBlocker>,
     next_action: B8DebugObjcHelperExecutionNextAction,
 }
@@ -2080,6 +2081,16 @@ impl B8DebugObjcHelperExecutionRequestReport {
             blockers.push(B8DebugObjcHelperExecutionBlocker::SelectorVmAddressUnavailable);
         }
         blockers.push(B8DebugObjcHelperExecutionBlocker::ObjcHelperExecutionUnimplemented);
+        let return_writeback_boundary = materialization.return_value.writeback_boundary;
+        let required_capability =
+            B8DebugObjcHelperExecutionCapability::ObjcRuntimeMessageSendHelper;
+        let bridge_contract = B8DebugObjcRuntimeHelperBridgeContractReport::blocked(
+            import,
+            receiver_identity.as_ref(),
+            selector_vm_address,
+            return_writeback_boundary,
+            required_capability,
+        );
         let next_action = if blockers.len() == 1 {
             B8DebugObjcHelperExecutionNextAction::DefineObjcRuntimeHelperBridge
         } else {
@@ -2093,8 +2104,9 @@ impl B8DebugObjcHelperExecutionRequestReport {
             source_import: import.clone(),
             receiver_identity,
             selector_vm_address,
-            return_writeback_boundary: materialization.return_value.writeback_boundary,
-            required_capability: B8DebugObjcHelperExecutionCapability::ObjcRuntimeMessageSendHelper,
+            return_writeback_boundary,
+            required_capability,
+            bridge_contract,
             blockers,
             next_action,
         })
@@ -2126,6 +2138,120 @@ enum B8DebugObjcHelperExecutionBlocker {
 enum B8DebugObjcHelperExecutionNextAction {
     DefineObjcRuntimeHelperBridge,
     InspectObjcMessageMaterializationBoundary,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugObjcRuntimeHelperBridgeContractReport {
+    schema: &'static str,
+    status: B8DebugImportBoundaryStatus,
+    capability: B8DebugObjcHelperExecutionCapability,
+    input_contract: B8DebugObjcRuntimeHelperBridgeInputContractReport,
+    output_contract: B8DebugObjcRuntimeHelperBridgeOutputContractReport,
+    error_contract: B8DebugObjcRuntimeHelperBridgeErrorContractReport,
+    blocker: B8DebugObjcHelperExecutionBlocker,
+    next_action: B8DebugObjcRuntimeHelperBridgeNextAction,
+}
+
+impl B8DebugObjcRuntimeHelperBridgeContractReport {
+    fn blocked(
+        source_import: &MachOChainedImportIdentityReport,
+        receiver_identity: Option<&MachOChainedImportIdentityReport>,
+        selector_vm_address: Option<MachOChainedRebaseTargetIdentityReport>,
+        return_writeback_boundary: B8DebugObjcHelperReturnWritebackBoundaryReport,
+        capability: B8DebugObjcHelperExecutionCapability,
+    ) -> Self {
+        Self {
+            schema: "b8_objc_runtime_helper_bridge_contract_v0",
+            status: B8DebugImportBoundaryStatus::Blocked,
+            capability,
+            input_contract: B8DebugObjcRuntimeHelperBridgeInputContractReport::new(
+                source_import,
+                receiver_identity,
+                selector_vm_address,
+                capability,
+            ),
+            output_contract: B8DebugObjcRuntimeHelperBridgeOutputContractReport::new(
+                return_writeback_boundary,
+            ),
+            error_contract: B8DebugObjcRuntimeHelperBridgeErrorContractReport::blocked(),
+            blocker: B8DebugObjcHelperExecutionBlocker::ObjcHelperExecutionUnimplemented,
+            next_action:
+                B8DebugObjcRuntimeHelperBridgeNextAction::ImplementPublicObjcRuntimeHelperBridge,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugObjcRuntimeHelperBridgeInputContractReport {
+    source_import: MachOChainedImportIdentityReport,
+    receiver_identity: Option<MachOChainedImportIdentityReport>,
+    selector_vm_address: Option<MachOChainedRebaseTargetIdentityReport>,
+    required_capability: B8DebugObjcHelperExecutionCapability,
+}
+
+impl B8DebugObjcRuntimeHelperBridgeInputContractReport {
+    fn new(
+        source_import: &MachOChainedImportIdentityReport,
+        receiver_identity: Option<&MachOChainedImportIdentityReport>,
+        selector_vm_address: Option<MachOChainedRebaseTargetIdentityReport>,
+        required_capability: B8DebugObjcHelperExecutionCapability,
+    ) -> Self {
+        Self {
+            source_import: source_import.clone(),
+            receiver_identity: receiver_identity.cloned(),
+            selector_vm_address,
+            required_capability,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugObjcRuntimeHelperBridgeOutputContractReport {
+    helper_output: B8DebugObjcRuntimeHelperOutput,
+    return_writeback_boundary: B8DebugObjcHelperReturnWritebackBoundaryReport,
+}
+
+impl B8DebugObjcRuntimeHelperBridgeOutputContractReport {
+    const fn new(
+        return_writeback_boundary: B8DebugObjcHelperReturnWritebackBoundaryReport,
+    ) -> Self {
+        Self {
+            helper_output: B8DebugObjcRuntimeHelperOutput::ObjcHelperReturnValue,
+            return_writeback_boundary,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugObjcRuntimeHelperBridgeErrorContractReport {
+    error_classification: B8DebugObjcRuntimeHelperErrorClassification,
+}
+
+impl B8DebugObjcRuntimeHelperBridgeErrorContractReport {
+    const fn blocked() -> Self {
+        Self {
+            error_classification:
+                B8DebugObjcRuntimeHelperErrorClassification::ObjcRuntimeHelperExecutionUnimplemented,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugObjcRuntimeHelperOutput {
+    ObjcHelperReturnValue,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugObjcRuntimeHelperErrorClassification {
+    ObjcRuntimeHelperExecutionUnimplemented,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugObjcRuntimeHelperBridgeNextAction {
+    ImplementPublicObjcRuntimeHelperBridge,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]

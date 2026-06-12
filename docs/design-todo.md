@@ -376,6 +376,14 @@
   AppKit API の host execution、arbitrary indirect call target execution、translation
   cache、fallback JIT/interpreter を追加するものではない。次の B8-G6b では、この required
   capability を public Objective-C runtime helper bridge contract として分離する。
+- 2026-06-12 の B8-G6b として、`objc_runtime_message_send_helper` capability を
+  `b8_objc_runtime_helper_bridge_contract_v0` として stable report に分離した。contract は
+  input として `_objc_msgSend` import identity、receiver import identity、selector VM
+  address、required capability を持ち、output として `objc_helper_return_value` と
+  x86_64 `rax` return write-back boundary を持つ。error contract は
+  `objc_runtime_helper_execution_unimplemented` として分類する。これは public Objective-C
+  runtime / AppKit helper bridge の実行実装ではなく、次の B8-G6c で self-authored
+  fixture に必要な host execution slice を接続するための contract 固定である。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、
