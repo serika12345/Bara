@@ -9,12 +9,12 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-12 20:21 JST
+最終更新: 2026-06-12 21:11 JST
 
 状態:
 
 - project_state: in_progress。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
-  reviewable GUI 起動 slice の積み上げとして扱う。B8-G5c までで、self-authored
+  reviewable GUI 起動 slice の積み上げとして扱う。B8-G6a までで、self-authored
   x86_64 GUI fixture の実 `LC_MAIN` entry から
   `push rbp; mov rbp,rsp; push r15; push r14; push rbx; push rax; call rel32;
   mov rbx,rax; mov rax,qword ptr [rip+disp32]; mov rdx,qword ptr [rax];
@@ -52,26 +52,27 @@
   blocker は解消し、次の blocker は `helper_return_value_materialization_unimplemented`
   に進む。B8-G5e では helper return value を x86_64 `rax` に書き戻す
   `b8_objc_helper_return_writeback_boundary_v0` を stable report に保存し、remaining
-  blocker は `objc_helper_execution_unimplemented` に進む。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G5e Helper Return Value
-  Materialization: helper return value materialization boundary を定義する。
+  blocker は `objc_helper_execution_unimplemented` に進む。B8-G6a では
+  `b8_objc_helper_execution_request_v0` として `_objc_msgSend` import identity、
+  receiver import identity、selector resolved VM address、return write-back boundary、
+  required capability `objc_runtime_message_send_helper`、remaining blocker
+  `objc_helper_execution_unimplemented` を 1 つの stable helper execution request に
+  集約する。Objective-C runtime / AppKit helper の host execution はまだ行わない。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G6a ObjC Helper Execution
+  Boundary: ObjC helper execution request boundary を stable report に分離する。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
   Objective-C runtime / dyld の private behavior は使わず、public metadata、
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
-- active_branch: `task/b8-g5e-helper-return-value-materialization`。B8-G5d PR #29
-  <https://github.com/serika12345/Bara/pull/29> は
-  `task/b8-g5a-import-helper-marshaling-contract` へ merge 済みのため、B8-G5e branch は
-  `origin/task/b8-g5a-import-helper-marshaling-contract` の `82bc271`
-  (`Merge pull request #29 from serika12345/task/b8-g5d-objc-argument-fixup-resolution`)
-  を base にした stacked branch として扱う。B8-G5e 実装 commit は `9c88763`
-  (`feat: define objc helper return writeback`)。Draft PR #30
-  <https://github.com/serika12345/Bara/pull/30> を開いて review gate で停止中。
+- active_branch: `task/b8-g6a-objc-helper-execution-boundary`。B8-G5e PR #30
+  <https://github.com/serika12345/Bara/pull/30> の HEAD `4b6bfff`
+  (`docs: record b8-g5e review gate`) を base にした stacked branch として扱う。
+  B8-G6a 実装 commit は作成前で、検証後に commit / push / draft PR 作成へ進む。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a / B8-G5b / B8-G5c /
-  B8-G5d / B8-G5e。
+  B8-G5d / B8-G5e / B8-G6a / B8-G6b。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -158,19 +159,39 @@
   `ordering=after_helper_call_returns` を保存する。helper result はまだ生成せず、
   materialization boundary と helper marshaling contract の remaining blocker は
   `objc_helper_execution_unimplemented`、`next_action` は
-  `define_objc_runtime_helper_bridge` である。
-- remaining_work: B8-G6a。B8-G5e 後に残る `objc_helper_execution_unimplemented` を、
-  ObjC helper execution request boundary として stable report に分離する。まだ
-  `_objc_msgSend` host execution、Objective-C / AppKit helper bridge、arbitrary
-  indirect call target execution、translation cache、fallback JIT/interpreter は行わない。
-- next_action: B8-G5e draft PR #30 の review gate で停止する。レビュー後の次 PR Gate は
-  B8-G6a ObjC Helper Execution Boundary。
+  `define_objc_runtime_helper_bridge` である。B8-G6a として
+  `helper_execution_request.schema=b8_objc_helper_execution_request_v0`、
+  `kind=objc_msg_send`、`source_import.symbol_name=_objc_msgSend`、
+  `receiver_identity.symbol_name=_OBJC_CLASS_$_NSApplication`、
+  `selector_vm_address.resolved_vm_address=4294975648`、
+  `return_writeback_boundary.schema=b8_objc_helper_return_writeback_boundary_v0`、
+  `required_capability=objc_runtime_message_send_helper` を保存する。helper execution request
+  は `objc_helper_execution_unimplemented` で停止し、host execution は行わない。
+- remaining_work: B8-G6b。B8-G6a の `objc_runtime_message_send_helper` required
+  capability と `objc_helper_execution_unimplemented` を受けて、public Objective-C
+  runtime helper bridge の input / output / error contract を stable report に分離する。
+  まだ `_objc_msgSend` host execution、Objective-C / AppKit helper bridge execution、
+  arbitrary indirect call target execution、translation cache、fallback JIT/interpreter は
+  行わない。
+- next_action: B8-G6a branch を検証し、commit / push / draft PR 作成で review gate に
+  到達する。次の PR Gate は B8-G6b ObjC Runtime Helper Bridge Contract。
 - verification: targeted check として
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
   full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-12 21:07 JST: B8-G6a ObjC Helper Execution Boundary を実装した。
+  B8 debug bundle の `helper_boundary_request.request` に
+  `b8_objc_helper_execution_request_v0` を追加し、`_objc_msgSend` source import、
+  receiver `_OBJC_CLASS_$_NSApplication` import identity、selector resolved VM address
+  `4294975648`、`b8_objc_helper_return_writeback_boundary_v0`、required capability
+  `objc_runtime_message_send_helper` を 1 つの stable helper execution request として
+  保存するようにした。Objective-C runtime / AppKit helper の host execution、
+  arbitrary indirect call target execution、translation cache、fallback JIT/interpreter は
+  追加していない。targeted check は
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
+  full `nix develop -c ./scripts/verify` も通過した。
 - 2026-06-12 20:21 JST: B8-G5e branch
   `task/b8-g5e-helper-return-value-materialization` を push し、Draft PR #30
   <https://github.com/serika12345/Bara/pull/30> を

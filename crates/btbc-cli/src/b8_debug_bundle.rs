@@ -1372,6 +1372,7 @@ struct B8DebugImportHelperRequestReport {
     return_to: u64,
     import: MachOChainedImportIdentityReport,
     required_marshaling: B8DebugHelperMarshalingReport,
+    helper_execution_request: Option<B8DebugObjcHelperExecutionRequestReport>,
 }
 
 impl B8DebugImportHelperRequestReport {
@@ -1383,6 +1384,18 @@ impl B8DebugImportHelperRequestReport {
         decode_report: &B8DebugDecodeReport,
         image_metadata: &ProgramImageMetadata,
     ) -> Self {
+        let required_marshaling = B8DebugHelperMarshalingReport::blocked(
+            call_boundary,
+            input,
+            input_probe,
+            decode_report,
+            image_metadata,
+        );
+        let helper_execution_request =
+            B8DebugObjcHelperExecutionRequestReport::from_import_and_marshaling(
+                &import,
+                &required_marshaling,
+            );
         Self {
             kind: B8DebugImportHelperRequestKind::ImportHelperCall,
             source: B8DebugImportHelperRequestSource::PublicDyldChainedFixupsImport,
@@ -1391,13 +1404,8 @@ impl B8DebugImportHelperRequestReport {
             call_site: call_boundary.call_site,
             return_to: call_boundary.return_to,
             import,
-            required_marshaling: B8DebugHelperMarshalingReport::blocked(
-                call_boundary,
-                input,
-                input_probe,
-                decode_report,
-                image_metadata,
-            ),
+            required_marshaling,
+            helper_execution_request,
         }
     }
 }
@@ -1904,6 +1912,18 @@ impl B8DebugObjcArgumentValueMaterializationReport {
             .as_ref()
             .is_some_and(B8DebugObjcArgumentFixupResolutionReport::is_resolved)
     }
+
+    fn resolved_import_identity(&self) -> Option<MachOChainedImportIdentityReport> {
+        self.fixup_resolution
+            .as_ref()
+            .and_then(|resolution| resolution.import.clone())
+    }
+
+    fn resolved_rebase_target(&self) -> Option<MachOChainedRebaseTargetIdentityReport> {
+        self.fixup_resolution
+            .as_ref()
+            .and_then(|resolution| resolution.rebase)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -2021,6 +2041,91 @@ impl B8DebugObjcHelperReturnWritebackBoundaryReport {
             blocker: B8DebugObjcMessageMaterializationBlocker::ObjcHelperExecutionUnimplemented,
         }
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugObjcHelperExecutionRequestReport {
+    schema: &'static str,
+    status: B8DebugImportBoundaryStatus,
+    kind: B8DebugObjcHelperExecutionRequestKind,
+    source_import: MachOChainedImportIdentityReport,
+    receiver_identity: Option<MachOChainedImportIdentityReport>,
+    selector_vm_address: Option<MachOChainedRebaseTargetIdentityReport>,
+    return_writeback_boundary: B8DebugObjcHelperReturnWritebackBoundaryReport,
+    required_capability: B8DebugObjcHelperExecutionCapability,
+    blockers: Vec<B8DebugObjcHelperExecutionBlocker>,
+    next_action: B8DebugObjcHelperExecutionNextAction,
+}
+
+impl B8DebugObjcHelperExecutionRequestReport {
+    fn from_import_and_marshaling(
+        import: &MachOChainedImportIdentityReport,
+        marshaling: &B8DebugHelperMarshalingReport,
+    ) -> Option<Self> {
+        let contract = marshaling.contract.as_ref()?;
+        let materialization = &contract.materialization_boundary;
+        let receiver_identity = materialization
+            .receiver
+            .mapped_value
+            .resolved_import_identity();
+        let selector_vm_address = materialization
+            .selector
+            .mapped_value
+            .resolved_rebase_target();
+        let mut blockers = Vec::new();
+        if receiver_identity.is_none() {
+            blockers.push(B8DebugObjcHelperExecutionBlocker::ReceiverIdentityUnavailable);
+        }
+        if selector_vm_address.is_none() {
+            blockers.push(B8DebugObjcHelperExecutionBlocker::SelectorVmAddressUnavailable);
+        }
+        blockers.push(B8DebugObjcHelperExecutionBlocker::ObjcHelperExecutionUnimplemented);
+        let next_action = if blockers.len() == 1 {
+            B8DebugObjcHelperExecutionNextAction::DefineObjcRuntimeHelperBridge
+        } else {
+            B8DebugObjcHelperExecutionNextAction::InspectObjcMessageMaterializationBoundary
+        };
+
+        Some(Self {
+            schema: "b8_objc_helper_execution_request_v0",
+            status: B8DebugImportBoundaryStatus::Blocked,
+            kind: B8DebugObjcHelperExecutionRequestKind::ObjcMsgSend,
+            source_import: import.clone(),
+            receiver_identity,
+            selector_vm_address,
+            return_writeback_boundary: materialization.return_value.writeback_boundary,
+            required_capability: B8DebugObjcHelperExecutionCapability::ObjcRuntimeMessageSendHelper,
+            blockers,
+            next_action,
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugObjcHelperExecutionRequestKind {
+    ObjcMsgSend,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugObjcHelperExecutionCapability {
+    ObjcRuntimeMessageSendHelper,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugObjcHelperExecutionBlocker {
+    ObjcHelperExecutionUnimplemented,
+    ReceiverIdentityUnavailable,
+    SelectorVmAddressUnavailable,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugObjcHelperExecutionNextAction {
+    DefineObjcRuntimeHelperBridge,
+    InspectObjcMessageMaterializationBoundary,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
