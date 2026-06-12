@@ -1217,9 +1217,8 @@ PR に含めない:
 
 review gate:
 
-- 完了したら commit / push / draft PR 作成で停止する。次の gate は helper return
-  materialization 後の blocker を見て B8-G6a ObjC Helper Execution Boundary として
-  更新する。
+- B8-G5e draft PR #30 <https://github.com/serika12345/Bara/pull/30> を開いて停止する。
+  次の gate は B8-G6a ObjC Helper Execution Boundary。
 - [ ] B8-G6a: ObjC helper execution boundary を stable report に分離する。
   - [ ] B8-G5e 後に残る `objc_helper_execution_unimplemented` を受けて、helper execution
     request の source import、receiver identity、selector VM address、return write-back

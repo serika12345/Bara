@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-12 20:19 JST
+最終更新: 2026-06-12 20:21 JST
 
 状態:
 
@@ -65,8 +65,9 @@
   `task/b8-g5a-import-helper-marshaling-contract` へ merge 済みのため、B8-G5e branch は
   `origin/task/b8-g5a-import-helper-marshaling-contract` の `82bc271`
   (`Merge pull request #29 from serika12345/task/b8-g5d-objc-argument-fixup-resolution`)
-  を base にした stacked branch として扱う。latest commit は B8-G5e review package で
-  報告する。
+  を base にした stacked branch として扱う。B8-G5e 実装 commit は `9c88763`
+  (`feat: define objc helper return writeback`)。Draft PR #30
+  <https://github.com/serika12345/Bara/pull/30> を開いて review gate で停止中。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a / B8-G5b / B8-G5c /
@@ -162,14 +163,20 @@
   ObjC helper execution request boundary として stable report に分離する。まだ
   `_objc_msgSend` host execution、Objective-C / AppKit helper bridge、arbitrary
   indirect call target execution、translation cache、fallback JIT/interpreter は行わない。
-- next_action: B8-G5e branch を commit / push し、draft PR を開いて review gate で
-  停止する。レビュー後の次 PR Gate は B8-G6a ObjC Helper Execution Boundary。
+- next_action: B8-G5e draft PR #30 の review gate で停止する。レビュー後の次 PR Gate は
+  B8-G6a ObjC Helper Execution Boundary。
 - verification: targeted check として
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
   full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-12 20:21 JST: B8-G5e branch
+  `task/b8-g5e-helper-return-value-materialization` を push し、Draft PR #30
+  <https://github.com/serika12345/Bara/pull/30> を
+  `task/b8-g5a-import-helper-marshaling-contract` base で開いた。clean HEAD の
+  `nix develop -c ./scripts/verify` は通過済み。次は B8-G5e review gate で停止し、
+  レビュー後に B8-G6a ObjC Helper Execution Boundary へ進む。
 - 2026-06-12 20:19 JST: B8-G5e Helper Return Value Materialization を実装した。
   B8 debug bundle の `return_value` に
   `b8_objc_helper_return_writeback_boundary_v0` を追加し、ObjC helper return value を
