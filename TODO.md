@@ -1144,8 +1144,8 @@ PR に含めない:
 
 review gate:
 
-- 完了したら commit / push / draft PR 作成で停止する。次の gate は materialized value /
-  remaining blocker を見て B8-G6 または追加の import/helper slice として更新する。
+- B8-G5c draft PR #28 <https://github.com/serika12345/Bara/pull/28> を開いて停止する。
+  次の gate は B8-G5d ObjC Argument Fixup Resolution。
 - [ ] B8-G5d: ObjC receiver / selector mapped qword の public fixup resolution を
   定義する。
   - [ ] B8-G5c の `receiver_mapped_value_fixup_resolution_unimplemented` /

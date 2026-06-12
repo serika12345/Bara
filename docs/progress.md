@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-12 12:20 JST
+最終更新: 2026-06-12 12:27 JST
 
 状態:
 
@@ -61,8 +61,9 @@
   `task/b8-g5a-import-helper-marshaling-contract` へ merge 済みのため、B8-G5c branch は
   `origin/task/b8-g5a-import-helper-marshaling-contract` の `b1eb4d2`
   (`Merge pull request #27 from serika12345/task/b8-g5b-objc-message-materialization-boundary`)
-  を base にした stacked branch として扱う。latest commit は B8-G5c review package で
-  報告する。
+  を base にした stacked branch として扱う。B8-G5c 実装 commit は `09883f2`
+  (`feat: map objc materialization segment bytes`)。Draft PR #28
+  <https://github.com/serika12345/Bara/pull/28> を開いて review gate で停止中。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a / B8-G5b / B8-G5c。
@@ -142,15 +143,22 @@
   解釈できるか判定する。まだ `_objc_msgSend` host execution、Objective-C / AppKit
   helper bridge、arbitrary indirect call target execution、translation cache、
   fallback JIT/interpreter は行わない。
-- next_action: B8-G5c branch を commit / push し、draft PR を開いて review gate で
-  停止する。レビュー後の次 PR Gate は B8-G5d ObjC Argument Fixup Resolution。
+- next_action: B8-G5c draft PR #28 の review gate で停止する。レビュー後の次 PR Gate は
+  B8-G5d ObjC Argument Fixup Resolution。
 - verification: targeted check として
   `nix develop -c cargo test -p bara-oracle maps_public_file_backed_segments_into_program_image_metadata -- --nocapture` と
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
-  full `nix develop -c ./scripts/verify` も通過した。
+  full `nix develop -c ./scripts/verify` は B8-G5c 実装 commit `09883f2` の clean HEAD で
+  通過した。
 
 直近で完了した作業:
 
+- 2026-06-12 12:27 JST: B8-G5c branch
+  `task/b8-g5c-objc-materialization-mapped-image-metadata` を push し、Draft PR #28
+  <https://github.com/serika12345/Bara/pull/28> を
+  `task/b8-g5a-import-helper-marshaling-contract` base で開いた。clean HEAD の
+  `nix develop -c ./scripts/verify` は通過済み。次は B8-G5c review gate で停止し、
+  レビュー後に B8-G5d ObjC Argument Fixup Resolution へ進む。
 - 2026-06-12 12:20 JST: B8-G5c ObjC Materialization Mapped Image Metadata を実装した。
   `mach_o_entry_function_input` が作る `ProgramImageMetadata.mapped_bytes` を、entry
   executable segment だけでなく public `LC_SEGMENT_64` file-backed segment 全体から
