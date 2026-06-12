@@ -18,6 +18,28 @@ const B8_GUI_HELLO_WORLD_STDOUT: &str =
     "{\"event\":\"gui_window_created\",\"title\":\"Bara GUI Hello World\",\"text\":\"hello world\"}\n";
 const B8_GUI_HELLO_WORLD_TITLE: &str = "Bara GUI Hello World";
 const B8_GUI_HELLO_WORLD_TEXT: &str = "hello world";
+const B8_OBJC_SHARED_APPLICATION_HELPER_RETURN_VALUE: u64 = 1;
+const B8_OBJC_SHARED_APPLICATION_HELPER_STDOUT: &str =
+    "{\"event\":\"objc_runtime_message_send_helper_returned\",\"receiver\":\"NSApplication\",\"selector\":\"sharedApplication\",\"objc_helper_return_value\":1,\"return_value_kind\":\"non_null_objc_object_opaque_handle\"}\n";
+const B8_OBJC_SHARED_APPLICATION_HELPER_SOURCE: &str = r#"#import <AppKit/AppKit.h>
+#include <stdio.h>
+
+int main(void) {
+    @autoreleasepool {
+        freopen("/dev/null", "w", stderr);
+
+        NSApplication *application = [NSApplication sharedApplication];
+        if (application == nil) {
+            puts("{\"event\":\"objc_runtime_message_send_helper_returned\",\"receiver\":\"NSApplication\",\"selector\":\"sharedApplication\",\"objc_helper_return_value\":0,\"return_value_kind\":\"null_objc_object\"}");
+            return 2;
+        }
+
+        puts("{\"event\":\"objc_runtime_message_send_helper_returned\",\"receiver\":\"NSApplication\",\"selector\":\"sharedApplication\",\"objc_helper_return_value\":1,\"return_value_kind\":\"non_null_objc_object_opaque_handle\"}");
+    }
+
+    return 0;
+}
+"#;
 
 #[derive(Debug)]
 pub(crate) enum X8664MachOFixtureError {
@@ -928,6 +950,26 @@ impl X8664MachOFixtureToolchainCommand {
         }
     }
 
+    fn clang_host_appkit_helper_build(
+        source_path: &Path,
+        output_path: &X8664MachOFixtureOutputPath,
+    ) -> Self {
+        Self {
+            program: "clang",
+            args: vec![
+                String::from("-x"),
+                X8664MachOFixtureSourceLanguage::ObjectiveC
+                    .as_clang_arg()
+                    .to_owned(),
+                source_path.to_string_lossy().into_owned(),
+                String::from("-framework"),
+                String::from("AppKit"),
+                String::from("-o"),
+                output_path.as_path().to_string_lossy().into_owned(),
+            ],
+        }
+    }
+
     fn to_command(&self) -> Command {
         let mut command = Command::new(self.program);
         command.args(&self.args);
@@ -1059,6 +1101,29 @@ pub(crate) fn observe_appkit_gui_hello_world_manual_visible_helper_actual(
     )
 }
 
+pub(crate) fn observe_appkit_shared_application_helper_actual(
+) -> Result<ObservedResult, X8664MachOFixtureError> {
+    ensure_supported_host()?;
+
+    let helper_path = temporary_path("bara-appkit-shared-application-helper", "exe")?;
+    if let Err(error) = build_appkit_shared_application_helper(&helper_path) {
+        let _ = fs::remove_file(&helper_path);
+        return Err(error);
+    }
+
+    let output =
+        Command::new(&helper_path)
+            .output()
+            .map_err(|source| X8664MachOFixtureError::RunnerSpawn {
+                path: helper_path.clone(),
+                source,
+            });
+    let _ = fs::remove_file(&helper_path);
+
+    AppKitSharedApplicationHelperObservation::from_process_output(output?)
+        .into_observed_result(&helper_path)
+}
+
 fn observe_appkit_gui_hello_world_helper_actual_with_run_mode(
     run_mode: X8664GuiHelloWorldRunMode,
 ) -> Result<ObservedResult, X8664MachOFixtureError> {
@@ -1081,6 +1146,45 @@ fn observe_appkit_gui_hello_world_helper_actual_with_run_mode(
 
     AppKitGuiHelloWorldHelperObservation::from_process_output(output?)
         .into_observed_result(&helper_path)
+}
+
+fn build_appkit_shared_application_helper(
+    output_path: &Path,
+) -> Result<(), X8664MachOFixtureError> {
+    let source_path = temporary_path("bara-appkit-shared-application-helper", "m")?;
+    fs::write(&source_path, B8_OBJC_SHARED_APPLICATION_HELPER_SOURCE).map_err(|source| {
+        X8664MachOFixtureError::WriteSource {
+            path: source_path.clone(),
+            source,
+        }
+    })?;
+
+    let output_path = X8664MachOFixtureOutputPath::from_path(output_path);
+    let toolchain_command = X8664MachOFixtureToolchainCommand::clang_host_appkit_helper_build(
+        &source_path,
+        &output_path,
+    );
+    let output = toolchain_command
+        .to_command()
+        .output()
+        .map_err(|source| X8664MachOFixtureError::ClangSpawn { source });
+
+    let _ = fs::remove_file(&source_path);
+
+    let output = output?;
+    if !output.status.success() {
+        return Err(X8664MachOFixtureError::ClangFailed {
+            status: output.status.to_string(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        });
+    }
+    if !output_path.as_path().exists() {
+        return Err(X8664MachOFixtureError::MissingOutput {
+            path: output_path.as_path().to_path_buf(),
+        });
+    }
+
+    Ok(())
 }
 
 fn build_appkit_gui_hello_world_helper(
@@ -1299,6 +1403,54 @@ impl AppKitGuiHelloWorldHelperObservation {
     }
 }
 
+struct AppKitSharedApplicationHelperObservation {
+    helper_succeeded: bool,
+    helper_status: String,
+    helper_exit_code: Option<i32>,
+    stdout: String,
+    stderr: String,
+}
+
+impl AppKitSharedApplicationHelperObservation {
+    fn from_process_output(output: Output) -> Self {
+        Self {
+            helper_succeeded: output.status.success(),
+            helper_status: output.status.to_string(),
+            helper_exit_code: output.status.code(),
+            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        }
+    }
+
+    fn into_observed_result(
+        self,
+        helper_path: &Path,
+    ) -> Result<ObservedResult, X8664MachOFixtureError> {
+        if !self.helper_succeeded {
+            return Err(X8664MachOFixtureError::RunnerFailed {
+                path: helper_path.to_path_buf(),
+                status: self.helper_status,
+                stdout: self.stdout,
+                stderr: self.stderr,
+            });
+        }
+        if self.stdout != B8_OBJC_SHARED_APPLICATION_HELPER_STDOUT {
+            return Err(X8664MachOFixtureError::InvalidGuiLaunchStdout {
+                path: helper_path.to_path_buf(),
+                stdout: self.stdout,
+            });
+        }
+
+        Ok(ObservedResult::new(
+            b8_gui_hello_world_case_id()?,
+            self.helper_exit_code.unwrap_or(0),
+            B8_OBJC_SHARED_APPLICATION_HELPER_RETURN_VALUE,
+            self.stdout,
+            self.stderr,
+        ))
+    }
+}
+
 fn ensure_supported_host() -> Result<(), X8664MachOFixtureError> {
     if cfg!(target_os = "macos") {
         Ok(())
@@ -1431,6 +1583,7 @@ mod tests {
         X8664MachOFixtureError, X8664MachOFixtureOutputPath, X8664MachOFixturePackager,
         X8664MachOFixtureSourceLanguage, X8664MachOFixtureToolchainCommand,
         X8664OracleRunnerBuildRequest, X8664OracleRunnerPackager, X8664OracleRunnerSource,
+        B8_OBJC_SHARED_APPLICATION_HELPER_SOURCE,
     };
 
     #[test]
@@ -1512,6 +1665,18 @@ mod tests {
         assert!(source.contains("#ifndef BARA_GUI_HELLO_WORLD_MANUAL_VISIBLE"));
         assert!(source.contains("[NSApp activateIgnoringOtherApps:YES]"));
         assert!(source.contains("gui_window_created"));
+    }
+
+    #[test]
+    fn shared_application_helper_source_uses_public_appkit_api() {
+        assert!(
+            B8_OBJC_SHARED_APPLICATION_HELPER_SOURCE.contains("[NSApplication sharedApplication]")
+        );
+        assert!(
+            B8_OBJC_SHARED_APPLICATION_HELPER_SOURCE.contains("non_null_objc_object_opaque_handle")
+        );
+        assert!(B8_OBJC_SHARED_APPLICATION_HELPER_SOURCE
+            .contains("objc_runtime_message_send_helper_returned"));
     }
 
     #[test]
