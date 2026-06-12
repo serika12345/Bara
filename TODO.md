@@ -1252,8 +1252,8 @@ PR に含めない:
 
 review gate:
 
-- B8-G6a draft PR を開いて停止する。次の gate は B8-G6b ObjC Runtime Helper
-  Bridge Contract。
+- B8-G6a draft PR #31 <https://github.com/serika12345/Bara/pull/31> を開いて停止する。
+  次の gate は B8-G6b ObjC Runtime Helper Bridge Contract。
 - [ ] B8-G6b: ObjC runtime message-send helper bridge contract を stable report にする。
   - [ ] B8-G6a の `objc_runtime_message_send_helper` required capability と
     `objc_helper_execution_unimplemented` を受けて、public ObjC runtime helper

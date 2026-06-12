@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-12 21:11 JST
+最終更新: 2026-06-12 21:12 JST
 
 状態:
 
@@ -68,7 +68,9 @@
 - active_branch: `task/b8-g6a-objc-helper-execution-boundary`。B8-G5e PR #30
   <https://github.com/serika12345/Bara/pull/30> の HEAD `4b6bfff`
   (`docs: record b8-g5e review gate`) を base にした stacked branch として扱う。
-  B8-G6a 実装 commit は作成前で、検証後に commit / push / draft PR 作成へ進む。
+  B8-G6a 実装 commit は `5ebc868`
+  (`feat: define objc helper execution request`)。Draft PR #31
+  <https://github.com/serika12345/Bara/pull/31> を開いて review gate で停止中。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a / B8-G5b / B8-G5c /
@@ -173,8 +175,8 @@
   まだ `_objc_msgSend` host execution、Objective-C / AppKit helper bridge execution、
   arbitrary indirect call target execution、translation cache、fallback JIT/interpreter は
   行わない。
-- next_action: B8-G6a branch を検証し、commit / push / draft PR 作成で review gate に
-  到達する。次の PR Gate は B8-G6b ObjC Runtime Helper Bridge Contract。
+- next_action: B8-G6a draft PR #31 の review gate で停止する。レビュー後の次 PR Gate は
+  B8-G6b ObjC Runtime Helper Bridge Contract。
 - verification: targeted check として
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
   full `nix develop -c ./scripts/verify` も通過した。
@@ -192,6 +194,12 @@
   追加していない。targeted check は
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
   full `nix develop -c ./scripts/verify` も通過した。
+- 2026-06-12 21:12 JST: B8-G6a branch
+  `task/b8-g6a-objc-helper-execution-boundary` を push し、Draft PR #31
+  <https://github.com/serika12345/Bara/pull/31> を
+  `task/b8-g5e-helper-return-value-materialization` base で開いた。clean HEAD の
+  `nix develop -c ./scripts/verify` は通過済み。次は B8-G6a review gate で停止し、
+  レビュー後に B8-G6b ObjC Runtime Helper Bridge Contract へ進む。
 - 2026-06-12 20:21 JST: B8-G5e branch
   `task/b8-g5e-helper-return-value-materialization` を push し、Draft PR #30
   <https://github.com/serika12345/Bara/pull/30> を
