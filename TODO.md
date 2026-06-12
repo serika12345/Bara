@@ -888,7 +888,7 @@ review gate:
   - [x] B8-G4b: public rebase / bind / import metadata を使い、`call r14` の target
     identity と helper boundary request を stable blocker または解決済み import として
     report する。
-  - [ ] B8-G4c: public `LC_DYLD_CHAINED_FIXUPS` payload を decode し、現在の
+  - [x] B8-G4c: public `LC_DYLD_CHAINED_FIXUPS` payload を decode し、現在の
     `call r14` target pointer load を import symbol identity へ近づける。
 
 #### PR Gate: B8-G4a User-Space Mach-O VM Image Mapping
@@ -972,11 +972,11 @@ branch: `task/b8-g4c-public-chained-fixups-import-decoder`
 
 完了条件:
 
-- [ ] public `LC_DYLD_CHAINED_FIXUPS` payload の header / starts / imports のうち、
+- [x] public `LC_DYLD_CHAINED_FIXUPS` payload の header / starts / imports のうち、
   現 fixture の `call r14` target pointer load に必要な最小範囲を decode する。
-- [ ] decoded chained fixups metadata を private dyld behavior に依存せず typed report
+- [x] decoded chained fixups metadata を private dyld behavior に依存せず typed report
   として保存する。
-- [ ] `target_pointer_load.address=4294979672` が chained fixups import metadata で
+- [x] `target_pointer_load.address=4294979672` が chained fixups import metadata で
   解決可能か、または不足している public metadata を stable blocker として report する。
 
 PR に含めない:
@@ -1000,6 +1000,36 @@ review gate:
     core IR に直接埋め込まず、helper capability request と stable blocker に分ける。
   - [ ] unsupported import は symbol identity、call site、argument model の不足理由を
     report する。
+
+#### PR Gate: B8-G5 Import Helper Boundary Request
+
+branch: `task/b8-g5-import-helper-boundary-request`
+
+完了条件:
+
+- [ ] B8-G4c の decoded chained fixups result から、`call r14` target が
+  `/usr/lib/libobjc.A.dylib` の `_objc_msgSend` import identity であることを
+  helper boundary planning input として扱う。
+- [ ] import identity、call site、target register、return PC、必要な argument /
+  return marshaling の不足理由を stable helper boundary request または blocker として
+  `loader.plan.json` / launch report に保存する。
+- [ ] core IR / ARM64 emit に Objective-C runtime や AppKit 固有処理を混ぜない。
+
+PR に含めない:
+
+- `_objc_msgSend` の host execution。
+- Objective-C runtime / AppKit helper bridge の一般化。
+- arbitrary indirect call target execution、translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止する。次の gate は helper boundary
+  request の不足理由を見て B8-G6 または追加の import/helper slice として追加する。
 - [ ] B8-G6: Objective-C runtime / AppKit helper bridge を B8-G1 専用 lifecycle
   event から一般化する。
   - [ ] class lookup、selector lookup、message send、autorelease pool、main run loop
