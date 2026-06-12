@@ -9,11 +9,11 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-12 23:50 JST
+最終更新: 2026-06-12 23:52 JST
 
 状態:
 
-- project_state: in_progress。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
+- project_state: paused。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
   reviewable GUI 起動 slice の積み上げとして扱う。B8-G6b までで、self-authored
   x86_64 GUI fixture の実 `LC_MAIN` entry から
   `push rbp; mov rbp,rsp; push r15; push r14; push rbx; push rax; call rel32;
@@ -74,7 +74,7 @@
 - active_branch: `task/b8-g6b-objc-runtime-helper-bridge-contract`。base branch は
   最新 `main` の `7b5a648` (`Merge pull request #38 from
   serika12345:task/b8-g6a-objc-helper-execution-boundary`)。B8-G6b 実装 commit を含む。
-  draft PR はこれから作成する。
+  draft PR は <https://github.com/serika12345/Bara/pull/39>。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
@@ -183,11 +183,12 @@
   `objc_runtime_helper_execution_unimplemented` を、self-authored fixture に必要な範囲の
   public Objective-C runtime / AppKit helper execution として扱う。arbitrary indirect
   call target execution、translation cache、fallback JIT/interpreter はまだ行わない。
-- next_action: B8-G6b branch を push して draft PR を開いたら review gate で停止する。
-  レビュー後の次 PR Gate は B8-G6c ObjC Runtime Helper Bridge Host Execution Slice。
+- next_action: B8-G6b draft PR #39 を review / merge する。merge 後の次 PR Gate は
+  B8-G6c ObjC Runtime Helper Bridge Host Execution Slice。
 - verification: `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
   manual `generate-b8-debug-bundle` / `jq` bridge contract 確認、
-  `nix develop -c ./scripts/verify` が通過した。
+  `nix develop -c ./scripts/verify`、PR URL 記録後の
+  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 
 直近で完了した作業:
 
@@ -197,7 +198,8 @@
   selector VM address、return write-back boundary、helper output、error classification を
   stable bridge contract に分離する。Objective-C runtime / AppKit helper の host
   execution は追加しない。targeted check、manual debug bundle generation、
-  full `nix develop -c ./scripts/verify` が通過した。
+  full `nix develop -c ./scripts/verify` が通過し、draft PR
+  <https://github.com/serika12345/Bara/pull/39> を開いた。
 - 2026-06-12 23:35 JST: B8-G6a ObjC Helper Execution Boundary を実装した。
   B8 debug bundle の import helper request に
   `b8_objc_helper_execution_request_v0` を追加し、`_objc_msgSend` source import、
