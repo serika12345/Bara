@@ -2538,6 +2538,16 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"selector_vm_address\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"required_capability\":\"objc_runtime_message_send_helper\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"bridge_contract\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_objc_runtime_helper_bridge_contract_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"input_contract\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"output_contract\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"error_contract\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"helper_output\":\"objc_helper_return_value\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"error_classification\":\"objc_runtime_helper_execution_unimplemented\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"materialization_boundary\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
@@ -2623,6 +2633,14 @@ mod tests {
         assert!(
             launch_report.contains("\"required_capability\":\"objc_runtime_message_send_helper\"")
         );
+        assert!(launch_report.contains("\"bridge_contract\""));
+        assert!(launch_report.contains("\"schema\":\"b8_objc_runtime_helper_bridge_contract_v0\""));
+        assert!(launch_report.contains("\"input_contract\""));
+        assert!(launch_report.contains("\"output_contract\""));
+        assert!(launch_report.contains("\"error_contract\""));
+        assert!(launch_report.contains("\"helper_output\":\"objc_helper_return_value\""));
+        assert!(launch_report
+            .contains("\"error_classification\":\"objc_runtime_helper_execution_unimplemented\""));
         assert!(
             launch_report.contains("\"schema\":\"b8_objc_message_materialization_boundary_v0\"")
         );

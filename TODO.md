@@ -1154,11 +1154,11 @@ review gate:
 
 - 完了したら commit / push / draft PR 作成で停止する。次の gate は B8-G6b ObjC Runtime
   Helper Bridge Contract として更新する。
-- [ ] B8-G6b: ObjC runtime message-send helper bridge contract を stable report にする。
-  - [ ] B8-G6a の `objc_runtime_message_send_helper` required capability と
+- [x] B8-G6b: ObjC runtime message-send helper bridge contract を stable report にする。
+  - [x] B8-G6a の `objc_runtime_message_send_helper` required capability と
     `objc_helper_execution_unimplemented` を受けて、public ObjC runtime helper bridge の
     input / output / error contract を stable report に追加する。
-  - [ ] `_objc_msgSend` host execution はまだ行わず、bridge 実行に必要な public API
+  - [x] `_objc_msgSend` host execution はまだ行わず、bridge 実行に必要な public API
     capability と不足条件だけを分類する。
 
 #### PR Gate: B8-G6b ObjC Runtime Helper Bridge Contract
@@ -1167,13 +1167,13 @@ branch: `task/b8-g6b-objc-runtime-helper-bridge-contract`
 
 完了条件:
 
-- [ ] B8-G6a の helper execution request が要求する
+- [x] B8-G6a の helper execution request が要求する
   `objc_runtime_message_send_helper` capability を、public Objective-C runtime helper
   bridge contract として stable report に分離する。
-- [ ] bridge contract は `_objc_msgSend` import identity、receiver identity、
+- [x] bridge contract は `_objc_msgSend` import identity、receiver identity、
   selector VM address、return write-back boundary、helper output / error classification
   を input / output contract として保存する。
-- [ ] Objective-C runtime / AppKit helper の host execution、arbitrary indirect call
+- [x] Objective-C runtime / AppKit helper の host execution、arbitrary indirect call
   target execution、translation cache、fallback JIT/interpreter は行わない。
 
 PR に含めない:
@@ -1189,8 +1189,46 @@ PR に含めない:
 
 review gate:
 
-- 完了したら commit / push / draft PR 作成で停止する。次の gate は bridge contract の
-  不足条件を見て B8-G6c または focused Objective-C / AppKit helper execution slice として
+- 完了したら commit / push / draft PR 作成で停止する。次の gate は B8-G6c ObjC Runtime
+  Helper Bridge Host Execution Slice として更新する。
+- [ ] B8-G6c: ObjC runtime message-send helper bridge の host execution slice を追加する。
+  - [ ] B8-G6b の `objc_runtime_helper_execution_unimplemented` を受けて、self-authored
+    GUI fixture に必要な `_objc_msgSend` helper execution を public Objective-C runtime /
+    AppKit API 境界として実行する。
+  - [ ] 実行結果は helper output / return write-back boundary に接続するが、arbitrary
+    indirect call target execution、translation cache、fallback JIT/interpreter はまだ行わない。
+
+#### PR Gate: B8-G6c ObjC Runtime Helper Bridge Host Execution Slice
+
+branch: `task/b8-g6c-objc-runtime-helper-bridge-execution`
+
+完了条件:
+
+- [ ] B8-G6b の bridge contract が残す
+  `objc_runtime_helper_execution_unimplemented` を、self-authored fixture に必要な範囲の
+  public Objective-C runtime / AppKit helper execution として扱う。
+- [ ] helper output を `objc_helper_return_value` として report し、既存の x86_64 `rax`
+  return write-back boundary へ接続する。
+- [ ] host execution は public Objective-C runtime / AppKit API と self-authored fixture
+  に限定し、private dyld behavior や Objective-C / AppKit 内部構造を実装根拠にしない。
+- [ ] arbitrary indirect call target execution、translation cache、fallback JIT/interpreter
+  は行わない。
+
+PR に含めない:
+
+- 任意 Objective-C / AppKit application の一般実行。
+- arbitrary indirect call target execution、translation cache、fallback JIT/interpreter。
+- private Objective-C runtime、private AppKit、private dyld behavior への依存。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止する。次の gate は helper execution result
+  の blocker を見て B8-G6d または focused process-state / AppKit lifecycle slice として
   更新する。
 - [ ] B8-G6: Objective-C runtime / AppKit helper bridge を B8-G1 専用 lifecycle
   event から一般化する。

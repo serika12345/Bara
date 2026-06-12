@@ -9,12 +9,12 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-12 23:36 JST
+最終更新: 2026-06-12 23:50 JST
 
 状態:
 
 - project_state: in_progress。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
-  reviewable GUI 起動 slice の積み上げとして扱う。B8-G6a までで、self-authored
+  reviewable GUI 起動 slice の積み上げとして扱う。B8-G6b までで、self-authored
   x86_64 GUI fixture の実 `LC_MAIN` entry から
   `push rbp; mov rbp,rsp; push r15; push r14; push rbx; push rax; call rel32;
   mov rbx,rax; mov rax,qword ptr [rip+disp32]; mov rdx,qword ptr [rax];
@@ -57,18 +57,24 @@
   receiver import identity、selector resolved VM address、return write-back boundary、
   required capability `objc_runtime_message_send_helper`、remaining blocker
   `objc_helper_execution_unimplemented` を 1 つの stable helper execution request に
-  集約する。Objective-C runtime / AppKit helper の host execution はまだ行わない。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G6a ObjC Helper Execution
-  Boundary: ObjC helper execution request boundary を stable report に分離する。
+  集約する。B8-G6b ではこの request を
+  `b8_objc_runtime_helper_bridge_contract_v0` として public Objective-C runtime helper
+  bridge contract に分離し、input / output / error contract、helper output
+  `objc_helper_return_value`、error classification
+  `objc_runtime_helper_execution_unimplemented` を stable report に保存する。
+  Objective-C runtime / AppKit helper の host execution はまだ行わない。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G6b ObjC Runtime Helper
+  Bridge Contract: `objc_runtime_message_send_helper` capability を public Objective-C
+  runtime helper bridge contract として stable report に分離する。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
   Objective-C runtime / dyld の private behavior は使わず、public metadata、
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
-- active_branch: `task/b8-g6a-objc-helper-execution-boundary`。base branch は
-  最新 `main` の `1cb47b8` (`Merge pull request #37 from
-  serika12345/task/b8-g5b-g5e-objc-materialization-boundary`)。draft PR は
-  <https://github.com/serika12345/Bara/pull/38>。
+- active_branch: `task/b8-g6b-objc-runtime-helper-bridge-contract`。base branch は
+  最新 `main` の `7b5a648` (`Merge pull request #38 from
+  serika12345:task/b8-g6a-objc-helper-execution-boundary`)。B8-G6b 実装 commit を含む。
+  draft PR はこれから作成する。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
@@ -167,27 +173,31 @@
   `return_writeback_boundary.schema=b8_objc_helper_return_writeback_boundary_v0`、
   `required_capability=objc_runtime_message_send_helper` を保存する。helper execution request
   の remaining blocker は `objc_helper_execution_unimplemented`、next action は
-  `define_objc_runtime_helper_bridge_contract` である。
-- remaining_work: B8-G6b。B8-G6a の helper execution request が要求する
-  `objc_runtime_message_send_helper` capability を、public Objective-C runtime helper
-  bridge contract として stable report に分離する。まだ `_objc_msgSend` host execution、
-  Objective-C / AppKit helper bridge、arbitrary indirect call target execution、
-  translation cache、fallback JIT/interpreter は行わない。
-- next_action: draft PR #38 を review gate として確認する。レビュー後の次 PR Gate は
-  B8-G6b ObjC Runtime Helper Bridge Contract。
-- verification: targeted check として
-  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
-  manual debug bundle generation で
-  `helper_execution_request.schema=b8_objc_helper_execution_request_v0`、
-  `source_import.symbol_name=_objc_msgSend`、
-  `receiver_identity.symbol_name=_OBJC_CLASS_$_NSApplication`、
-  `selector_vm_address.resolved_vm_address=4294975648`、
-  `required_capability=objc_runtime_message_send_helper`、
-  `next_action=define_objc_runtime_helper_bridge` を確認した。full
-  `nix develop -c ./scripts/verify` も通過した。
+  `define_objc_runtime_helper_bridge_contract` である。B8-G6b として
+  `bridge_contract.schema=b8_objc_runtime_helper_bridge_contract_v0`、input contract、
+  output contract、error contract を保存し、helper output を
+  `objc_helper_return_value`、error classification を
+  `objc_runtime_helper_execution_unimplemented` として分類する。まだ Objective-C runtime /
+  AppKit helper の host execution は行わない。
+- remaining_work: B8-G6c。B8-G6b の bridge contract が残す
+  `objc_runtime_helper_execution_unimplemented` を、self-authored fixture に必要な範囲の
+  public Objective-C runtime / AppKit helper execution として扱う。arbitrary indirect
+  call target execution、translation cache、fallback JIT/interpreter はまだ行わない。
+- next_action: B8-G6b branch を push して draft PR を開いたら review gate で停止する。
+  レビュー後の次 PR Gate は B8-G6c ObjC Runtime Helper Bridge Host Execution Slice。
+- verification: `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
+  manual `generate-b8-debug-bundle` / `jq` bridge contract 確認、
+  `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-12 23:50 JST: B8-G6b ObjC Runtime Helper Bridge Contract を実装した。
+  B8 debug bundle の helper execution request に
+  `b8_objc_runtime_helper_bridge_contract_v0` を追加し、source import、receiver identity、
+  selector VM address、return write-back boundary、helper output、error classification を
+  stable bridge contract に分離する。Objective-C runtime / AppKit helper の host
+  execution は追加しない。targeted check、manual debug bundle generation、
+  full `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-12 23:35 JST: B8-G6a ObjC Helper Execution Boundary を実装した。
   B8 debug bundle の import helper request に
   `b8_objc_helper_execution_request_v0` を追加し、`_objc_msgSend` source import、
