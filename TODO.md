@@ -1104,8 +1104,9 @@ PR に含めない:
 
 review gate:
 
-- 完了したら commit / push / draft PR 作成で停止する。次の gate は materialization
-  blocker を見て B8-G6 または追加の import/helper slice として更新する。
+- B8-G5b draft PR #27 <https://github.com/serika12345/Bara/pull/27> を開いて停止する。
+  次の gate は materialization blocker を見て B8-G6 または追加の import/helper slice
+  として更新する。
 - [ ] B8-G5c: ObjC receiver / selector materialization 用に public Mach-O mapped image
   metadata を拡張する。
   - [ ] B8-G5b の `receiver_mapped_image_qword_unavailable` /

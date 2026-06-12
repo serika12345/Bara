@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-12 12:02 JST
+最終更新: 2026-06-12 12:08 JST
 
 状態:
 
@@ -54,7 +54,9 @@
   #26 <https://github.com/serika12345/Bara/pull/26> は open のため、B8-G5b branch は
   `task/b8-g5a-import-helper-marshaling-contract` の `ad41229`
   (`docs: record b8-g5a review gate`) を base にした stacked branch として扱う。
-  latest commit は B8-G5b review package で報告する。
+  Draft PR #27 <https://github.com/serika12345/Bara/pull/27> を開いた。検証済みの
+  B8-G5b implementation commit は `92e096f`
+  (`feat: report objc message materialization boundary`)。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a / B8-G5b / B8-G5c。
@@ -128,9 +130,9 @@
   report する。まだ `_objc_msgSend` host execution、Objective-C / AppKit helper bridge、
   arbitrary indirect call target execution、translation cache、fallback JIT/interpreter
   は行わない。
-- next_action: B8-G5b branch を commit / push し、draft PR を開いて review gate で
-  停止する。レビュー後の次 PR Gate は B8-G5c ObjC Materialization Mapped Image
-  Metadata。
+- next_action: B8-G5b draft PR #27
+  <https://github.com/serika12345/Bara/pull/27> の review gate で停止する。
+  レビュー後の次 PR Gate は B8-G5c ObjC Materialization Mapped Image Metadata。
 - verification: targeted check として
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
   full `nix develop -c ./scripts/verify` も通過した。
@@ -149,7 +151,9 @@
   `helper_return_value_materialization_unimplemented` blocker に留める。
   `_objc_msgSend` 実行や Objective-C / AppKit bridge は追加していない。targeted check
   として `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
-  が通過し、full `nix develop -c ./scripts/verify` も通過した。
+  が通過し、full `nix develop -c ./scripts/verify` も clean HEAD の `92e096f` で通過した。
+  Draft PR #27 <https://github.com/serika12345/Bara/pull/27> を
+  `task/b8-g5a-import-helper-marshaling-contract` base で開き、review gate に到達した。
 - 2026-06-12 10:11 JST: B8-G5a Import Helper Marshaling Contract を実装した。
   B8 debug bundle の `helper_boundary_request.request.required_marshaling.contract` に
   `b8_import_helper_marshaling_contract_v0` を追加し、x86_64 macOS System V calling
