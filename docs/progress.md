@@ -9,11 +9,11 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 00:22 JST
+最終更新: 2026-06-13 00:24 JST
 
 状態:
 
-- project_state: in_progress。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
+- project_state: paused。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
   reviewable GUI 起動 slice の積み上げとして扱う。B8-G6c までで、self-authored
   x86_64 GUI fixture の実 `LC_MAIN` entry から
   `push rbp; mov rbp,rsp; push r15; push r14; push rbx; push rax; call rel32;
@@ -82,7 +82,8 @@
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
 - active_branch: `task/b8-g6c-objc-runtime-helper-bridge-execution`。base branch は
   最新 `main` の `4d7f5ff` (`Merge pull request #39 from
-  serika12345:task/b8-g6b-objc-runtime-helper-bridge-contract`)。draft PR はこれから作成する。
+  serika12345:task/b8-g6b-objc-runtime-helper-bridge-contract`)。draft PR は
+  <https://github.com/serika12345/Bara/pull/40>。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
@@ -198,13 +199,13 @@
   `objc_helper_return_continuation_unimplemented` を、`return_to` PC からの continuation
   boundary として report する。arbitrary indirect call target execution、translation
   cache、fallback JIT/interpreter はまだ行わない。
-- next_action: B8-G6c branch を full verification し、commit / push して draft PR を開いたら
-  review gate で停止する。レビュー後の次 PR Gate は B8-G6d ObjC Helper Return
-  Continuation Boundary。
+- next_action: B8-G6c draft PR #40 を review / merge する。merge 後の次 PR Gate は
+  B8-G6d ObjC Helper Return Continuation Boundary。
 - verification: `nix develop -c cargo test -p bara-ir
   mapped_image_bytes_read_nul_terminated_utf8_by_vm_address`、
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
-  `nix develop -c ./scripts/verify` が通過した。
+  `nix develop -c ./scripts/verify`、PR URL 記録後の
+  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 
 直近で完了した作業:
 
@@ -216,7 +217,8 @@
   report され、既存 x86_64 `rax` return write-back boundary に `available` な
   `written_value` として接続される。arbitrary indirect call target execution、translation
   cache、fallback JIT/interpreter は追加しない。targeted checks と full
-  `nix develop -c ./scripts/verify` が通過した。
+  `nix develop -c ./scripts/verify` が通過し、draft PR
+  <https://github.com/serika12345/Bara/pull/40> を開いた。
 - 2026-06-12 23:50 JST: B8-G6b ObjC Runtime Helper Bridge Contract を実装した。
   B8 debug bundle の helper execution request に
   `b8_objc_runtime_helper_bridge_contract_v0` を追加し、source import、receiver identity、
