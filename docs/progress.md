@@ -14,7 +14,7 @@
 状態:
 
 - project_state: in_progress。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
-  reviewable GUI 起動 slice の積み上げとして扱う。B8-G5b までで、self-authored
+  reviewable GUI 起動 slice の積み上げとして扱う。B8-G5c までで、self-authored
   x86_64 GUI fixture の実 `LC_MAIN` entry から
   `push rbp; mov rbp,rsp; push r15; push r14; push rbx; push rax; call rel32;
   mov rbx,rax; mov rax,qword ptr [rip+disp32]; mov rdx,qword ptr [rax];
@@ -41,10 +41,16 @@
   `receiver_mapped_image_qword_unavailable` /
   `selector_mapped_image_qword_unavailable` として分類する。`rax` return destination は
   `write_helper_return_to_x86_64_rax` plan と
-  `helper_return_value_materialization_unimplemented` blocker で停止する。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G5b ObjC Message
-  Materialization Boundary: B8-G5a の marshaling contract から receiver / selector /
-  return value materialization boundary を stable report として扱う。
+  `helper_return_value_materialization_unimplemented` blocker で停止する。B8-G5c では
+  `ProgramImageMetadata.mapped_bytes` を public `LC_SEGMENT_64` file-backed segment
+  全体から構成し、receiver address `4294988120` と selector address `4294988072` の
+  mapped raw qword を stable report に保存する。これにより mapped image qword
+  unavailable blocker は解消し、次の blocker は
+  `receiver_mapped_value_fixup_resolution_unimplemented` /
+  `selector_mapped_value_fixup_resolution_unimplemented` へ進む。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G5c ObjC Materialization
+  Mapped Image Metadata: receiver / selector materialization 用に public Mach-O
+  mapped image metadata を拡張する。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
@@ -119,17 +125,24 @@
   `return_value.plan=write_helper_return_to_x86_64_rax`、
   `helper_return_value_materialization_unimplemented`、
   `next_action=extend_mach_o_mapped_image_metadata_for_objc_materialization` を保存する。
-- remaining_work: B8-G5c。B8-G5b の materialization boundary が出す
-  `receiver_mapped_image_qword_unavailable` /
-  `selector_mapped_image_qword_unavailable` を受けて、public Mach-O mapped image
-  metadata が current fixture の receiver / selector qword load address を覆うようにするか、
-  不足している public segment / mapping metadata をより具体的な stable blocker として
-  report する。まだ `_objc_msgSend` host execution、Objective-C / AppKit helper bridge、
-  arbitrary indirect call target execution、translation cache、fallback JIT/interpreter
-  は行わない。
+  B8-G5c として `ProgramImageMetadata.mapped_bytes` が public file-backed
+  `LC_SEGMENT_64` segment を覆うようになり、
+  receiver `mapped_value.address=4294988120` /
+  `value=9227875636482146321`、selector `mapped_value.address=4294988072` /
+  `value=4503599627378848` を保存する。mapped raw qword はまだ public fixup
+  resolution 前の値であるため、stable blocker は
+  `receiver_mapped_value_fixup_resolution_unimplemented` /
+  `selector_mapped_value_fixup_resolution_unimplemented` に進み、
+  `next_action=resolve_objc_argument_mapped_value_fixups` を保存する。
+- remaining_work: B8-G5d。B8-G5c の mapped raw qword を、public chained fixups /
+  rebase / bind metadata から receiver / selector identity または VM address として
+  解釈できるか判定する。まだ `_objc_msgSend` host execution、Objective-C / AppKit
+  helper bridge、arbitrary indirect call target execution、translation cache、
+  fallback JIT/interpreter は行わない。
 - next_action: B8-G5b〜B8-G5e の統合 branch を実装・検証し、commit / push して
   draft PR を開いたら review gate で停止する。
 - verification: targeted check として
+  `nix develop -c cargo test -p bara-oracle maps_public_file_backed_segments_into_program_image_metadata -- --nocapture` と
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
   manual debug bundle generation で `required_marshaling.contract.schema=b8_import_helper_marshaling_contract_v0`、
   `calling_convention=x86_64_macos_system_v`、`argument_sources[0].source.register=rdi`、
@@ -139,6 +152,17 @@
 
 直近で完了した作業:
 
+- 2026-06-12 12:20 JST: B8-G5c ObjC Materialization Mapped Image Metadata を実装した。
+  `mach_o_entry_function_input` が作る `ProgramImageMetadata.mapped_bytes` を、entry
+  executable segment だけでなく public `LC_SEGMENT_64` file-backed segment 全体から
+  構成するようにした。B8 debug bundle は receiver qword load address `4294988120` から
+  raw value `9227875636482146321`、selector qword load address `4294988072` から
+  raw value `4503599627378848` を保存する。これらはまだ chained fixups / rebase / bind
+  resolution 前の mapped raw qword なので、次 blocker は
+  `receiver_mapped_value_fixup_resolution_unimplemented` /
+  `selector_mapped_value_fixup_resolution_unimplemented` である。`_objc_msgSend` 実行や
+  Objective-C / AppKit bridge は追加していない。targeted checks と full
+  `nix develop -c ./scripts/verify` は通過した。
 - 2026-06-12 12:02 JST: B8-G5b ObjC Message Materialization Boundary を実装した。
   B8 debug bundle の `helper_boundary_request.request.required_marshaling.contract` に
   `b8_objc_message_materialization_boundary_v0` を追加し、`rdi` receiver と `rsi`

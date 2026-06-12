@@ -1106,15 +1106,15 @@ review gate:
 
 - 完了したら commit / push / draft PR 作成で停止する。次の gate は materialization
   blocker を見て B8-G6 または追加の import/helper slice として更新する。
-- [ ] B8-G5c: ObjC receiver / selector materialization 用に public Mach-O mapped image
+- [x] B8-G5c: ObjC receiver / selector materialization 用に public Mach-O mapped image
   metadata を拡張する。
-  - [ ] B8-G5b の `receiver_mapped_image_qword_unavailable` /
+  - [x] B8-G5b の `receiver_mapped_image_qword_unavailable` /
     `selector_mapped_image_qword_unavailable` を受けて、current fixture の
     RIP-relative qword load 元を mapped bytes として読めるようにするか、public metadata
     上の不足をより具体的な stable blocker として report する。
-  - [ ] public `LC_SEGMENT_64` file range / VM address metadata の範囲で扱い、private dyld
+  - [x] public `LC_SEGMENT_64` file range / VM address metadata の範囲で扱い、private dyld
     state や Objective-C runtime 実行には踏み込まない。
-  - [ ] `_objc_msgSend` host execution と Objective-C / AppKit helper bridge はまだ行わない。
+  - [x] `_objc_msgSend` host execution と Objective-C / AppKit helper bridge はまだ行わない。
 
 #### PR Gate: B8-G5c ObjC Materialization Mapped Image Metadata
 
@@ -1122,12 +1122,12 @@ branch: `task/b8-g5c-objc-materialization-mapped-image-metadata`
 
 完了条件:
 
-- [ ] B8-G5b の materialization boundary が参照する `rdi` / `rsi` qword load address を
+- [x] B8-G5b の materialization boundary が参照する `rdi` / `rsi` qword load address を
   public Mach-O mapped image metadata から読めるか判定する。
-- [ ] 読める場合は receiver / selector materialized value を stable report に保存し、
+- [x] 読める場合は receiver / selector materialized value を stable report に保存し、
   読めない場合は不足している public segment / mapping metadata を stable blocker として
   保存する。
-- [ ] `_objc_msgSend` の host execution、Objective-C / AppKit bridge、arbitrary
+- [x] `_objc_msgSend` の host execution、Objective-C / AppKit bridge、arbitrary
   indirect call target execution は行わない。
 
 PR に含めない:
@@ -1145,6 +1145,45 @@ review gate:
 
 - 完了したら commit / push / draft PR 作成で停止する。次の gate は materialized value /
   remaining blocker を見て B8-G6 または追加の import/helper slice として更新する。
+- [ ] B8-G5d: ObjC receiver / selector mapped qword の public fixup resolution を
+  定義する。
+  - [ ] B8-G5c の `receiver_mapped_value_fixup_resolution_unimplemented` /
+    `selector_mapped_value_fixup_resolution_unimplemented` を受けて、mapped raw qword を
+    public chained fixups / rebase / bind metadata から解釈できるか判定する。
+  - [ ] 解釈できる場合は receiver / selector の resolved identity または VM address を
+    stable report に保存し、できない場合は不足している public fixup metadata を stable
+    blocker として保存する。
+  - [ ] `_objc_msgSend` host execution と Objective-C / AppKit helper bridge はまだ行わない。
+
+#### PR Gate: B8-G5d ObjC Argument Fixup Resolution
+
+branch: `task/b8-g5d-objc-argument-fixup-resolution`
+
+完了条件:
+
+- [ ] B8-G5c の materialization boundary が保存した receiver / selector mapped qword を
+  public Mach-O fixup metadata から解釈できるか判定する。
+- [ ] 解釈できる場合は resolved identity / VM address を stable report に保存し、
+  解釈できない場合は不足 metadata を stable blocker として保存する。
+- [ ] `_objc_msgSend` の host execution、Objective-C / AppKit bridge、arbitrary
+  indirect call target execution は行わない。
+
+PR に含めない:
+
+- `_objc_msgSend` の host execution。
+- Objective-C runtime / AppKit helper bridge の一般化。
+- arbitrary indirect call target execution、translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止する。次の gate は resolved
+  receiver/selector と return materialization blocker を見て B8-G6 または追加の
+  import/helper slice として更新する。
 - [ ] B8-G6: Objective-C runtime / AppKit helper bridge を B8-G1 専用 lifecycle
   event から一般化する。
   - [ ] class lookup、selector lookup、message send、autorelease pool、main run loop

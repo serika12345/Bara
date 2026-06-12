@@ -1625,9 +1625,17 @@ impl B8DebugObjcMessageMaterializationBoundaryReport {
         let mut blockers = Vec::new();
         if let Some(blocker) = receiver.mapped_value.blocker {
             blockers.push(blocker);
+        } else if receiver.mapped_value.is_available() {
+            blockers.push(
+                B8DebugObjcMessageMaterializationBlocker::ReceiverMappedValueFixupResolutionUnimplemented,
+            );
         }
         if let Some(blocker) = selector.mapped_value.blocker {
             blockers.push(blocker);
+        } else if selector.mapped_value.is_available() {
+            blockers.push(
+                B8DebugObjcMessageMaterializationBlocker::SelectorMappedValueFixupResolutionUnimplemented,
+            );
         }
         blockers.push(return_value.blocker);
         let next_action = if blockers
@@ -1635,6 +1643,11 @@ impl B8DebugObjcMessageMaterializationBoundaryReport {
             .any(|blocker| blocker.requires_mapped_image_extension())
         {
             B8DebugObjcMessageMaterializationNextAction::ExtendMachOMappedImageMetadataForObjcMaterialization
+        } else if blockers
+            .iter()
+            .any(|blocker| blocker.requires_mapped_value_fixup_resolution())
+        {
+            B8DebugObjcMessageMaterializationNextAction::ResolveObjcArgumentMappedValueFixups
         } else {
             B8DebugObjcMessageMaterializationNextAction::DefineHelperReturnValueMaterialization
         };
@@ -1789,6 +1802,10 @@ impl B8DebugObjcArgumentValueMaterializationReport {
             blocker: Some(blocker),
         }
     }
+
+    const fn is_available(&self) -> bool {
+        matches!(self.status, B8DebugValueMaterializationStatus::Available)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -1892,6 +1909,8 @@ enum B8DebugObjcMessageMaterializationBlocker {
     SelectorRegisterDefinitionUnavailable,
     ReceiverMappedImageQwordUnavailable,
     SelectorMappedImageQwordUnavailable,
+    ReceiverMappedValueFixupResolutionUnimplemented,
+    SelectorMappedValueFixupResolutionUnimplemented,
     HelperReturnValueMaterializationUnimplemented,
 }
 
@@ -1905,6 +1924,14 @@ impl B8DebugObjcMessageMaterializationBlocker {
                 | Self::SelectorMappedImageQwordUnavailable
         )
     }
+
+    const fn requires_mapped_value_fixup_resolution(self) -> bool {
+        matches!(
+            self,
+            Self::ReceiverMappedValueFixupResolutionUnimplemented
+                | Self::SelectorMappedValueFixupResolutionUnimplemented
+        )
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -1912,6 +1939,7 @@ impl B8DebugObjcMessageMaterializationBlocker {
 enum B8DebugObjcMessageMaterializationNextAction {
     DefineHelperReturnValueMaterialization,
     ExtendMachOMappedImageMetadataForObjcMaterialization,
+    ResolveObjcArgumentMappedValueFixups,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]

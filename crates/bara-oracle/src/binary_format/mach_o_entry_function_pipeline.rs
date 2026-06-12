@@ -7,7 +7,7 @@ use bara_ir::{
     ProgramImageImports, ProgramImageMappedByteSegment, ProgramImageMappedBytes,
     ProgramImageMetadata, ProgramImageMetadataError, ProgramImageRange, ProgramImageRelocations,
     ProgramImageSection, ProgramImageSectionKind, ProgramImageSections, ProgramImageSymbols,
-    ProgramUnwindMetadata,
+    ProgramUnwindMetadata, X86Va,
 };
 
 use super::{
@@ -16,7 +16,7 @@ use super::{
         MachOExecutableImageEntryFunctionError,
     },
     materialize_mach_o_executable_image, plan_mach_o_executable_image, probe_public_binary_format,
-    BinaryFormatProbeError, BinaryInput, MachOExecutableImageConversion,
+    BinaryFormatProbeError, BinaryFormatProbeReport, BinaryInput, MachOExecutableImageConversion,
     MachOExecutableImageMaterializationError, MachOExecutableImagePlanError,
 };
 
@@ -140,9 +140,13 @@ fn mach_o_entry_function_input_with_host_trap_plan(
         .map_err(MachOEntryFunctionTestCaseError::Materialization)?;
     let embedded_stdout_metadata = embedded_stdout_metadata_from_image(&image)?;
     let host_trap_plan = host_trap_plan_from_image(&image)?;
-    let program_image_metadata =
-        program_image_metadata_from_executable_image(&image, embedded_stdout_metadata.as_ref())
-            .map_err(MachOEntryFunctionTestCaseError::ProgramImageMetadata)?;
+    let program_image_metadata = program_image_metadata_from_executable_image(
+        input,
+        &report,
+        &image,
+        embedded_stdout_metadata.as_ref(),
+    )
+    .map_err(MachOEntryFunctionTestCaseError::ProgramImageMetadata)?;
 
     let test_case = mach_o_executable_image_entry_function_with_host_traps_and_stack_state(
         case_id,
@@ -160,6 +164,8 @@ fn mach_o_entry_function_input_with_host_trap_plan(
 }
 
 fn program_image_metadata_from_executable_image(
+    input: &BinaryInput,
+    report: &BinaryFormatProbeReport,
     image: &ExecutableImage,
     embedded_stdout_metadata: Option<&EmbeddedStdoutMetadata>,
 ) -> Result<ProgramImageMetadata, ProgramImageMetadataError> {
@@ -171,12 +177,7 @@ fn program_image_metadata_from_executable_image(
         .entry()
         .checked_add(code_len)
         .map_err(|_| ProgramImageMetadataError::AddressOverflow)?;
-    let mapped_code_range = ProgramImageRange::new(code.entry(), code_end)?;
-    let mapped_bytes =
-        ProgramImageMappedBytes::from_segments([ProgramImageMappedByteSegment::new(
-            mapped_code_range,
-            code.bytes().to_vec(),
-        )?]);
+    let mapped_bytes = public_mach_o_file_backed_mapped_bytes(input, report)?;
     let code_range = ProgramImageRange::new(code_start, code_end)?;
     let mut sections = vec![ProgramImageSection::new(
         ProgramImageSectionKind::Code,
@@ -198,6 +199,45 @@ fn program_image_metadata_from_executable_image(
         ProgramImageImports::empty(),
         ProgramUnwindMetadata::empty(),
     ))
+}
+
+fn public_mach_o_file_backed_mapped_bytes(
+    input: &BinaryInput,
+    report: &BinaryFormatProbeReport,
+) -> Result<ProgramImageMappedBytes, ProgramImageMetadataError> {
+    let mut mapped_segments = Vec::new();
+    for segment in report
+        .metadata()
+        .mach_o_metadata()
+        .load_commands()
+        .summary()
+        .recognized_segments()
+    {
+        let header = segment.header();
+        let byte_len = header.filesize().as_u64();
+        if byte_len == 0 {
+            continue;
+        }
+
+        let start = X86Va::new(header.vmaddr().as_u64());
+        let end = start
+            .checked_add(byte_len)
+            .map_err(|_| ProgramImageMetadataError::AddressOverflow)?;
+        let offset = usize::try_from(header.fileoff().as_u64())
+            .map_err(|_| ProgramImageMetadataError::AddressOverflow)?;
+        let size =
+            usize::try_from(byte_len).map_err(|_| ProgramImageMetadataError::AddressOverflow)?;
+        let bytes = input
+            .read_bytes_at(offset, size)
+            .ok_or(ProgramImageMetadataError::AddressOverflow)?
+            .to_vec();
+        mapped_segments.push(ProgramImageMappedByteSegment::new(
+            ProgramImageRange::new(start, end)?,
+            bytes,
+        )?);
+    }
+
+    Ok(ProgramImageMappedBytes::from_segments(mapped_segments))
 }
 
 const MACH_O_EMBEDDED_STDOUT_TRAP_MAGIC: &[u8] = b"BARA_STDOUT\0";
