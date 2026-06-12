@@ -384,6 +384,18 @@
   `objc_runtime_helper_execution_unimplemented` として分類する。これは public Objective-C
   runtime / AppKit helper bridge の実行実装ではなく、次の B8-G6c で self-authored
   fixture に必要な host execution slice を接続するための contract 固定である。
+- 2026-06-13 の B8-G6c として、B8-G6b の bridge contract が残した
+  `objc_runtime_helper_execution_unimplemented` を self-authored B8 GUI fixture に必要な
+  `_objc_msgSend(NSApplication, sharedApplication)` だけの host execution slice として
+  扱う。selector identity は public Mach-O mapped bytes の NUL-terminated UTF-8 から
+  `sharedApplication` として解決し、host execution は temporary Objective-C helper process
+  を public Objective-C runtime / AppKit API で build/run する。戻り値は
+  `objc_helper_return_value` / `host_pointer_u64` として report し、既存の
+  `b8_objc_helper_return_writeback_boundary_v0` を `available` にして x86_64 `rax`
+  write-back value へ接続する。これは arbitrary indirect call target execution、
+  translation cache、fallback JIT/interpreter、Objective-C / AppKit 内部構造の再実装ではない。
+  次の blocker は `objc_helper_return_continuation_unimplemented` であり、B8-G6d では
+  `return_to` PC からの continuation boundary を report する。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、

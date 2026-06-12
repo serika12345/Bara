@@ -2,6 +2,7 @@ use super::{
     BinaryInput, MachOLinkeditDataCommandKind, MachOMetadata, RecognizedMachOLinkeditDataCommand,
 };
 
+use bara_ir::X86Va;
 use serde::Serialize;
 
 pub fn decode_mach_o_chained_fixups_for_target(
@@ -239,6 +240,10 @@ impl MachOChainedRebaseTargetIdentityReport {
             high8,
             resolved_vm_address,
         }
+    }
+
+    pub const fn resolved_x86_va(self) -> X86Va {
+        X86Va::new(self.resolved_vm_address)
     }
 }
 
