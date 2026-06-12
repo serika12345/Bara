@@ -5,7 +5,7 @@ use std::{
 };
 
 use bara_arm64::{emit_program, EmitError};
-use bara_ir::{Program, ProgramImageMetadata, Terminator, UnsupportedReason};
+use bara_ir::{Program, ProgramImageMetadata, Terminator, UnsupportedReason, X86Va};
 use bara_isa_x86::{
     decode_function, lift_decoded_function_with_image_metadata, DecodeError, DecodedFunction,
     DecodedInstructionKind, LiftError,
@@ -640,6 +640,70 @@ impl B8DebugDecodeReport {
                 _ => None,
             })
     }
+
+    fn last_register_materialization_before(
+        &self,
+        register: B8DebugRegisterName,
+        call_site: u64,
+    ) -> Option<B8DebugRegisterMaterializationSourceReport> {
+        self.instructions
+            .iter()
+            .rev()
+            .find_map(|instruction| match (&instruction.kind, register) {
+                _ if instruction.start >= call_site => None,
+                (
+                    B8DebugDecodedInstructionKindReport::MovRdiQwordPtrRipRelative {
+                        address,
+                        width,
+                        ..
+                    },
+                    B8DebugRegisterName::Rdi,
+                ) => Some(
+                    B8DebugRegisterMaterializationSourceReport::rip_relative_qword_load(
+                        instruction,
+                        B8DebugRegisterName::Rdi,
+                        *address,
+                        *width,
+                    ),
+                ),
+                (
+                    B8DebugDecodedInstructionKindReport::MovRsiQwordPtrRipRelative {
+                        address,
+                        width,
+                        ..
+                    },
+                    B8DebugRegisterName::Rsi,
+                ) => Some(
+                    B8DebugRegisterMaterializationSourceReport::rip_relative_qword_load(
+                        instruction,
+                        B8DebugRegisterName::Rsi,
+                        *address,
+                        *width,
+                    ),
+                ),
+                (
+                    B8DebugDecodedInstructionKindReport::LeaRdiRipRelative { address, .. },
+                    B8DebugRegisterName::Rdi,
+                ) => Some(
+                    B8DebugRegisterMaterializationSourceReport::rip_relative_address(
+                        instruction,
+                        B8DebugRegisterName::Rdi,
+                        *address,
+                    ),
+                ),
+                (
+                    B8DebugDecodedInstructionKindReport::LeaRsiRipRelative { address, .. },
+                    B8DebugRegisterName::Rsi,
+                ) => Some(
+                    B8DebugRegisterMaterializationSourceReport::rip_relative_address(
+                        instruction,
+                        B8DebugRegisterName::Rsi,
+                        *address,
+                    ),
+                ),
+                _ => None,
+            })
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -925,6 +989,7 @@ impl B8DebugLoaderPlanReport {
                 input,
                 input_probe,
                 decode_report,
+                entry_input.program_image_metadata(),
             ),
             entry_source_for_this_bundle: B8DebugEntrySource::PublicLcMainEntryoff,
             next_entry_source: B8DebugLoaderNextEntrySource::FirstUnsupportedBoundary,
@@ -997,6 +1062,7 @@ impl B8DebugImportBoundaryReport {
         input: &BinaryInput,
         input_probe: &BinaryFormatProbeReport,
         decode_report: &B8DebugDecodeReport,
+        image_metadata: &ProgramImageMetadata,
     ) -> Self {
         let public_metadata = B8DebugPublicImportMetadataReport::from_probe(input_probe);
         let call_boundary = decode_report.register_indirect_call_r14_boundary();
@@ -1024,6 +1090,8 @@ impl B8DebugImportBoundaryReport {
                         B8DebugHelperBoundaryRequestReport::blocked_import_helper_call(
                             call_boundary_report,
                             import_identity,
+                            decode_report,
+                            image_metadata,
                         ),
                     )
                     } else {
@@ -1259,6 +1327,8 @@ impl B8DebugHelperBoundaryRequestReport {
     fn blocked_import_helper_call(
         call_boundary: B8DebugRegisterIndirectCallBoundaryReport,
         import_identity: MachOChainedImportIdentityReport,
+        decode_report: &B8DebugDecodeReport,
+        image_metadata: &ProgramImageMetadata,
     ) -> Self {
         let reason = B8DebugHelperBoundaryBlockedReason::ImportHelperMarshalingUnimplemented;
         Self {
@@ -1267,6 +1337,8 @@ impl B8DebugHelperBoundaryRequestReport {
             request: Some(B8DebugImportHelperRequestReport::from_boundary_and_import(
                 call_boundary,
                 import_identity,
+                decode_report,
+                image_metadata,
             )),
             blockers: B8DebugHelperBoundaryBlocker::from_reason(reason),
         }
@@ -1298,6 +1370,8 @@ impl B8DebugImportHelperRequestReport {
     fn from_boundary_and_import(
         call_boundary: B8DebugRegisterIndirectCallBoundaryReport,
         import: MachOChainedImportIdentityReport,
+        decode_report: &B8DebugDecodeReport,
+        image_metadata: &ProgramImageMetadata,
     ) -> Self {
         Self {
             kind: B8DebugImportHelperRequestKind::ImportHelperCall,
@@ -1307,7 +1381,11 @@ impl B8DebugImportHelperRequestReport {
             call_site: call_boundary.call_site,
             return_to: call_boundary.return_to,
             import,
-            required_marshaling: B8DebugHelperMarshalingReport::blocked(),
+            required_marshaling: B8DebugHelperMarshalingReport::blocked(
+                call_boundary,
+                decode_report,
+                image_metadata,
+            ),
         }
     }
 }
@@ -1334,12 +1412,20 @@ struct B8DebugHelperMarshalingReport {
 }
 
 impl B8DebugHelperMarshalingReport {
-    fn blocked() -> Self {
+    fn blocked(
+        call_boundary: B8DebugRegisterIndirectCallBoundaryReport,
+        decode_report: &B8DebugDecodeReport,
+        image_metadata: &ProgramImageMetadata,
+    ) -> Self {
         Self {
             status: B8DebugImportBoundaryStatus::Blocked,
             argument_model: B8DebugHelperArgumentModel::X8664CallArguments,
             return_model: B8DebugHelperReturnModel::X8664RaxReturnValue,
-            contract: Some(B8DebugImportHelperMarshalingContractReport::blocked()),
+            contract: Some(B8DebugImportHelperMarshalingContractReport::blocked(
+                call_boundary,
+                decode_report,
+                image_metadata,
+            )),
             blockers: B8DebugHelperBoundaryBlocker::from_reason(
                 B8DebugHelperBoundaryBlockedReason::ImportHelperMarshalingUnimplemented,
             ),
@@ -1354,12 +1440,22 @@ struct B8DebugImportHelperMarshalingContractReport {
     calling_convention: B8DebugHelperCallingConvention,
     argument_sources: Vec<B8DebugHelperArgumentSourceReport>,
     return_destination: B8DebugHelperReturnDestinationReport,
+    materialization_boundary: B8DebugObjcMessageMaterializationBoundaryReport,
     blockers: Vec<B8DebugHelperBoundaryBlocker>,
     next_action: B8DebugHelperMarshalingNextAction,
 }
 
 impl B8DebugImportHelperMarshalingContractReport {
-    fn blocked() -> Self {
+    fn blocked(
+        call_boundary: B8DebugRegisterIndirectCallBoundaryReport,
+        decode_report: &B8DebugDecodeReport,
+        image_metadata: &ProgramImageMetadata,
+    ) -> Self {
+        let materialization_boundary = B8DebugObjcMessageMaterializationBoundaryReport::blocked(
+            call_boundary.call_site,
+            decode_report,
+            image_metadata,
+        );
         Self {
             schema: "b8_import_helper_marshaling_contract_v0",
             status: B8DebugImportBoundaryStatus::Blocked,
@@ -1382,13 +1478,14 @@ impl B8DebugImportHelperMarshalingContractReport {
                 B8DebugRegisterName::Rax,
                 B8DebugHelperBoundaryBlocker::HelperReturnValueMaterializationUnimplemented,
             ),
+            materialization_boundary,
             blockers: vec![
                 B8DebugHelperBoundaryBlocker::ObjcReceiverMaterializationUnimplemented,
                 B8DebugHelperBoundaryBlocker::ObjcSelectorMaterializationUnimplemented,
                 B8DebugHelperBoundaryBlocker::HelperReturnValueMaterializationUnimplemented,
             ],
             next_action:
-                B8DebugHelperMarshalingNextAction::DefineObjcReceiverSelectorMaterialization,
+                B8DebugHelperMarshalingNextAction::ExtendMachOMappedImageMetadataForObjcMaterialization,
         }
     }
 }
@@ -1495,10 +1592,332 @@ impl B8DebugHelperMaterializationReport {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugObjcMessageMaterializationBoundaryReport {
+    schema: &'static str,
+    status: B8DebugImportBoundaryStatus,
+    receiver: B8DebugObjcArgumentMaterializationReport,
+    selector: B8DebugObjcArgumentMaterializationReport,
+    return_value: B8DebugObjcReturnValueMaterializationReport,
+    blockers: Vec<B8DebugObjcMessageMaterializationBlocker>,
+    next_action: B8DebugObjcMessageMaterializationNextAction,
+}
+
+impl B8DebugObjcMessageMaterializationBoundaryReport {
+    fn blocked(
+        call_site: u64,
+        decode_report: &B8DebugDecodeReport,
+        image_metadata: &ProgramImageMetadata,
+    ) -> Self {
+        let receiver = B8DebugObjcArgumentMaterializationReport::from_register_argument(
+            B8DebugObjcArgumentMaterializationSpec::receiver(),
+            call_site,
+            decode_report,
+            image_metadata,
+        );
+        let selector = B8DebugObjcArgumentMaterializationReport::from_register_argument(
+            B8DebugObjcArgumentMaterializationSpec::selector(),
+            call_site,
+            decode_report,
+            image_metadata,
+        );
+        let return_value = B8DebugObjcReturnValueMaterializationReport::blocked();
+        let mut blockers = Vec::new();
+        if let Some(blocker) = receiver.mapped_value.blocker {
+            blockers.push(blocker);
+        }
+        if let Some(blocker) = selector.mapped_value.blocker {
+            blockers.push(blocker);
+        }
+        blockers.push(return_value.blocker);
+        let next_action = if blockers
+            .iter()
+            .any(|blocker| blocker.requires_mapped_image_extension())
+        {
+            B8DebugObjcMessageMaterializationNextAction::ExtendMachOMappedImageMetadataForObjcMaterialization
+        } else {
+            B8DebugObjcMessageMaterializationNextAction::DefineHelperReturnValueMaterialization
+        };
+
+        Self {
+            schema: "b8_objc_message_materialization_boundary_v0",
+            status: B8DebugImportBoundaryStatus::Blocked,
+            receiver,
+            selector,
+            return_value,
+            blockers,
+            next_action,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct B8DebugObjcArgumentMaterializationSpec {
+    position: u8,
+    role: B8DebugHelperArgumentRole,
+    source_register: B8DebugRegisterName,
+    missing_definition_blocker: B8DebugObjcMessageMaterializationBlocker,
+    unavailable_qword_blocker: B8DebugObjcMessageMaterializationBlocker,
+}
+
+impl B8DebugObjcArgumentMaterializationSpec {
+    const fn receiver() -> Self {
+        Self {
+            position: 0,
+            role: B8DebugHelperArgumentRole::ObjcReceiver,
+            source_register: B8DebugRegisterName::Rdi,
+            missing_definition_blocker:
+                B8DebugObjcMessageMaterializationBlocker::ReceiverRegisterDefinitionUnavailable,
+            unavailable_qword_blocker:
+                B8DebugObjcMessageMaterializationBlocker::ReceiverMappedImageQwordUnavailable,
+        }
+    }
+
+    const fn selector() -> Self {
+        Self {
+            position: 1,
+            role: B8DebugHelperArgumentRole::ObjcSelector,
+            source_register: B8DebugRegisterName::Rsi,
+            missing_definition_blocker:
+                B8DebugObjcMessageMaterializationBlocker::SelectorRegisterDefinitionUnavailable,
+            unavailable_qword_blocker:
+                B8DebugObjcMessageMaterializationBlocker::SelectorMappedImageQwordUnavailable,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugObjcArgumentMaterializationReport {
+    status: B8DebugValueMaterializationStatus,
+    position: u8,
+    role: B8DebugHelperArgumentRole,
+    source_register: B8DebugRegisterName,
+    source_definition: Option<B8DebugRegisterMaterializationSourceReport>,
+    mapped_value: B8DebugObjcArgumentValueMaterializationReport,
+}
+
+impl B8DebugObjcArgumentMaterializationReport {
+    fn from_register_argument(
+        spec: B8DebugObjcArgumentMaterializationSpec,
+        call_site: u64,
+        decode_report: &B8DebugDecodeReport,
+        image_metadata: &ProgramImageMetadata,
+    ) -> Self {
+        let source_definition =
+            decode_report.last_register_materialization_before(spec.source_register, call_site);
+        let mapped_value = B8DebugObjcArgumentValueMaterializationReport::from_source_definition(
+            source_definition.as_ref(),
+            image_metadata,
+            spec.missing_definition_blocker,
+            spec.unavailable_qword_blocker,
+        );
+        Self {
+            status: mapped_value.status,
+            position: spec.position,
+            role: spec.role,
+            source_register: spec.source_register,
+            source_definition,
+            mapped_value,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugObjcArgumentValueMaterializationReport {
+    status: B8DebugValueMaterializationStatus,
+    source: B8DebugObjcArgumentValueSource,
+    address: Option<u64>,
+    value: Option<u64>,
+    blocker: Option<B8DebugObjcMessageMaterializationBlocker>,
+}
+
+impl B8DebugObjcArgumentValueMaterializationReport {
+    fn from_source_definition(
+        source_definition: Option<&B8DebugRegisterMaterializationSourceReport>,
+        image_metadata: &ProgramImageMetadata,
+        missing_definition_blocker: B8DebugObjcMessageMaterializationBlocker,
+        unavailable_qword_blocker: B8DebugObjcMessageMaterializationBlocker,
+    ) -> Self {
+        let Some(source_definition) = source_definition else {
+            return Self::blocked(
+                B8DebugObjcArgumentValueSource::RegisterDefinitionUnavailable,
+                None,
+                missing_definition_blocker,
+            );
+        };
+
+        match source_definition.kind {
+            B8DebugRegisterMaterializationSourceKind::RipRelativeQwordLoad => {
+                let value = image_metadata
+                    .mapped_bytes()
+                    .read_u64_le(X86Va::new(source_definition.address));
+                match value {
+                    Some(value) => Self {
+                        status: B8DebugValueMaterializationStatus::Available,
+                        source: B8DebugObjcArgumentValueSource::ProgramImageMetadata,
+                        address: Some(source_definition.address),
+                        value: Some(value),
+                        blocker: None,
+                    },
+                    None => Self::blocked(
+                        B8DebugObjcArgumentValueSource::ProgramImageMetadata,
+                        Some(source_definition.address),
+                        unavailable_qword_blocker,
+                    ),
+                }
+            }
+            B8DebugRegisterMaterializationSourceKind::RipRelativeAddress => Self {
+                status: B8DebugValueMaterializationStatus::Available,
+                source: B8DebugObjcArgumentValueSource::RipRelativeAddress,
+                address: Some(source_definition.address),
+                value: Some(source_definition.address),
+                blocker: None,
+            },
+        }
+    }
+
+    const fn blocked(
+        source: B8DebugObjcArgumentValueSource,
+        address: Option<u64>,
+        blocker: B8DebugObjcMessageMaterializationBlocker,
+    ) -> Self {
+        Self {
+            status: B8DebugValueMaterializationStatus::Blocked,
+            source,
+            address,
+            value: None,
+            blocker: Some(blocker),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugObjcReturnValueMaterializationReport {
+    status: B8DebugValueMaterializationStatus,
+    role: B8DebugHelperReturnRole,
+    destination_register: B8DebugRegisterName,
+    plan: B8DebugObjcReturnValueMaterializationPlan,
+    blocker: B8DebugObjcMessageMaterializationBlocker,
+}
+
+impl B8DebugObjcReturnValueMaterializationReport {
+    const fn blocked() -> Self {
+        Self {
+            status: B8DebugValueMaterializationStatus::Blocked,
+            role: B8DebugHelperReturnRole::ObjcMessageReturnValue,
+            destination_register: B8DebugRegisterName::Rax,
+            plan: B8DebugObjcReturnValueMaterializationPlan::WriteHelperReturnToX8664Rax,
+            blocker:
+                B8DebugObjcMessageMaterializationBlocker::HelperReturnValueMaterializationUnimplemented,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugRegisterMaterializationSourceReport {
+    kind: B8DebugRegisterMaterializationSourceKind,
+    target_register: B8DebugRegisterName,
+    instruction_start: u64,
+    instruction_end: u64,
+    address: u64,
+    width: Option<B8DebugMemoryReadWidthReport>,
+}
+
+impl B8DebugRegisterMaterializationSourceReport {
+    const fn rip_relative_qword_load(
+        instruction: &B8DebugDecodedInstructionReport,
+        target_register: B8DebugRegisterName,
+        address: u64,
+        width: B8DebugMemoryReadWidthReport,
+    ) -> Self {
+        Self {
+            kind: B8DebugRegisterMaterializationSourceKind::RipRelativeQwordLoad,
+            target_register,
+            instruction_start: instruction.start,
+            instruction_end: instruction.end,
+            address,
+            width: Some(width),
+        }
+    }
+
+    const fn rip_relative_address(
+        instruction: &B8DebugDecodedInstructionReport,
+        target_register: B8DebugRegisterName,
+        address: u64,
+    ) -> Self {
+        Self {
+            kind: B8DebugRegisterMaterializationSourceKind::RipRelativeAddress,
+            target_register,
+            instruction_start: instruction.start,
+            instruction_end: instruction.end,
+            address,
+            width: None,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugRegisterMaterializationSourceKind {
+    RipRelativeQwordLoad,
+    RipRelativeAddress,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugValueMaterializationStatus {
+    Available,
+    Blocked,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugObjcArgumentValueSource {
+    ProgramImageMetadata,
+    RegisterDefinitionUnavailable,
+    RipRelativeAddress,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugObjcReturnValueMaterializationPlan {
+    #[serde(rename = "write_helper_return_to_x86_64_rax")]
+    WriteHelperReturnToX8664Rax,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugObjcMessageMaterializationBlocker {
+    ReceiverRegisterDefinitionUnavailable,
+    SelectorRegisterDefinitionUnavailable,
+    ReceiverMappedImageQwordUnavailable,
+    SelectorMappedImageQwordUnavailable,
+    HelperReturnValueMaterializationUnimplemented,
+}
+
+impl B8DebugObjcMessageMaterializationBlocker {
+    const fn requires_mapped_image_extension(self) -> bool {
+        matches!(
+            self,
+            Self::ReceiverRegisterDefinitionUnavailable
+                | Self::SelectorRegisterDefinitionUnavailable
+                | Self::ReceiverMappedImageQwordUnavailable
+                | Self::SelectorMappedImageQwordUnavailable
+        )
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugObjcMessageMaterializationNextAction {
+    DefineHelperReturnValueMaterialization,
+    ExtendMachOMappedImageMetadataForObjcMaterialization,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum B8DebugHelperMarshalingNextAction {
-    DefineObjcReceiverSelectorMaterialization,
+    ExtendMachOMappedImageMetadataForObjcMaterialization,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]

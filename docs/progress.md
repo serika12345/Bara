@@ -9,12 +9,12 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-12 22:34 JST
+最終更新: 2026-06-12 22:52 JST
 
 状態:
 
 - project_state: in_progress。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
-  reviewable GUI 起動 slice の積み上げとして扱う。B8-G5a までで、self-authored
+  reviewable GUI 起動 slice の積み上げとして扱う。B8-G5b までで、self-authored
   x86_64 GUI fixture の実 `LC_MAIN` entry から
   `push rbp; mov rbp,rsp; push r15; push r14; push rbx; push rax; call rel32;
   mov rbx,rax; mov rax,qword ptr [rip+disp32]; mov rdx,qword ptr [rax];
@@ -34,23 +34,29 @@
   `b8_import_helper_marshaling_contract_v0` として x86_64 macOS System V calling
   convention、`rdi` receiver、`rsi` selector、`rax` return destination を
   stable report に保存し、次の blocker を receiver / selector / return value
-  materialization に進める。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G5a Import Helper
-  Marshaling Contract: B8-G5 の helper request から x86_64 call argument source と
-  `rax` return destination を helper boundary の typed contract として扱う。
+  materialization に進める。B8-G5b では
+  `b8_objc_message_materialization_boundary_v0` として、`call r14` 直前の `rdi` /
+  `rsi` source definition を RIP-relative qword load として保存し、現
+  `ProgramImageMetadata.mapped_bytes` では data 側 qword value をまだ読めないことを
+  `receiver_mapped_image_qword_unavailable` /
+  `selector_mapped_image_qword_unavailable` として分類する。`rax` return destination は
+  `write_helper_return_to_x86_64_rax` plan と
+  `helper_return_value_materialization_unimplemented` blocker で停止する。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G5b ObjC Message
+  Materialization Boundary: B8-G5a の marshaling contract から receiver / selector /
+  return value materialization boundary を stable report として扱う。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
   Objective-C runtime / dyld の private behavior は使わず、public metadata、
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
-- active_branch: `task/b8-g5a-import-helper-marshaling-contract`。base branch は
-  最新 `main` の `9faaefd` (`Merge pull request #35 from
-  serika12345:task/b8-g5-import-helper-boundary-request`)。latest commit は
-  B8-G5a review package で報告する。draft PR は
-  <https://github.com/serika12345/Bara/pull/36>。
+- active_branch: `task/b8-g5b-g5e-objc-materialization-boundary`。base branch は
+  最新 `main` の `2cdf6de` (`Merge pull request #36 from
+  serika12345:task/b8-g5a-import-helper-marshaling-contract`)。B8-G5b から B8-G5e までを
+  1 つの PR Gate として扱う。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
-  B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a / B8-G5b。
+  B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a / B8-G5b / B8-G5c。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -103,17 +109,26 @@
   `calling_convention=x86_64_macos_system_v`、`argument_sources[0].role=objc_receiver` /
   `source.register=rdi`、`argument_sources[1].role=objc_selector` /
   `source.register=rsi`、`return_destination.destination.register=rax`、
-  `next_action=define_objc_receiver_selector_materialization` を保存する。
-- remaining_work: B8-G5b。B8-G5a の helper marshaling contract が出す
-  `objc_receiver_materialization_unimplemented` /
-  `objc_selector_materialization_unimplemented` /
-  `helper_return_value_materialization_unimplemented` を受けて、receiver / selector /
-  return value materialization boundary を stable report として定義する。まだ
-  `_objc_msgSend` host execution、Objective-C / AppKit helper bridge、
+  `next_action=define_objc_receiver_selector_materialization` を保存する。B8-G5b として
+  `materialization_boundary.schema=b8_objc_message_materialization_boundary_v0`、
+  receiver / selector の `source_definition.kind=rip_relative_qword_load`、
+  `source_definition.target_register=rdi` / `rsi`、
+  `mapped_value.source=program_image_metadata`、
+  `receiver_mapped_image_qword_unavailable`、
+  `selector_mapped_image_qword_unavailable`、
+  `return_value.plan=write_helper_return_to_x86_64_rax`、
+  `helper_return_value_materialization_unimplemented`、
+  `next_action=extend_mach_o_mapped_image_metadata_for_objc_materialization` を保存する。
+- remaining_work: B8-G5c。B8-G5b の materialization boundary が出す
+  `receiver_mapped_image_qword_unavailable` /
+  `selector_mapped_image_qword_unavailable` を受けて、public Mach-O mapped image
+  metadata が current fixture の receiver / selector qword load address を覆うようにするか、
+  不足している public segment / mapping metadata をより具体的な stable blocker として
+  report する。まだ `_objc_msgSend` host execution、Objective-C / AppKit helper bridge、
   arbitrary indirect call target execution、translation cache、fallback JIT/interpreter
   は行わない。
-- next_action: draft PR #36 を review gate として確認する。レビュー後の次 PR Gate は
-  B8-G5b ObjC Message Materialization Boundary。
+- next_action: B8-G5b〜B8-G5e の統合 branch を実装・検証し、commit / push して
+  draft PR を開いたら review gate で停止する。
 - verification: targeted check として
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
   manual debug bundle generation で `required_marshaling.contract.schema=b8_import_helper_marshaling_contract_v0`、
@@ -124,6 +139,19 @@
 
 直近で完了した作業:
 
+- 2026-06-12 12:02 JST: B8-G5b ObjC Message Materialization Boundary を実装した。
+  B8 debug bundle の `helper_boundary_request.request.required_marshaling.contract` に
+  `b8_objc_message_materialization_boundary_v0` を追加し、`rdi` receiver と `rsi`
+  selector の source definition を `call r14` 直前の RIP-relative qword load として
+  保存する。現 `ProgramImageMetadata.mapped_bytes` では receiver / selector qword
+  value を読めないため、stable blocker は
+  `receiver_mapped_image_qword_unavailable` /
+  `selector_mapped_image_qword_unavailable` である。`rax` return destination は
+  `write_helper_return_to_x86_64_rax` plan と
+  `helper_return_value_materialization_unimplemented` blocker に留める。
+  `_objc_msgSend` 実行や Objective-C / AppKit bridge は追加していない。targeted check
+  として `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+  が通過し、full `nix develop -c ./scripts/verify` も通過した。
 - 2026-06-12 10:11 JST: B8-G5a Import Helper Marshaling Contract を実装した。
   B8 debug bundle の `helper_boundary_request.request.required_marshaling.contract` に
   `b8_import_helper_marshaling_contract_v0` を追加し、x86_64 macOS System V calling
