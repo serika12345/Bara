@@ -1019,13 +1019,13 @@ impl B8DebugImportBoundaryReport {
                 if public_metadata.has_chained_fixups() {
                     if let Some(import_identity) = resolved_import_identity {
                         (
-                            B8DebugImportBoundaryResolution::ResolvedPublicDyldChainedFixupsImport,
-                            B8DebugImportBoundaryNextAction::DefineImportHelperMarshalingContract,
-                            B8DebugHelperBoundaryRequestReport::blocked_import_helper_call(
-                                call_boundary_report,
-                                import_identity,
-                            ),
-                        )
+                        B8DebugImportBoundaryResolution::ResolvedPublicDyldChainedFixupsImport,
+                        B8DebugImportBoundaryNextAction::DefineObjcReceiverSelectorMaterialization,
+                        B8DebugHelperBoundaryRequestReport::blocked_import_helper_call(
+                            call_boundary_report,
+                            import_identity,
+                        ),
+                    )
                     } else {
                         (
                             B8DebugImportBoundaryResolution::RequiresPublicDyldChainedFixupsDecoder,
@@ -1109,6 +1109,9 @@ enum B8DebugTargetPointerLoadKind {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum B8DebugRegisterName {
+    Rax,
+    Rdi,
+    Rsi,
     R14,
 }
 
@@ -1326,6 +1329,7 @@ struct B8DebugHelperMarshalingReport {
     status: B8DebugImportBoundaryStatus,
     argument_model: B8DebugHelperArgumentModel,
     return_model: B8DebugHelperReturnModel,
+    contract: Option<B8DebugImportHelperMarshalingContractReport>,
     blockers: Vec<B8DebugHelperBoundaryBlocker>,
 }
 
@@ -1335,11 +1339,166 @@ impl B8DebugHelperMarshalingReport {
             status: B8DebugImportBoundaryStatus::Blocked,
             argument_model: B8DebugHelperArgumentModel::X8664CallArguments,
             return_model: B8DebugHelperReturnModel::X8664RaxReturnValue,
+            contract: Some(B8DebugImportHelperMarshalingContractReport::blocked()),
             blockers: B8DebugHelperBoundaryBlocker::from_reason(
                 B8DebugHelperBoundaryBlockedReason::ImportHelperMarshalingUnimplemented,
             ),
         }
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugImportHelperMarshalingContractReport {
+    schema: &'static str,
+    status: B8DebugImportBoundaryStatus,
+    calling_convention: B8DebugHelperCallingConvention,
+    argument_sources: Vec<B8DebugHelperArgumentSourceReport>,
+    return_destination: B8DebugHelperReturnDestinationReport,
+    blockers: Vec<B8DebugHelperBoundaryBlocker>,
+    next_action: B8DebugHelperMarshalingNextAction,
+}
+
+impl B8DebugImportHelperMarshalingContractReport {
+    fn blocked() -> Self {
+        Self {
+            schema: "b8_import_helper_marshaling_contract_v0",
+            status: B8DebugImportBoundaryStatus::Blocked,
+            calling_convention: B8DebugHelperCallingConvention::X8664MacosSystemV,
+            argument_sources: vec![
+                B8DebugHelperArgumentSourceReport::register_argument(
+                    0,
+                    B8DebugHelperArgumentRole::ObjcReceiver,
+                    B8DebugRegisterName::Rdi,
+                    B8DebugHelperBoundaryBlocker::ObjcReceiverMaterializationUnimplemented,
+                ),
+                B8DebugHelperArgumentSourceReport::register_argument(
+                    1,
+                    B8DebugHelperArgumentRole::ObjcSelector,
+                    B8DebugRegisterName::Rsi,
+                    B8DebugHelperBoundaryBlocker::ObjcSelectorMaterializationUnimplemented,
+                ),
+            ],
+            return_destination: B8DebugHelperReturnDestinationReport::register_return(
+                B8DebugRegisterName::Rax,
+                B8DebugHelperBoundaryBlocker::HelperReturnValueMaterializationUnimplemented,
+            ),
+            blockers: vec![
+                B8DebugHelperBoundaryBlocker::ObjcReceiverMaterializationUnimplemented,
+                B8DebugHelperBoundaryBlocker::ObjcSelectorMaterializationUnimplemented,
+                B8DebugHelperBoundaryBlocker::HelperReturnValueMaterializationUnimplemented,
+            ],
+            next_action:
+                B8DebugHelperMarshalingNextAction::DefineObjcReceiverSelectorMaterialization,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugHelperCallingConvention {
+    #[serde(rename = "x86_64_macos_system_v")]
+    X8664MacosSystemV,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugHelperArgumentSourceReport {
+    position: u8,
+    role: B8DebugHelperArgumentRole,
+    source: B8DebugHelperValueSourceReport,
+    materialization: B8DebugHelperMaterializationReport,
+}
+
+impl B8DebugHelperArgumentSourceReport {
+    const fn register_argument(
+        position: u8,
+        role: B8DebugHelperArgumentRole,
+        register: B8DebugRegisterName,
+        blocker: B8DebugHelperBoundaryBlocker,
+    ) -> Self {
+        Self {
+            position,
+            role,
+            source: B8DebugHelperValueSourceReport::register(register),
+            materialization: B8DebugHelperMaterializationReport::blocked(blocker),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugHelperArgumentRole {
+    ObjcReceiver,
+    ObjcSelector,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugHelperReturnDestinationReport {
+    role: B8DebugHelperReturnRole,
+    destination: B8DebugHelperValueSourceReport,
+    materialization: B8DebugHelperMaterializationReport,
+}
+
+impl B8DebugHelperReturnDestinationReport {
+    const fn register_return(
+        register: B8DebugRegisterName,
+        blocker: B8DebugHelperBoundaryBlocker,
+    ) -> Self {
+        Self {
+            role: B8DebugHelperReturnRole::ObjcMessageReturnValue,
+            destination: B8DebugHelperValueSourceReport::register(register),
+            materialization: B8DebugHelperMaterializationReport::blocked(blocker),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugHelperReturnRole {
+    ObjcMessageReturnValue,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugHelperValueSourceReport {
+    kind: B8DebugHelperValueSourceKind,
+    register: B8DebugRegisterName,
+    width: B8DebugMemoryReadWidthReport,
+}
+
+impl B8DebugHelperValueSourceReport {
+    const fn register(register: B8DebugRegisterName) -> Self {
+        Self {
+            kind: B8DebugHelperValueSourceKind::Register,
+            register,
+            width: B8DebugMemoryReadWidthReport::Bits64,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugHelperValueSourceKind {
+    Register,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugHelperMaterializationReport {
+    status: B8DebugImportBoundaryStatus,
+    blocker: B8DebugHelperBoundaryBlocker,
+}
+
+impl B8DebugHelperMaterializationReport {
+    const fn blocked(blocker: B8DebugHelperBoundaryBlocker) -> Self {
+        Self {
+            status: B8DebugImportBoundaryStatus::Blocked,
+            blocker,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugHelperMarshalingNextAction {
+    DefineObjcReceiverSelectorMaterialization,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -1370,6 +1529,9 @@ enum B8DebugHelperBoundaryBlocker {
     #[serde(rename = "x86_64_argument_marshaling_unimplemented")]
     X8664ArgumentMarshalingUnimplemented,
     HelperReturnMarshalingUnimplemented,
+    ObjcReceiverMaterializationUnimplemented,
+    ObjcSelectorMaterializationUnimplemented,
+    HelperReturnValueMaterializationUnimplemented,
 }
 
 impl B8DebugHelperBoundaryBlocker {
@@ -1399,7 +1561,7 @@ enum B8DebugImportBoundaryResolution {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum B8DebugImportBoundaryNextAction {
-    DefineImportHelperMarshalingContract,
+    DefineObjcReceiverSelectorMaterialization,
     DecodePublicDyldChainedFixupsImports,
     DecodePublicDyldBindOpcodes,
     InspectUnsupportedLoaderMetadata,
