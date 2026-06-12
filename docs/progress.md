@@ -9,12 +9,12 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-12 23:07 JST
+最終更新: 2026-06-12 23:36 JST
 
 状態:
 
 - project_state: in_progress。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
-  reviewable GUI 起動 slice の積み上げとして扱う。B8-G5b〜G5e までで、self-authored
+  reviewable GUI 起動 slice の積み上げとして扱う。B8-G6a までで、self-authored
   x86_64 GUI fixture の実 `LC_MAIN` entry から
   `push rbp; mov rbp,rsp; push r15; push r14; push rbx; push rax; call rel32;
   mov rbx,rax; mov rax,qword ptr [rip+disp32]; mov rdx,qword ptr [rax];
@@ -52,25 +52,27 @@
   blocker は解消し、次の blocker は `helper_return_value_materialization_unimplemented`
   に進む。B8-G5e では helper return value を x86_64 `rax` に書き戻す
   `b8_objc_helper_return_writeback_boundary_v0` を stable report に保存し、remaining
-  blocker は `objc_helper_execution_unimplemented` に進む。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G5b-G5e ObjC
-  Materialization And Return Boundary: receiver / selector materialization、public mapped
-  image metadata、public fixup resolution、helper return value write-back boundary を
-  1 つの PR Gate として扱う。
+  blocker は `objc_helper_execution_unimplemented` に進む。B8-G6a では
+  `b8_objc_helper_execution_request_v0` として `_objc_msgSend` import identity、
+  receiver import identity、selector resolved VM address、return write-back boundary、
+  required capability `objc_runtime_message_send_helper`、remaining blocker
+  `objc_helper_execution_unimplemented` を 1 つの stable helper execution request に
+  集約する。Objective-C runtime / AppKit helper の host execution はまだ行わない。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G6a ObjC Helper Execution
+  Boundary: ObjC helper execution request boundary を stable report に分離する。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
   Objective-C runtime / dyld の private behavior は使わず、public metadata、
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
-- active_branch: `task/b8-g5b-g5e-objc-materialization-boundary`。base branch は
-  最新 `main` の `2cdf6de` (`Merge pull request #36 from
-  serika12345:task/b8-g5a-import-helper-marshaling-contract`)。B8-G5b から B8-G5e までを
-  1 つの PR Gate として扱う。draft PR は
-  <https://github.com/serika12345/Bara/pull/37>。
+- active_branch: `task/b8-g6a-objc-helper-execution-boundary`。base branch は
+  最新 `main` の `1cb47b8` (`Merge pull request #37 from
+  serika12345/task/b8-g5b-g5e-objc-materialization-boundary`)。draft PR は
+  <https://github.com/serika12345/Bara/pull/38>。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
-  B8-G5b-G5e / B8-G6a。
+  B8-G5b-G5e / B8-G6a / B8-G6b。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -157,24 +159,42 @@
   `ordering=after_helper_call_returns` を保存する。helper result はまだ生成せず、
   materialization boundary と helper marshaling contract の remaining blocker は
   `objc_helper_execution_unimplemented`、`next_action` は
-  `define_objc_runtime_helper_bridge` である。
-- remaining_work: B8-G6a。B8-G5e 後に残る `objc_helper_execution_unimplemented` を、
-  ObjC helper execution request boundary として stable report に分離する。まだ
-  `_objc_msgSend` host execution、Objective-C / AppKit helper bridge、arbitrary
-  indirect call target execution、translation cache、fallback JIT/interpreter は行わない。
-- next_action: draft PR #37 を review gate として確認する。レビュー後の次 PR Gate は
-  B8-G6a ObjC Helper Execution Boundary。
+  `define_objc_runtime_helper_bridge` である。B8-G6a として
+  `helper_execution_request.schema=b8_objc_helper_execution_request_v0`、
+  `kind=objc_msg_send`、`source_import.symbol_name=_objc_msgSend`、
+  `receiver_identity.symbol_name=_OBJC_CLASS_$_NSApplication`、
+  `selector_vm_address.resolved_vm_address=4294975648`、
+  `return_writeback_boundary.schema=b8_objc_helper_return_writeback_boundary_v0`、
+  `required_capability=objc_runtime_message_send_helper` を保存する。helper execution request
+  の remaining blocker は `objc_helper_execution_unimplemented`、next action は
+  `define_objc_runtime_helper_bridge_contract` である。
+- remaining_work: B8-G6b。B8-G6a の helper execution request が要求する
+  `objc_runtime_message_send_helper` capability を、public Objective-C runtime helper
+  bridge contract として stable report に分離する。まだ `_objc_msgSend` host execution、
+  Objective-C / AppKit helper bridge、arbitrary indirect call target execution、
+  translation cache、fallback JIT/interpreter は行わない。
+- next_action: draft PR #38 を review gate として確認する。レビュー後の次 PR Gate は
+  B8-G6b ObjC Runtime Helper Bridge Contract。
 - verification: targeted check として
-  `nix develop -c cargo test -p bara-oracle chained_fixups -- --nocapture`、
-  `nix develop -c cargo test -p bara-oracle maps_public_file_backed_segments_into_program_image_metadata -- --nocapture`、
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
-  manual debug bundle generation で receiver が `_OBJC_CLASS_$_NSApplication` import、
-  selector が `resolved_vm_address=4294975648`、return write-back が
-  `b8_objc_helper_return_writeback_boundary_v0` / `objc_helper_execution_unimplemented` を
-  保存することを確認した。full `nix develop -c ./scripts/verify` も通過した。
+  manual debug bundle generation で
+  `helper_execution_request.schema=b8_objc_helper_execution_request_v0`、
+  `source_import.symbol_name=_objc_msgSend`、
+  `receiver_identity.symbol_name=_OBJC_CLASS_$_NSApplication`、
+  `selector_vm_address.resolved_vm_address=4294975648`、
+  `required_capability=objc_runtime_message_send_helper`、
+  `next_action=define_objc_runtime_helper_bridge` を確認した。full
+  `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-12 23:35 JST: B8-G6a ObjC Helper Execution Boundary を実装した。
+  B8 debug bundle の import helper request に
+  `b8_objc_helper_execution_request_v0` を追加し、`_objc_msgSend` source import、
+  receiver identity、selector VM address、return write-back boundary、required
+  capability、remaining blocker を 1 つの stable report に集約する。Objective-C
+  runtime / AppKit helper の host execution は追加しない。targeted check、manual debug
+  bundle generation、full `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-12 23:04 JST: B8-G5b〜B8-G5e を 1 つの PR Gate として統合し、
   ObjC message materialization から helper return write-back boundary までを実装した。
   B8 debug bundle は `rdi` receiver と `rsi` selector の source definition、

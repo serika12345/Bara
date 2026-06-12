@@ -365,6 +365,17 @@
   remaining blocker は `objc_helper_execution_unimplemented` に進める。次の B8-G6a では
   Objective-C / AppKit host execution ではなく、ObjC helper execution request boundary を
   stable report として分離する。
+- 2026-06-12 の B8-G6a として、B8-G5e の
+  `objc_helper_execution_unimplemented` を
+  `b8_objc_helper_execution_request_v0` として stable report に分離した。request は
+  `_objc_msgSend` の public import identity、receiver の
+  `_OBJC_CLASS_$_NSApplication` import identity、selector の resolved VM address、x86_64
+  `rax` return write-back boundary、required capability
+  `objc_runtime_message_send_helper`、remaining blocker
+  `objc_helper_execution_unimplemented` を 1 箇所に集約する。これは Objective-C runtime /
+  AppKit API の host execution、arbitrary indirect call target execution、translation
+  cache、fallback JIT/interpreter を追加するものではない。次の B8-G6b では、この required
+  capability を public Objective-C runtime helper bridge contract として分離する。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、
