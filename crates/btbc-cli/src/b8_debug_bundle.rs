@@ -14,9 +14,10 @@ use bara_oracle::{
     binary_format_probe_report_to_json, decode_mach_o_chained_fixups_for_target,
     mach_o_entry_function_input, probe_public_binary_format, BinaryFileBytes,
     BinaryFormatProbeError, BinaryFormatProbeReport, BinaryInput, FailureKind, JsonError,
-    MachOChainedFixupTargetAddress, MachOChainedFixupsTargetReport, MachOChainedFixupsTargetStatus,
-    MachODyldInfoCommandKind, MachODylibImportCommandKind, MachOEntryFunctionInput,
-    MachOEntryFunctionTestCaseError, MachOLinkeditDataCommandKind, TestCase,
+    MachOChainedFixupTargetAddress, MachOChainedFixupsTargetReport,
+    MachOChainedImportIdentityReport, MachODyldInfoCommandKind, MachODylibImportCommandKind,
+    MachOEntryFunctionInput, MachOEntryFunctionTestCaseError, MachOLinkeditDataCommandKind,
+    TestCase,
 };
 use serde::Serialize;
 
@@ -66,17 +67,18 @@ pub(crate) fn generate_b8_debug_bundle(
     write_json_file(&paths.pcmap_path(), &attempt.pcmap)?;
     write_json_file(&paths.fixups_path(), &attempt.fixups)?;
     write_json_file(&paths.helpers_path(), &attempt.helpers)?;
-    write_json_file(
-        &paths.loader_plan_path(),
-        &B8DebugLoaderPlanReport::real_lc_main_attempted(
-            &input,
-            &entry_input,
-            &input_probe,
-            &attempt.decode_report,
-        ),
-    )?;
+    let loader_plan = B8DebugLoaderPlanReport::real_lc_main_attempted(
+        &input,
+        &entry_input,
+        &input_probe,
+        &attempt.decode_report,
+    );
+    let launch_report = attempt
+        .launch_report
+        .with_helper_boundary_request(loader_plan.import_boundary.helper_boundary_request.clone());
+    write_json_file(&paths.loader_plan_path(), &loader_plan)?;
     write_json_file(&paths.runtime_attempt_path(), &attempt.runtime_report)?;
-    write_json_file(&paths.launch_report_path(), &attempt.launch_report)?;
+    write_json_file(&paths.launch_report_path(), &launch_report)?;
     write_json_file(&paths.blocker_path(), &attempt.blocker_report)?;
     write_text_file(
         &paths.repro_path(),
@@ -460,6 +462,7 @@ struct B8DebugLaunchReport {
     source_pc: u64,
     processed_source_pc_range: Option<B8DebugProcessedPcRange>,
     b8_g1_host_trap_path: B8DebugHostTrapPathComparison,
+    helper_boundary_request: B8DebugHelperBoundaryRequestReport,
     blocker: B8DebugBlockerReport,
 }
 
@@ -477,8 +480,17 @@ impl B8DebugLaunchReport {
             source_pc: test_case.x86_bytes().entry().value(),
             processed_source_pc_range,
             b8_g1_host_trap_path: B8DebugHostTrapPathComparison::NotUsed,
+            helper_boundary_request: B8DebugHelperBoundaryRequestReport::skipped(),
             blocker: blocker.clone(),
         }
+    }
+
+    fn with_helper_boundary_request(
+        mut self,
+        helper_boundary_request: B8DebugHelperBoundaryRequestReport,
+    ) -> Self {
+        self.helper_boundary_request = helper_boundary_request;
+        self
     }
 }
 
@@ -999,28 +1011,30 @@ impl B8DebugImportBoundaryReport {
             )
         });
 
-        if call_boundary.is_some() {
-            let chained_fixups_resolved = chained_fixups
+        if let Some(call_boundary_report) = call_boundary {
+            let resolved_import_identity = chained_fixups
                 .as_ref()
-                .map(|report| report.status() == MachOChainedFixupsTargetStatus::ResolvedImport)
-                .unwrap_or(false);
+                .and_then(MachOChainedFixupsTargetReport::resolved_import_identity);
             let (resolution, next_action, helper_boundary_request) =
-                if public_metadata.has_chained_fixups() && chained_fixups_resolved {
-                    (
-                        B8DebugImportBoundaryResolution::ResolvedPublicDyldChainedFixupsImport,
-                        B8DebugImportBoundaryNextAction::ConnectImportHelperBoundaryRequest,
-                        B8DebugHelperBoundaryRequestReport::blocked(
-                            B8DebugHelperBoundaryBlockedReason::ImportHelperBoundaryUnimplemented,
-                        ),
-                    )
-                } else if public_metadata.has_chained_fixups() {
-                    (
-                        B8DebugImportBoundaryResolution::RequiresPublicDyldChainedFixupsDecoder,
-                        B8DebugImportBoundaryNextAction::DecodePublicDyldChainedFixupsImports,
-                        B8DebugHelperBoundaryRequestReport::blocked(
-                            B8DebugHelperBoundaryBlockedReason::ImportSymbolIdentityUnresolved,
-                        ),
-                    )
+                if public_metadata.has_chained_fixups() {
+                    if let Some(import_identity) = resolved_import_identity {
+                        (
+                            B8DebugImportBoundaryResolution::ResolvedPublicDyldChainedFixupsImport,
+                            B8DebugImportBoundaryNextAction::DefineImportHelperMarshalingContract,
+                            B8DebugHelperBoundaryRequestReport::blocked_import_helper_call(
+                                call_boundary_report,
+                                import_identity,
+                            ),
+                        )
+                    } else {
+                        (
+                            B8DebugImportBoundaryResolution::RequiresPublicDyldChainedFixupsDecoder,
+                            B8DebugImportBoundaryNextAction::DecodePublicDyldChainedFixupsImports,
+                            B8DebugHelperBoundaryRequestReport::blocked(
+                                B8DebugHelperBoundaryBlockedReason::ImportSymbolIdentityUnresolved,
+                            ),
+                        )
+                    }
                 } else if public_metadata.has_dyld_info_bind_ranges() {
                     (
                         B8DebugImportBoundaryResolution::RequiresPublicDyldBindOpcodeDecoder,
@@ -1041,7 +1055,7 @@ impl B8DebugImportBoundaryReport {
 
             return Self {
                 status: B8DebugImportBoundaryStatus::Blocked,
-                call_boundary,
+                call_boundary: Some(call_boundary_report),
                 target_pointer_load,
                 public_metadata,
                 chained_fixups,
@@ -1220,33 +1234,156 @@ impl B8DebugLinkeditDataRangeReport {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 struct B8DebugHelperBoundaryRequestReport {
     status: B8DebugImportBoundaryStatus,
     reason: Option<B8DebugHelperBoundaryBlockedReason>,
+    request: Option<B8DebugImportHelperRequestReport>,
+    blockers: Vec<B8DebugHelperBoundaryBlocker>,
 }
 
 impl B8DebugHelperBoundaryRequestReport {
-    const fn blocked(reason: B8DebugHelperBoundaryBlockedReason) -> Self {
+    fn blocked(reason: B8DebugHelperBoundaryBlockedReason) -> Self {
+        let blockers = B8DebugHelperBoundaryBlocker::from_reason(reason);
         Self {
             status: B8DebugImportBoundaryStatus::Blocked,
             reason: Some(reason),
+            request: None,
+            blockers,
         }
     }
 
-    const fn skipped() -> Self {
+    fn blocked_import_helper_call(
+        call_boundary: B8DebugRegisterIndirectCallBoundaryReport,
+        import_identity: MachOChainedImportIdentityReport,
+    ) -> Self {
+        let reason = B8DebugHelperBoundaryBlockedReason::ImportHelperMarshalingUnimplemented;
+        Self {
+            status: B8DebugImportBoundaryStatus::Blocked,
+            reason: Some(reason),
+            request: Some(B8DebugImportHelperRequestReport::from_boundary_and_import(
+                call_boundary,
+                import_identity,
+            )),
+            blockers: B8DebugHelperBoundaryBlocker::from_reason(reason),
+        }
+    }
+
+    fn skipped() -> Self {
         Self {
             status: B8DebugImportBoundaryStatus::Skipped,
             reason: None,
+            request: None,
+            blockers: Vec::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugImportHelperRequestReport {
+    kind: B8DebugImportHelperRequestKind,
+    source: B8DebugImportHelperRequestSource,
+    source_isa: B8DebugSourceIsa,
+    target_register: B8DebugRegisterName,
+    call_site: u64,
+    return_to: u64,
+    import: MachOChainedImportIdentityReport,
+    required_marshaling: B8DebugHelperMarshalingReport,
+}
+
+impl B8DebugImportHelperRequestReport {
+    fn from_boundary_and_import(
+        call_boundary: B8DebugRegisterIndirectCallBoundaryReport,
+        import: MachOChainedImportIdentityReport,
+    ) -> Self {
+        Self {
+            kind: B8DebugImportHelperRequestKind::ImportHelperCall,
+            source: B8DebugImportHelperRequestSource::PublicDyldChainedFixupsImport,
+            source_isa: B8DebugSourceIsa::X8664,
+            target_register: call_boundary.target_register,
+            call_site: call_boundary.call_site,
+            return_to: call_boundary.return_to,
+            import,
+            required_marshaling: B8DebugHelperMarshalingReport::blocked(),
         }
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+enum B8DebugImportHelperRequestKind {
+    ImportHelperCall,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugImportHelperRequestSource {
+    PublicDyldChainedFixupsImport,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugHelperMarshalingReport {
+    status: B8DebugImportBoundaryStatus,
+    argument_model: B8DebugHelperArgumentModel,
+    return_model: B8DebugHelperReturnModel,
+    blockers: Vec<B8DebugHelperBoundaryBlocker>,
+}
+
+impl B8DebugHelperMarshalingReport {
+    fn blocked() -> Self {
+        Self {
+            status: B8DebugImportBoundaryStatus::Blocked,
+            argument_model: B8DebugHelperArgumentModel::X8664CallArguments,
+            return_model: B8DebugHelperReturnModel::X8664RaxReturnValue,
+            blockers: B8DebugHelperBoundaryBlocker::from_reason(
+                B8DebugHelperBoundaryBlockedReason::ImportHelperMarshalingUnimplemented,
+            ),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugHelperArgumentModel {
+    #[serde(rename = "x86_64_call_arguments")]
+    X8664CallArguments,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugHelperReturnModel {
+    #[serde(rename = "x86_64_rax_return_value")]
+    X8664RaxReturnValue,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
 enum B8DebugHelperBoundaryBlockedReason {
-    ImportHelperBoundaryUnimplemented,
+    ImportHelperMarshalingUnimplemented,
     ImportSymbolIdentityUnresolved,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugHelperBoundaryBlocker {
+    ImportSymbolIdentityUnresolved,
+    #[serde(rename = "x86_64_argument_marshaling_unimplemented")]
+    X8664ArgumentMarshalingUnimplemented,
+    HelperReturnMarshalingUnimplemented,
+}
+
+impl B8DebugHelperBoundaryBlocker {
+    fn from_reason(reason: B8DebugHelperBoundaryBlockedReason) -> Vec<Self> {
+        match reason {
+            B8DebugHelperBoundaryBlockedReason::ImportHelperMarshalingUnimplemented => vec![
+                Self::X8664ArgumentMarshalingUnimplemented,
+                Self::HelperReturnMarshalingUnimplemented,
+            ],
+            B8DebugHelperBoundaryBlockedReason::ImportSymbolIdentityUnresolved => {
+                vec![Self::ImportSymbolIdentityUnresolved]
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -1262,7 +1399,7 @@ enum B8DebugImportBoundaryResolution {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum B8DebugImportBoundaryNextAction {
-    ConnectImportHelperBoundaryRequest,
+    DefineImportHelperMarshalingContract,
     DecodePublicDyldChainedFixupsImports,
     DecodePublicDyldBindOpcodes,
     InspectUnsupportedLoaderMetadata,
