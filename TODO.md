@@ -1182,8 +1182,8 @@ PR に含めない:
 
 review gate:
 
-- 完了したら commit / push / draft PR 作成で停止する。次の gate は
-  B8-G5e Helper Return Value Materialization。
+- B8-G5d draft PR #29 <https://github.com/serika12345/Bara/pull/29> を開いて停止する。
+  次の gate は B8-G5e Helper Return Value Materialization。
 - [ ] B8-G5e: helper return value materialization boundary を定義する。
   - [ ] B8-G5d 後に残る `helper_return_value_materialization_unimplemented` を受けて、
     helper return value を x86_64 `rax` に書き戻す report / boundary を stable 化する。
