@@ -1066,8 +1066,8 @@ PR に含めない:
 
 review gate:
 
-- 完了したら commit / push / draft PR 作成で停止する。次の gate は marshaling
-  contract の `objc_receiver_materialization_unimplemented` /
+- B8-G5a draft PR #26 <https://github.com/serika12345/Bara/pull/26> を開いて停止する。
+  次の gate は marshaling contract の `objc_receiver_materialization_unimplemented` /
   `objc_selector_materialization_unimplemented` /
   `helper_return_value_materialization_unimplemented` を受けて、B8-G5b として追加する。
 - [ ] B8-G5b: `_objc_msgSend` receiver / selector / return materialization boundary を
