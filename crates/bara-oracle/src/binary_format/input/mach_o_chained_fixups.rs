@@ -90,23 +90,23 @@ pub fn decode_mach_o_chained_fixups_for_target(
             );
         }
     };
-    let resolution = match resolve_target_import(input, metadata, target_address, &starts, &imports)
-    {
-        Ok(resolution) => resolution,
-        Err(blocker) => {
-            return MachOChainedFixupsTargetReport::blocked(
-                target_address,
-                Some(header),
-                Some(starts),
-                Some(imports),
-                blocker,
-            );
-        }
-    };
+    let resolution =
+        match resolve_target_pointer(input, metadata, target_address, &starts, &imports) {
+            Ok(resolution) => resolution,
+            Err(blocker) => {
+                return MachOChainedFixupsTargetReport::blocked(
+                    target_address,
+                    Some(header),
+                    Some(starts),
+                    Some(imports),
+                    blocker,
+                );
+            }
+        };
 
     MachOChainedFixupsTargetReport {
         schema: "mach_o_chained_fixups_target_report_v0",
-        status: MachOChainedFixupsTargetStatus::ResolvedImport,
+        status: resolution.status(),
         target_address,
         header: Some(header),
         starts: Some(starts),
@@ -165,9 +165,22 @@ impl MachOChainedFixupsTargetReport {
     }
 
     pub fn resolved_import_identity(&self) -> Option<MachOChainedImportIdentityReport> {
+        self.target_resolution.as_ref().and_then(|resolution| {
+            resolution
+                .import
+                .as_ref()
+                .map(MachOChainedImportIdentityReport::from_import)
+        })
+    }
+
+    pub fn resolved_rebase_target(&self) -> Option<MachOChainedRebaseTargetIdentityReport> {
         self.target_resolution
             .as_ref()
-            .map(|resolution| MachOChainedImportIdentityReport::from_import(&resolution.import))
+            .and_then(|resolution| resolution.rebase)
+    }
+
+    pub const fn blocker(&self) -> Option<MachOChainedFixupsBlocker> {
+        self.blocker
     }
 }
 
@@ -176,6 +189,7 @@ impl MachOChainedFixupsTargetReport {
 pub enum MachOChainedFixupsTargetStatus {
     Blocked,
     ResolvedImport,
+    ResolvedRebase,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -208,6 +222,23 @@ impl MachOChainedImportIdentityReport {
 
     pub const fn is_weak_import(&self) -> bool {
         self.weak_import
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+pub struct MachOChainedRebaseTargetIdentityReport {
+    raw_target: u64,
+    high8: u8,
+    resolved_vm_address: u64,
+}
+
+impl MachOChainedRebaseTargetIdentityReport {
+    const fn new(raw_target: u64, high8: u8, resolved_vm_address: u64) -> Self {
+        Self {
+            raw_target,
+            high8,
+            resolved_vm_address,
+        }
     }
 }
 
@@ -440,7 +471,7 @@ impl MachOChainedPointerFormatReport {
         Self { value, kind }
     }
 
-    const fn supports_64_bind(self) -> bool {
+    const fn supports_64_pointer(self) -> bool {
         matches!(
             self.kind,
             MachOChainedPointerFormatKind::Ptr64 | MachOChainedPointerFormatKind::Ptr64Offset
@@ -544,15 +575,29 @@ struct MachOChainedFixupTargetResolutionReport {
     raw_pointer: u64,
     pointer_format: MachOChainedPointerFormatReport,
     pointer_kind: MachOChainedPointerKind,
-    import: MachOChainedImportReport,
-    addend: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    import: Option<MachOChainedImportReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rebase: Option<MachOChainedRebaseTargetIdentityReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    addend: Option<u8>,
     next_stride_count: u16,
+}
+
+impl MachOChainedFixupTargetResolutionReport {
+    const fn status(&self) -> MachOChainedFixupsTargetStatus {
+        match self.pointer_kind {
+            MachOChainedPointerKind::Bind => MachOChainedFixupsTargetStatus::ResolvedImport,
+            MachOChainedPointerKind::Rebase => MachOChainedFixupsTargetStatus::ResolvedRebase,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum MachOChainedPointerKind {
     Bind,
+    Rebase,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -561,12 +606,14 @@ pub enum MachOChainedFixupsBlocker {
     ChainDidNotReachTarget,
     ChainEntryOutOfBounds,
     ChainWalkLimitExceeded,
+    ImageBaseMissing,
     ImportOrdinalOutOfBounds { import_index: u32 },
     ImportsOutOfBounds,
     MissingChainedFixupsCommand,
     PageStartMultiUnsupported,
     PageStartNone,
     PayloadOutOfBounds,
+    RebaseTargetAddressOverflow,
     SegmentIndexMissing { segment_index: u32 },
     SegmentStartsOutOfBounds,
     StartsOutOfBounds,
@@ -697,7 +744,7 @@ impl MachOChainedFixupsPayloadRange {
     }
 }
 
-fn resolve_target_import(
+fn resolve_target_pointer(
     input: &BinaryInput,
     metadata: &MachOMetadata,
     target_address: MachOChainedFixupTargetAddress,
@@ -730,7 +777,7 @@ fn resolve_target_import(
         let pointer_format = segment_starts
             .pointer_format
             .ok_or(MachOChainedFixupsBlocker::TargetSegmentMissing)?;
-        if !pointer_format.supports_64_bind() {
+        if !pointer_format.supports_64_pointer() {
             return Err(MachOChainedFixupsBlocker::UnsupportedPointerFormat {
                 pointer_format: pointer_format.value,
             });
@@ -775,27 +822,27 @@ fn resolve_target_import(
             let next_stride_count = ((raw_pointer >> 51) & 0x0fff) as u16;
 
             if entry_address == target {
-                if !bind {
-                    return Err(MachOChainedFixupsBlocker::TargetChainEntryIsRebase);
-                }
-                let import_index = (raw_pointer & 0x00ff_ffff) as u32;
-                let import = imports
-                    .import(import_index)
-                    .cloned()
-                    .ok_or(MachOChainedFixupsBlocker::ImportOrdinalOutOfBounds { import_index })?;
-                return Ok(MachOChainedFixupTargetResolutionReport {
+                let common = MachOChainedFixupTargetResolutionCommon {
                     segment_index: u32::try_from(segment_index).unwrap_or(u32::MAX),
                     segment_name: header.name().as_str().to_owned(),
                     page_index,
-                    chain_entry_address: target_address,
+                    target_address,
                     chain_entry_file_offset: file_offset,
                     raw_pointer,
                     pointer_format,
-                    pointer_kind: MachOChainedPointerKind::Bind,
-                    import,
-                    addend: ((raw_pointer >> 24) & 0xff) as u8,
                     next_stride_count,
-                });
+                };
+                if bind {
+                    let import_index = (raw_pointer & 0x00ff_ffff) as u32;
+                    let import = imports.import(import_index).cloned().ok_or(
+                        MachOChainedFixupsBlocker::ImportOrdinalOutOfBounds { import_index },
+                    )?;
+                    return Ok(
+                        common.into_bind_resolution(import, ((raw_pointer >> 24) & 0xff) as u8)
+                    );
+                }
+
+                return common.into_rebase_resolution(metadata);
             }
 
             if next_stride_count == 0 {
@@ -810,6 +857,93 @@ fn resolve_target_import(
     }
 
     Err(MachOChainedFixupsBlocker::TargetSegmentMissing)
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct MachOChainedFixupTargetResolutionCommon {
+    segment_index: u32,
+    segment_name: String,
+    page_index: u64,
+    target_address: MachOChainedFixupTargetAddress,
+    chain_entry_file_offset: u64,
+    raw_pointer: u64,
+    pointer_format: MachOChainedPointerFormatReport,
+    next_stride_count: u16,
+}
+
+impl MachOChainedFixupTargetResolutionCommon {
+    fn into_bind_resolution(
+        self,
+        import: MachOChainedImportReport,
+        addend: u8,
+    ) -> MachOChainedFixupTargetResolutionReport {
+        MachOChainedFixupTargetResolutionReport {
+            segment_index: self.segment_index,
+            segment_name: self.segment_name,
+            page_index: self.page_index,
+            chain_entry_address: self.target_address,
+            chain_entry_file_offset: self.chain_entry_file_offset,
+            raw_pointer: self.raw_pointer,
+            pointer_format: self.pointer_format,
+            pointer_kind: MachOChainedPointerKind::Bind,
+            import: Some(import),
+            rebase: None,
+            addend: Some(addend),
+            next_stride_count: self.next_stride_count,
+        }
+    }
+
+    fn into_rebase_resolution(
+        self,
+        metadata: &MachOMetadata,
+    ) -> Result<MachOChainedFixupTargetResolutionReport, MachOChainedFixupsBlocker> {
+        let raw_target = self.raw_pointer & DYLD_CHAINED_PTR_64_REBASE_TARGET_MASK;
+        let high8 = ((self.raw_pointer >> 36) & 0xff) as u8;
+        let target = raw_target | (u64::from(high8) << 56);
+        let resolved_vm_address = match self.pointer_format.kind {
+            MachOChainedPointerFormatKind::Ptr64 => target,
+            MachOChainedPointerFormatKind::Ptr64Offset => mach_o_image_base_vmaddr(metadata)?
+                .checked_add(target)
+                .ok_or(MachOChainedFixupsBlocker::RebaseTargetAddressOverflow)?,
+            MachOChainedPointerFormatKind::Unsupported => {
+                return Err(MachOChainedFixupsBlocker::UnsupportedPointerFormat {
+                    pointer_format: self.pointer_format.value,
+                });
+            }
+        };
+
+        Ok(MachOChainedFixupTargetResolutionReport {
+            segment_index: self.segment_index,
+            segment_name: self.segment_name,
+            page_index: self.page_index,
+            chain_entry_address: self.target_address,
+            chain_entry_file_offset: self.chain_entry_file_offset,
+            raw_pointer: self.raw_pointer,
+            pointer_format: self.pointer_format,
+            pointer_kind: MachOChainedPointerKind::Rebase,
+            import: None,
+            rebase: Some(MachOChainedRebaseTargetIdentityReport::new(
+                raw_target,
+                high8,
+                resolved_vm_address,
+            )),
+            addend: None,
+            next_stride_count: self.next_stride_count,
+        })
+    }
+}
+
+fn mach_o_image_base_vmaddr(metadata: &MachOMetadata) -> Result<u64, MachOChainedFixupsBlocker> {
+    let summary = metadata.load_commands().summary();
+    summary
+        .recognized_segments()
+        .iter()
+        .find(|segment| {
+            segment.header().fileoff().as_u64() == 0 && segment.header().filesize().as_u64() > 0
+        })
+        .or_else(|| summary.recognized_segments().first())
+        .map(|segment| segment.header().vmaddr().as_u64())
+        .ok_or(MachOChainedFixupsBlocker::ImageBaseMissing)
 }
 
 fn chained_fixups_command(metadata: &MachOMetadata) -> Option<&RecognizedMachOLinkeditDataCommand> {
@@ -865,6 +999,7 @@ const DYLD_CHAINED_IMPORT_ADDEND64: u32 = 3;
 const DYLD_CHAINED_IMPORT_ENTRY_SIZE: u32 = 4;
 const DYLD_CHAINED_PTR_64: u16 = 2;
 const DYLD_CHAINED_PTR_64_OFFSET: u16 = 6;
+const DYLD_CHAINED_PTR_64_REBASE_TARGET_MASK: u64 = 0x0000_000f_ffff_ffff;
 const DYLD_CHAINED_PTR_64_STRIDE: u64 = 4;
 const DYLD_CHAINED_PTR_START_NONE: u16 = 0xffff;
 const DYLD_CHAINED_PTR_START_MULTI: u16 = 0x8000;
@@ -994,6 +1129,42 @@ mod tests {
         );
     }
 
+    #[test]
+    fn chained_fixups_resolve_target_rebase_to_vm_address() {
+        let input = BinaryInput::from_file_bytes(BinaryFileBytes::from_untrusted_file_contents(
+            chained_fixups_rebase_fixture(),
+        ));
+        let report = probe_public_binary_format(&input).expect("fixture probes");
+        let metadata = report.metadata().mach_o_metadata();
+        let chained = decode_mach_o_chained_fixups_for_target(
+            &input,
+            metadata,
+            MachOChainedFixupTargetAddress::from_mach_o_virtual_address(0x1020),
+        );
+
+        assert_eq!(
+            chained.status(),
+            MachOChainedFixupsTargetStatus::ResolvedRebase
+        );
+        let target = chained
+            .resolved_rebase_target()
+            .expect("resolved rebase target");
+        assert_eq!(target.resolved_vm_address, 0x1080);
+        assert_eq!(
+            serde_json::to_value(target).expect("target serializes"),
+            serde_json::json!({
+                "raw_target": 0x80,
+                "high8": 0,
+                "resolved_vm_address": 0x1080
+            })
+        );
+        assert_eq!(
+            serde_json::to_value(chained).expect("report serializes")["target_resolution"]
+                ["pointer_kind"],
+            serde_json::json!("rebase")
+        );
+    }
+
     fn chained_fixups_fixture() -> Vec<u8> {
         let mut bytes = vec![0; 0x300];
         write_u32(&mut bytes, 0, 0xfeedfacf);
@@ -1009,6 +1180,12 @@ mod tests {
         write_chained_fixups_payload(&mut bytes, 0x100);
         write_u64(&mut bytes, 0x220, 1 << 63);
 
+        bytes
+    }
+
+    fn chained_fixups_rebase_fixture() -> Vec<u8> {
+        let mut bytes = chained_fixups_fixture();
+        write_u64(&mut bytes, 0x220, 0x80);
         bytes
     }
 

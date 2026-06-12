@@ -45,12 +45,14 @@
   `ProgramImageMetadata.mapped_bytes` を public `LC_SEGMENT_64` file-backed segment
   全体から構成し、receiver address `4294988120` と selector address `4294988072` の
   mapped raw qword を stable report に保存する。これにより mapped image qword
-  unavailable blocker は解消し、次の blocker は
-  `receiver_mapped_value_fixup_resolution_unimplemented` /
-  `selector_mapped_value_fixup_resolution_unimplemented` へ進む。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G5c ObjC Materialization
-  Mapped Image Metadata: receiver / selector materialization 用に public Mach-O
-  mapped image metadata を拡張する。
+  unavailable blocker は解消した。B8-G5d では mapped raw qword を public
+  `LC_DYLD_CHAINED_FIXUPS` bind / rebase metadata から解釈し、receiver を
+  `_OBJC_CLASS_$_NSApplication` import identity、selector を resolved VM address
+  `4294975648` として stable report に保存する。receiver / selector materialization
+  blocker は解消し、次の blocker は `helper_return_value_materialization_unimplemented`
+  に進む。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G5d ObjC Argument Fixup
+  Resolution: ObjC receiver / selector mapped qword の public fixup resolution を定義する。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
@@ -62,7 +64,8 @@
   1 つの PR Gate として扱う。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
-  B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a / B8-G5b / B8-G5c。
+  B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a / B8-G5b / B8-G5c /
+  B8-G5d。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -133,25 +136,39 @@
   resolution 前の値であるため、stable blocker は
   `receiver_mapped_value_fixup_resolution_unimplemented` /
   `selector_mapped_value_fixup_resolution_unimplemented` に進み、
-  `next_action=resolve_objc_argument_mapped_value_fixups` を保存する。
-- remaining_work: B8-G5d。B8-G5c の mapped raw qword を、public chained fixups /
-  rebase / bind metadata から receiver / selector identity または VM address として
-  解釈できるか判定する。まだ `_objc_msgSend` host execution、Objective-C / AppKit
-  helper bridge、arbitrary indirect call target execution、translation cache、
-  fallback JIT/interpreter は行わない。
+  `next_action=resolve_objc_argument_mapped_value_fixups` を保存する。B8-G5d として
+  mapped raw qword に `fixup_resolution` を追加し、receiver
+  `fixup_resolution.status=resolved_import` /
+  `import.symbol_name=_OBJC_CLASS_$_NSApplication` /
+  `import.dylib_path=/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit`、selector
+  `fixup_resolution.status=resolved_rebase` /
+  `rebase.resolved_vm_address=4294975648` を保存する。receiver / selector の argument
+  materialization は `available` へ進み、materialization boundary の remaining blocker は
+  `helper_return_value_materialization_unimplemented`、`next_action` は
+  `define_helper_return_value_materialization` である。
+- remaining_work: B8-G5e。B8-G5d 後に残る helper return value materialization blocker を
+  x86_64 `rax` write-back plan として stable 化する。まだ `_objc_msgSend` host execution、
+  Objective-C / AppKit helper bridge、arbitrary indirect call target execution、
+  translation cache、fallback JIT/interpreter は行わない。
 - next_action: B8-G5b〜B8-G5e の統合 branch を実装・検証し、commit / push して
   draft PR を開いたら review gate で停止する。
 - verification: targeted check として
-  `nix develop -c cargo test -p bara-oracle maps_public_file_backed_segments_into_program_image_metadata -- --nocapture` と
+  `nix develop -c cargo test -p bara-oracle chained_fixups -- --nocapture` と
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
-  manual debug bundle generation で `required_marshaling.contract.schema=b8_import_helper_marshaling_contract_v0`、
-  `calling_convention=x86_64_macos_system_v`、`argument_sources[0].source.register=rdi`、
-  `argument_sources[1].source.register=rsi`、`return_destination.destination.register=rax`、
-  `next_action=define_objc_receiver_selector_materialization` を確認した。full
-  `nix develop -c ./scripts/verify` も通過した。
+  full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-12 12:51 JST: B8-G5d ObjC Argument Fixup Resolution を実装した。
+  public chained fixups decoder が bind target だけでなく rebase target も解決できるようにし、
+  `MachOChainedFixupsTargetStatus::ResolvedRebase` と resolved VM address report を追加した。
+  B8 debug bundle は receiver mapped raw qword を
+  `_OBJC_CLASS_$_NSApplication` import identity、selector mapped raw qword を
+  resolved VM address `4294975648` として保存する。`_objc_msgSend` 実行や
+  Objective-C / AppKit bridge は追加していない。targeted checks は
+  `nix develop -c cargo test -p bara-oracle chained_fixups -- --nocapture` と
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過し、
+  full `nix develop -c ./scripts/verify` も通過した。
 - 2026-06-12 12:20 JST: B8-G5c ObjC Materialization Mapped Image Metadata を実装した。
   `mach_o_entry_function_input` が作る `ProgramImageMetadata.mapped_bytes` を、entry
   executable segment だけでなく public `LC_SEGMENT_64` file-backed segment 全体から
