@@ -125,6 +125,51 @@ fn builds_entry_function_input_from_full_mach_o_executable_image() {
 }
 
 #[test]
+fn maps_public_file_backed_segments_into_program_image_metadata() {
+    let input = BinaryInput::from_hex(concat!(
+        "cffaedfe07000001030000000200000003000000a80000000000000000000000",
+        "1900000048000000",
+        "5f5f5445585400000000000000000000",
+        "0000000001000000",
+        "0800000000000000",
+        "c800000000000000",
+        "0800000000000000",
+        "00000000000000000000000000000000",
+        "1900000048000000",
+        "5f5f4441544100000000000000000000",
+        "0010000001000000",
+        "0800000000000000",
+        "d000000000000000",
+        "0800000000000000",
+        "00000000000000000000000000000000",
+        "2800008018000000",
+        "ca00000000000000",
+        "0020000000000000",
+        "9090b82a000000c3",
+        "8877665544332211",
+    ))
+    .expect("hex fixture is valid");
+    let case_id = CaseId::new("mach_o_mapped_segments").expect("case id is non-empty");
+
+    let entry_input = mach_o_entry_function_input(case_id, &input).expect("pipeline succeeds");
+
+    assert_eq!(
+        entry_input
+            .program_image_metadata()
+            .mapped_bytes()
+            .read_u64_le(X86Va::new(0x1_0000_0000)),
+        Some(0xc300_0000_2ab8_9090)
+    );
+    assert_eq!(
+        entry_input
+            .program_image_metadata()
+            .mapped_bytes()
+            .read_u64_le(X86Va::new(0x1_0000_1000)),
+        Some(0x1122_3344_5566_7788)
+    );
+}
+
+#[test]
 fn preserves_host_trap_plan_from_mach_o_binary_input() {
     let input = BinaryInput::from_hex(concat!(
         "cffaedfe07000001030000000200000002000000600000000000000000000000",

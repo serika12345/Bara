@@ -2532,13 +2532,20 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"mapped_value\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"source\":\"program_image_metadata\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"address\":4294988120"));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"receiver_mapped_image_qword_unavailable\""));
+            .contains("\"value\":9227875636482146321"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"address\":4294988072"));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"value\":4503599627378848")
+        );
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"selector_mapped_image_qword_unavailable\""));
-        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"next_action\":\"extend_mach_o_mapped_image_metadata_for_objc_materialization\""
-        ));
+            .contains("\"receiver_mapped_value_fixup_resolution_unimplemented\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"selector_mapped_value_fixup_resolution_unimplemented\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"blocker\":null"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_action\":\"resolve_objc_argument_mapped_value_fixups\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"x86_64_argument_marshaling_unimplemented\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
@@ -2568,11 +2575,11 @@ mod tests {
         assert!(
             launch_report.contains("\"schema\":\"b8_objc_message_materialization_boundary_v0\"")
         );
-        assert!(launch_report.contains("\"receiver_mapped_image_qword_unavailable\""));
-        assert!(launch_report.contains("\"selector_mapped_image_qword_unavailable\""));
-        assert!(launch_report.contains(
-            "\"next_action\":\"extend_mach_o_mapped_image_metadata_for_objc_materialization\""
-        ));
+        assert!(launch_report.contains("\"receiver_mapped_value_fixup_resolution_unimplemented\""));
+        assert!(launch_report.contains("\"selector_mapped_value_fixup_resolution_unimplemented\""));
+        assert!(
+            launch_report.contains("\"next_action\":\"resolve_objc_argument_mapped_value_fixups\"")
+        );
         assert!(launch_report.contains("\"x86_64_argument_marshaling_unimplemented\""));
         let blocker_report = read_file(&bundle_dir.join("blocker.json"));
         assert!(blocker_report.contains("\"status\":\"blocked\""));

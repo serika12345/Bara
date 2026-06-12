@@ -342,6 +342,15 @@
   `helper_return_value_materialization_unimplemented` blocker に留める。これは
   Objective-C / AppKit bridge や `_objc_msgSend` host execution ではなく、次の B8-G5c
   で public Mach-O mapped image metadata を広げるための materialization boundary である。
+- 2026-06-12 の B8-G5c として、`ProgramImageMetadata.mapped_bytes` を executable entry
+  segment だけでなく、public `LC_SEGMENT_64` の file-backed segment 全体から構成する
+  ようにした。これにより current fixture の `__DATA.__objc_classrefs` /
+  `__DATA.__objc_selrefs` にある receiver / selector qword load 元を stable report に
+  保存できる。保存される値は file-backed mapped raw qword であり、private dyld state
+  は使わない。current blocker は
+  `receiver_mapped_value_fixup_resolution_unimplemented` /
+  `selector_mapped_value_fixup_resolution_unimplemented` へ進むため、次の B8-G5d では
+  public chained fixups / rebase / bind metadata に基づく raw qword resolution を扱う。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、
