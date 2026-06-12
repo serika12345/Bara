@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-12 23:35 JST
+最終更新: 2026-06-12 23:36 JST
 
 状態:
 
@@ -67,7 +67,8 @@
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
 - active_branch: `task/b8-g6a-objc-helper-execution-boundary`。base branch は
   最新 `main` の `1cb47b8` (`Merge pull request #37 from
-  serika12345/task/b8-g5b-g5e-objc-materialization-boundary`)。
+  serika12345/task/b8-g5b-g5e-objc-materialization-boundary`)。draft PR は
+  <https://github.com/serika12345/Bara/pull/38>。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
@@ -172,9 +173,8 @@
   bridge contract として stable report に分離する。まだ `_objc_msgSend` host execution、
   Objective-C / AppKit helper bridge、arbitrary indirect call target execution、
   translation cache、fallback JIT/interpreter は行わない。
-- next_action: B8-G6a branch を検証し、commit / push して draft PR を開いたら
-  review gate で停止する。レビュー後の次 PR Gate は B8-G6b ObjC Runtime Helper
-  Bridge Contract。
+- next_action: draft PR #38 を review gate として確認する。レビュー後の次 PR Gate は
+  B8-G6b ObjC Runtime Helper Bridge Contract。
 - verification: targeted check として
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
   manual debug bundle generation で
