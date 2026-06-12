@@ -1327,8 +1327,8 @@ PR に含めない:
 
 review gate:
 
-- 完了したら commit / push / draft PR 作成で停止する。次の gate は B8-G6d ObjC Helper
-  Return Continuation Boundary。
+- B8-G6c draft PR #33 <https://github.com/serika12345/Bara/pull/33> を開いて停止する。
+  次の gate は B8-G6d ObjC Helper Return Continuation Boundary。
 - [ ] B8-G6d: ObjC helper return 後の continuation / write-back state boundary を追加する。
   - [ ] B8-G6c の `continue_after_objc_helper_return` を受けて、
     `objc_helper_return_value` を x86_64 `rax` state に反映する post-helper-return

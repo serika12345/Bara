@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-12 21:42 JST
+最終更新: 2026-06-12 21:49 JST
 
 状態:
 
@@ -74,8 +74,8 @@
   は `continue_after_objc_helper_return` に進む。
 - active_milestone: completed。[TODO.md](../TODO.md) の B8-G6c ObjC Runtime Helper
   Bridge Host Execution Slice: ObjC runtime message-send helper bridge の host execution slice
-  を追加する。実装、targeted checks、full verify は完了し、commit / push / draft PR
-  作成が残っている。
+  を追加する。実装、targeted checks、full verify、commit、push、draft PR 作成は完了し、
+  review gate で停止中。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
@@ -86,8 +86,9 @@
   `task/b8-g5e-helper-return-value-materialization` へ merge 済みのため、B8-G6c branch は
   `origin/task/b8-g5e-helper-return-value-materialization` の `6c8406d`
   (`Merge pull request #32 from serika12345:task/b8-g6b-objc-runtime-helper-bridge-contract`)
-  を base にした stacked branch として扱う。B8-G6c 実装は local diff として準備済みで、
-  commit / push / draft PR はこれから行う。
+  を base にした stacked branch として扱う。B8-G6c 実装 commit は `4f2c0e6`
+  (`feat: execute objc runtime helper bridge slice`)。Draft PR #33
+  <https://github.com/serika12345/Bara/pull/33> を開いて review gate で停止中。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a / B8-G5b / B8-G5c /
@@ -202,8 +203,8 @@
   continuation request と `return_to=4294972999` の再開境界を stable report にする。
   まだ arbitrary indirect call target execution、translation cache、fallback JIT/interpreter
   は行わない。
-- next_action: B8-G6c 実装を commit / push / draft PR 作成して review gate で停止する。
-  レビュー後の次 PR Gate は B8-G6d ObjC Helper Return Continuation Boundary。
+- next_action: B8-G6c draft PR #33 の review gate で停止する。レビュー後の次 PR Gate は
+  B8-G6d ObjC Helper Return Continuation Boundary。
 - verification: targeted check として
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` と
   `nix develop -c cargo test -p btbc-cli shared_application_helper_source -- --nocapture` が通過した。
@@ -225,6 +226,13 @@
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` と
   `nix develop -c cargo test -p btbc-cli shared_application_helper_source -- --nocapture` が通過した。
   full `nix develop -c ./scripts/verify` も通過した。
+- 2026-06-12 21:49 JST: B8-G6c branch
+  `task/b8-g6c-objc-runtime-helper-bridge-execution` を push し、Draft PR #33
+  <https://github.com/serika12345/Bara/pull/33> を
+  `task/b8-g5e-helper-return-value-materialization` base で開いた。実装 commit は `4f2c0e6`
+  (`feat: execute objc runtime helper bridge slice`)。clean HEAD の
+  `nix develop -c ./scripts/verify` は通過済み。次は B8-G6c review gate で停止し、
+  レビュー後に B8-G6d ObjC Helper Return Continuation Boundary へ進む。
 - 2026-06-12 21:19 JST: B8-G6b ObjC Runtime Helper Bridge Contract を実装した。
   B8 debug bundle の `helper_execution_request` に
   `b8_objc_runtime_helper_bridge_contract_v0` を追加し、public ObjC runtime helper bridge の
