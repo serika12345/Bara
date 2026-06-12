@@ -317,6 +317,14 @@
   `loader.plan.json` に保存される。これは import helper execution や Objective-C /
   AppKit bridge の実装ではなく、次の B8-G5 で helper boundary request と marshaling
   blocker へ接続するための public metadata decode boundary である。
+- 2026-06-12 の B8-G5 として、decoded `_objc_msgSend` import identity を
+  `import_helper_call` request の planning input に接続した。`loader.plan.json` と
+  launch report は import identity、`target_register=r14`、`call_site=4294972996`、
+  `return_to=4294972999`、`source_isa=x86_64` を保存し、helper execution ではなく
+  `x86_64_argument_marshaling_unimplemented` /
+  `helper_return_marshaling_unimplemented` の stable blocker で停止する。次の focused
+  slice は Objective-C / AppKit bridge ではなく、B8-G5a の helper marshaling
+  contract である。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、

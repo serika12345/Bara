@@ -995,10 +995,10 @@ review gate:
 
 - 完了したら commit / push / draft PR 作成で停止する。次の gate は decoded import
   identity と helper boundary request の結果を見て追加または更新する。
-- [ ] B8-G5: import stub / external symbol call を汎用 helper request に接続する。
-  - [ ] symbol stubs、lazy bind 相当、`objc_msgSend`、public libc / AppKit symbol を
+- [x] B8-G5: import stub / external symbol call を汎用 helper request に接続する。
+  - [x] symbol stubs、lazy bind 相当、`objc_msgSend`、public libc / AppKit symbol を
     core IR に直接埋め込まず、helper capability request と stable blocker に分ける。
-  - [ ] unsupported import は symbol identity、call site、argument model の不足理由を
+  - [x] unsupported import は symbol identity、call site、argument model の不足理由を
     report する。
 
 #### PR Gate: B8-G5 Import Helper Boundary Request
@@ -1007,13 +1007,13 @@ branch: `task/b8-g5-import-helper-boundary-request`
 
 完了条件:
 
-- [ ] B8-G4c の decoded chained fixups result から、`call r14` target が
+- [x] B8-G4c の decoded chained fixups result から、`call r14` target が
   `/usr/lib/libobjc.A.dylib` の `_objc_msgSend` import identity であることを
   helper boundary planning input として扱う。
-- [ ] import identity、call site、target register、return PC、必要な argument /
+- [x] import identity、call site、target register、return PC、必要な argument /
   return marshaling の不足理由を stable helper boundary request または blocker として
   `loader.plan.json` / launch report に保存する。
-- [ ] core IR / ARM64 emit に Objective-C runtime や AppKit 固有処理を混ぜない。
+- [x] core IR / ARM64 emit に Objective-C runtime や AppKit 固有処理を混ぜない。
 
 PR に含めない:
 
@@ -1029,7 +1029,45 @@ PR に含めない:
 review gate:
 
 - 完了したら commit / push / draft PR 作成で停止する。次の gate は helper boundary
-  request の不足理由を見て B8-G6 または追加の import/helper slice として追加する。
+  request の `x86_64_argument_marshaling_unimplemented` /
+  `helper_return_marshaling_unimplemented` を受けて、B8-G5a として追加する。
+- [ ] B8-G5a: import helper call の x86_64 argument / return marshaling contract を
+  定義する。
+  - [ ] B8-G5 の `helper_boundary_request.required_marshaling` から、
+    x86_64 call argument source と `rax` return destination を helper boundary の
+    typed contract として扱う。
+  - [ ] `_objc_msgSend` host execution はまだ行わず、selector / receiver /
+    return value materialization が不足する場合は stable blocker として report する。
+  - [ ] core IR / ARM64 emit に Objective-C runtime や AppKit 固有処理を混ぜない。
+
+#### PR Gate: B8-G5a Import Helper Marshaling Contract
+
+branch: `task/b8-g5a-import-helper-marshaling-contract`
+
+完了条件:
+
+- [ ] B8-G5 の helper request から、`x86_64_argument_marshaling_unimplemented` と
+  `helper_return_marshaling_unimplemented` を次に潰す boundary として扱う。
+- [ ] x86_64 call arguments と `rax` return value の helper marshaling contract を
+  stable report に保存する。
+- [ ] `_objc_msgSend` の host execution、Objective-C / AppKit bridge、arbitrary
+  indirect call target execution は行わない。
+
+PR に含めない:
+
+- `_objc_msgSend` の host execution。
+- Objective-C runtime / AppKit helper bridge の一般化。
+- arbitrary indirect call target execution、translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止する。次の gate は marshaling
+  contract の不足理由を見て B8-G6 または追加の import/helper slice として更新する。
 - [ ] B8-G6: Objective-C runtime / AppKit helper bridge を B8-G1 専用 lifecycle
   event から一般化する。
   - [ ] class lookup、selector lookup、message send、autorelease pool、main run loop

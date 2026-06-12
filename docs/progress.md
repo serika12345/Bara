@@ -9,12 +9,12 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-12 08:02 JST
+最終更新: 2026-06-12 08:26 JST
 
 状態:
 
 - project_state: in_progress。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
-  reviewable GUI 起動 slice の積み上げとして扱う。B8-G4c までで、self-authored
+  reviewable GUI 起動 slice の積み上げとして扱う。B8-G5 までで、self-authored
   x86_64 GUI fixture の実 `LC_MAIN` entry から
   `push rbp; mov rbp,rsp; push r15; push r14; push rbx; push rax; call rel32;
   mov rbx,rax; mov rax,qword ptr [rip+disp32]; mov rdx,qword ptr [rax];
@@ -25,25 +25,30 @@
   Mach-O VM address space で materialize される。`call r14` は public
   `LC_DYLD_CHAINED_FIXUPS` payload の header / starts / imports / symbol strings /
   `DYLD_CHAINED_PTR_64_OFFSET` bind chain entry から `/usr/lib/libobjc.A.dylib` の
-  `_objc_msgSend` import identity へ解決され、helper boundary request は helper
-  marshaling / execution 未実装として停止する。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G4c Public Chained Fixups
-  Import Decoder: public `LC_DYLD_CHAINED_FIXUPS` payload のうち現 fixture の
-  `call r14` target pointer load に必要な最小範囲を decode し、
-  `target_pointer_load.address=4294979672` を import symbol identity へ解決する。
+  `_objc_msgSend` import identity へ解決される。B8-G5 ではこの decoded import identity を
+  `import_helper_call` request の planning input に接続し、`target_register=r14`、
+  `call_site=4294972996`、`return_to=4294972999`、`source_isa=x86_64` とともに
+  `loader.plan.json` / launch report へ保存する。helper execution は行わず、
+  `x86_64_argument_marshaling_unimplemented` /
+  `helper_return_marshaling_unimplemented` の stable blocker で停止する。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G5 Import Helper Boundary
+  Request: B8-G4c の decoded `_objc_msgSend` import identity、call site、target
+  register、return PC を汎用 helper boundary request へ接続し、argument / return
+  marshaling の不足理由を stable report に保存する。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
   Objective-C runtime / dyld の private behavior は使わず、public metadata、
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
-- active_branch: `task/b8-g4c-public-chained-fixups-import-decoder`。base branch は
-  `task/b8-g4b-public-bind-import-boundary` の `fbd046b`
-  (`feat: report public chained fixups import boundary`) で、B8-G4b が main へ
-  merge されるまでは stacked branch として扱う。latest commit は B8-G4c review
+- active_branch: `task/b8-g5-import-helper-boundary-request`。base branch は
+  `origin/task/b8-g4b-public-bind-import-boundary` の `c1b82f0`
+  (`Merge pull request #24 from serika12345/task/b8-g4c-public-chained-fixups-import-decoder`)
+  で、B8-G4c を含む stacked branch として扱う。draft PR は
+  <https://github.com/serika12345/Bara/pull/25>。latest commit は B8-G5 review
   package で報告する。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
-  B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5。
+  B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -85,28 +90,42 @@
   public rebase / bind / import 解決の deferred step を保存する。さらに B8-G4c として
   `chained_fixups.status=resolved_import`、`header.imports_format.kind=dyld_chained_import`、
   `pointer_format.kind=ptr64_offset`、`target_resolution.import.symbol_name=_objc_msgSend`、
-  `target_resolution.import.dylib_path=/usr/lib/libobjc.A.dylib`、
-  `helper_boundary_request.reason=import_helper_boundary_unimplemented`、
-  `next_action=connect_import_helper_boundary_request` を保存する。
-- remaining_work: B8-G5。decoded `_objc_msgSend` import identity、call site、
-  target register、return PC を汎用 helper boundary request へ接続し、argument /
-  return marshaling の不足理由を stable blocker として report する。まだ
+  `target_resolution.import.dylib_path=/usr/lib/libobjc.A.dylib` を保存する。B8-G5 として
+  `helper_boundary_request.request.kind=import_helper_call`、`source=public_dyld_chained_fixups_import`、
+  `target_register=r14`、`call_site=4294972996`、`return_to=4294972999`、
+  `required_marshaling.argument_model=x86_64_call_arguments`、
+  `required_marshaling.return_model=x86_64_rax_return_value`、
+  `helper_boundary_request.reason=import_helper_marshaling_unimplemented`、
+  `next_action=define_import_helper_marshaling_contract` を保存する。
+- remaining_work: B8-G5a。B8-G5 の helper request が出す
+  `x86_64_argument_marshaling_unimplemented` /
+  `helper_return_marshaling_unimplemented` を受けて、x86_64 argument / return
+  marshaling contract を helper boundary の typed contract として定義する。まだ
   `_objc_msgSend` host execution、Objective-C / AppKit helper bridge、
   arbitrary indirect call target execution、translation cache、fallback JIT/interpreter
   は行わない。
-- next_action: B8-G4c branch を commit / push し、draft PR を開いて review gate で
-  停止する。レビュー後の次 PR Gate は B8-G5 Import Helper Boundary Request。
+- next_action: B8-G5 draft PR #25 の review gate で停止する。レビュー後の次 PR Gate は
+  B8-G5a Import Helper Marshaling Contract。
 - verification: targeted checks として
   `nix develop -c cargo test -p bara-oracle chained_fixups -- --nocapture` と
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
-  manual debug bundle generation で `loader.plan.json` の
-  `chained_fixups.status=resolved_import`、`target_pointer_load.address=4294979672`、
-  `symbol_name=_objc_msgSend`、`dylib_path=/usr/lib/libobjc.A.dylib`、
-  `next_action=connect_import_helper_boundary_request` を確認した。full
-  `nix develop -c ./scripts/verify` も通過した。
+  `nix develop -c ./scripts/check-domain-types` と `nix develop -c cargo fmt` も通過した。
+  full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-12 08:26 JST: B8-G5 Import Helper Boundary Request を実装した。
+  `bara-oracle` の chained fixups target report から resolved import identity を typed
+  report として取り出せるようにし、B8 debug bundle は decoded `_objc_msgSend`
+  import identity を `import_helper_call` request に接続する。`loader.plan.json` と
+  launch report は `target_register=r14`、`call_site=4294972996`、
+  `return_to=4294972999`、`source_isa=x86_64`、`symbol_name=_objc_msgSend`、
+  `dylib_path=/usr/lib/libobjc.A.dylib` を保存し、helper execution ではなく
+  `x86_64_argument_marshaling_unimplemented` /
+  `helper_return_marshaling_unimplemented` で停止する。targeted checks と
+  `check-domain-types`、full `nix develop -c ./scripts/verify` が通過した。
+  branch `task/b8-g5-import-helper-boundary-request` を push し、draft PR
+  <https://github.com/serika12345/Bara/pull/25> を開いて review gate で停止した。
 - 2026-06-12 08:02 JST: B8-G4c Public Chained Fixups Import Decoder を実装した。
   `bara-oracle` に public `LC_DYLD_CHAINED_FIXUPS` payload parser を追加し、header、
   starts-in-image / starts-in-segment、`DYLD_CHAINED_IMPORT` table、uncompressed symbol
