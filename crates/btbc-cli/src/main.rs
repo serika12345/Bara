@@ -2492,13 +2492,36 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"return_model\":\"x86_64_rax_return_value\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_import_helper_marshaling_contract_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"calling_convention\":\"x86_64_macos_system_v\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"argument_sources\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"position\":0"));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"role\":\"objc_receiver\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"position\":1"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register\":\"rdi\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"role\":\"objc_selector\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register\":\"rsi\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"return_destination\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register\":\"rax\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"objc_receiver_materialization_unimplemented\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"objc_selector_materialization_unimplemented\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"helper_return_value_materialization_unimplemented\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_action\":\"define_objc_receiver_selector_materialization\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"x86_64_argument_marshaling_unimplemented\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"helper_return_marshaling_unimplemented\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"resolution\":\"resolved_public_dyld_chained_fixups_import\""));
-        assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"next_action\":\"define_import_helper_marshaling_contract\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_entry_source\":\"first_unsupported_boundary\""));
         assert!(read_file(&bundle_dir.join("runtime-attempt.json"))
@@ -2513,6 +2536,12 @@ mod tests {
         assert!(launch_report.contains("\"symbol_name\":\"_objc_msgSend\""));
         assert!(launch_report.contains("\"call_site\":4294972996"));
         assert!(launch_report.contains("\"return_to\":4294972999"));
+        assert!(launch_report.contains("\"schema\":\"b8_import_helper_marshaling_contract_v0\""));
+        assert!(launch_report.contains("\"calling_convention\":\"x86_64_macos_system_v\""));
+        assert!(launch_report.contains("\"role\":\"objc_receiver\""));
+        assert!(launch_report.contains("\"role\":\"objc_selector\""));
+        assert!(launch_report.contains("\"return_destination\""));
+        assert!(launch_report.contains("\"helper_return_value_materialization_unimplemented\""));
         assert!(launch_report.contains("\"x86_64_argument_marshaling_unimplemented\""));
         let blocker_report = read_file(&bundle_dir.join("blocker.json"));
         assert!(blocker_report.contains("\"status\":\"blocked\""));
