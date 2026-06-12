@@ -331,6 +331,17 @@
   selector、`rax` return destination を stable report として保存する。これは
   `_objc_msgSend` 実行ではなく、次の B8-G5b で receiver / selector / return value
   materialization blocker を扱うための ABI/helper boundary contract である。
+- 2026-06-12 の B8-G5b として、B8-G5a の marshaling contract から
+  `b8_objc_message_materialization_boundary_v0` を追加した。boundary は `call r14` の
+  直前にある `rdi` / `rsi` の materialization source を decode report から探し、
+  current fixture ではどちらも RIP-relative qword load として report する。その qword
+  value は `ProgramImageMetadata.mapped_bytes` から読むが、現 mapping は必要な data 側
+  address をまだ覆っていないため、`receiver_mapped_image_qword_unavailable` /
+  `selector_mapped_image_qword_unavailable` で止める。`rax` return destination は
+  `write_helper_return_to_x86_64_rax` plan と
+  `helper_return_value_materialization_unimplemented` blocker に留める。これは
+  Objective-C / AppKit bridge や `_objc_msgSend` host execution ではなく、次の B8-G5c
+  で public Mach-O mapped image metadata を広げるための materialization boundary である。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、
