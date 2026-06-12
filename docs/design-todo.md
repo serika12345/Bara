@@ -351,6 +351,13 @@
   `receiver_mapped_value_fixup_resolution_unimplemented` /
   `selector_mapped_value_fixup_resolution_unimplemented` へ進むため、次の B8-G5d では
   public chained fixups / rebase / bind metadata に基づく raw qword resolution を扱う。
+- 2026-06-12 の B8-G5d として、public `LC_DYLD_CHAINED_FIXUPS` metadata に基づき、
+  ObjC receiver / selector の mapped raw qword を bind import または rebase VM address
+  として解釈する report を追加した。current fixture では receiver が
+  `_OBJC_CLASS_$_NSApplication` import identity、selector が Mach-O image-base relative
+  rebase VM address `4294975648` として解決される。これは `_objc_msgSend` execution や
+  Objective-C / AppKit bridge ではなく、argument materialization blocker を return value
+  materialization blocker へ進めるための public loader/fixup boundary である。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、
