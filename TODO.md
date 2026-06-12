@@ -1183,10 +1183,10 @@ review gate:
 
 - 完了したら commit / push / draft PR 作成で停止する。次の gate は
   B8-G5e Helper Return Value Materialization。
-- [ ] B8-G5e: helper return value materialization boundary を定義する。
-  - [ ] B8-G5d 後に残る `helper_return_value_materialization_unimplemented` を受けて、
+- [x] B8-G5e: helper return value materialization boundary を定義する。
+  - [x] B8-G5d 後に残る `helper_return_value_materialization_unimplemented` を受けて、
     helper return value を x86_64 `rax` に書き戻す report / boundary を stable 化する。
-  - [ ] `_objc_msgSend` host execution、Objective-C runtime / AppKit helper bridge、
+  - [x] `_objc_msgSend` host execution、Objective-C runtime / AppKit helper bridge、
     arbitrary indirect call target execution はまだ行わない。
 
 #### PR Gate: B8-G5e Helper Return Value Materialization
@@ -1195,12 +1195,12 @@ branch: `task/b8-g5e-helper-return-value-materialization`
 
 完了条件:
 
-- [ ] B8-G5d の materialization boundary が残す
+- [x] B8-G5d の materialization boundary が残す
   `helper_return_value_materialization_unimplemented` を、x86_64 `rax` return
   destination の stable materialization boundary として具体化する。
-- [ ] helper return value を実行結果として生成するのではなく、public ABI/helper
+- [x] helper return value を実行結果として生成するのではなく、public ABI/helper
   contract 上の write-back plan と remaining blocker を保存する。
-- [ ] `_objc_msgSend` の host execution、Objective-C / AppKit bridge、arbitrary
+- [x] `_objc_msgSend` の host execution、Objective-C / AppKit bridge、arbitrary
   indirect call target execution は行わない。
 
 PR に含めない:
@@ -1217,7 +1217,43 @@ PR に含めない:
 review gate:
 
 - 完了したら commit / push / draft PR 作成で停止する。次の gate は helper return
-  materialization 後の blocker を見て B8-G6 または追加の import/helper slice として
+  materialization 後の blocker を見て B8-G6a ObjC Helper Execution Boundary として
+  更新する。
+- [ ] B8-G6a: ObjC helper execution boundary を stable report に分離する。
+  - [ ] B8-G5e 後に残る `objc_helper_execution_unimplemented` を受けて、helper execution
+    request の source import、receiver identity、selector VM address、return write-back
+    boundary を 1 つの stable report として保存する。
+  - [ ] Objective-C runtime / AppKit API の host execution はまだ行わず、実行に必要な
+    public helper capability と不足条件だけを分類する。
+
+#### PR Gate: B8-G6a ObjC Helper Execution Boundary
+
+branch: `task/b8-g6a-objc-helper-execution-boundary`
+
+完了条件:
+
+- [ ] B8-G5e の `objc_helper_execution_unimplemented` を、ObjC helper execution request
+  boundary として stable report に分離する。
+- [ ] `_objc_msgSend` import identity、receiver identity、selector VM address、return
+  write-back boundary を helper execution request の input として保存する。
+- [ ] Objective-C runtime / AppKit helper の host execution、arbitrary indirect call
+  target execution、translation cache、fallback JIT/interpreter は行わない。
+
+PR に含めない:
+
+- `_objc_msgSend` の host execution。
+- Objective-C runtime / AppKit helper bridge の実行実装。
+- arbitrary indirect call target execution、translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止する。次の gate は helper execution
+  request の不足条件を見て B8-G6b または focused Objective-C / AppKit helper slice として
   更新する。
 - [ ] B8-G6: Objective-C runtime / AppKit helper bridge を B8-G1 専用 lifecycle
   event から一般化する。
