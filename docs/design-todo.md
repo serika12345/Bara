@@ -358,6 +358,13 @@
   rebase VM address `4294975648` として解決される。これは `_objc_msgSend` execution や
   Objective-C / AppKit bridge ではなく、argument materialization blocker を return value
   materialization blocker へ進めるための public loader/fixup boundary である。
+- 2026-06-12 の B8-G5e として、ObjC helper return value を x86_64 `rax` に書き戻す
+  `b8_objc_helper_return_writeback_boundary_v0` を stable report に追加した。boundary は
+  source を `objc_helper_return_value`、destination を `x86_64_rax`、width を 64-bit、
+  ordering を `after_helper_call_returns` として保存する。まだ helper result は生成せず、
+  remaining blocker は `objc_helper_execution_unimplemented` に進める。次の B8-G6a では
+  Objective-C / AppKit host execution ではなく、ObjC helper execution request boundary を
+  stable report として分離する。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、

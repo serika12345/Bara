@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-12 12:53 JST
+最終更新: 2026-06-12 20:19 JST
 
 状態:
 
@@ -50,26 +50,27 @@
   `_OBJC_CLASS_$_NSApplication` import identity、selector を resolved VM address
   `4294975648` として stable report に保存する。receiver / selector materialization
   blocker は解消し、次の blocker は `helper_return_value_materialization_unimplemented`
-  に進む。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G5d ObjC Argument Fixup
-  Resolution: ObjC receiver / selector mapped qword の public fixup resolution を定義する。
+  に進む。B8-G5e では helper return value を x86_64 `rax` に書き戻す
+  `b8_objc_helper_return_writeback_boundary_v0` を stable report に保存し、remaining
+  blocker は `objc_helper_execution_unimplemented` に進む。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G5e Helper Return Value
+  Materialization: helper return value materialization boundary を定義する。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
   Objective-C runtime / dyld の private behavior は使わず、public metadata、
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
-- active_branch: `task/b8-g5d-objc-argument-fixup-resolution`。B8-G5c PR #28
-  <https://github.com/serika12345/Bara/pull/28> は
-  `task/b8-g5a-import-helper-marshaling-contract` へ merge 済みのため、B8-G5d branch は
-  `origin/task/b8-g5a-import-helper-marshaling-contract` の `6e294b9`
-  (`Merge pull request #28 from serika12345/task/b8-g5c-objc-materialization-mapped-image-metadata`)
-  を base にした stacked branch として扱う。B8-G5d 実装 commit は `277fd24`
-  (`feat: resolve objc argument fixups`)。Draft PR #29
-  <https://github.com/serika12345/Bara/pull/29> を開いて review gate で停止中。
+- active_branch: `task/b8-g5e-helper-return-value-materialization`。B8-G5d PR #29
+  <https://github.com/serika12345/Bara/pull/29> は
+  `task/b8-g5a-import-helper-marshaling-contract` へ merge 済みのため、B8-G5e branch は
+  `origin/task/b8-g5a-import-helper-marshaling-contract` の `82bc271`
+  (`Merge pull request #29 from serika12345/task/b8-g5d-objc-argument-fixup-resolution`)
+  を base にした stacked branch として扱う。latest commit は B8-G5e review package で
+  報告する。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a / B8-G5b / B8-G5c /
-  B8-G5d。
+  B8-G5d / B8-G5e。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -149,20 +150,35 @@
   `rebase.resolved_vm_address=4294975648` を保存する。receiver / selector の argument
   materialization は `available` へ進み、materialization boundary の remaining blocker は
   `helper_return_value_materialization_unimplemented`、`next_action` は
-  `define_helper_return_value_materialization` である。
-- remaining_work: B8-G5e。B8-G5d 後に残る helper return value materialization blocker を
-  x86_64 `rax` write-back plan として stable 化する。まだ `_objc_msgSend` host execution、
-  Objective-C / AppKit helper bridge、arbitrary indirect call target execution、
-  translation cache、fallback JIT/interpreter は行わない。
-- next_action: B8-G5d draft PR #29 の review gate で停止する。レビュー後の次 PR Gate は
-  B8-G5e Helper Return Value Materialization。
+  `define_helper_return_value_materialization` である。B8-G5e として
+  `return_value.writeback_boundary.schema=b8_objc_helper_return_writeback_boundary_v0`、
+  `source=objc_helper_return_value`、`destination=x86_64_rax`、`width=bits64`、
+  `writeback_plan=write_helper_return_to_x86_64_rax`、
+  `ordering=after_helper_call_returns` を保存する。helper result はまだ生成せず、
+  materialization boundary と helper marshaling contract の remaining blocker は
+  `objc_helper_execution_unimplemented`、`next_action` は
+  `define_objc_runtime_helper_bridge` である。
+- remaining_work: B8-G6a。B8-G5e 後に残る `objc_helper_execution_unimplemented` を、
+  ObjC helper execution request boundary として stable report に分離する。まだ
+  `_objc_msgSend` host execution、Objective-C / AppKit helper bridge、arbitrary
+  indirect call target execution、translation cache、fallback JIT/interpreter は行わない。
+- next_action: B8-G5e branch を commit / push し、draft PR を開いて review gate で
+  停止する。レビュー後の次 PR Gate は B8-G6a ObjC Helper Execution Boundary。
 - verification: targeted check として
-  `nix develop -c cargo test -p bara-oracle chained_fixups -- --nocapture` と
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
   full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-12 20:19 JST: B8-G5e Helper Return Value Materialization を実装した。
+  B8 debug bundle の `return_value` に
+  `b8_objc_helper_return_writeback_boundary_v0` を追加し、ObjC helper return value を
+  x86_64 `rax` に 64-bit write-back する plan、source、destination、ordering を
+  stable report として保存するようにした。helper return value はまだ実行結果として
+  生成せず、remaining blocker は `objc_helper_execution_unimplemented` である。
+  `_objc_msgSend` 実行や Objective-C / AppKit bridge は追加していない。targeted check は
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過し、
+  full `nix develop -c ./scripts/verify` も通過した。
 - 2026-06-12 12:53 JST: B8-G5d branch
   `task/b8-g5d-objc-argument-fixup-resolution` を push し、Draft PR #29
   <https://github.com/serika12345/Bara/pull/29> を
