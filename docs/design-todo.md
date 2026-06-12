@@ -325,6 +325,12 @@
   `helper_return_marshaling_unimplemented` の stable blocker で停止する。次の focused
   slice は Objective-C / AppKit bridge ではなく、B8-G5a の helper marshaling
   contract である。
+- 2026-06-12 の B8-G5a として、`import_helper_call` request の
+  `required_marshaling.contract` に `b8_import_helper_marshaling_contract_v0` を追加した。
+  contract は x86_64 macOS System V calling convention、`rdi` receiver、`rsi`
+  selector、`rax` return destination を stable report として保存する。これは
+  `_objc_msgSend` 実行ではなく、次の B8-G5b で receiver / selector / return value
+  materialization blocker を扱うための ABI/helper boundary contract である。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、

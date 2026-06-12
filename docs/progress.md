@@ -9,12 +9,12 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-12 08:26 JST
+最終更新: 2026-06-12 10:19 JST
 
 状態:
 
 - project_state: in_progress。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
-  reviewable GUI 起動 slice の積み上げとして扱う。B8-G5 までで、self-authored
+  reviewable GUI 起動 slice の積み上げとして扱う。B8-G5a までで、self-authored
   x86_64 GUI fixture の実 `LC_MAIN` entry から
   `push rbp; mov rbp,rsp; push r15; push r14; push rbx; push rax; call rel32;
   mov rbx,rax; mov rax,qword ptr [rip+disp32]; mov rdx,qword ptr [rax];
@@ -30,25 +30,29 @@
   `call_site=4294972996`、`return_to=4294972999`、`source_isa=x86_64` とともに
   `loader.plan.json` / launch report へ保存する。helper execution は行わず、
   `x86_64_argument_marshaling_unimplemented` /
-  `helper_return_marshaling_unimplemented` の stable blocker で停止する。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G5 Import Helper Boundary
-  Request: B8-G4c の decoded `_objc_msgSend` import identity、call site、target
-  register、return PC を汎用 helper boundary request へ接続し、argument / return
-  marshaling の不足理由を stable report に保存する。
+  `helper_return_marshaling_unimplemented` の stable blocker で停止する。B8-G5a では
+  `b8_import_helper_marshaling_contract_v0` として x86_64 macOS System V calling
+  convention、`rdi` receiver、`rsi` selector、`rax` return destination を
+  stable report に保存し、次の blocker を receiver / selector / return value
+  materialization に進める。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G5a Import Helper
+  Marshaling Contract: B8-G5 の helper request から x86_64 call argument source と
+  `rax` return destination を helper boundary の typed contract として扱う。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
   Objective-C runtime / dyld の private behavior は使わず、public metadata、
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
-- active_branch: `task/b8-g5-import-helper-boundary-request`。base branch は
-  `origin/task/b8-g4b-public-bind-import-boundary` の `c1b82f0`
-  (`Merge pull request #24 from serika12345/task/b8-g4c-public-chained-fixups-import-decoder`)
-  で、B8-G4c を含む stacked branch として扱う。draft PR は
-  <https://github.com/serika12345/Bara/pull/25>。latest commit は B8-G5 review
-  package で報告する。
+- active_branch: `task/b8-g5a-import-helper-marshaling-contract`。B8-G5 PR #25 は
+  `task/b8-g4b-public-bind-import-boundary` へ merge 済みのため、B8-G5a draft PR #26
+  <https://github.com/serika12345/Bara/pull/26> は
+  `task/b8-g4b-public-bind-import-boundary` の `6c581c5`
+  (`Merge pull request #25 from serika12345/task/b8-g5-import-helper-boundary-request`)
+  を base branch として扱う。検証済みの B8-G5a implementation commit は `89bf7e9`
+  (`feat: define import helper marshaling contract`)。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
-  B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a。
+  B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a / B8-G5b。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -96,24 +100,40 @@
   `required_marshaling.argument_model=x86_64_call_arguments`、
   `required_marshaling.return_model=x86_64_rax_return_value`、
   `helper_boundary_request.reason=import_helper_marshaling_unimplemented`、
-  `next_action=define_import_helper_marshaling_contract` を保存する。
-- remaining_work: B8-G5a。B8-G5 の helper request が出す
-  `x86_64_argument_marshaling_unimplemented` /
-  `helper_return_marshaling_unimplemented` を受けて、x86_64 argument / return
-  marshaling contract を helper boundary の typed contract として定義する。まだ
+  `next_action=define_import_helper_marshaling_contract` を保存する。B8-G5a として
+  `required_marshaling.contract.schema=b8_import_helper_marshaling_contract_v0`、
+  `calling_convention=x86_64_macos_system_v`、`argument_sources[0].role=objc_receiver` /
+  `source.register=rdi`、`argument_sources[1].role=objc_selector` /
+  `source.register=rsi`、`return_destination.destination.register=rax`、
+  `next_action=define_objc_receiver_selector_materialization` を保存する。
+- remaining_work: B8-G5b。B8-G5a の helper marshaling contract が出す
+  `objc_receiver_materialization_unimplemented` /
+  `objc_selector_materialization_unimplemented` /
+  `helper_return_value_materialization_unimplemented` を受けて、receiver / selector /
+  return value materialization boundary を stable report として定義する。まだ
   `_objc_msgSend` host execution、Objective-C / AppKit helper bridge、
   arbitrary indirect call target execution、translation cache、fallback JIT/interpreter
   は行わない。
-- next_action: B8-G5 draft PR #25 の review gate で停止する。レビュー後の次 PR Gate は
-  B8-G5a Import Helper Marshaling Contract。
-- verification: targeted checks として
-  `nix develop -c cargo test -p bara-oracle chained_fixups -- --nocapture` と
+- next_action: B8-G5a draft PR #26
+  <https://github.com/serika12345/Bara/pull/26> の review gate で停止する。
+  レビュー後の次 PR Gate は B8-G5b ObjC Message Materialization Boundary。
+- verification: targeted check として
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
-  `nix develop -c ./scripts/check-domain-types` と `nix develop -c cargo fmt` も通過した。
   full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-12 10:11 JST: B8-G5a Import Helper Marshaling Contract を実装した。
+  B8 debug bundle の `helper_boundary_request.request.required_marshaling.contract` に
+  `b8_import_helper_marshaling_contract_v0` を追加し、x86_64 macOS System V calling
+  convention、`rdi` receiver、`rsi` selector、`rax` return destination を
+  stable report に保存する。`_objc_msgSend` 実行や Objective-C / AppKit bridge は
+  追加せず、次 blocker は `objc_receiver_materialization_unimplemented`、
+  `objc_selector_materialization_unimplemented`、
+  `helper_return_value_materialization_unimplemented` である。targeted check は通過し、
+  full `nix develop -c ./scripts/verify` も clean HEAD の `89bf7e9` で通過した。
+  Draft PR #26 <https://github.com/serika12345/Bara/pull/26> を
+  `task/b8-g4b-public-bind-import-boundary` base で開き、review gate に到達した。
 - 2026-06-12 08:26 JST: B8-G5 Import Helper Boundary Request を実装した。
   `bara-oracle` の chained fixups target report から resolved import identity を typed
   report として取り出せるようにし、B8 debug bundle は decoded `_objc_msgSend`
