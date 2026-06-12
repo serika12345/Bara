@@ -1146,15 +1146,15 @@ review gate:
 
 - B8-G5c draft PR #28 <https://github.com/serika12345/Bara/pull/28> を開いて停止する。
   次の gate は B8-G5d ObjC Argument Fixup Resolution。
-- [ ] B8-G5d: ObjC receiver / selector mapped qword の public fixup resolution を
+- [x] B8-G5d: ObjC receiver / selector mapped qword の public fixup resolution を
   定義する。
-  - [ ] B8-G5c の `receiver_mapped_value_fixup_resolution_unimplemented` /
+  - [x] B8-G5c の `receiver_mapped_value_fixup_resolution_unimplemented` /
     `selector_mapped_value_fixup_resolution_unimplemented` を受けて、mapped raw qword を
     public chained fixups / rebase / bind metadata から解釈できるか判定する。
-  - [ ] 解釈できる場合は receiver / selector の resolved identity または VM address を
+  - [x] 解釈できる場合は receiver / selector の resolved identity または VM address を
     stable report に保存し、できない場合は不足している public fixup metadata を stable
     blocker として保存する。
-  - [ ] `_objc_msgSend` host execution と Objective-C / AppKit helper bridge はまだ行わない。
+  - [x] `_objc_msgSend` host execution と Objective-C / AppKit helper bridge はまだ行わない。
 
 #### PR Gate: B8-G5d ObjC Argument Fixup Resolution
 
@@ -1162,10 +1162,45 @@ branch: `task/b8-g5d-objc-argument-fixup-resolution`
 
 完了条件:
 
-- [ ] B8-G5c の materialization boundary が保存した receiver / selector mapped qword を
+- [x] B8-G5c の materialization boundary が保存した receiver / selector mapped qword を
   public Mach-O fixup metadata から解釈できるか判定する。
-- [ ] 解釈できる場合は resolved identity / VM address を stable report に保存し、
+- [x] 解釈できる場合は resolved identity / VM address を stable report に保存し、
   解釈できない場合は不足 metadata を stable blocker として保存する。
+- [x] `_objc_msgSend` の host execution、Objective-C / AppKit bridge、arbitrary
+  indirect call target execution は行わない。
+
+PR に含めない:
+
+- `_objc_msgSend` の host execution。
+- Objective-C runtime / AppKit helper bridge の一般化。
+- arbitrary indirect call target execution、translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止する。次の gate は
+  B8-G5e Helper Return Value Materialization。
+- [ ] B8-G5e: helper return value materialization boundary を定義する。
+  - [ ] B8-G5d 後に残る `helper_return_value_materialization_unimplemented` を受けて、
+    helper return value を x86_64 `rax` に書き戻す report / boundary を stable 化する。
+  - [ ] `_objc_msgSend` host execution、Objective-C runtime / AppKit helper bridge、
+    arbitrary indirect call target execution はまだ行わない。
+
+#### PR Gate: B8-G5e Helper Return Value Materialization
+
+branch: `task/b8-g5e-helper-return-value-materialization`
+
+完了条件:
+
+- [ ] B8-G5d の materialization boundary が残す
+  `helper_return_value_materialization_unimplemented` を、x86_64 `rax` return
+  destination の stable materialization boundary として具体化する。
+- [ ] helper return value を実行結果として生成するのではなく、public ABI/helper
+  contract 上の write-back plan と remaining blocker を保存する。
 - [ ] `_objc_msgSend` の host execution、Objective-C / AppKit bridge、arbitrary
   indirect call target execution は行わない。
 
@@ -1182,9 +1217,9 @@ PR に含めない:
 
 review gate:
 
-- 完了したら commit / push / draft PR 作成で停止する。次の gate は resolved
-  receiver/selector と return materialization blocker を見て B8-G6 または追加の
-  import/helper slice として更新する。
+- 完了したら commit / push / draft PR 作成で停止する。次の gate は helper return
+  materialization 後の blocker を見て B8-G6 または追加の import/helper slice として
+  更新する。
 - [ ] B8-G6: Objective-C runtime / AppKit helper bridge を B8-G1 専用 lifecycle
   event から一般化する。
   - [ ] class lookup、selector lookup、message send、autorelease pool、main run loop
