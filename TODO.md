@@ -1289,8 +1289,8 @@ PR に含めない:
 
 review gate:
 
-- B8-G6b draft PR を開いて停止する。次の gate は B8-G6c ObjC Runtime Helper
-  Bridge Host Execution Slice。
+- B8-G6b draft PR #32 <https://github.com/serika12345/Bara/pull/32> を開いて停止する。
+  次の gate は B8-G6c ObjC Runtime Helper Bridge Host Execution Slice。
 - [ ] B8-G6c: ObjC runtime message-send helper bridge の host execution slice を追加する。
   - [ ] B8-G6b の `objc_runtime_helper_execution_unimplemented` を受けて、self-authored
     GUI fixture に必要な `_objc_msgSend` helper execution を public Objective-C runtime /

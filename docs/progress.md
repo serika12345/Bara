@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-12 21:23 JST
+最終更新: 2026-06-12 21:24 JST
 
 状態:
 
@@ -74,8 +74,9 @@
   `task/b8-g5e-helper-return-value-materialization` へ merge 済みのため、B8-G6b branch は
   `origin/task/b8-g5e-helper-return-value-materialization` の `5370158`
   (`Merge pull request #31 from serika12345/task/b8-g6a-objc-helper-execution-boundary`)
-  を base にした stacked branch として扱う。B8-G6b 実装 commit は作成前で、検証後に
-  commit / push / draft PR 作成へ進む。
+  を base にした stacked branch として扱う。B8-G6b 実装 commit は `651d23a`
+  (`feat: define objc runtime helper bridge contract`)。Draft PR #32
+  <https://github.com/serika12345/Bara/pull/32> を開いて review gate で停止中。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a / B8-G5b / B8-G5c /
@@ -184,8 +185,8 @@
   runtime / AppKit API 境界として実行し、helper output と x86_64 `rax` return write-back
   boundary へ接続する。まだ arbitrary indirect call target execution、translation cache、
   fallback JIT/interpreter は行わない。
-- next_action: B8-G6b branch を検証し、commit / push / draft PR 作成で review gate に
-  到達する。次の PR Gate は B8-G6c ObjC Runtime Helper Bridge Host Execution Slice。
+- next_action: B8-G6b draft PR #32 の review gate で停止する。レビュー後の次 PR Gate は
+  B8-G6c ObjC Runtime Helper Bridge Host Execution Slice。
 - verification: targeted check として
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
   full `nix develop -c ./scripts/verify` も通過した。
@@ -205,6 +206,12 @@
   cache、fallback JIT/interpreter は追加していない。targeted check は
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
   full `nix develop -c ./scripts/verify` も通過した。
+- 2026-06-12 21:24 JST: B8-G6b branch
+  `task/b8-g6b-objc-runtime-helper-bridge-contract` を push し、Draft PR #32
+  <https://github.com/serika12345/Bara/pull/32> を
+  `task/b8-g5e-helper-return-value-materialization` base で開いた。clean HEAD の
+  `nix develop -c ./scripts/verify` は通過済み。次は B8-G6b review gate で停止し、
+  レビュー後に B8-G6c ObjC Runtime Helper Bridge Host Execution Slice へ進む。
 - 2026-06-12 21:07 JST: B8-G6a ObjC Helper Execution Boundary を実装した。
   B8 debug bundle の `helper_boundary_request.request` に
   `b8_objc_helper_execution_request_v0` を追加し、`_objc_msgSend` source import、
