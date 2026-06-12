@@ -384,6 +384,20 @@
   `objc_runtime_helper_execution_unimplemented` として分類する。これは public Objective-C
   runtime / AppKit helper bridge の実行実装ではなく、次の B8-G6c で self-authored
   fixture に必要な host execution slice を接続するための contract 固定である。
+- 2026-06-12 の B8-G6c として、self-authored AppKit helper source で
+  `[NSApplication sharedApplication]` を public AppKit API として実行し、
+  `b8_objc_runtime_helper_bridge_execution_v0` に
+  `execution_source=self_authored_appkit_shared_application_helper`、
+  `api_boundary=public_appkit_api`、`scope=self_authored_fixture_only`、
+  `helper_output=objc_helper_return_value`、`objc_helper_return_value=1`、
+  `return_value_kind=non_null_objc_object_opaque_handle` を保存する。host ObjC object
+  pointer は guest raw pointer として露出せず、current fixture 用の opaque helper
+  return として扱う。`error_contract.error_classification` と
+  `objc_helper_execution_unimplemented` blocker は解消し、next action は
+  `continue_after_objc_helper_return` に進む。これは arbitrary indirect call target
+  execution、translation cache、fallback JIT/interpreter、private Objective-C /
+  AppKit / dyld behavior を追加するものではない。次の B8-G6d では helper return 後の
+  x86_64 `rax` state write-back と `return_to` continuation boundary を分離する。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、

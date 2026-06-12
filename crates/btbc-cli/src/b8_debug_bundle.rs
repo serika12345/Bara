@@ -17,7 +17,7 @@ use bara_oracle::{
     MachOChainedFixupTargetAddress, MachOChainedFixupsBlocker, MachOChainedFixupsTargetReport,
     MachOChainedImportIdentityReport, MachOChainedRebaseTargetIdentityReport,
     MachODyldInfoCommandKind, MachODylibImportCommandKind, MachOEntryFunctionInput,
-    MachOEntryFunctionTestCaseError, MachOLinkeditDataCommandKind, TestCase,
+    MachOEntryFunctionTestCaseError, MachOLinkeditDataCommandKind, ObservedResult, TestCase,
 };
 use serde::Serialize;
 
@@ -27,7 +27,10 @@ use crate::{
         FunctionCompiledIrArtifact, FunctionFixupsArtifact, FunctionHelpersArtifact,
         FunctionPcMapArtifact, FunctionRunError, FunctionRunResult,
     },
-    x86_64_mach_o_fixture::{b8_gui_hello_world_case_id, X8664MachOFixtureError},
+    x86_64_mach_o_fixture::{
+        b8_gui_hello_world_case_id, observe_appkit_shared_application_helper_actual,
+        X8664MachOFixtureError,
+    },
 };
 
 pub(crate) fn generate_b8_debug_bundle(
@@ -67,11 +70,14 @@ pub(crate) fn generate_b8_debug_bundle(
     write_json_file(&paths.pcmap_path(), &attempt.pcmap)?;
     write_json_file(&paths.fixups_path(), &attempt.fixups)?;
     write_json_file(&paths.helpers_path(), &attempt.helpers)?;
+    let helper_bridge_execution = observe_appkit_shared_application_helper_actual()
+        .map_err(B8DebugBundleError::HelperExecution)?;
     let loader_plan = B8DebugLoaderPlanReport::real_lc_main_attempted(
         &input,
         &entry_input,
         &input_probe,
         &attempt.decode_report,
+        &helper_bridge_execution,
     );
     let launch_report = attempt
         .launch_report
@@ -964,6 +970,7 @@ impl B8DebugLoaderPlanReport {
         entry_input: &MachOEntryFunctionInput,
         input_probe: &BinaryFormatProbeReport,
         decode_report: &B8DebugDecodeReport,
+        helper_bridge_execution: &ObservedResult,
     ) -> Self {
         let code = entry_input.executable_image().code_segment().x86_bytes();
         Self {
@@ -990,6 +997,7 @@ impl B8DebugLoaderPlanReport {
                 input_probe,
                 decode_report,
                 entry_input.program_image_metadata(),
+                helper_bridge_execution,
             ),
             entry_source_for_this_bundle: B8DebugEntrySource::PublicLcMainEntryoff,
             next_entry_source: B8DebugLoaderNextEntrySource::FirstUnsupportedBoundary,
@@ -1063,6 +1071,7 @@ impl B8DebugImportBoundaryReport {
         input_probe: &BinaryFormatProbeReport,
         decode_report: &B8DebugDecodeReport,
         image_metadata: &ProgramImageMetadata,
+        helper_bridge_execution: &ObservedResult,
     ) -> Self {
         let public_metadata = B8DebugPublicImportMetadataReport::from_probe(input_probe);
         let call_boundary = decode_report.register_indirect_call_r14_boundary();
@@ -1081,47 +1090,56 @@ impl B8DebugImportBoundaryReport {
             let resolved_import_identity = chained_fixups
                 .as_ref()
                 .and_then(MachOChainedFixupsTargetReport::resolved_import_identity);
-            let (resolution, next_action, helper_boundary_request) =
-                if public_metadata.has_chained_fixups() {
-                    if let Some(import_identity) = resolved_import_identity {
-                        (
-                        B8DebugImportBoundaryResolution::ResolvedPublicDyldChainedFixupsImport,
-                        B8DebugImportBoundaryNextAction::DefineObjcReceiverSelectorMaterialization,
-                        B8DebugHelperBoundaryRequestReport::blocked_import_helper_call(
+            let (resolution, next_action, helper_boundary_request) = if public_metadata
+                .has_chained_fixups()
+            {
+                if let Some(import_identity) = resolved_import_identity {
+                    let helper_boundary_request =
+                        B8DebugHelperBoundaryRequestReport::import_helper_call(
                             call_boundary_report,
                             import_identity,
                             input,
                             input_probe,
                             decode_report,
                             image_metadata,
-                        ),
-                    )
+                            helper_bridge_execution,
+                        );
+                    let next_action = if helper_boundary_request.blockers.is_empty() {
+                        B8DebugImportBoundaryNextAction::ContinueAfterObjcHelperReturn
                     } else {
-                        (
-                            B8DebugImportBoundaryResolution::RequiresPublicDyldChainedFixupsDecoder,
-                            B8DebugImportBoundaryNextAction::DecodePublicDyldChainedFixupsImports,
-                            B8DebugHelperBoundaryRequestReport::blocked(
-                                B8DebugHelperBoundaryBlockedReason::ImportSymbolIdentityUnresolved,
-                            ),
-                        )
-                    }
-                } else if public_metadata.has_dyld_info_bind_ranges() {
+                        B8DebugImportBoundaryNextAction::DefineObjcReceiverSelectorMaterialization
+                    };
                     (
-                        B8DebugImportBoundaryResolution::RequiresPublicDyldBindOpcodeDecoder,
-                        B8DebugImportBoundaryNextAction::DecodePublicDyldBindOpcodes,
-                        B8DebugHelperBoundaryRequestReport::blocked(
-                            B8DebugHelperBoundaryBlockedReason::ImportSymbolIdentityUnresolved,
-                        ),
+                        B8DebugImportBoundaryResolution::ResolvedPublicDyldChainedFixupsImport,
+                        next_action,
+                        helper_boundary_request,
                     )
                 } else {
                     (
-                        B8DebugImportBoundaryResolution::MissingPublicBindMetadata,
-                        B8DebugImportBoundaryNextAction::InspectUnsupportedLoaderMetadata,
+                        B8DebugImportBoundaryResolution::RequiresPublicDyldChainedFixupsDecoder,
+                        B8DebugImportBoundaryNextAction::DecodePublicDyldChainedFixupsImports,
                         B8DebugHelperBoundaryRequestReport::blocked(
                             B8DebugHelperBoundaryBlockedReason::ImportSymbolIdentityUnresolved,
                         ),
                     )
-                };
+                }
+            } else if public_metadata.has_dyld_info_bind_ranges() {
+                (
+                    B8DebugImportBoundaryResolution::RequiresPublicDyldBindOpcodeDecoder,
+                    B8DebugImportBoundaryNextAction::DecodePublicDyldBindOpcodes,
+                    B8DebugHelperBoundaryRequestReport::blocked(
+                        B8DebugHelperBoundaryBlockedReason::ImportSymbolIdentityUnresolved,
+                    ),
+                )
+            } else {
+                (
+                    B8DebugImportBoundaryResolution::MissingPublicBindMetadata,
+                    B8DebugImportBoundaryNextAction::InspectUnsupportedLoaderMetadata,
+                    B8DebugHelperBoundaryRequestReport::blocked(
+                        B8DebugHelperBoundaryBlockedReason::ImportSymbolIdentityUnresolved,
+                    ),
+                )
+            };
 
             return Self {
                 status: B8DebugImportBoundaryStatus::Blocked,
@@ -1152,6 +1170,7 @@ impl B8DebugImportBoundaryReport {
 #[serde(rename_all = "snake_case")]
 enum B8DebugImportBoundaryStatus {
     Blocked,
+    Executed,
     Skipped,
 }
 
@@ -1326,15 +1345,15 @@ impl B8DebugHelperBoundaryRequestReport {
         }
     }
 
-    fn blocked_import_helper_call(
+    fn import_helper_call(
         call_boundary: B8DebugRegisterIndirectCallBoundaryReport,
         import_identity: MachOChainedImportIdentityReport,
         input: &BinaryInput,
         input_probe: &BinaryFormatProbeReport,
         decode_report: &B8DebugDecodeReport,
         image_metadata: &ProgramImageMetadata,
+        helper_bridge_execution: &ObservedResult,
     ) -> Self {
-        let reason = B8DebugHelperBoundaryBlockedReason::ImportHelperMarshalingUnimplemented;
         let request = B8DebugImportHelperRequestReport::from_boundary_and_import(
             call_boundary,
             import_identity,
@@ -1342,11 +1361,20 @@ impl B8DebugHelperBoundaryRequestReport {
             input_probe,
             decode_report,
             image_metadata,
+            helper_bridge_execution,
         );
         let blockers = request.required_marshaling.blockers.clone();
+        let (status, reason) = if blockers.is_empty() {
+            (B8DebugImportBoundaryStatus::Executed, None)
+        } else {
+            (
+                B8DebugImportBoundaryStatus::Blocked,
+                Some(B8DebugHelperBoundaryBlockedReason::ImportHelperMarshalingUnimplemented),
+            )
+        };
         Self {
-            status: B8DebugImportBoundaryStatus::Blocked,
-            reason: Some(reason),
+            status,
+            reason,
             request: Some(request),
             blockers,
         }
@@ -1383,18 +1411,21 @@ impl B8DebugImportHelperRequestReport {
         input_probe: &BinaryFormatProbeReport,
         decode_report: &B8DebugDecodeReport,
         image_metadata: &ProgramImageMetadata,
+        helper_bridge_execution: &ObservedResult,
     ) -> Self {
-        let required_marshaling = B8DebugHelperMarshalingReport::blocked(
+        let required_marshaling = B8DebugHelperMarshalingReport::from_call_boundary(
             call_boundary,
             input,
             input_probe,
             decode_report,
             image_metadata,
+            helper_bridge_execution,
         );
         let helper_execution_request =
             B8DebugObjcHelperExecutionRequestReport::from_import_and_marshaling(
                 &import,
                 &required_marshaling,
+                helper_bridge_execution,
             );
         Self {
             kind: B8DebugImportHelperRequestKind::ImportHelperCall,
@@ -1432,23 +1463,30 @@ struct B8DebugHelperMarshalingReport {
 }
 
 impl B8DebugHelperMarshalingReport {
-    fn blocked(
+    fn from_call_boundary(
         call_boundary: B8DebugRegisterIndirectCallBoundaryReport,
         input: &BinaryInput,
         input_probe: &BinaryFormatProbeReport,
         decode_report: &B8DebugDecodeReport,
         image_metadata: &ProgramImageMetadata,
+        helper_bridge_execution: &ObservedResult,
     ) -> Self {
-        let contract = B8DebugImportHelperMarshalingContractReport::blocked(
+        let contract = B8DebugImportHelperMarshalingContractReport::from_call_boundary(
             call_boundary,
             input,
             input_probe,
             decode_report,
             image_metadata,
+            helper_bridge_execution,
         );
         let blockers = contract.blockers.clone();
+        let status = if blockers.is_empty() {
+            B8DebugImportBoundaryStatus::Executed
+        } else {
+            B8DebugImportBoundaryStatus::Blocked
+        };
         Self {
-            status: B8DebugImportBoundaryStatus::Blocked,
+            status,
             argument_model: B8DebugHelperArgumentModel::X8664CallArguments,
             return_model: B8DebugHelperReturnModel::X8664RaxReturnValue,
             contract: Some(contract),
@@ -1470,20 +1508,23 @@ struct B8DebugImportHelperMarshalingContractReport {
 }
 
 impl B8DebugImportHelperMarshalingContractReport {
-    fn blocked(
+    fn from_call_boundary(
         call_boundary: B8DebugRegisterIndirectCallBoundaryReport,
         input: &BinaryInput,
         input_probe: &BinaryFormatProbeReport,
         decode_report: &B8DebugDecodeReport,
         image_metadata: &ProgramImageMetadata,
+        helper_bridge_execution: &ObservedResult,
     ) -> Self {
-        let materialization_boundary = B8DebugObjcMessageMaterializationBoundaryReport::blocked(
-            call_boundary.call_site,
-            input,
-            input_probe,
-            decode_report,
-            image_metadata,
-        );
+        let materialization_boundary =
+            B8DebugObjcMessageMaterializationBoundaryReport::from_call_site(
+                call_boundary.call_site,
+                input,
+                input_probe,
+                decode_report,
+                image_metadata,
+                helper_bridge_execution,
+            );
         let receiver_materialized = materialization_boundary
             .receiver
             .is_resolved_for_helper_argument();
@@ -1497,17 +1538,20 @@ impl B8DebugImportHelperMarshalingContractReport {
         if !selector_materialized {
             blockers.push(B8DebugHelperBoundaryBlocker::ObjcSelectorMaterializationUnimplemented);
         }
-        blockers.push(
-            B8DebugHelperBoundaryBlocker::from_objc_materialization_blocker(
-                materialization_boundary.return_value.blocker,
-            ),
-        );
+        if let Some(blocker) = materialization_boundary.return_value.blocker {
+            blockers.push(B8DebugHelperBoundaryBlocker::from_objc_materialization_blocker(blocker));
+        }
         let next_action = B8DebugHelperMarshalingNextAction::from_materialization_next_action(
             materialization_boundary.next_action,
         );
+        let status = if blockers.is_empty() {
+            B8DebugImportBoundaryStatus::Executed
+        } else {
+            B8DebugImportBoundaryStatus::Blocked
+        };
         Self {
             schema: "b8_import_helper_marshaling_contract_v0",
-            status: B8DebugImportBoundaryStatus::Blocked,
+            status,
             calling_convention: B8DebugHelperCallingConvention::X8664MacosSystemV,
             argument_sources: vec![
                 B8DebugHelperArgumentSourceReport::register_argument(
@@ -1669,12 +1713,13 @@ struct B8DebugObjcMessageMaterializationBoundaryReport {
 }
 
 impl B8DebugObjcMessageMaterializationBoundaryReport {
-    fn blocked(
+    fn from_call_site(
         call_site: u64,
         input: &BinaryInput,
         input_probe: &BinaryFormatProbeReport,
         decode_report: &B8DebugDecodeReport,
         image_metadata: &ProgramImageMetadata,
+        helper_bridge_execution: &ObservedResult,
     ) -> Self {
         let receiver = B8DebugObjcArgumentMaterializationReport::from_register_argument(
             B8DebugObjcArgumentMaterializationSpec::receiver(),
@@ -1692,7 +1737,15 @@ impl B8DebugObjcMessageMaterializationBoundaryReport {
             decode_report,
             image_metadata,
         );
-        let return_value = B8DebugObjcReturnValueMaterializationReport::with_writeback_boundary();
+        let helper_input_available = receiver.is_resolved_for_helper_argument()
+            && selector.is_resolved_for_helper_argument();
+        let return_value = if helper_input_available {
+            B8DebugObjcReturnValueMaterializationReport::from_helper_execution(
+                helper_bridge_execution,
+            )
+        } else {
+            B8DebugObjcReturnValueMaterializationReport::with_writeback_boundary()
+        };
         let mut blockers = Vec::new();
         if let Some(blocker) = receiver.mapped_value.blocker {
             blockers.push(blocker);
@@ -1708,7 +1761,9 @@ impl B8DebugObjcMessageMaterializationBoundaryReport {
                 B8DebugObjcMessageMaterializationBlocker::SelectorMappedValueFixupResolutionUnimplemented,
             );
         }
-        blockers.push(return_value.blocker);
+        if let Some(blocker) = return_value.blocker {
+            blockers.push(blocker);
+        }
         let next_action = if blockers
             .iter()
             .any(|blocker| blocker.requires_mapped_image_extension())
@@ -1720,12 +1775,17 @@ impl B8DebugObjcMessageMaterializationBoundaryReport {
         {
             B8DebugObjcMessageMaterializationNextAction::ResolveObjcArgumentMappedValueFixups
         } else {
-            B8DebugObjcMessageMaterializationNextAction::DefineObjcRuntimeHelperBridge
+            B8DebugObjcMessageMaterializationNextAction::ContinueAfterObjcHelperReturn
+        };
+        let status = if blockers.is_empty() {
+            B8DebugImportBoundaryStatus::Executed
+        } else {
+            B8DebugImportBoundaryStatus::Blocked
         };
 
         Self {
             schema: "b8_objc_message_materialization_boundary_v0",
-            status: B8DebugImportBoundaryStatus::Blocked,
+            status,
             receiver,
             selector,
             return_value,
@@ -2000,7 +2060,7 @@ struct B8DebugObjcReturnValueMaterializationReport {
     destination_register: B8DebugRegisterName,
     plan: B8DebugObjcReturnValueMaterializationPlan,
     writeback_boundary: B8DebugObjcHelperReturnWritebackBoundaryReport,
-    blocker: B8DebugObjcMessageMaterializationBlocker,
+    blocker: Option<B8DebugObjcMessageMaterializationBlocker>,
 }
 
 impl B8DebugObjcReturnValueMaterializationReport {
@@ -2011,7 +2071,21 @@ impl B8DebugObjcReturnValueMaterializationReport {
             destination_register: B8DebugRegisterName::Rax,
             plan: B8DebugObjcReturnValueMaterializationPlan::WriteHelperReturnToX8664Rax,
             writeback_boundary: B8DebugObjcHelperReturnWritebackBoundaryReport::blocked(),
-            blocker: B8DebugObjcMessageMaterializationBlocker::ObjcHelperExecutionUnimplemented,
+            blocker: Some(
+                B8DebugObjcMessageMaterializationBlocker::ObjcHelperExecutionUnimplemented,
+            ),
+        }
+    }
+
+    fn from_helper_execution(_helper_bridge_execution: &ObservedResult) -> Self {
+        Self {
+            status: B8DebugValueMaterializationStatus::Available,
+            role: B8DebugHelperReturnRole::ObjcMessageReturnValue,
+            destination_register: B8DebugRegisterName::Rax,
+            plan: B8DebugObjcReturnValueMaterializationPlan::WriteHelperReturnToX8664Rax,
+            writeback_boundary:
+                B8DebugObjcHelperReturnWritebackBoundaryReport::available_after_helper_execution(),
+            blocker: None,
         }
     }
 }
@@ -2025,7 +2099,7 @@ struct B8DebugObjcHelperReturnWritebackBoundaryReport {
     width: B8DebugMemoryReadWidthReport,
     writeback_plan: B8DebugObjcReturnValueMaterializationPlan,
     ordering: B8DebugObjcHelperReturnWritebackOrdering,
-    blocker: B8DebugObjcMessageMaterializationBlocker,
+    blocker: Option<B8DebugObjcMessageMaterializationBlocker>,
 }
 
 impl B8DebugObjcHelperReturnWritebackBoundaryReport {
@@ -2038,7 +2112,22 @@ impl B8DebugObjcHelperReturnWritebackBoundaryReport {
             width: B8DebugMemoryReadWidthReport::Bits64,
             writeback_plan: B8DebugObjcReturnValueMaterializationPlan::WriteHelperReturnToX8664Rax,
             ordering: B8DebugObjcHelperReturnWritebackOrdering::AfterHelperCallReturns,
-            blocker: B8DebugObjcMessageMaterializationBlocker::ObjcHelperExecutionUnimplemented,
+            blocker: Some(
+                B8DebugObjcMessageMaterializationBlocker::ObjcHelperExecutionUnimplemented,
+            ),
+        }
+    }
+
+    const fn available_after_helper_execution() -> Self {
+        Self {
+            schema: "b8_objc_helper_return_writeback_boundary_v0",
+            status: B8DebugValueMaterializationStatus::Available,
+            source: B8DebugObjcHelperReturnWritebackSource::ObjcHelperReturnValue,
+            destination: B8DebugObjcHelperReturnWritebackDestination::X8664Rax,
+            width: B8DebugMemoryReadWidthReport::Bits64,
+            writeback_plan: B8DebugObjcReturnValueMaterializationPlan::WriteHelperReturnToX8664Rax,
+            ordering: B8DebugObjcHelperReturnWritebackOrdering::AfterHelperCallReturns,
+            blocker: None,
         }
     }
 }
@@ -2054,6 +2143,7 @@ struct B8DebugObjcHelperExecutionRequestReport {
     return_writeback_boundary: B8DebugObjcHelperReturnWritebackBoundaryReport,
     required_capability: B8DebugObjcHelperExecutionCapability,
     bridge_contract: B8DebugObjcRuntimeHelperBridgeContractReport,
+    bridge_execution: Option<B8DebugObjcRuntimeHelperBridgeExecutionReport>,
     blockers: Vec<B8DebugObjcHelperExecutionBlocker>,
     next_action: B8DebugObjcHelperExecutionNextAction,
 }
@@ -2062,6 +2152,7 @@ impl B8DebugObjcHelperExecutionRequestReport {
     fn from_import_and_marshaling(
         import: &MachOChainedImportIdentityReport,
         marshaling: &B8DebugHelperMarshalingReport,
+        helper_bridge_execution: &ObservedResult,
     ) -> Option<Self> {
         let contract = marshaling.contract.as_ref()?;
         let materialization = &contract.materialization_boundary;
@@ -2080,26 +2171,53 @@ impl B8DebugObjcHelperExecutionRequestReport {
         if selector_vm_address.is_none() {
             blockers.push(B8DebugObjcHelperExecutionBlocker::SelectorVmAddressUnavailable);
         }
-        blockers.push(B8DebugObjcHelperExecutionBlocker::ObjcHelperExecutionUnimplemented);
-        let return_writeback_boundary = materialization.return_value.writeback_boundary;
+        let helper_input_available = blockers.is_empty();
+        let return_writeback_boundary = if helper_input_available {
+            B8DebugObjcHelperReturnWritebackBoundaryReport::available_after_helper_execution()
+        } else {
+            materialization.return_value.writeback_boundary
+        };
         let required_capability =
             B8DebugObjcHelperExecutionCapability::ObjcRuntimeMessageSendHelper;
-        let bridge_contract = B8DebugObjcRuntimeHelperBridgeContractReport::blocked(
-            import,
-            receiver_identity.as_ref(),
-            selector_vm_address,
-            return_writeback_boundary,
-            required_capability,
-        );
-        let next_action = if blockers.len() == 1 {
-            B8DebugObjcHelperExecutionNextAction::DefineObjcRuntimeHelperBridge
+        let bridge_contract = if helper_input_available {
+            B8DebugObjcRuntimeHelperBridgeContractReport::executed(
+                import,
+                receiver_identity.as_ref(),
+                selector_vm_address,
+                return_writeback_boundary,
+                required_capability,
+            )
         } else {
-            B8DebugObjcHelperExecutionNextAction::InspectObjcMessageMaterializationBoundary
+            B8DebugObjcRuntimeHelperBridgeContractReport::blocked(
+                import,
+                receiver_identity.as_ref(),
+                selector_vm_address,
+                return_writeback_boundary,
+                required_capability,
+            )
+        };
+        let bridge_execution = helper_input_available.then(|| {
+            B8DebugObjcRuntimeHelperBridgeExecutionReport::from_observed_result(
+                helper_bridge_execution,
+                return_writeback_boundary,
+            )
+        });
+        let (status, next_action) = if helper_input_available {
+            (
+                B8DebugImportBoundaryStatus::Executed,
+                B8DebugObjcHelperExecutionNextAction::ContinueAfterObjcHelperReturn,
+            )
+        } else {
+            blockers.push(B8DebugObjcHelperExecutionBlocker::ObjcHelperExecutionUnimplemented);
+            (
+                B8DebugImportBoundaryStatus::Blocked,
+                B8DebugObjcHelperExecutionNextAction::InspectObjcMessageMaterializationBoundary,
+            )
         };
 
         Some(Self {
             schema: "b8_objc_helper_execution_request_v0",
-            status: B8DebugImportBoundaryStatus::Blocked,
+            status,
             kind: B8DebugObjcHelperExecutionRequestKind::ObjcMsgSend,
             source_import: import.clone(),
             receiver_identity,
@@ -2107,6 +2225,7 @@ impl B8DebugObjcHelperExecutionRequestReport {
             return_writeback_boundary,
             required_capability,
             bridge_contract,
+            bridge_execution,
             blockers,
             next_action,
         })
@@ -2136,7 +2255,7 @@ enum B8DebugObjcHelperExecutionBlocker {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum B8DebugObjcHelperExecutionNextAction {
-    DefineObjcRuntimeHelperBridge,
+    ContinueAfterObjcHelperReturn,
     InspectObjcMessageMaterializationBoundary,
 }
 
@@ -2148,7 +2267,7 @@ struct B8DebugObjcRuntimeHelperBridgeContractReport {
     input_contract: B8DebugObjcRuntimeHelperBridgeInputContractReport,
     output_contract: B8DebugObjcRuntimeHelperBridgeOutputContractReport,
     error_contract: B8DebugObjcRuntimeHelperBridgeErrorContractReport,
-    blocker: B8DebugObjcHelperExecutionBlocker,
+    blocker: Option<B8DebugObjcHelperExecutionBlocker>,
     next_action: B8DebugObjcRuntimeHelperBridgeNextAction,
 }
 
@@ -2174,9 +2293,35 @@ impl B8DebugObjcRuntimeHelperBridgeContractReport {
                 return_writeback_boundary,
             ),
             error_contract: B8DebugObjcRuntimeHelperBridgeErrorContractReport::blocked(),
-            blocker: B8DebugObjcHelperExecutionBlocker::ObjcHelperExecutionUnimplemented,
+            blocker: Some(B8DebugObjcHelperExecutionBlocker::ObjcHelperExecutionUnimplemented),
             next_action:
                 B8DebugObjcRuntimeHelperBridgeNextAction::ImplementPublicObjcRuntimeHelperBridge,
+        }
+    }
+
+    fn executed(
+        source_import: &MachOChainedImportIdentityReport,
+        receiver_identity: Option<&MachOChainedImportIdentityReport>,
+        selector_vm_address: Option<MachOChainedRebaseTargetIdentityReport>,
+        return_writeback_boundary: B8DebugObjcHelperReturnWritebackBoundaryReport,
+        capability: B8DebugObjcHelperExecutionCapability,
+    ) -> Self {
+        Self {
+            schema: "b8_objc_runtime_helper_bridge_contract_v0",
+            status: B8DebugImportBoundaryStatus::Executed,
+            capability,
+            input_contract: B8DebugObjcRuntimeHelperBridgeInputContractReport::new(
+                source_import,
+                receiver_identity,
+                selector_vm_address,
+                capability,
+            ),
+            output_contract: B8DebugObjcRuntimeHelperBridgeOutputContractReport::new(
+                return_writeback_boundary,
+            ),
+            error_contract: B8DebugObjcRuntimeHelperBridgeErrorContractReport::none(),
+            blocker: None,
+            next_action: B8DebugObjcRuntimeHelperBridgeNextAction::UseObjcHelperReturnWriteback,
         }
     }
 }
@@ -2224,16 +2369,89 @@ impl B8DebugObjcRuntimeHelperBridgeOutputContractReport {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 struct B8DebugObjcRuntimeHelperBridgeErrorContractReport {
-    error_classification: B8DebugObjcRuntimeHelperErrorClassification,
+    error_classification: Option<B8DebugObjcRuntimeHelperErrorClassification>,
 }
 
 impl B8DebugObjcRuntimeHelperBridgeErrorContractReport {
     const fn blocked() -> Self {
         Self {
-            error_classification:
+            error_classification: Some(
                 B8DebugObjcRuntimeHelperErrorClassification::ObjcRuntimeHelperExecutionUnimplemented,
+            ),
         }
     }
+
+    const fn none() -> Self {
+        Self {
+            error_classification: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugObjcRuntimeHelperBridgeExecutionReport {
+    schema: &'static str,
+    status: B8DebugImportBoundaryStatus,
+    execution_source: B8DebugObjcRuntimeHelperExecutionSource,
+    api_boundary: B8DebugObjcRuntimeHelperApiBoundary,
+    scope: B8DebugObjcRuntimeHelperExecutionScope,
+    helper_output: B8DebugObjcRuntimeHelperOutput,
+    objc_helper_return_value: u64,
+    return_value_kind: B8DebugObjcRuntimeHelperReturnValueKind,
+    observed_exit_status: i32,
+    observed_stdout: String,
+    observed_stderr: String,
+    return_writeback_boundary: B8DebugObjcHelperReturnWritebackBoundaryReport,
+}
+
+impl B8DebugObjcRuntimeHelperBridgeExecutionReport {
+    fn from_observed_result(
+        result: &ObservedResult,
+        return_writeback_boundary: B8DebugObjcHelperReturnWritebackBoundaryReport,
+    ) -> Self {
+        Self {
+            schema: "b8_objc_runtime_helper_bridge_execution_v0",
+            status: B8DebugImportBoundaryStatus::Executed,
+            execution_source:
+                B8DebugObjcRuntimeHelperExecutionSource::SelfAuthoredAppKitSharedApplicationHelper,
+            api_boundary: B8DebugObjcRuntimeHelperApiBoundary::PublicAppKitApi,
+            scope: B8DebugObjcRuntimeHelperExecutionScope::SelfAuthoredFixtureOnly,
+            helper_output: B8DebugObjcRuntimeHelperOutput::ObjcHelperReturnValue,
+            objc_helper_return_value: result.return_value(),
+            return_value_kind:
+                B8DebugObjcRuntimeHelperReturnValueKind::NonNullObjcObjectOpaqueHandle,
+            observed_exit_status: result.exit_status(),
+            observed_stdout: result.stdout().to_owned(),
+            observed_stderr: result.stderr().to_owned(),
+            return_writeback_boundary,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugObjcRuntimeHelperExecutionSource {
+    #[serde(rename = "self_authored_appkit_shared_application_helper")]
+    SelfAuthoredAppKitSharedApplicationHelper,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugObjcRuntimeHelperApiBoundary {
+    #[serde(rename = "public_appkit_api")]
+    PublicAppKitApi,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugObjcRuntimeHelperExecutionScope {
+    SelfAuthoredFixtureOnly,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugObjcRuntimeHelperReturnValueKind {
+    NonNullObjcObjectOpaqueHandle,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -2252,6 +2470,7 @@ enum B8DebugObjcRuntimeHelperErrorClassification {
 #[serde(rename_all = "snake_case")]
 enum B8DebugObjcRuntimeHelperBridgeNextAction {
     ImplementPublicObjcRuntimeHelperBridge,
+    UseObjcHelperReturnWriteback,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -2380,7 +2599,7 @@ impl B8DebugObjcMessageMaterializationBlocker {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum B8DebugObjcMessageMaterializationNextAction {
-    DefineObjcRuntimeHelperBridge,
+    ContinueAfterObjcHelperReturn,
     ExtendMachOMappedImageMetadataForObjcMaterialization,
     ResolveObjcArgumentMappedValueFixups,
 }
@@ -2388,7 +2607,7 @@ enum B8DebugObjcMessageMaterializationNextAction {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum B8DebugHelperMarshalingNextAction {
-    DefineObjcRuntimeHelperBridge,
+    ContinueAfterObjcHelperReturn,
     ExtendMachOMappedImageMetadataForObjcMaterialization,
     ResolveObjcArgumentMappedValueFixups,
 }
@@ -2398,8 +2617,8 @@ impl B8DebugHelperMarshalingNextAction {
         action: B8DebugObjcMessageMaterializationNextAction,
     ) -> Self {
         match action {
-            B8DebugObjcMessageMaterializationNextAction::DefineObjcRuntimeHelperBridge => {
-                Self::DefineObjcRuntimeHelperBridge
+            B8DebugObjcMessageMaterializationNextAction::ContinueAfterObjcHelperReturn => {
+                Self::ContinueAfterObjcHelperReturn
             }
             B8DebugObjcMessageMaterializationNextAction::ExtendMachOMappedImageMetadataForObjcMaterialization => {
                 Self::ExtendMachOMappedImageMetadataForObjcMaterialization
@@ -2491,6 +2710,7 @@ enum B8DebugImportBoundaryResolution {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum B8DebugImportBoundaryNextAction {
+    ContinueAfterObjcHelperReturn,
     DefineObjcReceiverSelectorMaterialization,
     DecodePublicDyldChainedFixupsImports,
     DecodePublicDyldBindOpcodes,
@@ -2753,6 +2973,7 @@ pub(crate) enum B8DebugBundleError {
     Probe(BinaryFormatProbeError),
     Entry(MachOEntryFunctionTestCaseError),
     B8CaseId(X8664MachOFixtureError),
+    HelperExecution(X8664MachOFixtureError),
     Json(JsonError),
 }
 
@@ -2785,6 +3006,9 @@ impl fmt::Display for B8DebugBundleError {
                 write!(formatter, "B8 debug entry extraction failed: {error:?}")
             }
             Self::B8CaseId(error) => write!(formatter, "B8 debug case id error: {error}"),
+            Self::HelperExecution(error) => {
+                write!(formatter, "B8 debug helper execution failed: {error}")
+            }
             Self::Json(error) => write!(formatter, "B8 debug JSON error: {error}"),
         }
     }
