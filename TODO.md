@@ -1826,13 +1826,13 @@ branch: `task/b8-hello-world-gui-complete`
 
 完了条件:
 
-- [ ] B8-G6t の `return_to_continuation_objc_helper_execution_unimplemented` を受けて、
+- [x] B8-G6t の `return_to_continuation_objc_helper_execution_unimplemented` を受けて、
   selector `run` の `_objc_msgSend(NSApp, run)` を no-argument Objective-C helper
   request として扱い、x86_64 `rdx` argument を要求しない contract に分ける。
-- [ ] public Objective-C / AppKit API と self-authored fixture の範囲で、`NSApp run`
+- [x] public Objective-C / AppKit API と self-authored fixture の範囲で、`NSApp run`
   を helper execution または AppKit run-loop lifecycle boundary として stable report
   する。
-- [ ] 次 blocker を `return_to=4294973062` continuation、window lifecycle / delegate
+- [x] 次 blocker を `return_to=4294973062` continuation、window lifecycle / delegate
   callback boundary、または focused AppKit run-loop boundary へ進める。
 
 PR に含めない:
@@ -1840,6 +1840,39 @@ PR に含めない:
 - AppKit run loop の一般実行。
 - window lifecycle / delegate callback into translated code の一般化。
 - arbitrary no-argument Objective-C message send。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6u は完了し、次の gate は B8-G6v。
+
+#### PR Gate: B8-G6v AppKit run-loop lifecycle observation boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [ ] B8-G6u の `return_to_continuation_appkit_run_loop_lifecycle_unimplemented` を受けて、
+  `NSApp run` を self-authored B8 GUI fixture の AppKit lifecycle observation
+  boundary として扱う。
+- [ ] public Objective-C / AppKit API helper で、fixture delegate の
+  `applicationDidFinishLaunching:` 相当が window / label creation event
+  `gui_window_created` を観測できる場合は stable report する。
+- [ ] automated oracle mode では run loop が無期限化しないよう、self-authored fixture
+  の bounded termination policy を report し、必要なら次 blocker を timer /
+  termination lifecycle boundary へ進める。
+
+PR に含めない:
+
+- arbitrary AppKit application lifecycle の一般化。
+- translated-code delegate callback execution。
+- `.app` bundle / resource / nib / storyboard 一般対応。
 - translation cache、fallback JIT/interpreter。
 
 検証:

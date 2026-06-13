@@ -2472,8 +2472,9 @@ mod tests {
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"helper_boundary_request\"")
         );
-        assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"reason\":\"return_to_continuation_objc_helper_execution_unimplemented\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"reason\":\"return_to_continuation_appkit_run_loop_lifecycle_unimplemented\""
+        ));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"kind\":\"import_helper_call\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
@@ -2583,7 +2584,7 @@ mod tests {
             .contains("\"next_source_pc\":4294972999"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register_state\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"blocker\":\"return_to_continuation_objc_helper_execution_unimplemented\""
+            "\"blocker\":\"return_to_continuation_appkit_run_loop_lifecycle_unimplemented\""
         ));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"continuation_block\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
@@ -2841,7 +2842,7 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_source_pc\":4294973049"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"blocker\":\"return_to_continuation_objc_helper_execution_unimplemented\""
+            "\"blocker\":\"return_to_continuation_appkit_run_loop_lifecycle_unimplemented\""
         ));
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"source_pc\":4294973049")
@@ -2871,14 +2872,28 @@ mod tests {
         );
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"effect\":\"run_application\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"argument\":null"));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"argument_state\":\"blocked\""));
+            .contains("\"argument_model\":\"no_arguments\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"argument_register\":null")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"argument_state\":\"not_required\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"execution_state\":\"blocked\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"error_classification\":\"unsupported_helper_contract\""));
+            .contains("\"appkit_run_loop_boundary\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_return_to_continuation_appkit_run_loop_boundary_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"execution_model\":\"ns_application_run_loop_entry\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"lifecycle_scope\":\"self_authored_b8_gui_fixture\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"error_classification\":\"appkit_run_loop_lifecycle_unimplemented\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"next_action\":\"implement_return_to_continuation_objc_helper_execution\""
+            "\"next_action\":\"model_return_to_continuation_appkit_run_loop_lifecycle\""
         ));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"unsupported_instruction\":null"));
@@ -2953,8 +2968,9 @@ mod tests {
         assert!(launch_report.contains("\"processed_source_pc_range\":{\"start\":"));
         assert!(launch_report.contains("\"b8_g1_host_trap_path\":\"not_used\""));
         assert!(launch_report.contains("\"helper_boundary_request\""));
-        assert!(launch_report
-            .contains("\"reason\":\"return_to_continuation_objc_helper_execution_unimplemented\""));
+        assert!(launch_report.contains(
+            "\"reason\":\"return_to_continuation_appkit_run_loop_lifecycle_unimplemented\""
+        ));
         assert!(launch_report.contains("\"symbol_name\":\"_objc_msgSend\""));
         assert!(launch_report.contains("\"call_site\":4294972996"));
         assert!(launch_report.contains("\"return_to\":4294972999"));
@@ -3013,7 +3029,7 @@ mod tests {
         assert!(launch_report.contains("\"next_source_pc\":4294972999"));
         assert!(launch_report.contains("\"register_state\""));
         assert!(launch_report.contains(
-            "\"blocker\":\"return_to_continuation_objc_helper_execution_unimplemented\""
+            "\"blocker\":\"return_to_continuation_appkit_run_loop_lifecycle_unimplemented\""
         ));
         assert!(launch_report.contains("\"continuation_block\""));
         assert!(
@@ -3189,7 +3205,7 @@ mod tests {
         );
         assert!(launch_report.contains("\"next_source_pc\":4294973049"));
         assert!(launch_report.contains(
-            "\"blocker\":\"return_to_continuation_objc_helper_execution_unimplemented\""
+            "\"blocker\":\"return_to_continuation_appkit_run_loop_lifecycle_unimplemented\""
         ));
         assert!(launch_report.contains("\"source_pc\":4294973049"));
         assert!(launch_report.contains("\"input_register_state\":null"));
@@ -3206,11 +3222,20 @@ mod tests {
         assert!(launch_report.contains("\"return_to\":4294973062"));
         assert!(launch_report.contains("\"selector_name\":\"run\""));
         assert!(launch_report.contains("\"effect\":\"run_application\""));
-        assert!(launch_report.contains("\"argument_state\":\"blocked\""));
+        assert!(launch_report.contains("\"argument\":null"));
+        assert!(launch_report.contains("\"argument_model\":\"no_arguments\""));
+        assert!(launch_report.contains("\"argument_register\":null"));
+        assert!(launch_report.contains("\"argument_state\":\"not_required\""));
         assert!(launch_report.contains("\"execution_state\":\"blocked\""));
-        assert!(launch_report.contains("\"error_classification\":\"unsupported_helper_contract\""));
+        assert!(launch_report.contains("\"appkit_run_loop_boundary\""));
+        assert!(launch_report
+            .contains("\"schema\":\"b8_return_to_continuation_appkit_run_loop_boundary_v0\""));
+        assert!(launch_report.contains("\"execution_model\":\"ns_application_run_loop_entry\""));
+        assert!(launch_report.contains("\"lifecycle_scope\":\"self_authored_b8_gui_fixture\""));
+        assert!(launch_report
+            .contains("\"error_classification\":\"appkit_run_loop_lifecycle_unimplemented\""));
         assert!(launch_report.contains(
-            "\"next_action\":\"implement_return_to_continuation_objc_helper_execution\""
+            "\"next_action\":\"model_return_to_continuation_appkit_run_loop_lifecycle\""
         ));
         assert!(launch_report.contains("\"unsupported_instruction\":null"));
         assert!(!launch_report.contains("\"return_to_continuation_unsupported_instruction\""));
