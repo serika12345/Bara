@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 13:37 JST
+最終更新: 2026-06-13 13:39 JST
 
 状態:
 
@@ -109,8 +109,9 @@
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
 - active_branch: `task/b8-g6i-continuation-xor-edx-zero`。base branch は
   最新 `main` の `2ae960b` (`Merge pull request #45 from
-  serika12345:task/b8-g6h-continuation-nsapp-global-load`)。implementation commit と
-  draft PR は検証後に作成する。
+  serika12345:task/b8-g6h-continuation-nsapp-global-load`)。implementation commit は
+  `f163cb2` (`feat: add b8 g6i xor edx continuation slice`)。draft PR は
+  <https://github.com/serika12345/Bara/pull/46>。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
@@ -255,8 +256,8 @@
   `4294973018` / `return_to=4294973021` を focused stable boundary として扱う。
   `return_to` 以降の一般実行、arbitrary indirect call target execution、translation cache、
   fallback JIT/interpreter はまだ行わない。
-- next_action: B8-G6i を full verify し、draft PR を作成して review gate で停止する。
-  merge 後の次 PR Gate は B8-G6j Return-To Continuation Call R14 Boundary Planning。
+- next_action: B8-G6i draft PR #46 を review / merge する。merge 後の次 PR Gate は
+  B8-G6j Return-To Continuation Call R14 Boundary Planning。
 - verification:
   `nix develop -c cargo test -p bara-isa-x86 xor_edx -- --nocapture`、
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
