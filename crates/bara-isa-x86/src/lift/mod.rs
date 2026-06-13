@@ -146,6 +146,13 @@ fn lift_instruction(
                 },
             }))
         }
+        DecodedInstructionKind::MovRdiQwordPtrR15 => Ok(LiftedInstruction::Op(IrOp::Mov {
+            dst: Operand::Reg(X86Reg::Rdi),
+            src: Operand::MemRegIndirect {
+                base: X86Reg::R15,
+                width: MemoryReadWidth::Bits64,
+            },
+        })),
         DecodedInstructionKind::MovRdxQwordPtrRax => Ok(LiftedInstruction::Op(IrOp::Mov {
             dst: Operand::Reg(X86Reg::Rdx),
             src: Operand::MemRegIndirect {
@@ -1315,6 +1322,37 @@ mod tests {
                 dst: Operand::Reg(X86Reg::Rdx),
                 src: Operand::MemRegIndirect {
                     base: X86Reg::Rax,
+                    width: MemoryReadWidth::Bits64,
+                }
+            }]
+        );
+        assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_mov_rdi_qword_ptr_r15_to_register_indirect_memory_load() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(3),
+                    DecodedInstructionKind::MovRdiQwordPtrR15,
+                ),
+                DecodedInstruction::new(X86Va::new(3), X86Va::new(4), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded R15-indirect load lifts");
+        let block = &program.blocks()[0];
+
+        assert_eq!(
+            block.ops(),
+            &[IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rdi),
+                src: Operand::MemRegIndirect {
+                    base: X86Reg::R15,
                     width: MemoryReadWidth::Bits64,
                 }
             }]

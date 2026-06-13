@@ -428,6 +428,18 @@
   `0x49` at `4294973006` へ進む。これは continuation block の一般実行や
   translation cache / fallback JIT を追加するものではなく、次の B8-G6g では
   `49 8b 3f` を `mov rdi, qword ptr [r15]` slice として扱う。
+- 2026-06-13 の B8-G6g として、G6f の
+  `return_to_continuation_unsupported_instruction` を受けて `49 8b 3f` を
+  x86_64 `mov rdi, qword ptr [r15]` として decode / lift / debug report 境界に
+  追加した。continuation report は input の x86_64 `rax` state と、直前の
+  `mov r15, qword ptr [rip+disp32]` で materialize した `r15` raw qword を保持し、
+  public `LC_DYLD_CHAINED_FIXUPS` 上で `r15` が AppKit `_NSApp` import に解決されることを
+  `fixup_resolution` として保存する。`mov rdi, [r15]` は mapped image qword read ではなく
+  imported global pointee load であるため、`rdi` materialization は
+  `return_to_continuation_import_global_load_unimplemented` として blocked report に残す。
+  これは一般的な dynamic library data symbol memory model、continuation block の一般実行、
+  translation cache / fallback JIT を追加するものではない。次の B8-G6h では `_NSApp`
+  imported global load を fixture-scoped boundary として扱う。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、

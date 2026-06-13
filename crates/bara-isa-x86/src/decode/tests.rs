@@ -842,6 +842,30 @@ fn decodes_mov_r15_qword_ptr_rip_relative_then_ret() {
 }
 
 #[test]
+fn decodes_mov_rdi_qword_ptr_r15_then_ret() {
+    let input = X86Bytes::new(X86Va::new(0x2000), vec![0x49, 0x8b, 0x3f, 0xc3])
+        .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0x2000),
+                X86Va::new(0x2003),
+                DecodedInstructionKind::MovRdiQwordPtrR15
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x2003),
+                X86Va::new(0x2004),
+                DecodedInstructionKind::Ret
+            )
+        ]
+    );
+}
+
+#[test]
 fn decodes_call_r14_as_indirect_call_terminator() {
     let input = X86Bytes::new(X86Va::new(0x2000), vec![0x41, 0xff, 0xd6, 0xc3])
         .expect("test bytes are non-empty");
