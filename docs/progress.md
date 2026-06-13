@@ -9,11 +9,11 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 10:16 JST
+最終更新: 2026-06-13 10:37 JST
 
 状態:
 
-- project_state: paused。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
+- project_state: in_progress。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
   reviewable GUI 起動 slice の積み上げとして扱う。B8-G6c までで、self-authored
   x86_64 GUI fixture の実 `LC_MAIN` entry から
   `push rbp; mov rbp,rsp; push r15; push r14; push rbx; push rax; call rel32;
@@ -71,25 +71,29 @@
   write-back value へ接続される。B8-G6d では、この helper output と `rax`
   write-back value を `b8_objc_helper_return_continuation_boundary_v0` に保存し、
   `call r14` の `return_to=4294972999` を `next_source_pc` として report する。
-  次の blocker は `return_to_continuation_execution_unimplemented` である。arbitrary
+  B8-G6e では、この `next_source_pc` から public Mach-O code segment bytes を使って
+  continuation block を decode し、
+  `b8_return_to_continuation_decode_boundary_v0` に `next_instruction` /
+  `unsupported_instruction` / input x86_64 `rax` register state を保存する。次の blocker は
+  `return_to_continuation_unsupported_instruction` であり、先頭 instruction は `4c 8b 3d ...`
+  の unsupported REX/MOV である。arbitrary
   indirect call target execution、translation cache、fallback JIT/interpreter はまだ行わない。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G6d ObjC Helper Return
-  Continuation Boundary: B8-G6c の helper execution result が残した continuation
-  blocker を、helper output 由来の x86_64 `rax` register state と `return_to` PC を持つ
-  stable boundary として保存する。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G6e Return-To Continuation
+  Decode Boundary: G6d の continuation boundary が残した `next_source_pc` から
+  continuation block を decode/report し、次の unsupported instruction blocker を
+  stable report に保存する。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
   Objective-C runtime / dyld の private behavior は使わず、public metadata、
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
-- active_branch: `task/b8-g6d-objc-helper-return-continuation`。base branch は
-  最新 `main` の `996918e` (`Merge pull request #40 from
-  serika12345/Bara:task/b8-g6c-objc-runtime-helper-bridge-execution`)。draft PR は
-  <https://github.com/serika12345/Bara/pull/41>。
+- active_branch: `task/b8-g6e-return-to-continuation-decode`。base branch は
+  最新 `main` の `d11dfb6` (`Merge pull request #41 from
+  serika12345:task/b8-g6d-objc-helper-return-continuation`)。draft PR は作成予定。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
-  B8-G5b-G5e / B8-G6a / B8-G6b / B8-G6c / B8-G6d。
+  B8-G5b-G5e / B8-G6a / B8-G6b / B8-G6c / B8-G6d / B8-G6e。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -201,19 +205,34 @@
   `source.kind=register_indirect_call_return`、`next_source_pc=4294972999`、
   `register_state.register=rax`、`register_state.source=objc_helper_return_value`、
   `blocker=return_to_continuation_execution_unimplemented`、`next_action=decode_return_to_continuation_block`
+  を stable report に保存する。B8-G6e として
+  `continuation_block.schema=b8_return_to_continuation_decode_boundary_v0`、
+  `source.kind=return_to_source_pc`、`source.byte_source=mach_o_code_segment_bytes`、
+  `decode_report.entry=4294972999`、`next_instruction.kind=unsupported`、
+  `unsupported_instruction.kind.reason=DecodeUnsupportedOpcode { opcode: 76, ... }`、
+  `blocker=return_to_continuation_unsupported_instruction`、`next_action=add_return_to_continuation_instruction_support`
   を stable report に保存する。
-- remaining_work: B8-G6e。G6d の continuation boundary が残す
-  `return_to_continuation_execution_unimplemented` を、`next_source_pc` からの continuation
-  block decode/report boundary として扱う。`return_to` 以降の一般実行、arbitrary indirect
-  call target execution、translation cache、fallback JIT/interpreter はまだ行わない。
-- next_action: B8-G6d draft PR #41 を review / merge する。merge 後の次 PR Gate は
-  B8-G6e Return-To Continuation Decode Boundary。
+- remaining_work: B8-G6f。G6e の continuation block が残す
+  `return_to_continuation_unsupported_instruction` を受けて、`return_to` 先頭の
+  `4c 8b 3d ...` を x86_64 `mov r15, qword ptr [rip+disp32]` の focused ISA slice
+  として扱う。`return_to` 以降の一般実行、arbitrary indirect call target execution、
+  translation cache、fallback JIT/interpreter はまだ行わない。
+- next_action: B8-G6e の commit / push / draft PR を作成する。
 - verification: `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
-  と `nix develop -c ./scripts/verify` が通過した。PR URL 記録後に
-  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
+  と `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-13 10:33 JST: B8-G6e Return-To Continuation Decode Boundary を実装した。
+  G6d の `b8_objc_helper_return_continuation_boundary_v0` に
+  `b8_return_to_continuation_decode_boundary_v0` を追加し、`next_source_pc=4294972999` から
+  public Mach-O code segment bytes を使って continuation block を decode する。
+  G6d の x86_64 `rax` register state は `input_register_state` として保持し、
+  `processed_source_pc_range=4294972999..4294973002`、`next_instruction.kind=unsupported`、
+  `unsupported_instruction.kind.reason=DecodeUnsupportedOpcode { opcode: 76, ... }` を
+  stable report に保存する。helper boundary の current blocker は
+  `return_to_continuation_unsupported_instruction` に進む。`return_to` block の実行、
+  arbitrary indirect call target execution、translation cache、fallback JIT/interpreter は追加しない。
 - 2026-06-13 10:11 JST: B8-G6d ObjC Helper Return Continuation Boundary を実装した。
   B8 debug bundle の helper execution request に
   `b8_objc_helper_return_continuation_boundary_v0` を追加し、`call r14` の
