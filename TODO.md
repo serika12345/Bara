@@ -1439,13 +1439,13 @@ branch: `task/b8-g6j-continuation-call-r14-boundary`
 
 完了条件:
 
-- [ ] B8-G6i の `return_to_continuation_execution_unimplemented` を受けて、
+- [x] B8-G6i の `return_to_continuation_execution_unimplemented` を受けて、
   `return_to` continuation block の decoded `call r14` at `4294973018` /
   `return_to=4294973021` を focused stable boundary として扱う。
-- [ ] continuation input の x86_64 `rax` state、`r15` AppKit `_NSApp` import identity、
+- [x] continuation input の x86_64 `rax` state、`r15` AppKit `_NSApp` import identity、
   `rdi` `_NSApp` value、`rdx=0` zeroing state を保持し、`call r14` の target /
   argument / blocked state と次 blocker を stable report に保存する。
-- [ ] `return_to` 以降の一般実行、arbitrary indirect call target execution、
+- [x] `return_to` 以降の一般実行、arbitrary indirect call target execution、
   translation cache、fallback JIT/interpreter は行わない。
 
 PR に含めない:
@@ -1454,6 +1454,40 @@ PR に含めない:
 - arbitrary indirect call target execution、translation cache、fallback JIT/interpreter。
 - Objective-C runtime / AppKit lifecycle 全体の一般化。
 - 一般的な continuation call execution engine。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止する。次の gate は continuation block
+  の next blocker を見て focused ISA / process-state / AppKit lifecycle slice として
+  更新する。
+
+#### PR Gate: B8-G6k Return-To Continuation setActivationPolicy Helper Boundary
+
+branch: `task/b8-g6k-continuation-set-activation-policy-helper`
+
+完了条件:
+
+- [ ] B8-G6j の `return_to_continuation_execution_unimplemented` を受けて、
+  continuation call boundary の target `_objc_msgSend`、receiver `_NSApp`、
+  selector `setActivationPolicy:`、argument `rdx=0` を focused Objective-C helper
+  boundary として扱う。
+- [ ] `setActivationPolicy:` helper request / bridge contract / available-or-blocked state を
+  stable report に保存し、次の decoded instruction / boundary / blocker を記録する。
+- [ ] `return_to` 以降の一般実行、arbitrary indirect call target execution、
+  translation cache、fallback JIT/interpreter、Objective-C runtime / AppKit lifecycle
+  全体の一般化は行わない。
+
+PR に含めない:
+
+- 一般的な continuation call execution engine。
+- arbitrary indirect call target execution、translation cache、fallback JIT/interpreter。
+- Objective-C runtime / AppKit lifecycle 全体の一般化。
+- `setActivationPolicy:` 以外の arbitrary Objective-C message send。
 
 検証:
 
