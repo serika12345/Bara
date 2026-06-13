@@ -553,6 +553,14 @@
   arbitrary Objective-C message send、general continuation execution、arbitrary indirect
   target execution、translation cache / JIT、`.app` bundle / resource が必要になったら
   先に TODO 上の focused gate または sub-target へ分割する。
+- 2026-06-13 の B8-G6v として、`NSApp run` は arbitrary AppKit lifecycle ではなく
+  self-authored B8 GUI fixture 専用の public AppKit helper observation boundary とする。
+  helper は fixture delegate の `applicationDidFinishLaunching:` 相当で
+  `gui_window_created` event を stdout observation として保存し、
+  `timer_after_gui_window_created` / `delay_millis=100` /
+  `termination_request=ns_app_terminate_nil` で bounded に戻る。translated-code delegate
+  callback execution、window lifecycle 一般化、`.app` bundle / nib / storyboard、
+  translation cache / fallback JIT はこの boundary に含めない。
 - B8-HWGUI 完遂後の OSS app cycle は、任意の downloaded binary ではなく、まず public
   source から x86_64 macOS binary を reproducible に build できる小さい OSS GUI app を
   source-built fixture として扱う。候補選定、license / redistribution、supply-chain、

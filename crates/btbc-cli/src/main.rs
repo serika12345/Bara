@@ -2472,9 +2472,8 @@ mod tests {
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"helper_boundary_request\"")
         );
-        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"reason\":\"return_to_continuation_appkit_run_loop_lifecycle_unimplemented\""
-        ));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"reason\":\"return_to_continuation_unsupported_instruction\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"kind\":\"import_helper_call\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
@@ -2583,9 +2582,8 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_source_pc\":4294972999"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register_state\""));
-        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"blocker\":\"return_to_continuation_appkit_run_loop_lifecycle_unimplemented\""
-        ));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"blocker\":\"return_to_continuation_unsupported_instruction\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"continuation_block\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"schema\":\"b8_return_to_continuation_decode_boundary_v0\""));
@@ -2841,9 +2839,8 @@ mod tests {
             .contains("\"return_value_handling\":\"no_x86_64_return_value_observed\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_source_pc\":4294973049"));
-        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"blocker\":\"return_to_continuation_appkit_run_loop_lifecycle_unimplemented\""
-        ));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"blocker\":\"return_to_continuation_unsupported_instruction\""));
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"source_pc\":4294973049")
         );
@@ -2881,24 +2878,53 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"argument_state\":\"not_required\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"execution_state\":\"blocked\""));
+            .contains("\"execution_state\":\"executed\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"appkit_run_loop_boundary\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"schema\":\"b8_return_to_continuation_appkit_run_loop_boundary_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"status\":\"executed\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"execution_model\":\"ns_application_run_loop_entry\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"lifecycle_scope\":\"self_authored_b8_gui_fixture\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"lifecycle_observation\"")
+        );
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"error_classification\":\"appkit_run_loop_lifecycle_unimplemented\""));
-        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"next_action\":\"model_return_to_continuation_appkit_run_loop_lifecycle\""
-        ));
+            .contains("\"delegate_class_name\":\"BaraGuiHelloWorldDelegate\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"delegate_callback\":\"applicationDidFinishLaunching:\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"observed_event\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"event\":\"gui_window_created\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"title\":\"Bara GUI Hello World\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"text\":\"hello world\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"bounded_termination_policy\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"trigger\":\"timer_after_gui_window_created\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"delay_millis\":100"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"termination_request\":\"ns_app_terminate_nil\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"return_value_handling\":\"no_x86_64_return_value_observed\""));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"appkit_run_loop_lifecycle_unimplemented\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"unsupported_instruction\":null"));
-        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"return_to_continuation_unsupported_instruction\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"source_pc\":4294973062")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"unsupported_instruction\":{\"start\":4294973062"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_action\":\"add_return_to_continuation_instruction_support\""));
         assert!(!read_file(&bundle_dir.join("loader.plan.json")).contains(
             "\"return_to_continuation_call_rel32_return_value_materialization_unimplemented\""
         ));
@@ -2968,9 +2994,9 @@ mod tests {
         assert!(launch_report.contains("\"processed_source_pc_range\":{\"start\":"));
         assert!(launch_report.contains("\"b8_g1_host_trap_path\":\"not_used\""));
         assert!(launch_report.contains("\"helper_boundary_request\""));
-        assert!(launch_report.contains(
-            "\"reason\":\"return_to_continuation_appkit_run_loop_lifecycle_unimplemented\""
-        ));
+        assert!(
+            launch_report.contains("\"reason\":\"return_to_continuation_unsupported_instruction\"")
+        );
         assert!(launch_report.contains("\"symbol_name\":\"_objc_msgSend\""));
         assert!(launch_report.contains("\"call_site\":4294972996"));
         assert!(launch_report.contains("\"return_to\":4294972999"));
@@ -3028,9 +3054,8 @@ mod tests {
         assert!(launch_report.contains("\"kind\":\"register_indirect_call_return\""));
         assert!(launch_report.contains("\"next_source_pc\":4294972999"));
         assert!(launch_report.contains("\"register_state\""));
-        assert!(launch_report.contains(
-            "\"blocker\":\"return_to_continuation_appkit_run_loop_lifecycle_unimplemented\""
-        ));
+        assert!(launch_report
+            .contains("\"blocker\":\"return_to_continuation_unsupported_instruction\""));
         assert!(launch_report.contains("\"continuation_block\""));
         assert!(
             launch_report.contains("\"schema\":\"b8_return_to_continuation_decode_boundary_v0\"")
@@ -3204,9 +3229,8 @@ mod tests {
             launch_report.contains("\"return_value_handling\":\"no_x86_64_return_value_observed\"")
         );
         assert!(launch_report.contains("\"next_source_pc\":4294973049"));
-        assert!(launch_report.contains(
-            "\"blocker\":\"return_to_continuation_appkit_run_loop_lifecycle_unimplemented\""
-        ));
+        assert!(launch_report
+            .contains("\"blocker\":\"return_to_continuation_unsupported_instruction\""));
         assert!(launch_report.contains("\"source_pc\":4294973049"));
         assert!(launch_report.contains("\"input_register_state\":null"));
         assert!(launch_report.contains("\"start\":4294973049"));
@@ -3226,19 +3250,34 @@ mod tests {
         assert!(launch_report.contains("\"argument_model\":\"no_arguments\""));
         assert!(launch_report.contains("\"argument_register\":null"));
         assert!(launch_report.contains("\"argument_state\":\"not_required\""));
-        assert!(launch_report.contains("\"execution_state\":\"blocked\""));
+        assert!(launch_report.contains("\"execution_state\":\"executed\""));
         assert!(launch_report.contains("\"appkit_run_loop_boundary\""));
         assert!(launch_report
             .contains("\"schema\":\"b8_return_to_continuation_appkit_run_loop_boundary_v0\""));
+        assert!(launch_report.contains("\"status\":\"executed\""));
         assert!(launch_report.contains("\"execution_model\":\"ns_application_run_loop_entry\""));
         assert!(launch_report.contains("\"lifecycle_scope\":\"self_authored_b8_gui_fixture\""));
-        assert!(launch_report
-            .contains("\"error_classification\":\"appkit_run_loop_lifecycle_unimplemented\""));
-        assert!(launch_report.contains(
-            "\"next_action\":\"model_return_to_continuation_appkit_run_loop_lifecycle\""
-        ));
+        assert!(launch_report.contains("\"lifecycle_observation\""));
+        assert!(launch_report.contains("\"delegate_class_name\":\"BaraGuiHelloWorldDelegate\""));
+        assert!(launch_report.contains("\"delegate_callback\":\"applicationDidFinishLaunching:\""));
+        assert!(launch_report.contains("\"observed_event\""));
+        assert!(launch_report.contains("\"event\":\"gui_window_created\""));
+        assert!(launch_report.contains("\"title\":\"Bara GUI Hello World\""));
+        assert!(launch_report.contains("\"text\":\"hello world\""));
+        assert!(launch_report.contains("\"bounded_termination_policy\""));
+        assert!(launch_report.contains("\"trigger\":\"timer_after_gui_window_created\""));
+        assert!(launch_report.contains("\"delay_millis\":100"));
+        assert!(launch_report.contains("\"termination_request\":\"ns_app_terminate_nil\""));
+        assert!(
+            launch_report.contains("\"return_value_handling\":\"no_x86_64_return_value_observed\"")
+        );
+        assert!(!launch_report.contains("\"appkit_run_loop_lifecycle_unimplemented\""));
         assert!(launch_report.contains("\"unsupported_instruction\":null"));
-        assert!(!launch_report.contains("\"return_to_continuation_unsupported_instruction\""));
+        assert!(launch_report.contains("\"return_to_continuation_unsupported_instruction\""));
+        assert!(launch_report.contains("\"source_pc\":4294973062"));
+        assert!(launch_report.contains("\"unsupported_instruction\":{\"start\":4294973062"));
+        assert!(launch_report
+            .contains("\"next_action\":\"add_return_to_continuation_instruction_support\""));
         assert!(!launch_report.contains(
             "\"return_to_continuation_call_rel32_return_value_materialization_unimplemented\""
         ));

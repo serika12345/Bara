@@ -2267,7 +2267,6 @@ enum B8DebugObjcHelperExecutionBlocker {
     ReturnToContinuationCallRel32HelperExecutionUnimplemented,
     ReturnToContinuationCallRel32StubSymbolResolutionUnresolved,
     ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented,
-    ReturnToContinuationAppkitRunLoopLifecycleUnimplemented,
     ReturnToContinuationExecutionUnimplemented,
     ReturnToContinuationImportGlobalLoadUnimplemented,
     ReturnToContinuationObjcAllocInitClassArgumentMaterializationUnimplemented,
@@ -2459,7 +2458,6 @@ enum B8DebugObjcHelperReturnContinuationNextAction {
     ImplementReturnToContinuationObjcHelperExecution,
     ImplementReturnToContinuationExecution,
     MaterializeReturnToContinuationObjcAllocInitClassArgument,
-    ModelReturnToContinuationAppkitRunLoopLifecycle,
     ResolveReturnToContinuationObjcAllocInitClassIdentity,
     ResolveReturnToContinuationCallRel32StubSymbol,
     MaterializeReturnToContinuationCallRel32ReturnValue,
@@ -2706,9 +2704,6 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
             B8DebugReturnToContinuationDecodeNextAction::MaterializeReturnToContinuationObjcAllocInitClassArgument => {
                 B8DebugObjcHelperReturnContinuationNextAction::MaterializeReturnToContinuationObjcAllocInitClassArgument
             }
-            B8DebugReturnToContinuationDecodeNextAction::ModelReturnToContinuationAppkitRunLoopLifecycle => {
-                B8DebugObjcHelperReturnContinuationNextAction::ModelReturnToContinuationAppkitRunLoopLifecycle
-            }
             B8DebugReturnToContinuationDecodeNextAction::ResolveReturnToContinuationObjcAllocInitClassIdentity => {
                 B8DebugObjcHelperReturnContinuationNextAction::ResolveReturnToContinuationObjcAllocInitClassIdentity
             }
@@ -2765,7 +2760,6 @@ enum B8DebugReturnToContinuationDecodeNextAction {
     MaterializeReturnToContinuationCallRel32ReturnValue,
     MaterializeReturnToContinuationImportGlobalLoad,
     MaterializeReturnToContinuationObjcAllocInitClassArgument,
-    ModelReturnToContinuationAppkitRunLoopLifecycle,
     ResolveReturnToContinuationObjcAllocInitClassIdentity,
     ResolveReturnToContinuationCallRel32StubSymbol,
     RunReturnToContinuationObjcHelperOnSupportedMacosHost,
@@ -3939,6 +3933,8 @@ const OBJC_CLASS_SYMBOL_PREFIX: &str = "_OBJC_CLASS_$_";
 const B8_GUI_HELLO_WORLD_DELEGATE_CLASS_SYMBOL_NAME: &str =
     "_OBJC_CLASS_$_BaraGuiHelloWorldDelegate";
 const B8_GUI_HELLO_WORLD_DELEGATE_CLASS_NAME: &str = "BaraGuiHelloWorldDelegate";
+const B8_GUI_HELLO_WORLD_TITLE: &str = "Bara GUI Hello World";
+const B8_GUI_HELLO_WORLD_TEXT: &str = "hello world";
 const B8_GUI_HELLO_WORLD_SET_DELEGATE_SELECTOR_NAME: &str = "setDelegate:";
 const B8_GUI_HELLO_WORLD_RUN_SELECTOR_NAME: &str = "run";
 
@@ -4090,6 +4086,16 @@ impl B8DebugReturnToContinuationImportedGlobalValue {
         request: &B8DebugReturnToContinuationObjcHelperRequestReport,
     ) -> Option<Self> {
         if !request.is_supported_b8_set_delegate_message() {
+            return None;
+        }
+
+        Self::nsapp_from_objc_helper_request(request)
+    }
+
+    fn nsapp_from_run_loop_request(
+        request: &B8DebugReturnToContinuationObjcHelperRequestReport,
+    ) -> Option<Self> {
+        if !request.is_supported_b8_run_message() {
             return None;
         }
 
@@ -4529,7 +4535,13 @@ impl B8DebugReturnToContinuationObjcHelperHostExecutionReport {
             );
         }
         if request.is_supported_b8_run_message() {
-            return Self::blocked_appkit_run_loop(request);
+            return Self::execute_appkit_run_loop(
+                request,
+                code_bytes,
+                input,
+                input_probe,
+                image_metadata,
+            );
         }
 
         Self::blocked(
@@ -4699,34 +4711,84 @@ impl B8DebugReturnToContinuationObjcHelperHostExecutionReport {
         }
     }
 
-    fn blocked_appkit_run_loop(
+    fn execute_appkit_run_loop(
         request: &B8DebugReturnToContinuationObjcHelperRequestReport,
+        code_bytes: &X86Bytes,
+        input: &BinaryInput,
+        input_probe: &BinaryFormatProbeReport,
+        image_metadata: &ProgramImageMetadata,
     ) -> Self {
-        Self {
-            schema: "b8_return_to_continuation_objc_helper_host_execution_v0",
-            status: B8DebugObjcRuntimeHelperHostExecutionStatus::Blocked,
-            api_boundary: B8DebugObjcRuntimeHelperHostApiBoundary::PublicObjcRuntimeAppKit,
-            fixture_scope: B8DebugObjcRuntimeHelperFixtureScope::SelfAuthoredB8GuiFixture,
-            effect: B8DebugReturnToContinuationObjcHelperEffect::RunApplication,
-            selector_name: request.selector_name().map(str::to_owned),
-            argument_value: request.argument_value(),
-            host_object_boundary: None,
-            appkit_run_loop_boundary:
-                B8DebugReturnToContinuationObjcHelperAppKitRunLoopBoundaryReport::from_request(
-                    request,
-                ),
-            output: None,
-            next_source_pc: request.return_to,
-            next_continuation: None,
-            error: Some(
-                B8DebugObjcRuntimeHelperHostExecutionErrorReport::classification_only(
-                    B8DebugObjcRuntimeHelperErrorClassification::AppkitRunLoopLifecycleUnimplemented,
-                ),
-            ),
-            next_blocker:
-                B8DebugObjcHelperExecutionBlocker::ReturnToContinuationAppkitRunLoopLifecycleUnimplemented,
-            next_action:
-                B8DebugReturnToContinuationDecodeNextAction::ModelReturnToContinuationAppkitRunLoopLifecycle,
+        if !cfg!(target_os = "macos") {
+            return Self::skipped(
+                request,
+                B8DebugObjcRuntimeHelperErrorClassification::UnsupportedHost,
+            );
+        }
+
+        match run_public_objc_msg_send_appkit_run_loop_helper() {
+            Ok(observation) => {
+                let output =
+                    B8DebugReturnToContinuationObjcHelperHostOutputReport::from_appkit_run_loop_observation(
+                        &observation,
+                    );
+                let preserved_r15_state = request
+                    .receiver
+                    .materialized_state
+                    .as_ref()
+                    .filter(|state| state.base_register == Some(B8DebugRegisterName::R15));
+                let continuation_inputs = B8DebugReturnToContinuationDecodeInputs {
+                    imported_global_value:
+                        B8DebugReturnToContinuationImportedGlobalValue::nsapp_from_run_loop_request(
+                            request,
+                        ),
+                    preserved_call_target_import: Some(request.source_import.clone()),
+                    preserved_r15_value: preserved_r15_state.and_then(|state| state.base_value),
+                    preserved_r15_fixup_resolution: preserved_r15_state
+                        .and_then(|state| state.base_fixup_resolution.clone()),
+                };
+                let next_continuation =
+                    B8DebugReturnToContinuationDecodeBoundaryReport::from_code_bytes(
+                        request.return_to,
+                        None,
+                        continuation_inputs,
+                        code_bytes,
+                        input,
+                        input_probe,
+                        image_metadata,
+                    );
+                let next_blocker = next_continuation.as_ref().map_or(
+                    B8DebugObjcHelperExecutionBlocker::ReturnToContinuationExecutionUnimplemented,
+                    |continuation| continuation.blocker(),
+                );
+                let next_action = next_continuation.as_ref().map_or(
+                    B8DebugReturnToContinuationDecodeNextAction::ImplementReturnToContinuationExecution,
+                    |continuation| continuation.next_action,
+                );
+
+                Self {
+                    schema: "b8_return_to_continuation_objc_helper_host_execution_v0",
+                    status: B8DebugObjcRuntimeHelperHostExecutionStatus::Executed,
+                    api_boundary: B8DebugObjcRuntimeHelperHostApiBoundary::PublicObjcRuntimeAppKit,
+                    fixture_scope: B8DebugObjcRuntimeHelperFixtureScope::SelfAuthoredB8GuiFixture,
+                    effect: B8DebugReturnToContinuationObjcHelperEffect::RunApplication,
+                    selector_name: request.selector_name().map(str::to_owned),
+                    argument_value: request.argument_value(),
+                    host_object_boundary: None,
+                    appkit_run_loop_boundary:
+                        B8DebugReturnToContinuationObjcHelperAppKitRunLoopBoundaryReport::executed_from_observation(
+                            request,
+                            &observation,
+                            next_action,
+                    ),
+                    output: Some(output),
+                    next_source_pc: request.return_to,
+                    next_continuation: next_continuation.map(Box::new),
+                    error: None,
+                    next_blocker,
+                    next_action,
+                }
+            }
+            Err(error) => Self::failed(request, error),
         }
     }
 
@@ -4827,6 +4889,53 @@ struct B8DebugReturnToContinuationObjcHelperHostObservation {
     return_value: Option<u64>,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+struct B8DebugReturnToContinuationObjcHelperAppKitRunLoopHostObservation {
+    schema: String,
+    observed_event: B8DebugReturnToContinuationObjcHelperAppKitRunLoopLifecycleEventReport,
+    termination_policy: B8DebugReturnToContinuationObjcHelperAppKitRunLoopTerminationPolicyReport,
+}
+
+impl B8DebugReturnToContinuationObjcHelperAppKitRunLoopHostObservation {
+    fn validate(self) -> Result<Self, B8DebugObjcRuntimeHelperHostExecutionErrorReport> {
+        if self.schema != "b8_return_to_continuation_appkit_run_loop_host_observation_v0" {
+            return Err(B8DebugObjcRuntimeHelperHostExecutionErrorReport::message(
+                B8DebugObjcRuntimeHelperErrorClassification::InvalidHelperOutput,
+                format!(
+                    "Objective-C AppKit run-loop helper emitted unexpected schema {:?}",
+                    self.schema
+                ),
+            ));
+        }
+        if self.observed_event.event
+            != B8DebugReturnToContinuationObjcHelperAppKitRunLoopLifecycleEventKind::GuiWindowCreated
+            || self.observed_event.title != B8_GUI_HELLO_WORLD_TITLE
+            || self.observed_event.text != B8_GUI_HELLO_WORLD_TEXT
+        {
+            return Err(B8DebugObjcRuntimeHelperHostExecutionErrorReport::message(
+                B8DebugObjcRuntimeHelperErrorClassification::InvalidHelperOutput,
+                format!(
+                    "Objective-C AppKit run-loop helper emitted unexpected lifecycle event {:?}",
+                    self.observed_event
+                ),
+            ));
+        }
+        if self.termination_policy
+            != B8DebugReturnToContinuationObjcHelperAppKitRunLoopTerminationPolicyReport::self_authored_fixture_timer()
+        {
+            return Err(B8DebugObjcRuntimeHelperHostExecutionErrorReport::message(
+                B8DebugObjcRuntimeHelperErrorClassification::InvalidHelperOutput,
+                format!(
+                    "Objective-C AppKit run-loop helper emitted unexpected termination policy {:?}",
+                    self.termination_policy
+                ),
+            ));
+        }
+
+        Ok(self)
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 struct B8DebugReturnToContinuationObjcHelperSetDelegateHostObjectBoundaryReport {
     schema: &'static str,
@@ -4889,19 +4998,27 @@ struct B8DebugReturnToContinuationObjcHelperAppKitRunLoopBoundaryReport {
     receiver: B8DebugReturnToContinuationObjcHelperReceiver,
     execution_model: B8DebugReturnToContinuationObjcHelperAppKitRunLoopExecutionModel,
     lifecycle_scope: B8DebugReturnToContinuationObjcHelperAppKitRunLoopLifecycleScope,
-    blocker: B8DebugObjcHelperExecutionBlocker,
+    lifecycle_observation:
+        Option<B8DebugReturnToContinuationObjcHelperAppKitRunLoopLifecycleObservationReport>,
+    bounded_termination_policy:
+        Option<B8DebugReturnToContinuationObjcHelperAppKitRunLoopTerminationPolicyReport>,
+    blocker: Option<B8DebugObjcHelperExecutionBlocker>,
     next_action: B8DebugReturnToContinuationDecodeNextAction,
 }
 
 impl B8DebugReturnToContinuationObjcHelperAppKitRunLoopBoundaryReport {
-    fn from_request(request: &B8DebugReturnToContinuationObjcHelperRequestReport) -> Option<Self> {
+    fn executed_from_observation(
+        request: &B8DebugReturnToContinuationObjcHelperRequestReport,
+        observation: &B8DebugReturnToContinuationObjcHelperAppKitRunLoopHostObservation,
+        next_action: B8DebugReturnToContinuationDecodeNextAction,
+    ) -> Option<Self> {
         if !request.is_supported_b8_run_message() {
             return None;
         }
 
         Some(Self {
             schema: "b8_return_to_continuation_appkit_run_loop_boundary_v0",
-            status: B8DebugImportBoundaryStatus::Blocked,
+            status: B8DebugImportBoundaryStatus::Executed,
             selector_name: B8_GUI_HELLO_WORLD_RUN_SELECTOR_NAME,
             receiver: B8DebugReturnToContinuationObjcHelperReceiver::from_argument(
                 &request.receiver,
@@ -4910,10 +5027,14 @@ impl B8DebugReturnToContinuationObjcHelperAppKitRunLoopBoundaryReport {
                 B8DebugReturnToContinuationObjcHelperAppKitRunLoopExecutionModel::NsApplicationRunLoopEntry,
             lifecycle_scope:
                 B8DebugReturnToContinuationObjcHelperAppKitRunLoopLifecycleScope::SelfAuthoredB8GuiFixture,
-            blocker:
-                B8DebugObjcHelperExecutionBlocker::ReturnToContinuationAppkitRunLoopLifecycleUnimplemented,
-            next_action:
-                B8DebugReturnToContinuationDecodeNextAction::ModelReturnToContinuationAppkitRunLoopLifecycle,
+            lifecycle_observation: Some(
+                B8DebugReturnToContinuationObjcHelperAppKitRunLoopLifecycleObservationReport::from_observation(
+                    observation,
+                ),
+            ),
+            bounded_termination_policy: Some(observation.termination_policy),
+            blocker: None,
+            next_action,
         })
     }
 }
@@ -4928,6 +5049,87 @@ enum B8DebugReturnToContinuationObjcHelperAppKitRunLoopExecutionModel {
 #[serde(rename_all = "snake_case")]
 enum B8DebugReturnToContinuationObjcHelperAppKitRunLoopLifecycleScope {
     SelfAuthoredB8GuiFixture,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationObjcHelperAppKitRunLoopLifecycleObservationReport {
+    schema: &'static str,
+    source: B8DebugReturnToContinuationObjcHelperAppKitRunLoopLifecycleObservationSource,
+    delegate_class_name: &'static str,
+    delegate_callback: B8DebugReturnToContinuationObjcHelperAppKitRunLoopDelegateCallback,
+    observed_event: B8DebugReturnToContinuationObjcHelperAppKitRunLoopLifecycleEventReport,
+}
+
+impl B8DebugReturnToContinuationObjcHelperAppKitRunLoopLifecycleObservationReport {
+    fn from_observation(
+        observation: &B8DebugReturnToContinuationObjcHelperAppKitRunLoopHostObservation,
+    ) -> Self {
+        Self {
+            schema: "b8_return_to_continuation_appkit_run_loop_lifecycle_observation_v0",
+            source:
+                B8DebugReturnToContinuationObjcHelperAppKitRunLoopLifecycleObservationSource::FixtureDelegateApplicationDidFinishLaunchingStdoutEvent,
+            delegate_class_name: B8_GUI_HELLO_WORLD_DELEGATE_CLASS_NAME,
+            delegate_callback:
+                B8DebugReturnToContinuationObjcHelperAppKitRunLoopDelegateCallback::ApplicationDidFinishLaunching,
+            observed_event: observation.observed_event.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationObjcHelperAppKitRunLoopLifecycleObservationSource {
+    FixtureDelegateApplicationDidFinishLaunchingStdoutEvent,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+enum B8DebugReturnToContinuationObjcHelperAppKitRunLoopDelegateCallback {
+    #[serde(rename = "applicationDidFinishLaunching:")]
+    ApplicationDidFinishLaunching,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationObjcHelperAppKitRunLoopLifecycleEventReport {
+    event: B8DebugReturnToContinuationObjcHelperAppKitRunLoopLifecycleEventKind,
+    title: String,
+    text: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationObjcHelperAppKitRunLoopLifecycleEventKind {
+    GuiWindowCreated,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationObjcHelperAppKitRunLoopTerminationPolicyReport {
+    trigger: B8DebugReturnToContinuationObjcHelperAppKitRunLoopTerminationTrigger,
+    delay_millis: u64,
+    termination_request: B8DebugReturnToContinuationObjcHelperAppKitRunLoopTerminationRequest,
+}
+
+impl B8DebugReturnToContinuationObjcHelperAppKitRunLoopTerminationPolicyReport {
+    const fn self_authored_fixture_timer() -> Self {
+        Self {
+            trigger:
+                B8DebugReturnToContinuationObjcHelperAppKitRunLoopTerminationTrigger::TimerAfterGuiWindowCreated,
+            delay_millis: 100,
+            termination_request:
+                B8DebugReturnToContinuationObjcHelperAppKitRunLoopTerminationRequest::NsAppTerminateNil,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationObjcHelperAppKitRunLoopTerminationTrigger {
+    TimerAfterGuiWindowCreated,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationObjcHelperAppKitRunLoopTerminationRequest {
+    NsAppTerminateNil,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -4964,6 +5166,18 @@ impl B8DebugReturnToContinuationObjcHelperHostOutputReport {
             representation:
                 B8DebugReturnToContinuationObjcHelperOutputRepresentation::VoidNoReturnValue,
             effect: B8DebugReturnToContinuationObjcHelperEffect::SetDelegate,
+            return_value: None,
+        }
+    }
+
+    const fn from_appkit_run_loop_observation(
+        _observation: &B8DebugReturnToContinuationObjcHelperAppKitRunLoopHostObservation,
+    ) -> Self {
+        Self {
+            helper_output: B8DebugObjcRuntimeHelperOutput::ObjcHelperVoidReturn,
+            representation:
+                B8DebugReturnToContinuationObjcHelperOutputRepresentation::VoidNoReturnValue,
+            effect: B8DebugReturnToContinuationObjcHelperEffect::RunApplication,
             return_value: None,
         }
     }
@@ -5111,7 +5325,7 @@ impl B8DebugReturnToContinuationObjcHelperOutputContractReport {
                     B8DebugReturnToContinuationObjcHelperReturnValueHandling::NoX8664ReturnValueObserved
                 }
                 B8DebugReturnToContinuationObjcHelperEffect::RunApplication => {
-                    B8DebugReturnToContinuationObjcHelperReturnValueHandling::DeferredUntilHelperExecution
+                    B8DebugReturnToContinuationObjcHelperReturnValueHandling::NoX8664ReturnValueObserved
                 }
                 B8DebugReturnToContinuationObjcHelperEffect::Unknown => {
                     B8DebugReturnToContinuationObjcHelperReturnValueHandling::DeferredUntilHelperExecution
@@ -5805,6 +6019,25 @@ fn run_public_objc_msg_send_set_delegate_helper() -> Result<
     })
 }
 
+fn run_public_objc_msg_send_appkit_run_loop_helper() -> Result<
+    B8DebugReturnToContinuationObjcHelperAppKitRunLoopHostObservation,
+    B8DebugObjcRuntimeHelperHostExecutionErrorReport,
+> {
+    let stdout =
+        run_public_objc_runtime_helper_source(B8_OBJC_RUNTIME_APPKIT_RUN_LOOP_HELPER_SOURCE)?;
+    let observation: B8DebugReturnToContinuationObjcHelperAppKitRunLoopHostObservation =
+        serde_json::from_str(&stdout).map_err(|error| {
+            B8DebugObjcRuntimeHelperHostExecutionErrorReport::message(
+                B8DebugObjcRuntimeHelperErrorClassification::InvalidHelperOutput,
+                format!(
+                    "Objective-C AppKit run-loop helper emitted invalid JSON: {error}; stdout={stdout:?}"
+                ),
+            )
+        })?;
+
+    observation.validate()
+}
+
 fn run_public_objc_alloc_init_fixture_delegate_helper(
 ) -> Result<B8DebugObjcRuntimeHelperHostObservation, B8DebugObjcRuntimeHelperHostExecutionErrorReport>
 {
@@ -6015,6 +6248,80 @@ int main(void) {
 }
 "#;
 
+const B8_OBJC_RUNTIME_APPKIT_RUN_LOOP_HELPER_SOURCE: &str = r#"
+#import <AppKit/AppKit.h>
+#include <stdio.h>
+
+@interface BaraGuiHelloWorldDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate> {
+    NSWindow *_window;
+}
+@end
+
+@implementation BaraGuiHelloWorldDelegate
+
+- (void)applicationDidFinishLaunching:(NSNotification *)notification {
+    (void)notification;
+
+    NSRect frame = NSMakeRect(200.0, 200.0, 360.0, 140.0);
+    _window = [[NSWindow alloc]
+        initWithContentRect:frame
+                  styleMask:(NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
+                    backing:NSBackingStoreBuffered
+                      defer:NO];
+    [_window setDelegate:self];
+    [_window setTitle:@"Bara GUI Hello World"];
+
+    NSTextField *label =
+        [[NSTextField alloc] initWithFrame:NSMakeRect(20.0, 55.0, 320.0, 24.0)];
+    [label setStringValue:@"hello world"];
+    [label setEditable:NO];
+    [label setBordered:NO];
+    [label setDrawsBackground:NO];
+    [label setAlignment:NSTextAlignmentCenter];
+    [[_window contentView] addSubview:label];
+
+    [NSApp activateIgnoringOtherApps:YES];
+    [_window makeKeyAndOrderFront:nil];
+
+    puts("{\"schema\":\"b8_return_to_continuation_appkit_run_loop_host_observation_v0\",\"observed_event\":{\"event\":\"gui_window_created\",\"title\":\"Bara GUI Hello World\",\"text\":\"hello world\"},\"termination_policy\":{\"trigger\":\"timer_after_gui_window_created\",\"delay_millis\":100,\"termination_request\":\"ns_app_terminate_nil\"}}");
+    fflush(stdout);
+
+    [NSTimer scheduledTimerWithTimeInterval:0.1
+                                     target:self
+                                   selector:@selector(terminateApplication:)
+                                   userInfo:nil
+                                    repeats:NO];
+}
+
+- (void)terminateApplication:(NSTimer *)timer {
+    (void)timer;
+    [NSApp terminate:nil];
+}
+
+- (void)windowWillClose:(NSNotification *)notification {
+    (void)notification;
+    [NSApp terminate:nil];
+}
+
+@end
+
+int main(void) {
+    @autoreleasepool {
+        freopen("/dev/null", "w", stderr);
+
+        [NSApplication sharedApplication];
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+
+        BaraGuiHelloWorldDelegate *delegate =
+            [[BaraGuiHelloWorldDelegate alloc] init];
+        [NSApp setDelegate:delegate];
+        [NSApp run];
+    }
+
+    return 0;
+}
+"#;
+
 const B8_OBJC_ALLOC_INIT_FIXTURE_DELEGATE_HELPER_SOURCE: &str = r#"
 #import <AppKit/AppKit.h>
 #include <stdint.h>
@@ -6164,7 +6471,6 @@ enum B8DebugObjcRuntimeHelperOutput {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum B8DebugObjcRuntimeHelperErrorClassification {
-    AppkitRunLoopLifecycleUnimplemented,
     EmptyHelperReturnValue,
     HelperBuildFailed,
     HelperRunFailed,
@@ -6383,7 +6689,6 @@ enum B8DebugHelperBoundaryBlockedReason {
     ReturnToContinuationCallRel32HelperExecutionUnimplemented,
     ReturnToContinuationCallRel32StubSymbolResolutionUnresolved,
     ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented,
-    ReturnToContinuationAppkitRunLoopLifecycleUnimplemented,
     ReturnToContinuationExecutionUnimplemented,
     ReturnToContinuationImportGlobalLoadUnimplemented,
     ReturnToContinuationObjcAllocInitClassArgumentMaterializationUnimplemented,
@@ -6421,9 +6726,6 @@ impl B8DebugHelperBoundaryBlockedReason {
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented => {
                 Self::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented
-            }
-            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationAppkitRunLoopLifecycleUnimplemented => {
-                Self::ReturnToContinuationAppkitRunLoopLifecycleUnimplemented
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationImportGlobalLoadUnimplemented => {
                 Self::ReturnToContinuationImportGlobalLoadUnimplemented
@@ -6473,7 +6775,6 @@ enum B8DebugHelperBoundaryBlocker {
     ReturnToContinuationCallRel32HelperExecutionUnimplemented,
     ReturnToContinuationCallRel32StubSymbolResolutionUnresolved,
     ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented,
-    ReturnToContinuationAppkitRunLoopLifecycleUnimplemented,
     ReturnToContinuationExecutionUnimplemented,
     ReturnToContinuationImportGlobalLoadUnimplemented,
     ReturnToContinuationObjcAllocInitClassArgumentMaterializationUnimplemented,
@@ -6517,9 +6818,6 @@ impl B8DebugHelperBoundaryBlocker {
             }
             B8DebugHelperBoundaryBlockedReason::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented => {
                 vec![Self::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented]
-            }
-            B8DebugHelperBoundaryBlockedReason::ReturnToContinuationAppkitRunLoopLifecycleUnimplemented => {
-                vec![Self::ReturnToContinuationAppkitRunLoopLifecycleUnimplemented]
             }
             B8DebugHelperBoundaryBlockedReason::ReturnToContinuationImportGlobalLoadUnimplemented => {
                 vec![Self::ReturnToContinuationImportGlobalLoadUnimplemented]
@@ -6581,9 +6879,6 @@ impl B8DebugHelperBoundaryBlocker {
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented => {
                 Self::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented
-            }
-            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationAppkitRunLoopLifecycleUnimplemented => {
-                Self::ReturnToContinuationAppkitRunLoopLifecycleUnimplemented
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationImportGlobalLoadUnimplemented => {
                 Self::ReturnToContinuationImportGlobalLoadUnimplemented

@@ -1858,13 +1858,13 @@ branch: `task/b8-hello-world-gui-complete`
 
 完了条件:
 
-- [ ] B8-G6u の `return_to_continuation_appkit_run_loop_lifecycle_unimplemented` を受けて、
+- [x] B8-G6u の `return_to_continuation_appkit_run_loop_lifecycle_unimplemented` を受けて、
   `NSApp run` を self-authored B8 GUI fixture の AppKit lifecycle observation
   boundary として扱う。
-- [ ] public Objective-C / AppKit API helper で、fixture delegate の
+- [x] public Objective-C / AppKit API helper で、fixture delegate の
   `applicationDidFinishLaunching:` 相当が window / label creation event
   `gui_window_created` を観測できる場合は stable report する。
-- [ ] automated oracle mode では run loop が無期限化しないよう、self-authored fixture
+- [x] automated oracle mode では run loop が無期限化しないよう、self-authored fixture
   の bounded termination policy を report し、必要なら次 blocker を timer /
   termination lifecycle boundary へ進める。
 
@@ -1873,6 +1873,38 @@ PR に含めない:
 - arbitrary AppKit application lifecycle の一般化。
 - translated-code delegate callback execution。
 - `.app` bundle / resource / nib / storyboard 一般対応。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6v は完了し、次の gate は B8-G6w。
+
+#### PR Gate: B8-G6w Post-Run main continuation unsupported instruction boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [ ] B8-G6v の `return_to_continuation_unsupported_instruction` を受けて、
+  `NSApp run` 後の `return_to=4294973062` continuation を focused に扱う。
+- [ ] self-authored B8 GUI fixture の post-run continuation 先頭命令
+  `48 89 df` / `mov rdi, rbx` を stable decode / report できるようにし、
+  `_objc_autoreleasePoolPop` へ渡す autorelease pool token handoff または
+  focused blocker を保存する。
+- [ ] 次 blocker を `_objc_autoreleasePoolPop` helper boundary、post-run epilogue
+  decode、または narrower continuation blocker へ進める。
+
+PR に含めない:
+
+- arbitrary register-to-register move の一般化。
+- arbitrary autorelease pool lifecycle execution。
+- full x86_64 function epilogue completion。
 - translation cache、fallback JIT/interpreter。
 
 検証:
