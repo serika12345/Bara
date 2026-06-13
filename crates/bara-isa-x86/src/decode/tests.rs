@@ -485,6 +485,37 @@ fn decodes_push_rax_pop_rax_between_mov_and_ret() {
 }
 
 #[test]
+fn decodes_add_rsp_imm8_before_next_unsupported_opcode() {
+    let input = X86Bytes::new(X86Va::new(0x1700), vec![0x48, 0x83, 0xc4, 0x08, 0x5b])
+        .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0x1700),
+                X86Va::new(0x1704),
+                DecodedInstructionKind::AddRspImm8 {
+                    imm: crate::decode::X86Imm8::new(8)
+                }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x1704),
+                X86Va::new(0x1705),
+                DecodedInstructionKind::Unsupported {
+                    reason: UnsupportedReason::DecodeUnsupportedOpcode {
+                        opcode: 0x5b,
+                        at: X86Va::new(0x1704)
+                    }
+                }
+            )
+        ]
+    );
+}
+
+#[test]
 fn decodes_prologue_and_rip_relative_load_batch_before_next_unsupported_opcode() {
     let input = X86Bytes::new(
         X86Va::new(0x1600),

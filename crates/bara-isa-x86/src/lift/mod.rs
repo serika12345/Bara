@@ -196,6 +196,10 @@ fn lift_instruction(
             dst: Operand::Reg(X86Reg::Rax),
             src: Operand::ImmU64(imm.as_i64() as u64),
         })),
+        DecodedInstructionKind::AddRspImm8 { imm } => Ok(LiftedInstruction::Op(IrOp::Add {
+            dst: Operand::Reg(X86Reg::Rsp),
+            src: Operand::ImmU64(imm.as_i64() as u64),
+        })),
         DecodedInstructionKind::SubEaxImm32 { imm } => Ok(LiftedInstruction::Op(IrOp::Sub {
             dst: Operand::Reg(X86Reg::Rax),
             src: Operand::ImmU64(imm.as_i64() as u64),
@@ -700,6 +704,36 @@ mod tests {
                     src: Operand::ImmU64(3)
                 }
             ]
+        );
+        assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_add_rsp_imm8_to_stack_pointer_adjustment() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(4),
+                    DecodedInstructionKind::AddRspImm8 {
+                        imm: crate::X86Imm8::new(8),
+                    },
+                ),
+                DecodedInstruction::new(X86Va::new(4), X86Va::new(5), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded stack adjustment lifts");
+        let block = &program.blocks()[0];
+
+        assert_eq!(
+            block.ops(),
+            &[IrOp::Add {
+                dst: Operand::Reg(X86Reg::Rsp),
+                src: Operand::ImmU64(8)
+            }]
         );
         assert_eq!(block.terminator(), &Terminator::Return);
     }

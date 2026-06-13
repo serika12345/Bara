@@ -348,6 +348,19 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                         ));
                         offset = end_offset;
                     }
+                    (0x83, 0xc4) => {
+                        let end_offset = offset + 4;
+                        let imm = read_u8(input, offset + 3, at, opcode)?;
+                        let end = instruction_end(input, at, end_offset, 4)?;
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::AddRspImm8 {
+                                imm: X86Imm8::new(i8::from_le_bytes([imm])),
+                            },
+                        ));
+                        offset = end_offset;
+                    }
                     _ => {
                         let end = instruction_end(input, at, offset + 3, 3)?;
                         instructions.push(unsupported_instruction(at, end, opcode));

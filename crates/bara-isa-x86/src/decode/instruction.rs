@@ -100,6 +100,9 @@ pub enum DecodedInstructionKind {
     AddEaxImm8 {
         imm: X86Imm8,
     },
+    AddRspImm8 {
+        imm: X86Imm8,
+    },
     SubEaxImm32 {
         imm: X86Imm32,
     },

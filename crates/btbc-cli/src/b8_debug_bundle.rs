@@ -782,6 +782,9 @@ enum B8DebugDecodedInstructionKindReport {
     AddEaxImm8 {
         imm: String,
     },
+    AddRspImm8 {
+        imm: String,
+    },
     SubEaxImm32 {
         imm: String,
     },
@@ -902,6 +905,9 @@ impl B8DebugDecodedInstructionKindReport {
                 imm: format!("{imm:?}"),
             },
             DecodedInstructionKind::AddEaxImm8 { imm } => Self::AddEaxImm8 {
+                imm: format!("{imm:?}"),
+            },
+            DecodedInstructionKind::AddRspImm8 { imm } => Self::AddRspImm8 {
                 imm: format!("{imm:?}"),
             },
             DecodedInstructionKind::SubEaxImm32 { imm } => Self::SubEaxImm32 {
@@ -1216,6 +1222,7 @@ enum B8DebugRegisterName {
     Rdx,
     Rdi,
     Rsi,
+    Rsp,
     R14,
     R15,
 }
@@ -2505,6 +2512,7 @@ struct B8DebugReturnToContinuationDecodeBoundaryReport {
         Vec<B8DebugReturnToContinuationBlockedRegisterMaterializationReport>,
     autorelease_pool_pop_boundary:
         Option<B8DebugReturnToContinuationAutoreleasePoolPopBoundaryReport>,
+    epilogue_stack_adjustment: Option<B8DebugReturnToContinuationEpilogueStackAdjustmentReport>,
     continuation_call_boundary: Option<B8DebugReturnToContinuationCallBoundaryReport>,
     decode_report: B8DebugDecodeReport,
     processed_source_pc_range: Option<B8DebugProcessedPcRange>,
@@ -2533,6 +2541,80 @@ impl B8DebugReturnToContinuationDecodeInputs {
             .rev()
             .find(|value| value.register == register)
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationEpilogueStackAdjustmentReport {
+    schema: &'static str,
+    status: B8DebugReturnToContinuationEpilogueStackAdjustmentStatus,
+    role: B8DebugReturnToContinuationEpilogueStackAdjustmentRole,
+    source: B8DebugReturnToContinuationEpilogueStackAdjustmentSource,
+    instruction: B8DebugDecodedInstructionReport,
+    stack_pointer_register: B8DebugRegisterName,
+    stack_pointer_delta: String,
+    next_blocker_after_adjustment: Option<B8DebugUnsupportedInstructionReport>,
+}
+
+impl B8DebugReturnToContinuationEpilogueStackAdjustmentReport {
+    fn from_decoded(
+        decoded: &DecodedFunction,
+        autorelease_pool_pop_boundary: Option<
+            &B8DebugReturnToContinuationAutoreleasePoolPopBoundaryReport,
+        >,
+    ) -> Option<Self> {
+        let autorelease_pool_pop_boundary = autorelease_pool_pop_boundary?;
+        if autorelease_pool_pop_boundary.status != B8DebugImportBoundaryStatus::Executed {
+            return None;
+        }
+
+        let instruction = decoded.instructions().iter().find(|instruction| {
+            instruction.start().value() >= autorelease_pool_pop_boundary.return_to
+                && matches!(
+                    instruction.kind(),
+                    DecodedInstructionKind::AddRspImm8 { .. }
+                )
+        })?;
+        let DecodedInstructionKind::AddRspImm8 { imm } = instruction.kind() else {
+            return None;
+        };
+        let next_blocker_after_adjustment = decoded
+            .instructions()
+            .iter()
+            .find(|candidate| {
+                candidate.start() == instruction.end()
+                    && matches!(candidate.kind(), DecodedInstructionKind::Unsupported { .. })
+            })
+            .map(B8DebugUnsupportedInstructionReport::from_instruction);
+
+        Some(Self {
+            schema: "b8_return_to_continuation_epilogue_stack_adjustment_v0",
+            status: B8DebugReturnToContinuationEpilogueStackAdjustmentStatus::Decoded,
+            role: B8DebugReturnToContinuationEpilogueStackAdjustmentRole::PostRunHelperBoundaryStackRestore,
+            source: B8DebugReturnToContinuationEpilogueStackAdjustmentSource::AfterAutoreleasePoolPopHelperReturn,
+            instruction: B8DebugDecodedInstructionReport::from_instruction(instruction),
+            stack_pointer_register: B8DebugRegisterName::Rsp,
+            stack_pointer_delta: format!("{imm:?}"),
+            next_blocker_after_adjustment,
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationEpilogueStackAdjustmentStatus {
+    Decoded,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationEpilogueStackAdjustmentRole {
+    PostRunHelperBoundaryStackRestore,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationEpilogueStackAdjustmentSource {
+    AfterAutoreleasePoolPopHelperReturn,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -2564,6 +2646,7 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
             materialized_register_states,
             blocked_register_materializations,
             autorelease_pool_pop_boundary,
+            epilogue_stack_adjustment,
             continuation_call_boundary,
             blocker,
             next_action,
@@ -2592,6 +2675,11 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
                         &materialized_register_states,
                         input,
                         input_probe,
+                    );
+                let epilogue_stack_adjustment =
+                    B8DebugReturnToContinuationEpilogueStackAdjustmentReport::from_decoded(
+                        &decoded,
+                        autorelease_pool_pop_boundary.as_ref(),
                     );
                 let continuation_call_boundary =
                     B8DebugReturnToContinuationCallBoundaryReport::from_decoded(
@@ -2696,6 +2784,7 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
                     materialized_register_states,
                     blocked_register_materializations,
                     autorelease_pool_pop_boundary,
+                    epilogue_stack_adjustment,
                     continuation_call_boundary,
                     blocker,
                     next_action,
@@ -2707,6 +2796,7 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
                 None,
                 Vec::new(),
                 Vec::new(),
+                None,
                 None,
                 None,
                 B8DebugObjcHelperExecutionBlocker::ReturnToContinuationDecodeFailed,
@@ -2726,6 +2816,7 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
             materialized_register_states,
             blocked_register_materializations,
             autorelease_pool_pop_boundary,
+            epilogue_stack_adjustment,
             continuation_call_boundary,
             decode_report,
             processed_source_pc_range,

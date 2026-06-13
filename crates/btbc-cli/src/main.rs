@@ -2977,6 +2977,24 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"representation\":\"void_no_return_value\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_return_to_continuation_epilogue_stack_adjustment_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"role\":\"post_run_helper_boundary_stack_restore\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"after_autorelease_pool_pop_helper_return\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"add_rsp_imm8\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"stack_pointer_register\":\"rsp\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"stack_pointer_delta\":\"X86Imm8(8)\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_blocker_after_adjustment\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"start\":4294973076"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("DecodeUnsupportedOpcode { opcode: 91"));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("DecodeUnsupportedOpcode { opcode: 72"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"blocker\":\"return_to_continuation_unsupported_instruction\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_action\":\"add_return_to_continuation_instruction_support\""));
@@ -3373,6 +3391,17 @@ mod tests {
         assert!(launch_report.contains("\"helper_token_observation\""));
         assert!(launch_report.contains("\"helper_output\":\"objc_helper_void_return\""));
         assert!(launch_report.contains("\"representation\":\"void_no_return_value\""));
+        assert!(launch_report
+            .contains("\"schema\":\"b8_return_to_continuation_epilogue_stack_adjustment_v0\""));
+        assert!(launch_report.contains("\"role\":\"post_run_helper_boundary_stack_restore\""));
+        assert!(launch_report.contains("\"source\":\"after_autorelease_pool_pop_helper_return\""));
+        assert!(launch_report.contains("\"add_rsp_imm8\""));
+        assert!(launch_report.contains("\"stack_pointer_register\":\"rsp\""));
+        assert!(launch_report.contains("\"stack_pointer_delta\":\"X86Imm8(8)\""));
+        assert!(launch_report.contains("\"next_blocker_after_adjustment\""));
+        assert!(launch_report.contains("\"start\":4294973076"));
+        assert!(launch_report.contains("DecodeUnsupportedOpcode { opcode: 91"));
+        assert!(!launch_report.contains("DecodeUnsupportedOpcode { opcode: 72"));
         assert!(launch_report
             .contains("\"blocker\":\"return_to_continuation_unsupported_instruction\""));
         assert!(launch_report

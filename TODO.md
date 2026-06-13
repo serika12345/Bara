@@ -1989,19 +1989,52 @@ branch: `task/b8-hello-world-gui-complete`
 
 完了条件:
 
-- [ ] B8-G6y の `return_to_continuation_unsupported_instruction` を受けて、
+- [x] B8-G6y の `return_to_continuation_unsupported_instruction` を受けて、
   post-run epilogue の `48 83 c4 08` / `add rsp, 8` at `4294973072` を
   focused に decode / report する。
-- [ ] stack restore instruction は post-run helper boundary 後の epilogue として
+- [x] stack restore instruction は post-run helper boundary 後の epilogue として
   stable report し、次 blocker を `pop rbx`、`pop r14`、`pop r15`、`pop rbp`、
   `ret`、または narrower epilogue blocker へ進める。
-- [ ] `_objc_autoreleasePoolPop` helper boundary が executed のまま維持されることを
+- [x] `_objc_autoreleasePoolPop` helper boundary が executed のまま維持されることを
   regression として確認する。
 
 PR に含めない:
 
 - arbitrary stack pointer arithmetic。
 - full x86_64 epilogue completion。
+- general stack frame unwinding。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6z は完了し、次の gate は B8-G6aa。
+
+#### PR Gate: B8-G6aa Post-run epilogue preserved rbx restore boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [ ] B8-G6z の `return_to_continuation_unsupported_instruction` を受けて、
+  post-run epilogue の `5b` / `pop rbx` at `4294973076` を focused に decode /
+  report する。
+- [ ] `pop rbx` は post-run epilogue の preserved-register restore として stable
+  report し、次 blocker を `pop r14` at `4294973077`、`pop r15`、`pop rbp`、
+  `ret`、または narrower epilogue blocker へ進める。
+- [ ] B8-G6z の `_objc_autoreleasePoolPop` executed boundary と
+  `b8_return_to_continuation_epilogue_stack_adjustment_v0` regression を維持する。
+
+PR に含めない:
+
+- arbitrary pop / stack-memory semantics。
+- full callee-saved register restoration。
+- full epilogue completion。
 - general stack frame unwinding。
 - translation cache、fallback JIT/interpreter。
 

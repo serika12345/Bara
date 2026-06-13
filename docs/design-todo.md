@@ -580,6 +580,12 @@
   helper-process token で push/pop capability を観測する。boundary が executed の場合、
   continuation blocker は `_objc_autoreleasePoolPop` ではなく post-run epilogue の
   `48 83 c4 08` / `add rsp, 8` に進める。
+- 2026-06-13 の B8-G6z として、post-run `48 83 c4 08` / `add rsp, 8` は
+  arbitrary stack arithmetic ではなく `_objc_autoreleasePoolPop` 後の epilogue
+  stack restore として扱う。`b8_return_to_continuation_epilogue_stack_adjustment_v0`
+  は `instruction=add_rsp_imm8`、`stack_pointer_register=rsp`、
+  `stack_pointer_delta=X86Imm8(8)`、次 blocker `DecodeUnsupportedOpcode { opcode: 91 }`
+  at `4294973076` を保存し、次 gate は preserved `rbx` restore に分離する。
 - B8-HWGUI 完遂後の OSS app cycle は、任意の downloaded binary ではなく、まず public
   source から x86_64 macOS binary を reproducible に build できる小さい OSS GUI app を
   source-built fixture として扱う。候補選定、license / redistribution、supply-chain、
