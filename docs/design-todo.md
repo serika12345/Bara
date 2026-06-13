@@ -82,6 +82,59 @@
   `spec/` 配下の独立仕様モデルと property/shrink が必要になり、schema と
   Nix toolchain 追加の必要性がテストで示された時点で導入する。
 
+## D4a: x86_64 ISA semantic coverage strategy
+
+- [ ] x86_64 coverage を opcode checklist ではなく semantic bucket catalog として管理する。
+- [ ] decode、canonical instruction、operand semantics、guest semantic IR、backend lowering、
+  helper/fallback の責務を分ける。
+- [ ] unsupported instruction report は opcode だけでなく、operand shape、semantic bucket、
+  required runtime service、fallback possibility を含める。
+- [ ] direct ARM64 lowering へ進める bucket と、helper / interpreter fallback へ逃がす
+  bucket の判断基準を固定する。
+- [ ] permissive license decoder を採用する場合でも、lift / IR / runtime semantics は
+  Bara の clean-room domain model として保持する。
+- [ ] Intel SDM、Arm A64 docs、ABI specs、Mach-O public docs を primary source として
+  coverage catalog に紐づける。
+- [ ] Intel XED、iced-x86、Zydis、Capstone、Remill / McSema、FEX、Box64、DynamoRIO を
+  dependency candidate / research reference / non-candidate に分類する。
+- [ ] dependency candidate を採用する前に、license、NOTICE、transitive dependency、
+  Nix packaging、`verify-supply-chain` 対象を audit する。
+
+メモ:
+
+- 一般アプリ実行に広げるとき、Bara は x86 opcode を 1 つずつ平たく潰す設計にはしない。
+  実装単位は opcode ではなく、命令を構成する意味の部品とする。
+- 典型的な流れは
+  `x86 bytes -> decoder -> canonical instruction -> operand semantics -> guest semantic IR -> lowering/helper/fallback`
+  である。
+- 抽象化できる bucket は、prefix / width / ModRM / SIB / immediate decode、
+  register / memory / immediate operand read-write、RIP-relative / register-indirect /
+  base+index*scale+disp addressing、integer ALU family、common flags builder、
+  condition-code evaluation、stack / direct control-flow family、helper request boundary である。
+- 個別に頑張る bucket は、x86 flags の細かい差分、partial register aliasing、
+  implicit operands、string instructions、atomic / `LOCK`、SIMD / FP / x87 / MXCSR、
+  environment-dependent instruction、self-modifying code、indirect branch / callback /
+  exception / signal / TLS / thread である。
+- hot path かつ共通性が高い bucket は direct ARM64 lowering へ進める。rare または複雑な
+  bucket は最初は helper または interpreter fallback へ逃がしてよいが、silent fallback は
+  禁止し、report に条件と不足している runtime service を保存する。
+- B8-HWGUI で追加した focused instruction slice は、今後は
+  `prologue/epilogue stack-control`、`RIP-relative data access`、`ObjC import helper call`、
+  `fixture-scoped host service` などの semantic bucket へ再分類する。B8-ARCH1a はこの分類を
+  implementation 前の design audit として扱う。
+- OSS app cycle では、debug bundle の observed blocker を source of truth にしつつ、
+  TODO は「次の opcode」ではなく「次の semantic bucket」として切る。
+- 参照するとよい primary sources と permissive candidates は
+  [Runtime Architecture Roadmap](runtime-architecture-roadmap.md) の
+  `Reference Materials And Permissive Candidates` を source of truth とする。
+  特に Intel SDM は x86_64 semantics の primary source、Intel XED / iced-x86 / Zydis は
+  decoder dependency 候補、Capstone は debug disassembly 候補、Remill / McSema は
+  lifting の責務分離の先行研究、FEX / Box64 / DynamoRIO は user-mode runtime /
+  dispatcher / code cache の比較研究とする。
+- QEMU user-mode、Valgrind、Ghidra、Binary Ninja、Rosetta は有用な比較対象になり得るが、
+  GPL / LGPL / proprietary license または clean-room 境界の理由により、Bara core の
+  permissive dependency candidate にはしない。
+
 ## D5: Host helper / OS boundary
 
 - [ ] stdout、file I/O、time、memory allocation、process exit を capability として分ける。

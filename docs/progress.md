@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 21:16 JST
+最終更新: 2026-06-13 21:50 JST
 
 状態:
 
@@ -221,6 +221,13 @@
   B8-HWGUI 後の抽象化順は B8-ARCH1 responsibility split audit、B8-ARCH2 guest image
   model extraction、B8-ARCH3 translation artifact/debug export、B8-ARCH4 runtime
   dispatcher、B8-ARCH5 helper/ABI bridge、B8-ARCH6 OS personality boundary とする。
+  一般アプリ化の x86_64 coverage は opcode checklist ではなく semantic bucket catalog
+  として扱い、B8-ARCH1a で decode / canonical instruction / operand semantics /
+  guest semantic IR / direct lowering / helper / fallback / stable blocker の責務分担を
+  design audit する。primary source は Intel SDM、Arm A64 docs、ABI specs、Mach-O
+  public docs とし、Intel XED、iced-x86、Zydis、Capstone、Remill / McSema、FEX、
+  Box64、DynamoRIO などの permissive candidate / prior art は dependency candidate と
+  research reference に分けて扱う。
 - active_branch: `task/b8-hello-world-gui-complete`。branch base は `2258806`
   (`docs: define b8 hello world gui completion target`)。latest pushed implementation commit is
   `32c8afb` (`feat: complete b8 modeled gui continuation`)。latest pushed documentation commit
@@ -235,7 +242,7 @@
   B8-G6n / B8-G6o / B8-G6p / B8-G6q / B8-G6r / B8-G6s / B8-G6t / B8-G6u /
   B8-G6v / B8-G6w / B8-G6x / B8-G6y / B8-G6z / B8-G6aa / B8-G6ab /
   B8-G6ac / B8-G6ad / B8-G6ae / B8-G6af / B8-HWGUI / B8-ARCH0 /
-  B8-ARCH1 / B8-ARCH2 / B8-ARCH3 / B8-ARCH4 / B8-ARCH5 / B8-ARCH6 /
+  B8-ARCH1 / B8-ARCH1a / B8-ARCH2 / B8-ARCH3 / B8-ARCH4 / B8-ARCH5 / B8-ARCH6 /
   B8-OSS0 / B8-WINE0。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
@@ -451,6 +458,13 @@
   主経路は user-visible converted app output ではなく、internal translation artifact /
   runtime cache / dispatcher / OS personality とする。Wine 接続は Windows API 実装ではなく、
   Windows x64-on-Wine OS personality として扱う。
+- B8-ARCH0 follow-up docs として、一般アプリ化時の x86_64 instruction coverage は
+  opcode を平たく潰すのではなく、semantic bucket、canonical instruction、
+  operand semantics、guest semantic IR、direct lowering、helper/fallback、stable blocker
+  に分けて進める方針を追加した。参照資料として Intel SDM などの primary source と、
+  Intel XED / iced-x86 / Zydis / Capstone / Remill / McSema / FEX / Box64 / DynamoRIO
+  などの permissive candidate / prior art を分類した。この docs-only 更新はユーザー指示に
+  よりコミットしない。
 - remaining_work: B8-HWGUI / B8-ARCH0 review gate。draft PR #49 の review / merge までは
   B8-ARCH1 implementation や B8-OSS0 に進まない。general continuation execution、
   arbitrary Objective-C message send、translation cache、fallback JIT/interpreter、
@@ -470,7 +484,8 @@
   `target/b8-hwgui-review/manual-visible.launch-report.json` が `mode=manual_visible`、
   `status=gui_visible_ready`、`exit_status=0`、`text=hello world` を保存している。
   B8-ARCH0 は docs-only change として `git diff --check` と
-  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
+  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。今回の
+  B8-ARCH0 follow-up docs-only change でも同じ 2 checks が通過した。
 
 直近で完了した作業:
 
@@ -481,6 +496,21 @@
   B8-ARCH1 responsibility split audit、B8-ARCH2 guest image model、B8-ARCH3 translation
   artifact/debug export、B8-ARCH4 runtime dispatcher、B8-ARCH5 helper/ABI bridge、
   B8-ARCH6 OS personality boundary、B8-WINE0 Wine bridge planning を追加した。
+- 2026-06-13 21:45 JST: B8-ARCH0 follow-up として、一般アプリ実行へ拡張する際の
+  ISA coverage 方針を追記した。x86_64 opcode を個別 checklist として潰すのではなく、
+  semantic bucket catalog、canonical instruction、operand semantics、guest semantic IR、
+  direct ARM64 lowering、helper/fallback、stable blocker report の責務分担として扱う。
+  TODO には B8-ARCH1a ISA Semantic Coverage Plan を追加した。この変更は docs-only で、
+  ユーザー指示によりコミットせず review 用の未コミット diff として残す。検証は
+  `git diff --check` と `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
+- 2026-06-13 21:50 JST: B8-ARCH1a の reference inventory として、Intel SDM、
+  Arm A64 docs、ABI specs、Mach-O public docs を primary source にし、Intel XED、
+  iced-x86、Zydis、Capstone、object、goblin、LIEF、AsmJit、Cranelift、Remill / McSema、
+  FEX、Box64、DynamoRIO を permissive dependency candidate または prior-art reference
+  として [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) に追記した。
+  GPL / LGPL / proprietary tool は permissive dependency candidate にしない方針も記録した。
+  この変更も docs-only で、ユーザー指示によりコミットしない。検証は
+  `git diff --check` と `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 - 2026-06-13 19:53 JST: B8-HWGUI Final expected/actual and manual visible review boundary を
   開始した。automated expected / actual は
   `target/b8-hwgui-review/expected.json` と `target/b8-hwgui-review/actual.json` の

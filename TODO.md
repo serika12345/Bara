@@ -2399,6 +2399,30 @@ B8-HWGUI / B8-ARCH0 が review / merge 済みになるまで開始しない。
 - [ ] audit 結果を [docs/design-todo.md](docs/design-todo.md) と
   [docs/runtime-architecture-roadmap.md](docs/runtime-architecture-roadmap.md) に反映する。
 
+#### Future Target: B8-ARCH1a ISA Semantic Coverage Plan
+
+B8-HWGUI / B8-ARCH0 が review / merge 済みになるまで開始しない。B8-ARCH1 の
+responsibility split audit と同じ docs / design phase で実施してよい。
+
+- [ ] 一般アプリ化で必要になる x86_64 instruction coverage を、opcode list ではなく
+  semantic bucket catalog として整理する。
+- [ ] B8-HWGUI で追加した focused instruction slice を、prologue / epilogue、
+  RIP-relative addressing、register-indirect load、integer zeroing、import/helper call、
+  fixture-scoped host service などの bucket に再分類する。
+- [ ] decode-only、lift-ready、direct ARM64 lowering、helper-required、
+  fallback-required、stable blocker の状態語彙を固定する。
+- [ ] direct lowering へ進める bucket と、helper / interpreter fallback へ逃がす bucket の
+  判断基準を design TODO に記録する。
+- [ ] unsupported instruction report が opcode だけでなく semantic bucket、operand shape、
+  required runtime service を返せるようにするための report schema 方針を定義する。
+- [ ] permissive decoder 依存を検討する場合の clean-room / license / supply-chain
+  checklist を定義する。lift / IR / runtime semantics は Bara の domain model として保持する。
+- [ ] Intel SDM / Arm A64 docs / ABI specs / Mach-O public docs を primary source とし、
+  Intel XED / iced-x86 / Zydis / Capstone / Remill / McSema / FEX / Box64 / DynamoRIO を
+  dependency candidate または research reference として分類した reference inventory を作る。
+- [ ] permissive dependency を採用する前の gate として、license / notice / transitive
+  dependency / Nix packaging / `verify-supply-chain` の確認項目を定義する。
+
 #### Future Target: B8-ARCH2 Guest Image Model Extraction
 
 - [ ] public Mach-O metadata から runtime が使う `GuestImage` / `MachOImage` domain model を
