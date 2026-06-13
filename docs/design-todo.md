@@ -448,6 +448,12 @@
   imported global memory model、任意の dynamic library data symbol read、continuation block
   の一般実行、translation cache / fallback JIT を追加するものではない。次の B8-G6i では
   `31 d2` / `xor edx, edx` を focused ISA slice として扱う。
+- 2026-06-13 の B8-G6i として、`31 d2` を x86_64 `xor edx, edx` 専用 slice として
+  decode / lift し、32-bit register zeroing semantics により `rdx` が 64-bit zero へ
+  materialize されることを `source=xor_edx_edx_zero`、`value=0`、`width=bits64` として
+  continuation report に保存する。これは `xor r32, r32` 全体の一般化、continuation block
+  の一般実行、translation cache / fallback JIT を追加するものではない。次の B8-G6j では
+  到達済みの `call r14` at `4294973018` / `return_to=4294973021` を focused boundary として扱う。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、
