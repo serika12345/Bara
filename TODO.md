@@ -1370,14 +1370,14 @@ branch: `task/b8-g6h-continuation-nsapp-global-load`
 
 完了条件:
 
-- [ ] B8-G6g の `return_to_continuation_import_global_load_unimplemented` を受けて、
+- [x] B8-G6g の `return_to_continuation_import_global_load_unimplemented` を受けて、
   `mov rdi, qword ptr [r15]` の base `r15` が public chained fixups 上で AppKit
   `_NSApp` import に解決されることを source of truth として、`_NSApp` imported global
   pointee load を focused stable boundary または fixture-scoped helper として扱う。
-- [ ] continuation input の x86_64 `rax` register state と `r15` import identity を保持し、
+- [x] continuation input の x86_64 `rax` register state と `r15` import identity を保持し、
   `rdi` materialization の available / blocked state、次の decoded instruction /
   boundary / blocker を stable report に保存する。
-- [ ] 一般的な imported global memory model、任意の dynamic library data symbol read、
+- [x] 一般的な imported global memory model、任意の dynamic library data symbol read、
   `return_to` 以降の一般実行、arbitrary indirect call target execution、translation cache、
   fallback JIT/interpreter は行わない。
 
@@ -1385,6 +1385,39 @@ PR に含めない:
 
 - 一般的な imported global memory model。
 - 任意の dynamic library data symbol read。
+- `return_to` 以降の一般実行。
+- arbitrary indirect call target execution、translation cache、fallback JIT/interpreter。
+- Objective-C runtime / AppKit lifecycle 全体の一般化。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止する。次の gate は continuation block
+  の next blocker を見て focused ISA / process-state / AppKit lifecycle slice として
+  更新する。
+
+#### PR Gate: B8-G6i Return-To Continuation XOR EDX Zero Slice
+
+branch: `task/b8-g6i-continuation-xor-edx-zero`
+
+完了条件:
+
+- [ ] B8-G6h の `return_to_continuation_unsupported_instruction` を受けて、
+  `return_to` continuation block の次 bytes `31 d2` を x86_64
+  `xor edx, edx` として decode / lift / emit または stable boundary に進める。
+- [ ] 32-bit register zeroing semantics により `rdx` が 64-bit zero へ materialize
+  されることを continuation report に保存し、次の decoded instruction / boundary /
+  blocker を stable report に保存する。
+- [ ] `return_to` 以降の一般実行、arbitrary indirect call target execution、
+  translation cache、fallback JIT/interpreter は行わない。
+
+PR に含めない:
+
+- `xor r32, r32` 全体の一般化。
 - `return_to` 以降の一般実行。
 - arbitrary indirect call target execution、translation cache、fallback JIT/interpreter。
 - Objective-C runtime / AppKit lifecycle 全体の一般化。

@@ -440,6 +440,14 @@
   これは一般的な dynamic library data symbol memory model、continuation block の一般実行、
   translation cache / fallback JIT を追加するものではない。次の B8-G6h では `_NSApp`
   imported global load を fixture-scoped boundary として扱う。
+- 2026-06-13 の B8-G6h として、`_NSApp` imported global pointee load は
+  self-authored B8 GUI fixture の `_objc_msgSend(NSApplication, sharedApplication)` host
+  helper return value に限って materialize する。`rdi` materialized state は
+  `source=imported_global_pointee_load`、`base_register=r15`、`base_fixup_resolution.import.symbol_name=_NSApp`、
+  `value_source=objc_shared_application_helper_return_value` を保存する。これは一般的な
+  imported global memory model、任意の dynamic library data symbol read、continuation block
+  の一般実行、translation cache / fallback JIT を追加するものではない。次の B8-G6i では
+  `31 d2` / `xor edx, edx` を focused ISA slice として扱う。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、
