@@ -497,6 +497,15 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                 ));
                 offset += 1;
             }
+            0x5d => {
+                let end = instruction_end(input, at, offset + 1, 1)?;
+                instructions.push(DecodedInstruction::new(
+                    at,
+                    end,
+                    DecodedInstructionKind::PopRbp,
+                ));
+                offset += 1;
+            }
             0x70..=0x7f => {
                 let end_offset = offset + 2;
                 let displacement = read_u8(input, offset + 1, at, opcode)?;

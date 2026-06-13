@@ -3006,11 +3006,20 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"pop_r15\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register\":\"r15\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"role\":\"post_run_epilogue_frame_pointer_restore\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"pop_rbp\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register\":\"rbp\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"stack_slot_source\":\"sequential_epilogue_stack_top\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_blocker_after_restore\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"start\":4294973081"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"start\":4294973082"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"kind\":\"ret\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"start\":4294973083"));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("DecodeUnsupportedOpcode { opcode: 0"));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
             .contains("DecodeUnsupportedOpcode { opcode: 93"));
         assert!(!read_file(&bundle_dir.join("loader.plan.json"))
             .contains("DecodeUnsupportedOpcode { opcode: 65"));
@@ -3435,10 +3444,17 @@ mod tests {
         assert!(launch_report.contains("\"register\":\"r14\""));
         assert!(launch_report.contains("\"pop_r15\""));
         assert!(launch_report.contains("\"register\":\"r15\""));
+        assert!(launch_report.contains("\"role\":\"post_run_epilogue_frame_pointer_restore\""));
+        assert!(launch_report.contains("\"pop_rbp\""));
+        assert!(launch_report.contains("\"register\":\"rbp\""));
         assert!(launch_report.contains("\"stack_slot_source\":\"sequential_epilogue_stack_top\""));
         assert!(launch_report.contains("\"next_blocker_after_restore\""));
         assert!(launch_report.contains("\"start\":4294973081"));
-        assert!(launch_report.contains("DecodeUnsupportedOpcode { opcode: 93"));
+        assert!(launch_report.contains("\"start\":4294973082"));
+        assert!(launch_report.contains("\"kind\":\"ret\""));
+        assert!(launch_report.contains("\"start\":4294973083"));
+        assert!(launch_report.contains("DecodeUnsupportedOpcode { opcode: 0"));
+        assert!(!launch_report.contains("DecodeUnsupportedOpcode { opcode: 93"));
         assert!(!launch_report.contains("DecodeUnsupportedOpcode { opcode: 65"));
         assert!(!launch_report.contains("DecodeUnsupportedOpcode { opcode: 91"));
         assert!(!launch_report.contains("DecodeUnsupportedOpcode { opcode: 72"));

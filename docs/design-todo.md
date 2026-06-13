@@ -603,6 +603,12 @@
   sequential restore として保存され、next blocker は
   `DecodeUnsupportedOpcode { opcode: 93 }` at `4294973081` / `5d` `pop rbp` に進む。
   frame-pointer restore と function return completion は次 gate へ分離する。
+- 2026-06-13 の B8-G6ad として、post-run `5d` / `pop rbp` は arbitrary pop ではなく
+  epilogue frame-pointer restore として同じ register restore report 配列に追加する。
+  `role=post_run_epilogue_frame_pointer_restore`、`register=rbp` として保存し、`ret` at
+  `4294973082` まで decode が進む。remaining blocker は `ret` 後の
+  `DecodeUnsupportedOpcode { opcode: 0 }` at `4294973083` なので、return terminator /
+  post-ret padding completion は次 gate へ分離する。
 - B8-HWGUI 完遂後の OSS app cycle は、任意の downloaded binary ではなく、まず public
   source から x86_64 macOS binary を reproducible に build できる小さい OSS GUI app を
   source-built fixture として扱う。候補選定、license / redistribution、supply-chain、

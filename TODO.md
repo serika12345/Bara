@@ -2121,13 +2121,13 @@ branch: `task/b8-hello-world-gui-complete`
 
 完了条件:
 
-- [ ] B8-G6ac の `return_to_continuation_unsupported_instruction` を受けて、
+- [x] B8-G6ac の `return_to_continuation_unsupported_instruction` を受けて、
   post-run epilogue の `5d` / `pop rbp` at `4294973081` を focused に decode /
   report する。
-- [ ] `pop rbp` は post-run epilogue の frame-pointer restore として stable report し、
+- [x] `pop rbp` は post-run epilogue の frame-pointer restore として stable report し、
   次 blocker を `ret` at `4294973082`、function completion、または narrower epilogue
   blocker へ進める。
-- [ ] B8-G6z-G6ac の `_objc_autoreleasePoolPop` executed boundary、epilogue stack
+- [x] B8-G6z-G6ac の `_objc_autoreleasePoolPop` executed boundary、epilogue stack
   adjustment report、epilogue register restore report regression を維持する。
 
 PR に含めない:
@@ -2135,6 +2135,38 @@ PR に含めない:
 - arbitrary pop / stack-memory semantics。
 - full frame unwinding。
 - full epilogue completion。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6ad は完了し、次の gate は B8-G6ae。
+
+#### PR Gate: B8-G6ae Post-run epilogue return terminator completion boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [ ] B8-G6ad の `return_to_continuation_unsupported_instruction` を受けて、
+  post-run epilogue の `c3` / `ret` at `4294973082` を focused に stable report する。
+- [ ] `ret` 後の trailing zero / padding blocker `DecodeUnsupportedOpcode { opcode: 0 }`
+  at `4294973083` は function completion または post-ret padding boundary として
+  分離し、Hello World GUI 完遂に必要な次 blocker を stable に分類する。
+- [ ] B8-G6z-G6ad の `_objc_autoreleasePoolPop` executed boundary、epilogue stack
+  adjustment report、epilogue register restore / frame-pointer restore report regression を
+  維持する。
+
+PR に含めない:
+
+- general return-to-continuation execution。
+- arbitrary post-ret byte interpretation。
+- whole-function unwinding / stack-frame validation。
 - translation cache、fallback JIT/interpreter。
 
 検証:

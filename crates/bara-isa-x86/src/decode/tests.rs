@@ -575,7 +575,7 @@ fn decodes_pop_r14_before_next_unsupported_rex_opcode() {
 
 #[test]
 fn decodes_pop_r15_before_next_unsupported_opcode() {
-    let input = X86Bytes::new(X86Va::new(0x1a00), vec![0x41, 0x5f, 0x5d])
+    let input = X86Bytes::new(X86Va::new(0x1a00), vec![0x41, 0x5f, 0x40])
         .expect("test bytes are non-empty");
 
     let decoded = decode_function(&input).expect("test bytes decode");
@@ -593,10 +593,34 @@ fn decodes_pop_r15_before_next_unsupported_opcode() {
                 X86Va::new(0x1a03),
                 DecodedInstructionKind::Unsupported {
                     reason: UnsupportedReason::DecodeUnsupportedOpcode {
-                        opcode: 0x5d,
+                        opcode: 0x40,
                         at: X86Va::new(0x1a02)
                     }
                 }
+            )
+        ]
+    );
+}
+
+#[test]
+fn decodes_pop_rbp_then_ret() {
+    let input =
+        X86Bytes::new(X86Va::new(0x1b00), vec![0x5d, 0xc3]).expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0x1b00),
+                X86Va::new(0x1b01),
+                DecodedInstructionKind::PopRbp
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x1b01),
+                X86Va::new(0x1b02),
+                DecodedInstructionKind::Ret
             )
         ]
     );

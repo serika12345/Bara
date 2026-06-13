@@ -124,6 +124,7 @@ pub enum DecodedInstructionKind {
     PushR15,
     PopRax,
     PopRbx,
+    PopRbp,
     PopR14,
     PopR15,
     XorEaxEax,

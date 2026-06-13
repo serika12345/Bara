@@ -806,6 +806,7 @@ enum B8DebugDecodedInstructionKindReport {
     PushR15,
     PopRax,
     PopRbx,
+    PopRbp,
     PopR14,
     PopR15,
     XorEaxEax,
@@ -934,6 +935,7 @@ impl B8DebugDecodedInstructionKindReport {
             DecodedInstructionKind::PushR15 => Self::PushR15,
             DecodedInstructionKind::PopRax => Self::PopRax,
             DecodedInstructionKind::PopRbx => Self::PopRbx,
+            DecodedInstructionKind::PopRbp => Self::PopRbp,
             DecodedInstructionKind::PopR14 => Self::PopR14,
             DecodedInstructionKind::PopR15 => Self::PopR15,
             DecodedInstructionKind::XorEaxEax => Self::XorEaxEax,
@@ -1225,6 +1227,7 @@ enum B8DebugTargetPointerLoadKind {
 enum B8DebugRegisterName {
     Rax,
     Rbx,
+    Rbp,
     Rdx,
     Rdi,
     Rsi,
@@ -2667,6 +2670,11 @@ impl B8DebugReturnToContinuationEpilogueRegisterRestoreReport {
             } else {
                 B8DebugReturnToContinuationEpilogueRegisterRestoreStackSlotSource::SequentialEpilogueStackTop
             };
+            let role = if register == B8DebugRegisterName::Rbp {
+                B8DebugReturnToContinuationEpilogueRegisterRestoreRole::PostRunEpilogueFramePointerRestore
+            } else {
+                B8DebugReturnToContinuationEpilogueRegisterRestoreRole::PostRunEpiloguePreservedRegisterRestore
+            };
             let next_blocker_after_restore = decoded
                 .instructions()
                 .iter()
@@ -2679,8 +2687,7 @@ impl B8DebugReturnToContinuationEpilogueRegisterRestoreReport {
             reports.push(Self {
                 schema: "b8_return_to_continuation_epilogue_register_restore_v0",
                 status: B8DebugReturnToContinuationEpilogueRegisterRestoreStatus::Decoded,
-                role:
-                    B8DebugReturnToContinuationEpilogueRegisterRestoreRole::PostRunEpiloguePreservedRegisterRestore,
+                role,
                 source,
                 instruction: B8DebugDecodedInstructionReport::from_instruction(instruction),
                 register,
@@ -2696,6 +2703,7 @@ impl B8DebugReturnToContinuationEpilogueRegisterRestoreReport {
     const fn restored_register(kind: &DecodedInstructionKind) -> Option<B8DebugRegisterName> {
         match kind {
             DecodedInstructionKind::PopRbx => Some(B8DebugRegisterName::Rbx),
+            DecodedInstructionKind::PopRbp => Some(B8DebugRegisterName::Rbp),
             DecodedInstructionKind::PopR14 => Some(B8DebugRegisterName::R14),
             DecodedInstructionKind::PopR15 => Some(B8DebugRegisterName::R15),
             _ => None,
@@ -2713,6 +2721,7 @@ enum B8DebugReturnToContinuationEpilogueRegisterRestoreStatus {
 #[serde(rename_all = "snake_case")]
 enum B8DebugReturnToContinuationEpilogueRegisterRestoreRole {
     PostRunEpiloguePreservedRegisterRestore,
+    PostRunEpilogueFramePointerRestore,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
