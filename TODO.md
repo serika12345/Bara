@@ -1791,16 +1791,16 @@ branch: `task/b8-hello-world-gui-complete`
 
 完了条件:
 
-- [ ] B8-G6s の
+- [x] B8-G6s の
   `return_to_continuation_objc_helper_void_return_continuation_unimplemented` を受けて、
   `setDelegate:` の void return では x86_64 `rax` value を要求しない continuation
   input model を追加する。
-- [ ] `return_to=4294973049` から public Mach-O code segment bytes を decode し、
+- [x] `return_to=4294973049` から public Mach-O code segment bytes を decode し、
   `mov rdi, qword ptr [r15]` / `mov rsi, qword ptr [rip+disp32]` / `call r14` を
   stable report に保存する。
-- [ ] preserved `r15` `_NSApp` import global と preserved `_objc_msgSend` target を使って、
+- [x] preserved `r15` `_NSApp` import global と preserved `_objc_msgSend` target を使って、
   receiver `NSApp` と selector `run` を available state として materialize する。
-- [ ] 次 blocker を `NSApp run` helper execution boundary または focused unsupported
+- [x] 次 blocker を `NSApp run` helper execution boundary または focused unsupported
   instruction / lifecycle boundary へ進める。
 
 PR に含めない:
@@ -1808,6 +1808,38 @@ PR に含めない:
 - AppKit run loop の一般実行。
 - window lifecycle / delegate callback into translated code。
 - arbitrary void-return Objective-C message continuation。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6t は完了し、次の gate は B8-G6u。
+
+#### PR Gate: B8-G6u Return-To Continuation NSApp run Helper Boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [ ] B8-G6t の `return_to_continuation_objc_helper_execution_unimplemented` を受けて、
+  selector `run` の `_objc_msgSend(NSApp, run)` を no-argument Objective-C helper
+  request として扱い、x86_64 `rdx` argument を要求しない contract に分ける。
+- [ ] public Objective-C / AppKit API と self-authored fixture の範囲で、`NSApp run`
+  を helper execution または AppKit run-loop lifecycle boundary として stable report
+  する。
+- [ ] 次 blocker を `return_to=4294973062` continuation、window lifecycle / delegate
+  callback boundary、または focused AppKit run-loop boundary へ進める。
+
+PR に含めない:
+
+- AppKit run loop の一般実行。
+- window lifecycle / delegate callback into translated code の一般化。
+- arbitrary no-argument Objective-C message send。
 - translation cache、fallback JIT/interpreter。
 
 検証:
