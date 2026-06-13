@@ -1955,14 +1955,14 @@ branch: `task/b8-hello-world-gui-complete`
 
 完了条件:
 
-- [ ] B8-G6x の
+- [x] B8-G6x の
   `return_to_continuation_call_rel32_helper_execution_unimplemented` を受けて、
   post-run `call_rel32` at `4294973065` / target `_objc_autoreleasePoolPop` を
   focused helper boundary として扱う。
-- [ ] `rdi` token argument は initial `_objc_autoreleasePoolPush` return value 由来の
+- [x] `rdi` token argument は initial `_objc_autoreleasePoolPush` return value 由来の
   saved `rbx` handoff であることを保ったまま、public Objective-C runtime
   autorelease pool helper contract を stable report する。
-- [ ] 次 blocker を post-run epilogue decode、function return completion、または
+- [x] 次 blocker を post-run epilogue decode、function return completion、または
   narrower continuation blocker へ進める。
 
 PR に含めない:
@@ -1971,6 +1971,38 @@ PR に含めない:
 - arbitrary autorelease pool lifecycle execution。
 - raw helper-process pointer reuse across helper processes。
 - full x86_64 function epilogue completion。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6y は完了し、次の gate は B8-G6z。
+
+#### PR Gate: B8-G6z Post-run epilogue stack adjustment boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [ ] B8-G6y の `return_to_continuation_unsupported_instruction` を受けて、
+  post-run epilogue の `48 83 c4 08` / `add rsp, 8` at `4294973072` を
+  focused に decode / report する。
+- [ ] stack restore instruction は post-run helper boundary 後の epilogue として
+  stable report し、次 blocker を `pop rbx`、`pop r14`、`pop r15`、`pop rbp`、
+  `ret`、または narrower epilogue blocker へ進める。
+- [ ] `_objc_autoreleasePoolPop` helper boundary が executed のまま維持されることを
+  regression として確認する。
+
+PR に含めない:
+
+- arbitrary stack pointer arithmetic。
+- full x86_64 epilogue completion。
+- general stack frame unwinding。
 - translation cache、fallback JIT/interpreter。
 
 検証:

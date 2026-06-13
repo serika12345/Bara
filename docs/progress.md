@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 17:58 JST
+最終更新: 2026-06-13 18:08 JST
 
 状態:
 
@@ -179,12 +179,16 @@
   `_objc_autoreleasePoolPop` の `call_rel32` helper boundary は
   `b8_return_to_continuation_autorelease_pool_pop_boundary_v0` として保存され、next blocker は
   `return_to_continuation_call_rel32_helper_execution_unimplemented` に進む。
+  B8-G6y では `_objc_autoreleasePoolPop` boundary を public Objective-C runtime helper
+  の fresh push/pop token observation として executed に進め、raw fixture token pointer は
+  helper process 間で再利用しない。next blocker は post-run epilogue の
+  `return_to_continuation_unsupported_instruction` at `source_pc=4294973072` に進む。
   arbitrary dynamic library data symbol read、return-to continuation の一般実行、
   arbitrary call-rel32 execution、translation cache、fallback JIT/interpreter はまだ行わない。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8-HWGUI Self-Authored Hello
   World GUI Completion を大目標として、`task/b8-hello-world-gui-complete` 上で
-  blocker-driven slice を継続中。B8-G6x は完了し、次は B8-G6y Autorelease pool
-  pop helper boundary。
+  blocker-driven slice を継続中。B8-G6y は完了し、次は B8-G6z Post-run epilogue
+  stack adjustment boundary。
 - active_design_focus: B8-HWGUI Self-Authored Hello World GUI Completion を大目標として
   明文化した。B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から GUI lifecycle helper boundary までを通す。`/advance-large` を
@@ -195,7 +199,7 @@
   dyld の private behavior は使わず、public metadata、public API、自前 fixture、
   Rosetta black-box observable result を根拠にする。
 - active_branch: `task/b8-hello-world-gui-complete`。branch base は `2258806`
-  (`docs: define b8 hello world gui completion target`)。この snapshot は B8-G6x
+  (`docs: define b8 hello world gui completion target`)。この snapshot は B8-G6y
   coherent step で更新されており、B8-HWGUI 完遂まではこの branch で coherent step
   ごとに commit / push する。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
@@ -204,7 +208,7 @@
   B8-G5b-G5e / B8-G6a / B8-G6b / B8-G6c / B8-G6d / B8-G6e / B8-G6f /
   B8-G6g / B8-G6h / B8-G6i / B8-G6j / B8-G6k / B8-G6l / B8-G6m /
   B8-G6n / B8-G6o / B8-G6p / B8-G6q / B8-G6r / B8-G6s / B8-G6t / B8-G6u /
-  B8-G6v / B8-G6w / B8-G6x / B8-G6y / B8-HWGUI / B8-OSS0。
+  B8-G6v / B8-G6w / B8-G6x / B8-G6y / B8-G6z / B8-HWGUI / B8-OSS0。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -415,24 +419,34 @@
   entry から GUI 起動完遂まで通す大目標、`/advance-large` 利用時の stop 条件、
   および B8-HWGUI merge 後に開始する B8-OSS0 source-built OSS GUI app automation target を
   TODO / design TODO に追加した。
-- remaining_work: B8-G6y。G6x が残す
-  `return_to_continuation_call_rel32_helper_execution_unimplemented` を受けて、post-run
-  `call_rel32` at `4294973065` / target `_objc_autoreleasePoolPop` を focused helper
-  boundary として扱う。`rdi` token argument は initial `_objc_autoreleasePoolPush`
-  return value 由来の saved `rbx` handoff として保持する。arbitrary call-rel32 helper
-  execution、arbitrary autorelease pool lifecycle、raw helper-process pointer reuse、
-  full epilogue completion、translation cache、fallback JIT/interpreter はまだ行わない。
-- next_action: 次の小 step は B8-G6y Autorelease pool pop helper boundary。
+- remaining_work: B8-G6z。G6y が残す
+  `return_to_continuation_unsupported_instruction` を受けて、post-run epilogue の
+  `48 83 c4 08` / `add rsp, 8` at `4294973072` を focused に decode / report する。
+  `_objc_autoreleasePoolPop` boundary は executed のまま維持し、次 blocker を `pop rbx`、
+  `pop r14`、`pop r15`、`pop rbp`、`ret`、または narrower epilogue blocker へ進める。
+  arbitrary stack pointer arithmetic、full epilogue completion、translation cache、
+  fallback JIT/interpreter はまだ行わない。
+- next_action: 次の小 step は B8-G6z Post-run epilogue stack adjustment boundary。
   B8-HWGUI 大目標の途中なので、coherent step ごとに verify /
   commit / push し、Hello World GUI 完遂 review gate で draft PR を開いて停止する。
 - verification:
   `nix develop -c cargo check -p btbc-cli`、
-  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
-  `nix develop -c cargo test -p btbc-cli -- --nocapture`
-  が B8-G6x 実装後に通過した。full `nix develop -c ./scripts/verify` も通過した。
+  `nix develop -c cargo run -q -p btbc-cli -- generate-b8-debug-bundle target/b8/b8_gui_hello_world_x86_64 /tmp/bara-b8-g6y-inspect`、
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`、
+  `nix develop -c ./scripts/verify`
+  が B8-G6y 実装後に通過した。
 
 直近で完了した作業:
 
+- 2026-06-13 18:08 JST: B8-G6y Autorelease pool pop helper boundary を実装した。
+  `b8_return_to_continuation_autorelease_pool_pop_boundary_v0` は `status=executed`、
+  `target_resolution.symbol_name=_objc_autoreleasePoolPop`、
+  `token_argument.source=saved_rbx_from_autorelease_pool_push` を保存する。
+  `b8_return_to_continuation_autorelease_pool_pop_host_execution_v0` は
+  `effect=autorelease_pool_push_pop`、`input_token_model=fresh_helper_process_push_pop_token`、
+  `raw_pointer_reuse=not_reused_across_helper_processes`、`output.helper_output=objc_helper_void_return`
+  を保存する。next blocker は post-run epilogue の
+  `return_to_continuation_unsupported_instruction` at `4294973072`。
 - 2026-06-13 17:58 JST: B8-G6x Autorelease pool saved-register token materialization
   boundary を実装した。entry decode の `call_rel32` at `4294972938` /
   target `_objc_autoreleasePoolPush` と直後の `mov rbx, rax` を

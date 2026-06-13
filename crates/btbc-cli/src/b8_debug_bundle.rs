@@ -2604,7 +2604,7 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
                     blocked_register_materializations.first().map(|blocked| blocked.blocker);
                 let autorelease_pool_pop_blocker = autorelease_pool_pop_boundary
                     .as_ref()
-                    .map(|boundary| boundary.blocker);
+                    .and_then(|boundary| boundary.blocker);
                 let continuation_call_blocker = continuation_call_boundary
                     .as_ref()
                     .map(|boundary| boundary.blocker);
@@ -2673,7 +2673,10 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
                     )
                 {
                     B8DebugReturnToContinuationDecodeNextAction::MaterializeReturnToContinuationSavedRegisterValue
-                } else if let Some(boundary) = autorelease_pool_pop_boundary.as_ref() {
+                } else if let Some(boundary) = autorelease_pool_pop_boundary
+                    .as_ref()
+                    .filter(|boundary| boundary.blocker.is_some())
+                {
                     boundary.next_action
                 } else if unsupported_instruction.is_some() {
                     B8DebugReturnToContinuationDecodeNextAction::AddReturnToContinuationInstructionSupport
@@ -4293,7 +4296,8 @@ struct B8DebugReturnToContinuationAutoreleasePoolPopBoundaryReport {
     target: u64,
     target_resolution: B8DebugReturnToContinuationMachOStubSymbolResolutionReport,
     token_argument: B8DebugReturnToContinuationAutoreleasePoolTokenArgumentReport,
-    blocker: B8DebugObjcHelperExecutionBlocker,
+    host_execution: B8DebugReturnToContinuationAutoreleasePoolPopHostExecutionReport,
+    blocker: Option<B8DebugObjcHelperExecutionBlocker>,
     next_action: B8DebugReturnToContinuationDecodeNextAction,
 }
 
@@ -4332,10 +4336,14 @@ impl B8DebugReturnToContinuationAutoreleasePoolPopBoundaryReport {
             materialized_register_states,
             call_site,
         )?;
+        let host_execution =
+            B8DebugReturnToContinuationAutoreleasePoolPopHostExecutionReport::from_token_argument(
+                &token_argument,
+            );
 
         Some(Self {
             schema: "b8_return_to_continuation_autorelease_pool_pop_boundary_v0",
-            status: B8DebugImportBoundaryStatus::Blocked,
+            status: host_execution.import_boundary_status(),
             kind: B8DebugReturnToContinuationAutoreleasePoolBoundaryKind::AutoreleasePoolPop,
             source:
                 B8DebugReturnToContinuationCallRel32HelperBoundarySource::PublicMachOSection64DysymtabSymtab,
@@ -4344,10 +4352,9 @@ impl B8DebugReturnToContinuationAutoreleasePoolPopBoundaryReport {
             target,
             target_resolution,
             token_argument,
-            blocker:
-                B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32HelperExecutionUnimplemented,
-            next_action:
-                B8DebugReturnToContinuationDecodeNextAction::ImplementReturnToContinuationCallRel32HelperExecution,
+            blocker: host_execution.blocker(),
+            next_action: host_execution.next_action,
+            host_execution,
         })
     }
 }
@@ -4412,6 +4419,158 @@ enum B8DebugReturnToContinuationAutoreleasePoolArgumentRole {
 #[serde(rename_all = "snake_case")]
 enum B8DebugReturnToContinuationAutoreleasePoolTokenSource {
     SavedRbxFromAutoreleasePoolPush,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationAutoreleasePoolPopHostExecutionReport {
+    schema: &'static str,
+    status: B8DebugObjcRuntimeHelperHostExecutionStatus,
+    api_boundary: B8DebugObjcRuntimeHelperHostApiBoundary,
+    fixture_scope: B8DebugObjcRuntimeHelperFixtureScope,
+    effect: B8DebugReturnToContinuationAutoreleasePoolHostEffect,
+    input_token_model: B8DebugReturnToContinuationAutoreleasePoolPopInputTokenModel,
+    fixture_token_value: u64,
+    helper_token_observation: Option<B8DebugObjcRuntimeHelperOutputReport>,
+    raw_pointer_reuse: B8DebugReturnToContinuationSavedRegisterRawPointerReuse,
+    output: Option<B8DebugReturnToContinuationAutoreleasePoolPopHostOutputReport>,
+    error: Option<B8DebugObjcRuntimeHelperHostExecutionErrorReport>,
+    blocker: Option<B8DebugObjcHelperExecutionBlocker>,
+    next_action: B8DebugReturnToContinuationDecodeNextAction,
+}
+
+impl B8DebugReturnToContinuationAutoreleasePoolPopHostExecutionReport {
+    fn from_token_argument(
+        token_argument: &B8DebugReturnToContinuationAutoreleasePoolTokenArgumentReport,
+    ) -> Self {
+        if !cfg!(target_os = "macos") {
+            return Self::with_error(
+                token_argument,
+                B8DebugObjcRuntimeHelperHostExecutionStatus::Skipped,
+                B8DebugObjcRuntimeHelperErrorClassification::UnsupportedHost,
+                B8DebugObjcHelperExecutionBlocker::ObjcRuntimeHelperHostExecutionUnsupported,
+                B8DebugReturnToContinuationDecodeNextAction::RunReturnToContinuationObjcHelperOnSupportedMacosHost,
+                None,
+            );
+        }
+
+        match run_public_objc_autorelease_pool_push_helper() {
+            Ok(observation) => {
+                let helper_token_observation =
+                    B8DebugObjcRuntimeHelperOutputReport::from_observation(observation);
+                Self {
+                    schema: "b8_return_to_continuation_autorelease_pool_pop_host_execution_v0",
+                    status: B8DebugObjcRuntimeHelperHostExecutionStatus::Executed,
+                    api_boundary: B8DebugObjcRuntimeHelperHostApiBoundary::PublicObjcRuntimeAppKit,
+                    fixture_scope: B8DebugObjcRuntimeHelperFixtureScope::SelfAuthoredB8GuiFixture,
+                    effect:
+                        B8DebugReturnToContinuationAutoreleasePoolHostEffect::AutoreleasePoolPushPop,
+                    input_token_model:
+                        B8DebugReturnToContinuationAutoreleasePoolPopInputTokenModel::FreshHelperProcessPushPopToken,
+                    fixture_token_value: token_argument.materialized_state.value,
+                    helper_token_observation: Some(helper_token_observation),
+                    raw_pointer_reuse:
+                        B8DebugReturnToContinuationSavedRegisterRawPointerReuse::NotReusedAcrossHelperProcesses,
+                    output: Some(
+                        B8DebugReturnToContinuationAutoreleasePoolPopHostOutputReport::void_return(),
+                    ),
+                    error: None,
+                    blocker: None,
+                    next_action:
+                        B8DebugReturnToContinuationDecodeNextAction::AddReturnToContinuationInstructionSupport,
+                }
+            }
+            Err(error) => Self::with_error(
+                token_argument,
+                B8DebugObjcRuntimeHelperHostExecutionStatus::Failed,
+                error.error_classification,
+                B8DebugObjcHelperExecutionBlocker::ObjcRuntimeHelperHostExecutionFailed,
+                B8DebugReturnToContinuationDecodeNextAction::InspectReturnToContinuationObjcHelperExecutionFailure,
+                Some(error),
+            ),
+        }
+    }
+
+    fn with_error(
+        token_argument: &B8DebugReturnToContinuationAutoreleasePoolTokenArgumentReport,
+        status: B8DebugObjcRuntimeHelperHostExecutionStatus,
+        classification: B8DebugObjcRuntimeHelperErrorClassification,
+        blocker: B8DebugObjcHelperExecutionBlocker,
+        next_action: B8DebugReturnToContinuationDecodeNextAction,
+        error: Option<B8DebugObjcRuntimeHelperHostExecutionErrorReport>,
+    ) -> Self {
+        Self {
+            schema: "b8_return_to_continuation_autorelease_pool_pop_host_execution_v0",
+            status,
+            api_boundary: B8DebugObjcRuntimeHelperHostApiBoundary::PublicObjcRuntimeAppKit,
+            fixture_scope: B8DebugObjcRuntimeHelperFixtureScope::SelfAuthoredB8GuiFixture,
+            effect: B8DebugReturnToContinuationAutoreleasePoolHostEffect::AutoreleasePoolPushPop,
+            input_token_model:
+                B8DebugReturnToContinuationAutoreleasePoolPopInputTokenModel::FreshHelperProcessPushPopToken,
+            fixture_token_value: token_argument.materialized_state.value,
+            helper_token_observation: None,
+            raw_pointer_reuse:
+                B8DebugReturnToContinuationSavedRegisterRawPointerReuse::NotReusedAcrossHelperProcesses,
+            output: None,
+            error: if let Some(error) = error {
+                Some(error)
+            } else {
+                Some(B8DebugObjcRuntimeHelperHostExecutionErrorReport::classification_only(
+                    classification,
+                ))
+            },
+            blocker: Some(blocker),
+            next_action,
+        }
+    }
+
+    const fn import_boundary_status(&self) -> B8DebugImportBoundaryStatus {
+        match self.status {
+            B8DebugObjcRuntimeHelperHostExecutionStatus::Executed => {
+                B8DebugImportBoundaryStatus::Executed
+            }
+            B8DebugObjcRuntimeHelperHostExecutionStatus::Skipped => {
+                B8DebugImportBoundaryStatus::Skipped
+            }
+            B8DebugObjcRuntimeHelperHostExecutionStatus::Blocked
+            | B8DebugObjcRuntimeHelperHostExecutionStatus::Failed => {
+                B8DebugImportBoundaryStatus::Blocked
+            }
+        }
+    }
+
+    const fn blocker(&self) -> Option<B8DebugObjcHelperExecutionBlocker> {
+        self.blocker
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationAutoreleasePoolHostEffect {
+    AutoreleasePoolPushPop,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationAutoreleasePoolPopInputTokenModel {
+    FreshHelperProcessPushPopToken,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationAutoreleasePoolPopHostOutputReport {
+    helper_output: B8DebugObjcRuntimeHelperOutput,
+    representation: B8DebugReturnToContinuationObjcHelperOutputRepresentation,
+    return_value: Option<u64>,
+}
+
+impl B8DebugReturnToContinuationAutoreleasePoolPopHostOutputReport {
+    const fn void_return() -> Self {
+        Self {
+            helper_output: B8DebugObjcRuntimeHelperOutput::ObjcHelperVoidReturn,
+            representation:
+                B8DebugReturnToContinuationObjcHelperOutputRepresentation::VoidNoReturnValue,
+            return_value: None,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]

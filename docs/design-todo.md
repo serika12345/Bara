@@ -574,6 +574,12 @@
   push/pop した観測値として保存するが、raw helper-process pointer は
   `not_reused_across_helper_processes` と明示し、実 `_objc_autoreleasePoolPop`
   helper execution は次 gate へ分離する。
+- 2026-06-13 の B8-G6y として、post-run `_objc_autoreleasePoolPop` は
+  focused call-rel32 helper boundary として扱う。fixture の raw token pointer は
+  helper process 間で再利用せず、public Objective-C runtime helper は fresh
+  helper-process token で push/pop capability を観測する。boundary が executed の場合、
+  continuation blocker は `_objc_autoreleasePoolPop` ではなく post-run epilogue の
+  `48 83 c4 08` / `add rsp, 8` に進める。
 - B8-HWGUI 完遂後の OSS app cycle は、任意の downloaded binary ではなく、まず public
   source から x86_64 macOS binary を reproducible に build できる小さい OSS GUI app を
   source-built fixture として扱う。候補選定、license / redistribution、supply-chain、
