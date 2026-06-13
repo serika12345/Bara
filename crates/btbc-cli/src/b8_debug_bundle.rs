@@ -805,6 +805,7 @@ enum B8DebugDecodedInstructionKindReport {
     PushR14,
     PushR15,
     PopRax,
+    PopRbx,
     XorEaxEax,
     XorEdxEdx,
     JccRel8 {
@@ -930,6 +931,7 @@ impl B8DebugDecodedInstructionKindReport {
             DecodedInstructionKind::PushR14 => Self::PushR14,
             DecodedInstructionKind::PushR15 => Self::PushR15,
             DecodedInstructionKind::PopRax => Self::PopRax,
+            DecodedInstructionKind::PopRbx => Self::PopRbx,
             DecodedInstructionKind::XorEaxEax => Self::XorEaxEax,
             DecodedInstructionKind::XorEdxEdx => Self::XorEdxEdx,
             DecodedInstructionKind::JccRel8 {
@@ -2513,6 +2515,7 @@ struct B8DebugReturnToContinuationDecodeBoundaryReport {
     autorelease_pool_pop_boundary:
         Option<B8DebugReturnToContinuationAutoreleasePoolPopBoundaryReport>,
     epilogue_stack_adjustment: Option<B8DebugReturnToContinuationEpilogueStackAdjustmentReport>,
+    epilogue_register_restore: Option<B8DebugReturnToContinuationEpilogueRegisterRestoreReport>,
     continuation_call_boundary: Option<B8DebugReturnToContinuationCallBoundaryReport>,
     decode_report: B8DebugDecodeReport,
     processed_source_pc_range: Option<B8DebugProcessedPcRange>,
@@ -2581,7 +2584,7 @@ impl B8DebugReturnToContinuationEpilogueStackAdjustmentReport {
             .instructions()
             .iter()
             .find(|candidate| {
-                candidate.start() == instruction.end()
+                candidate.start() >= instruction.end()
                     && matches!(candidate.kind(), DecodedInstructionKind::Unsupported { .. })
             })
             .map(B8DebugUnsupportedInstructionReport::from_instruction);
@@ -2617,6 +2620,79 @@ enum B8DebugReturnToContinuationEpilogueStackAdjustmentSource {
     AfterAutoreleasePoolPopHelperReturn,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationEpilogueRegisterRestoreReport {
+    schema: &'static str,
+    status: B8DebugReturnToContinuationEpilogueRegisterRestoreStatus,
+    role: B8DebugReturnToContinuationEpilogueRegisterRestoreRole,
+    source: B8DebugReturnToContinuationEpilogueRegisterRestoreSource,
+    instruction: B8DebugDecodedInstructionReport,
+    register: B8DebugRegisterName,
+    stack_slot_source: B8DebugReturnToContinuationEpilogueRegisterRestoreStackSlotSource,
+    next_blocker_after_restore: Option<B8DebugUnsupportedInstructionReport>,
+}
+
+impl B8DebugReturnToContinuationEpilogueRegisterRestoreReport {
+    fn from_decoded(
+        decoded: &DecodedFunction,
+        epilogue_stack_adjustment: Option<
+            &B8DebugReturnToContinuationEpilogueStackAdjustmentReport,
+        >,
+    ) -> Option<Self> {
+        let epilogue_stack_adjustment = epilogue_stack_adjustment?;
+        let instruction = decoded.instructions().iter().find(|instruction| {
+            instruction.start().value() == epilogue_stack_adjustment.instruction.end
+                && matches!(instruction.kind(), DecodedInstructionKind::PopRbx)
+        })?;
+        let next_blocker_after_restore = decoded
+            .instructions()
+            .iter()
+            .find(|candidate| {
+                candidate.start() == instruction.end()
+                    && matches!(candidate.kind(), DecodedInstructionKind::Unsupported { .. })
+            })
+            .map(B8DebugUnsupportedInstructionReport::from_instruction);
+
+        Some(Self {
+            schema: "b8_return_to_continuation_epilogue_register_restore_v0",
+            status: B8DebugReturnToContinuationEpilogueRegisterRestoreStatus::Decoded,
+            role:
+                B8DebugReturnToContinuationEpilogueRegisterRestoreRole::PostRunEpiloguePreservedRegisterRestore,
+            source:
+                B8DebugReturnToContinuationEpilogueRegisterRestoreSource::AfterEpilogueStackAdjustment,
+            instruction: B8DebugDecodedInstructionReport::from_instruction(instruction),
+            register: B8DebugRegisterName::Rbx,
+            stack_slot_source:
+                B8DebugReturnToContinuationEpilogueRegisterRestoreStackSlotSource::PostAdjustmentStackTop,
+            next_blocker_after_restore,
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationEpilogueRegisterRestoreStatus {
+    Decoded,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationEpilogueRegisterRestoreRole {
+    PostRunEpiloguePreservedRegisterRestore,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationEpilogueRegisterRestoreSource {
+    AfterEpilogueStackAdjustment,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationEpilogueRegisterRestoreStackSlotSource {
+    PostAdjustmentStackTop,
+}
+
 #[derive(Clone, Copy, Debug)]
 struct B8DebugReturnToContinuationHostExecutionContext<'a> {
     code_bytes: &'a X86Bytes,
@@ -2647,6 +2723,7 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
             blocked_register_materializations,
             autorelease_pool_pop_boundary,
             epilogue_stack_adjustment,
+            epilogue_register_restore,
             continuation_call_boundary,
             blocker,
             next_action,
@@ -2680,6 +2757,11 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
                     B8DebugReturnToContinuationEpilogueStackAdjustmentReport::from_decoded(
                         &decoded,
                         autorelease_pool_pop_boundary.as_ref(),
+                    );
+                let epilogue_register_restore =
+                    B8DebugReturnToContinuationEpilogueRegisterRestoreReport::from_decoded(
+                        &decoded,
+                        epilogue_stack_adjustment.as_ref(),
                     );
                 let continuation_call_boundary =
                     B8DebugReturnToContinuationCallBoundaryReport::from_decoded(
@@ -2785,6 +2867,7 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
                     blocked_register_materializations,
                     autorelease_pool_pop_boundary,
                     epilogue_stack_adjustment,
+                    epilogue_register_restore,
                     continuation_call_boundary,
                     blocker,
                     next_action,
@@ -2796,6 +2879,7 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
                 None,
                 Vec::new(),
                 Vec::new(),
+                None,
                 None,
                 None,
                 None,
@@ -2817,6 +2901,7 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
             blocked_register_materializations,
             autorelease_pool_pop_boundary,
             epilogue_stack_adjustment,
+            epilogue_register_restore,
             continuation_call_boundary,
             decode_report,
             processed_source_pc_range,

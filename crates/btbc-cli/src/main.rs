@@ -2989,8 +2989,22 @@ mod tests {
             .contains("\"stack_pointer_delta\":\"X86Imm8(8)\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_blocker_after_adjustment\""));
-        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"start\":4294973076"));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_return_to_continuation_epilogue_register_restore_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"role\":\"post_run_epilogue_preserved_register_restore\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"after_epilogue_stack_adjustment\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"pop_rbx\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register\":\"rbx\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"stack_slot_source\":\"post_adjustment_stack_top\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_blocker_after_restore\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"start\":4294973077"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("DecodeUnsupportedOpcode { opcode: 65"));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
             .contains("DecodeUnsupportedOpcode { opcode: 91"));
         assert!(!read_file(&bundle_dir.join("loader.plan.json"))
             .contains("DecodeUnsupportedOpcode { opcode: 72"));
@@ -3399,8 +3413,17 @@ mod tests {
         assert!(launch_report.contains("\"stack_pointer_register\":\"rsp\""));
         assert!(launch_report.contains("\"stack_pointer_delta\":\"X86Imm8(8)\""));
         assert!(launch_report.contains("\"next_blocker_after_adjustment\""));
-        assert!(launch_report.contains("\"start\":4294973076"));
-        assert!(launch_report.contains("DecodeUnsupportedOpcode { opcode: 91"));
+        assert!(launch_report
+            .contains("\"schema\":\"b8_return_to_continuation_epilogue_register_restore_v0\""));
+        assert!(launch_report.contains("\"role\":\"post_run_epilogue_preserved_register_restore\""));
+        assert!(launch_report.contains("\"source\":\"after_epilogue_stack_adjustment\""));
+        assert!(launch_report.contains("\"pop_rbx\""));
+        assert!(launch_report.contains("\"register\":\"rbx\""));
+        assert!(launch_report.contains("\"stack_slot_source\":\"post_adjustment_stack_top\""));
+        assert!(launch_report.contains("\"next_blocker_after_restore\""));
+        assert!(launch_report.contains("\"start\":4294973077"));
+        assert!(launch_report.contains("DecodeUnsupportedOpcode { opcode: 65"));
+        assert!(!launch_report.contains("DecodeUnsupportedOpcode { opcode: 91"));
         assert!(!launch_report.contains("DecodeUnsupportedOpcode { opcode: 72"));
         assert!(launch_report
             .contains("\"blocker\":\"return_to_continuation_unsupported_instruction\""));

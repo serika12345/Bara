@@ -586,6 +586,12 @@
   は `instruction=add_rsp_imm8`、`stack_pointer_register=rsp`、
   `stack_pointer_delta=X86Imm8(8)`、次 blocker `DecodeUnsupportedOpcode { opcode: 91 }`
   at `4294973076` を保存し、次 gate は preserved `rbx` restore に分離する。
+- 2026-06-13 の B8-G6aa として、post-run `5b` / `pop rbx` は arbitrary pop /
+  stack-memory semantics ではなく epilogue preserved-register restore として扱う。
+  `b8_return_to_continuation_epilogue_register_restore_v0` は `instruction=pop_rbx`、
+  `register=rbx`、`stack_slot_source=post_adjustment_stack_top`、次 blocker
+  `DecodeUnsupportedOpcode { opcode: 65 }` at `4294973077` を保存し、次 gate は
+  `41 5e` / `pop r14` に分離する。
 - B8-HWGUI 完遂後の OSS app cycle は、任意の downloaded binary ではなく、まず public
   source から x86_64 macOS binary を reproducible に build できる小さい OSS GUI app を
   source-built fixture として扱う。候補選定、license / redistribution、supply-chain、
