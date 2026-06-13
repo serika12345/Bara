@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 14:34 JST
+最終更新: 2026-06-13 14:51 JST
 
 状態:
 
@@ -104,15 +104,20 @@
   receiver `_NSApp` value、selector `setActivationPolicy:`、argument `rdx=0` の
   helper request / bridge contract / available-or-blocked state を stable report に保存する。
   next blocker は `return_to_continuation_objc_helper_execution_unimplemented` である。
+  B8-G6l では `_objc_msgSend(NSApp, setActivationPolicy:, 0)` を public Objective-C
+  runtime / AppKit API helper process で実行し、
+  `b8_return_to_continuation_objc_helper_host_execution_v0` に helper output
+  `bool_as_u64`、`next_source_pc=4294973021`、次の continuation decode boundary、
+  next blocker `return_to_continuation_unsupported_instruction` を保存する。次の blocker
+  は `4294973043` の `48 89 c2` / `mov rdx, rax` decode 未対応であり、直前の
+  `_objc_alloc_init` `call rel32` return value materialization と一緒に扱う必要がある。
   arbitrary dynamic library data symbol read、return-to continuation の一般実行、
   arbitrary indirect call target execution、translation cache、fallback JIT/interpreter は
   まだ行わない。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G6k Return-To Continuation
-  setActivationPolicy Helper Boundary: G6j の
-  `return_to_continuation_execution_unimplemented` を受けて、
-  `_objc_msgSend(NSApp, setActivationPolicy:, 0)` を focused Objective-C helper boundary
-  として扱い、helper request / bridge contract / available-or-blocked state と
-  `return_to_continuation_objc_helper_execution_unimplemented` blocker を stable report に保存する。
+- active_milestone: in_progress。[TODO.md](../TODO.md) の B8-HWGUI Self-Authored Hello
+  World GUI Completion を大目標として、`task/b8-hello-world-gui-complete` 上で
+  blocker-driven slice を継続中。B8-G6l は完了し、次は B8-G6m Return-To Continuation
+  `objc_alloc_init` Return Value Register Copy Slice。
 - active_design_focus: B8-HWGUI Self-Authored Hello World GUI Completion を大目標として
   明文化した。B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から GUI lifecycle helper boundary までを通す。`/advance-large` を
@@ -122,15 +127,16 @@
   TODO 上の focused gate または sub-target へ分割する。AppKit / Objective-C runtime /
   dyld の private behavior は使わず、public metadata、public API、自前 fixture、
   Rosetta black-box observable result を根拠にする。
-- active_branch: `main`。最新 commit は `0d1967c`
-  (`Merge pull request #48 from serika12345:task/b8-g6k-continuation-set-activation-policy-helper`)。
-  B8-G6k draft PR #48 は merge 済み。
+- active_branch: `task/b8-hello-world-gui-complete`。branch base は `2258806`
+  (`docs: define b8 hello world gui completion target`)。この snapshot は B8-G6l
+  coherent step commit で更新されており、B8-HWGUI 完遂まではこの branch で
+  coherent step ごとに commit / push する。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
   B8-G5b-G5e / B8-G6a / B8-G6b / B8-G6c / B8-G6d / B8-G6e / B8-G6f /
-  B8-G6g / B8-G6h / B8-G6i / B8-G6j / B8-G6k / B8-G6l / B8-HWGUI /
-  B8-OSS0。
+  B8-G6g / B8-G6h / B8-G6i / B8-G6j / B8-G6k / B8-G6l / B8-G6m /
+  B8-HWGUI / B8-OSS0。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -275,23 +281,29 @@
   available-or-blocked state を stable report に保存する。continuation block と
   helper boundary request の blocker は
   `return_to_continuation_objc_helper_execution_unimplemented` に進む。
+- B8-G6l として
+  `b8_return_to_continuation_objc_helper_host_execution_v0` を追加し、
+  `_objc_msgSend(NSApp, setActivationPolicy:, 0)` だけを public Objective-C runtime /
+  AppKit API helper process で実行する。helper output は `bool_as_u64` として保存し、
+  helper 実行後の `next_source_pc=4294973021`、次の continuation decode boundary、
+  next blocker `return_to_continuation_unsupported_instruction` を stable report に保存する。
 - B8-HWGUI として、self-authored x86_64 Mach-O GUI Hello World fixture を実 `LC_MAIN`
   entry から GUI 起動完遂まで通す大目標、`/advance-large` 利用時の stop 条件、
   および B8-HWGUI merge 後に開始する B8-OSS0 source-built OSS GUI app automation target を
   TODO / design TODO に追加した。
-- remaining_work: B8-G6l。G6k が残す
-  `return_to_continuation_objc_helper_execution_unimplemented` を受けて、
-  `_objc_msgSend(NSApp, setActivationPolicy:, 0)` だけの focused host execution slice を
-  扱う。`setActivationPolicy:` 以外の arbitrary Objective-C message send、
-  return-to continuation の一般実行、arbitrary indirect call target execution、
-  translation cache、fallback JIT/interpreter はまだ行わない。
-- next_action: 次の小 step は B8-G6l Return-To Continuation setActivationPolicy Host
-  Execution Slice。大きく進める場合は、B8-HWGUI を明示対象として `/advance-large` を使い、
-  Hello World GUI 完遂 review gate で停止する。
+- remaining_work: B8-G6m。G6l が残す
+  `return_to_continuation_unsupported_instruction` を受けて、`4294973043` の
+  `48 89 c2` / `mov rdx, rax` と、その source である直前の `_objc_alloc_init`
+  `call rel32` return value materialization boundary を focused slice として扱う。
+  arbitrary register-copy execution、general call-rel32 helper execution、arbitrary
+  Objective-C allocation / initialization bridge、translation cache、fallback
+  JIT/interpreter はまだ行わない。
+- next_action: 次の小 step は B8-G6m Return-To Continuation `objc_alloc_init` Return
+  Value Register Copy Slice。B8-HWGUI 大目標の途中なので、coherent step ごとに
+  verify / commit / push し、Hello World GUI 完遂 review gate で draft PR を開いて停止する。
 - verification:
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
-  `nix develop -c ./scripts/verify` が通過した。今回の docs-only planning update 後に
-  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
+  B8-G6l 実装後の full `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 

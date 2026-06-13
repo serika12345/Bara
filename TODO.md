@@ -1504,16 +1504,18 @@ review gate:
 
 branch: `task/b8-g6l-continuation-set-activation-policy-host-execution`
 
+実装 branch: `task/b8-hello-world-gui-complete`
+
 完了条件:
 
-- [ ] B8-G6k の `return_to_continuation_objc_helper_execution_unimplemented` を受けて、
+- [x] B8-G6k の `return_to_continuation_objc_helper_execution_unimplemented` を受けて、
   `_objc_msgSend(NSApp, setActivationPolicy:, 0)` だけを focused host execution slice
   として扱う。
-- [ ] public Objective-C runtime / AppKit API と self-authored B8 GUI fixture に基づき、
+- [x] public Objective-C runtime / AppKit API と self-authored B8 GUI fixture に基づき、
   helper execution result または stable blocked state を report に保存する。
-- [ ] helper execution 後の next source PC / next decoded boundary / next blocker を
+- [x] helper execution 後の next source PC / next decoded boundary / next blocker を
   stable report に保存する。
-- [ ] `setActivationPolicy:` 以外の arbitrary Objective-C message send、
+- [x] `setActivationPolicy:` 以外の arbitrary Objective-C message send、
   return-to continuation の一般実行、arbitrary indirect call target execution、
   translation cache、fallback JIT/interpreter は行わない。
 
@@ -1531,9 +1533,43 @@ PR に含めない:
 
 review gate:
 
-- 完了したら commit / push / draft PR 作成で停止する。次の gate は continuation block
-  の next blocker を見て focused ISA / process-state / AppKit lifecycle slice として
-  更新する。
+- B8-HWGUI 大目標の途中 slice として完了。次の gate は B8-G6m。
+
+#### PR Gate: B8-G6m Return-To Continuation objc_alloc_init Return Value Register Copy Slice
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [ ] B8-G6l の `return_to_continuation_unsupported_instruction` を受けて、
+  `4294973043` の `48 89 c2` / `mov rdx, rax` を focused x86_64 register-copy
+  slice として decode / report する。
+- [ ] `mov rdx, rax` の source `rax` が直前の `_objc_alloc_init` `call rel32`
+  return value であることを stable boundary として扱い、まだ helper 実行できない場合は
+  `objc_alloc_init` return materialization blocker として分類する。
+- [ ] `mov rdx, rax` 後の `call r14` が
+  `_objc_msgSend(NSApp, setDelegate:, delegate)` に進む事実または stable blocker を
+  next boundary として保存する。
+- [ ] `objc_alloc_init` 全般、arbitrary class allocation、arbitrary register-copy execution、
+  general call-rel32 helper execution、arbitrary Objective-C message send、
+  translation cache、fallback JIT/interpreter は行わない。
+
+PR に含めない:
+
+- 一般的な register transfer execution engine。
+- arbitrary call-rel32 import/helper execution。
+- arbitrary Objective-C allocation / initialization bridge。
+- general continuation execution、translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。
 
 - [ ] B8-G6: Objective-C runtime / AppKit helper bridge を B8-G1 専用 lifecycle
   event から一般化する。

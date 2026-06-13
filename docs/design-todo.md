@@ -472,6 +472,17 @@
   continuation block の一般実行、arbitrary indirect call target execution、
   translation cache / fallback JIT を追加するものではない。次の B8-G6l では
   `_objc_msgSend(NSApp, setActivationPolicy:, 0)` だけの focused host execution slice を扱う。
+- 2026-06-13 の B8-G6l として、`_objc_msgSend(NSApp, setActivationPolicy:, 0)` を
+  public Objective-C runtime / AppKit API helper process で実行し、
+  `b8_return_to_continuation_objc_helper_host_execution_v0` に helper output
+  `bool_as_u64`、`next_source_pc=4294973021`、次の continuation decode boundary、
+  次 blocker `return_to_continuation_unsupported_instruction` を保存する。これは
+  `setActivationPolicy:` 以外の arbitrary Objective-C message send、return-to
+  continuation の一般実行、arbitrary indirect call target execution、translation cache /
+  fallback JIT を追加するものではない。次の B8-G6m では `4294973043` の
+  `48 89 c2` / `mov rdx, rax` を扱うが、source `rax` は直前の `_objc_alloc_init`
+  `call rel32` return value なので、単なる register-copy decode だけでなく return
+  materialization blocker として扱う。
 - 2026-06-13 の planning update として、B8-HWGUI を self-authored Hello World GUI
   completion の大目標として明文化した。大目標の対象は、実 `LC_MAIN` entry から
   GUI lifecycle helper boundary までを通し、automated expected / actual と manual visible
