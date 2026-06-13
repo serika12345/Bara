@@ -9,11 +9,11 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 11:04 JST
+最終更新: 2026-06-13 11:05 JST
 
 状態:
 
-- project_state: completed。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
+- project_state: paused。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
   reviewable GUI 起動 slice の積み上げとして扱う。B8-G6c までで、self-authored
   x86_64 GUI fixture の実 `LC_MAIN` entry から
   `push rbp; mov rbp,rsp; push r15; push r14; push rbx; push rax; call rel32;
@@ -94,8 +94,9 @@
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
 - active_branch: `task/b8-g6f-continuation-r15-rip-relative-load`。base branch は
   最新 `main` の `7774f4a` (`Merge pull request #42 from
-  serika12345:task/b8-g6e-return-to-continuation-decode`)。draft PR は verify / push 後に
-  作成する。
+  serika12345:task/b8-g6e-return-to-continuation-decode`)。implementation commit は `9d5328e`
+  (`feat: add b8 g6f r15 rip-relative continuation load`)。draft PR は
+  <https://github.com/serika12345/Bara/pull/43>。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
@@ -227,12 +228,14 @@
   x86_64 `mov rdi, qword ptr [r15]` の focused ISA / state materialization slice として
   扱う。`return_to` 以降の一般実行、arbitrary indirect call target execution、
   translation cache、fallback JIT/interpreter はまだ行わない。
-- next_action: B8-G6f branch を push して draft PR を作成する。
+- next_action: B8-G6f draft PR #43 を review / merge する。merge 後の次 PR Gate は
+  B8-G6g Return-To Continuation R15-Indirect RDI Load Slice。
 - verification:
   `nix develop -c cargo test -p bara-isa-x86 mov_r15 -- --nocapture`、
   `nix develop -c cargo test -p bara-arm64 r15_from_rip -- --nocapture`、
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
-  `nix develop -c ./scripts/verify` が通過した。
+  `nix develop -c ./scripts/verify` が通過した。PR URL 記録後に
+  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 
 直近で完了した作業:
 
