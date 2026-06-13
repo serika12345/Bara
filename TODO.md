@@ -2225,9 +2225,9 @@ branch: `task/b8-hello-world-gui-complete`
 - [x] automated mode で Rosetta expected / Bara actual の stable JSON comparison が
   Hello World GUI 完遂条件に対して一致するか、残る差分が B8-HWGUI 完遂 blocker か
   post-completion 拡張対象かを stable report / review package に記録する。
-- [ ] manual visible mode で Bara 経由の実 entry path から `hello world` window / label を
+- [x] manual visible mode で Bara 経由の実 entry path から `hello world` window / label を
   表示できるか、実行環境上の制約があれば blocker として記録する。
-- [ ] B8-HWGUI 大目標の完遂条件を満たした場合は、TODO / progress を完了状態にし、
+- [x] B8-HWGUI 大目標の完遂条件を満たした場合は、TODO / progress を完了状態にし、
   branch を push して draft PR を開き、review gate で停止する。
 
 PR に含めない:
@@ -2247,7 +2247,7 @@ review gate:
 
 - B8-HWGUI 完遂時点で draft PR を開いて停止する。merge までは B8-OSS0 に進まない。
 
-current blocker:
+completion evidence:
 
 - 2026-06-13 19:53 JST: automated expected / actual は
   `target/b8-hwgui-review/expected.json` と `target/b8-hwgui-review/actual.json` の
@@ -2255,11 +2255,13 @@ current blocker:
   modeled helper continuation chain も
   `b8_return_to_continuation_modeled_execution_completion_v0` /
   `launch_path_status=completed` を確認した。
-- manual visible は `run-arm64-gui-hello-world-translated-visible` で helper process が
-  visible process として起動するところまで確認したが、Computer Use の Accessibility /
-  Screen Recording 権限が未完了で、`screencapture` も黒画面になったため、window / label の
-  目視確認は未完了。process は残さないため終了済み。次は権限付与後に同 command を再実行し、
-  window close まで通して `manual-visible.launch-report.json` を保存する。
+- 2026-06-13 20:01 JST: manual visible は
+  `run-arm64-gui-hello-world-translated-visible` で
+  `target/b8-hwgui-review/manual-visible.launch-report.json` を保存した。
+  WindowServer から `Bara GUI Hello World` window の on-screen title / bounds を確認し、
+  launch report は `mode=manual_visible`、`status=gui_visible_ready`、
+  `stdout={"event":"gui_window_created","title":"Bara GUI Hello World","text":"hello world"}`、
+  `exit_status=0` を保存している。
 
 - [ ] B8-G6: Objective-C runtime / AppKit helper bridge を B8-G1 専用 lifecycle
   event から一般化する。
@@ -2284,24 +2286,24 @@ branch: `task/b8-hello-world-gui-complete`
 
 目的:
 
-- [ ] self-authored x86_64 Mach-O GUI Hello World fixture を、B8-G1 専用
+- [x] self-authored x86_64 Mach-O GUI Hello World fixture を、B8-G1 専用
   sentinel / host trap ではなく、実 `LC_MAIN` entry から進めて GUI 起動完遂まで通す。
-- [ ] public Mach-O metadata、public Objective-C runtime / AppKit API、自前 fixture、
+- [x] public Mach-O metadata、public Objective-C runtime / AppKit API、自前 fixture、
   Rosetta black-box observable result だけを根拠にする。
-- [ ] debug bundle の next blocker を source of truth にし、必要な ISA / loader /
+- [x] debug bundle の next blocker を source of truth にし、必要な ISA / loader /
   helper / process-state boundary を focused step として追加する。
 
 完遂条件:
 
-- [ ] automated mode で Rosetta expected / Bara actual の stable JSON comparison が通る。
-- [ ] manual visible mode で Bara 経由の実 entry path から `hello world` window / label を
+- [x] automated mode で Rosetta expected / Bara actual の stable JSON comparison が通る。
+- [x] manual visible mode で Bara 経由の実 entry path から `hello world` window / label を
   表示できる。
-- [ ] launch report / debug bundle が、実 `LC_MAIN` entry から GUI lifecycle helper
+- [x] launch report / debug bundle が、実 `LC_MAIN` entry から GUI lifecycle helper
   boundary まで進んだ事実を保存し、B8-G1 専用 sentinel / host trap path と区別できる。
-- [ ] self-authored GUI Hello World fixture の expected launch path 上に残る blocker が
+- [x] self-authored GUI Hello World fixture の expected launch path 上に残る blocker が
   `unsupported_instruction` / `unsupported_import` / `unsupported_loader_feature` /
   Objective-C / AppKit helper boundary として未処理ではない。
-- [ ] 完遂後に残る next blocker が、Hello World GUI 完遂後の拡張対象
+- [x] 完遂後に残る next blocker が、Hello World GUI 完遂後の拡張対象
   （例: arbitrary ObjC message send、translation cache、OSS app 固有 boundary）として
   stable report されている。
 

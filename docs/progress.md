@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 19:18 JST
+最終更新: 2026-06-13 20:07 JST
 
 状態:
 
@@ -205,12 +205,12 @@
   `next_action=review_b8_hello_world_gui_completion` に進む。
   arbitrary dynamic library data symbol read、return-to continuation の一般実行、
   arbitrary call-rel32 execution、translation cache、fallback JIT/interpreter はまだ行わない。
-- active_milestone: blocked。[TODO.md](../TODO.md) の B8-HWGUI Self-Authored Hello
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-HWGUI Self-Authored Hello
   World GUI Completion を大目標として、`task/b8-hello-world-gui-complete` 上で
   blocker-driven slice を継続中。B8-G6af は完了し、B8-HWGUI Final expected/actual
   and manual visible review boundary のうち automated expected/actual と real-entry
-  modeled completion 確認までは完了した。manual visible の画面確認は Computer Use /
-  Screen Recording 権限未完了と黒画面 screenshot のため blocked。
+  modeled completion 確認、および manual visible mode の launch report 保存まで完了した。
+  draft PR を開いて review gate で停止する。
 - active_design_focus: B8-HWGUI Self-Authored Hello World GUI Completion を大目標として
   明文化した。B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から GUI lifecycle helper boundary までを通す。`/advance-large` を
@@ -222,9 +222,10 @@
   Rosetta black-box observable result を根拠にする。
 - active_branch: `task/b8-hello-world-gui-complete`。branch base は `2258806`
   (`docs: define b8 hello world gui completion target`)。latest pushed implementation commit is
-  `32c8afb` (`feat: complete b8 modeled gui continuation`)。この snapshot は
-  B8-HWGUI final review boundary の blocked state として更新されており、manual visible
-  確認が完了するまでは B8-OSS0 に進まない。
+  `32c8afb` (`feat: complete b8 modeled gui continuation`)。latest pushed documentation commit
+  before this completion update is `996e622` (`docs: record b8 hwgui visible blocker`)。
+  この snapshot は B8-HWGUI final review boundary completed state として更新されており、
+  draft PR を開いて merge review までは B8-OSS0 に進まない。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
@@ -443,17 +444,11 @@
   entry から GUI 起動完遂まで通す大目標、`/advance-large` 利用時の stop 条件、
   および B8-HWGUI merge 後に開始する B8-OSS0 source-built OSS GUI app automation target を
   TODO / design TODO に追加した。
-- remaining_work: manual visible mode の確認。`run-arm64-gui-hello-world-translated-visible`
-  で helper process が visible process として起動するところまでは確認したが、Computer Use の
-  Accessibility / Screen Recording 権限が未完了で、`screencapture` も黒画面だった。
-  process は残さないため終了済み。権限付与後に同 command を再実行し、window / label を確認して
-  `manual-visible.launch-report.json` を保存する必要がある。
+- remaining_work: B8-HWGUI review gate。draft PR を開き、merge までは B8-OSS0 に進まない。
   B8-OSS0、general continuation execution、arbitrary Objective-C message send、
   translation cache、fallback JIT/interpreter、`.app` bundle / resource 一般化はまだ行わない。
-- next_action: Computer Use の Accessibility / Screen Recording 権限を付与したうえで、
-  `nix develop -c cargo run -q -p btbc-cli -- run-arm64-gui-hello-world-translated-visible target/b8-hwgui-review/b8_gui_hello_world_visible_x86_64 target/b8-hwgui-review/manual-visible.launch-report.json`
-  を再実行し、window close まで通す。manual visible が確認できたら B8-HWGUI 完遂状態にして
-  draft PR を開く。
+- next_action: B8-HWGUI completion docs を commit / push し、draft PR を開いて review gate
+  で停止する。
 - verification:
   `nix develop -c cargo check -p btbc-cli`、
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`、
@@ -461,8 +456,10 @@
   は通過。format 後に `nix develop -c ./scripts/verify` も通過した。
   Final review boundary では `target/b8-hwgui-review/expected.json` と
   `target/b8-hwgui-review/actual.json` の `compare-expected-actual` が `{"issues":[]}` で
-  一致し、debug bundle の modeled completion も確認済み。manual visible は権限 blocker により
-  未完了。
+  一致し、debug bundle の modeled completion も確認済み。manual visible は WindowServer で
+  `Bara GUI Hello World` window title / bounds を確認し、
+  `target/b8-hwgui-review/manual-visible.launch-report.json` が `mode=manual_visible`、
+  `status=gui_visible_ready`、`exit_status=0`、`text=hello world` を保存している。
 
 直近で完了した作業:
 
@@ -475,10 +472,14 @@
   `helper_boundary_request.status=executed`、`reason=null`、
   `review_b8_hello_world_gui_completion`、および
   `b8_return_to_continuation_modeled_execution_completion_v0` /
-  `launch_path_status=completed` を保存している。manual visible は
-  `run-arm64-gui-hello-world-translated-visible` で helper process が visible process として
-  起動するところまで確認したが、Computer Use Accessibility / Screen Recording 権限未完了と
-  黒画面 screenshot のため window / label 確認は未完了。process は終了済み。
+  `launch_path_status=completed` を保存している。
+- 2026-06-13 20:01 JST: B8-HWGUI manual visible mode を確認した。
+  `run-arm64-gui-hello-world-translated-visible` で helper process を起動し、WindowServer から
+  `Bara GUI Hello World` window の on-screen title / bounds を確認した。AppKit terminate
+  で window close まで通し、`target/b8-hwgui-review/manual-visible.launch-report.json` は
+  `mode=manual_visible`、`status=gui_visible_ready`、`exit_status=0`、
+  `stdout={"event":"gui_window_created","title":"Bara GUI Hello World","text":"hello world"}` を
+  保存した。
 - 2026-06-13 19:32 JST: B8-G6af Self-authored continuation execution completion boundary を
   実装した。final continuation は
   `b8_return_to_continuation_modeled_execution_completion_v0` を保存し、

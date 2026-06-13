@@ -625,6 +625,11 @@
   nested helper request / continuation boundary は `blocker=null`、
   `next_action=review_b8_hello_world_gui_completion` になる。automated expected/actual と
   manual visible mode は final B8-HWGUI review boundary の差分として report に残す。
+- 2026-06-13 の B8-HWGUI final review として、automated expected/actual は
+  `{"issues":[]}` で一致し、manual visible mode は WindowServer の on-screen window title /
+  bounds と `manual-visible.launch-report.json` の `gui_window_created` event で確認した。
+  この時点で self-authored Hello World GUI は review gate 到達とし、B8-OSS0 は branch
+  review / merge 後に開始する。
 - B8-HWGUI 完遂後の OSS app cycle は、任意の downloaded binary ではなく、まず public
   source から x86_64 macOS binary を reproducible に build できる小さい OSS GUI app を
   source-built fixture として扱う。候補選定、license / redistribution、supply-chain、
