@@ -13,6 +13,9 @@ pub struct MachOSectionMetadata {
     reloff: MachOSectionRelocationFileOffset,
     nreloc: MachOSectionRelocationCount,
     flags: MachOSectionFlags,
+    reserved1: MachOSectionReserved1,
+    reserved2: MachOSectionReserved2,
+    reserved3: MachOSectionReserved3,
 }
 
 impl MachOSectionMetadata {
@@ -27,6 +30,9 @@ impl MachOSectionMetadata {
         reloff: MachOSectionRelocationFileOffset,
         nreloc: MachOSectionRelocationCount,
         flags: MachOSectionFlags,
+        reserved1: MachOSectionReserved1,
+        reserved2: MachOSectionReserved2,
+        reserved3: MachOSectionReserved3,
     ) -> Self {
         Self {
             name,
@@ -38,6 +44,9 @@ impl MachOSectionMetadata {
             reloff,
             nreloc,
             flags,
+            reserved1,
+            reserved2,
+            reserved3,
         }
     }
 
@@ -76,6 +85,18 @@ impl MachOSectionMetadata {
     pub const fn flags(&self) -> MachOSectionFlags {
         self.flags
     }
+
+    pub const fn reserved1(&self) -> MachOSectionReserved1 {
+        self.reserved1
+    }
+
+    pub const fn reserved2(&self) -> MachOSectionReserved2 {
+        self.reserved2
+    }
+
+    pub const fn reserved3(&self) -> MachOSectionReserved3 {
+        self.reserved3
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -113,6 +134,10 @@ impl MachOSectionAddress {
     const fn from_public_section_value(value: u64) -> Self {
         Self { value }
     }
+
+    pub(crate) const fn as_u64(self) -> u64 {
+        self.value
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -124,6 +149,10 @@ pub struct MachOSectionByteSize {
 impl MachOSectionByteSize {
     const fn from_public_section_value(value: u64) -> Self {
         Self { value }
+    }
+
+    pub(crate) const fn as_u64(self) -> u64 {
+        self.value
     }
 }
 
@@ -182,6 +211,50 @@ pub struct MachOSectionFlags {
 }
 
 impl MachOSectionFlags {
+    const fn from_public_section_value(value: u32) -> Self {
+        Self { value }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(transparent)]
+pub struct MachOSectionReserved1 {
+    value: u32,
+}
+
+impl MachOSectionReserved1 {
+    const fn from_public_section_value(value: u32) -> Self {
+        Self { value }
+    }
+
+    pub(crate) const fn as_u32(self) -> u32 {
+        self.value
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(transparent)]
+pub struct MachOSectionReserved2 {
+    value: u32,
+}
+
+impl MachOSectionReserved2 {
+    const fn from_public_section_value(value: u32) -> Self {
+        Self { value }
+    }
+
+    pub(crate) const fn as_u32(self) -> u32 {
+        self.value
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(transparent)]
+pub struct MachOSectionReserved3 {
+    value: u32,
+}
+
+impl MachOSectionReserved3 {
     const fn from_public_section_value(value: u32) -> Self {
         Self { value }
     }
@@ -313,6 +386,24 @@ fn parse_section_64_metadata(
         MACH_O_SECTION_64_FLAGS_OFFSET,
         MachOSectionFlags::from_public_section_value,
     )?;
+    let reserved1 = read_section_u32(
+        input,
+        section_offset,
+        MACH_O_SECTION_64_RESERVED1_OFFSET,
+        MachOSectionReserved1::from_public_section_value,
+    )?;
+    let reserved2 = read_section_u32(
+        input,
+        section_offset,
+        MACH_O_SECTION_64_RESERVED2_OFFSET,
+        MachOSectionReserved2::from_public_section_value,
+    )?;
+    let reserved3 = read_section_u32(
+        input,
+        section_offset,
+        MACH_O_SECTION_64_RESERVED3_OFFSET,
+        MachOSectionReserved3::from_public_section_value,
+    )?;
 
     Ok(MachOSectionMetadata::new(
         name,
@@ -324,6 +415,9 @@ fn parse_section_64_metadata(
         reloff,
         nreloc,
         flags,
+        reserved1,
+        reserved2,
+        reserved3,
     ))
 }
 
@@ -369,3 +463,6 @@ const MACH_O_SECTION_64_ALIGN_OFFSET: usize = 52;
 const MACH_O_SECTION_64_RELOFF_OFFSET: usize = 56;
 const MACH_O_SECTION_64_NRELOC_OFFSET: usize = 60;
 const MACH_O_SECTION_64_FLAGS_OFFSET: usize = 64;
+const MACH_O_SECTION_64_RESERVED1_OFFSET: usize = 68;
+const MACH_O_SECTION_64_RESERVED2_OFFSET: usize = 72;
+const MACH_O_SECTION_64_RESERVED3_OFFSET: usize = 76;

@@ -1504,16 +1504,18 @@ review gate:
 
 branch: `task/b8-g6l-continuation-set-activation-policy-host-execution`
 
+実装 branch: `task/b8-hello-world-gui-complete`
+
 完了条件:
 
-- [ ] B8-G6k の `return_to_continuation_objc_helper_execution_unimplemented` を受けて、
+- [x] B8-G6k の `return_to_continuation_objc_helper_execution_unimplemented` を受けて、
   `_objc_msgSend(NSApp, setActivationPolicy:, 0)` だけを focused host execution slice
   として扱う。
-- [ ] public Objective-C runtime / AppKit API と self-authored B8 GUI fixture に基づき、
+- [x] public Objective-C runtime / AppKit API と self-authored B8 GUI fixture に基づき、
   helper execution result または stable blocked state を report に保存する。
-- [ ] helper execution 後の next source PC / next decoded boundary / next blocker を
+- [x] helper execution 後の next source PC / next decoded boundary / next blocker を
   stable report に保存する。
-- [ ] `setActivationPolicy:` 以外の arbitrary Objective-C message send、
+- [x] `setActivationPolicy:` 以外の arbitrary Objective-C message send、
   return-to continuation の一般実行、arbitrary indirect call target execution、
   translation cache、fallback JIT/interpreter は行わない。
 
@@ -1531,9 +1533,739 @@ PR に含めない:
 
 review gate:
 
-- 完了したら commit / push / draft PR 作成で停止する。次の gate は continuation block
-  の next blocker を見て focused ISA / process-state / AppKit lifecycle slice として
-  更新する。
+- B8-HWGUI 大目標の途中 slice として完了。次の gate は B8-G6m。
+
+#### PR Gate: B8-G6m Return-To Continuation objc_alloc_init Return Value Register Copy Slice
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [x] B8-G6l の `return_to_continuation_unsupported_instruction` を受けて、
+  `4294973043` の `48 89 c2` / `mov rdx, rax` を focused x86_64 register-copy
+  slice として decode / report する。
+- [x] `mov rdx, rax` の source `rax` が直前の `_objc_alloc_init` `call rel32`
+  return value であることを stable boundary として扱い、まだ helper 実行できない場合は
+  `objc_alloc_init` return materialization blocker として分類する。
+- [x] `mov rdx, rax` 後の `call r14` が
+  `_objc_msgSend(NSApp, setDelegate:, delegate)` に進む事実または stable blocker を
+  next boundary として保存する。
+- [x] `objc_alloc_init` 全般、arbitrary class allocation、arbitrary register-copy execution、
+  general call-rel32 helper execution、arbitrary Objective-C message send、
+  translation cache、fallback JIT/interpreter は行わない。
+
+PR に含めない:
+
+- 一般的な register transfer execution engine。
+- arbitrary call-rel32 import/helper execution。
+- arbitrary Objective-C allocation / initialization bridge。
+- general continuation execution、translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として完了。次の gate は B8-G6n。
+
+#### PR Gate: B8-G6n Return-To Continuation call_rel32 objc_alloc_init Helper Boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [x] B8-G6m の
+  `return_to_continuation_call_rel32_return_value_materialization_unimplemented` を受けて、
+  `call_rel32` at `4294973028` / target `4294973108` / return_to `4294973033` を
+  focused helper boundary として保存する。
+- [x] public Mach-O stub / symbol / import metadata から `_objc_alloc_init` identity を
+  解決できる場合は保存し、まだ解決できない場合は stable unresolved-stub blocker として
+  分類する。
+- [x] `objc_alloc_init` return value が `rax` に入り、`mov rdx, rax` によって
+  `setDelegate:` argument へ渡る dataflow を helper return materialization boundary として
+  保存する。
+- [x] arbitrary call-rel32 helper execution、arbitrary Objective-C allocation /
+  initialization、general dynamic symbol resolver、translation cache、fallback
+  JIT/interpreter は行わない。
+
+PR に含めない:
+
+- 一般的な call-rel32 execution engine。
+- arbitrary Objective-C allocation / initialization bridge。
+- dynamic linker / dyld stub binding の一般実装。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6n は完了し、次の gate は B8-G6o。
+
+#### PR Gate: B8-G6o Return-To Continuation objc_alloc_init Helper Execution Boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [x] B8-G6n の
+  `return_to_continuation_call_rel32_helper_execution_unimplemented` を受けて、
+  `_objc_alloc_init` helper execution request を focused boundary として保存する。
+- [x] `call_rel32` at `4294973028` の x86_64 argument `rdi` を public Mach-O mapped
+  image / chained fixup metadata から materialize し、class identity を解決できる場合は
+  保存する。解決できない場合は stable class-argument blocker として分類する。
+- [x] `_objc_alloc_init` の return value が `rax` に入り、後続の `mov rdx, rax` で
+  `setDelegate:` argument へ渡る execution/dataflow 境界を更新する。
+- [x] arbitrary Objective-C class allocation / initialization bridge、arbitrary call-rel32
+  execution、general dynamic symbol resolver、translation cache、fallback JIT/interpreter は
+  行わない。
+
+PR に含めない:
+
+- 一般的な call-rel32 execution engine。
+- arbitrary Objective-C allocation / initialization bridge。
+- dynamic linker / dyld stub binding の一般実装。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6o は完了し、次の gate は B8-G6p。
+
+#### PR Gate: B8-G6p Return-To Continuation objc_alloc_init Delegate Class Bridge
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [x] B8-G6o の
+  `return_to_continuation_objc_alloc_init_class_bridge_unimplemented` を受けて、
+  `class_rebase.resolved_vm_address=4294988184` を self-authored fixture の delegate class
+  bridge boundary として扱う。
+- [x] public Mach-O / Objective-C metadata から `BaraGuiHelloWorldDelegate` identity を
+  解決できる場合は保存し、まだ解決できない場合は stable class-identity blocker として
+  分類する。
+- [x] `_objc_alloc_init` の host-side substitute が必要な場合は、self-authored B8 GUI
+  fixture の delegate class に限る bridge contract として保存する。arbitrary Objective-C
+  class allocation / initialization bridge にはしない。
+- [x] `_objc_alloc_init` return value が `rax` に入り、後続の `mov rdx, rax` で
+  `setDelegate:` argument へ渡る dataflow を維持する。
+
+PR に含めない:
+
+- 任意の Objective-C class / instance bridge。
+- 一般的な call-rel32 execution engine。
+- dynamic linker / dyld stub binding の一般実装。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6p は完了し、次の gate は B8-G6q。
+
+#### PR Gate: B8-G6q Return-To Continuation objc_alloc_init Fixture Delegate Bridge Contract
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [x] B8-G6p の
+  `return_to_continuation_objc_alloc_init_fixture_delegate_bridge_unimplemented` を受けて、
+  `_OBJC_CLASS_$_BaraGuiHelloWorldDelegate` に限る fixture delegate bridge contract として
+  保存する。
+- [x] `b8_return_to_continuation_objc_alloc_init_class_identity_v0` の
+  `public_mach_o_symtab_nlist64` 解決結果を contract input に接続し、private Objective-C
+  runtime metadata には依存しない。
+- [x] `_objc_alloc_init` host-side substitute が返す値は x86_64 `rax` writeback の
+  producer として扱い、後続の `mov rdx, rax` / `setDelegate:` dataflow を維持する。
+- [x] 次 blocker を fixture delegate host execution の未実装境界として分類する。
+
+PR に含めない:
+
+- 任意の Objective-C class / instance bridge。
+- Objective-C object layout、isa pointer、private runtime metadata の解釈。
+- 一般的な `_objc_alloc_init` execution engine。
+- dynamic linker / dyld stub binding の一般実装。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6q は完了し、次の gate は B8-G6r。
+
+#### PR Gate: B8-G6r Return-To Continuation objc_alloc_init Fixture Delegate Host Execution
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [x] B8-G6q の
+  `return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_unimplemented` を受けて、
+  self-authored fixture delegate substitute を public Objective-C / AppKit API helper で
+  実行する。
+- [x] host execution result を
+  `b8_return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_v0` として保存し、
+  `host_pointer_u64` output を `_objc_alloc_init` return value として扱う。
+- [x] `_objc_alloc_init` return value を x86_64 `rax` writeback に接続し、後続の
+  `mov rdx, rax` が `setDelegate:` argument として available になることを保存する。
+- [x] 次 blocker を `setDelegate:` helper execution boundary へ進める。
+
+PR に含めない:
+
+- x86_64 binary 内の Objective-C object layout / method table / isa pointer 解釈。
+- 任意の Objective-C class / instance bridge。
+- 一般的な `_objc_alloc_init` execution engine。
+- delegate callback into translated code。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6r は完了し、次の gate は B8-G6s。
+
+#### PR Gate: B8-G6s Return-To Continuation setDelegate Helper Execution Boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [x] B8-G6r の `return_to_continuation_objc_helper_execution_unimplemented` を受けて、
+  selector `setDelegate:` の helper request / bridge contract / host execution report を
+  `setActivationPolicy:` 専用 contract から分離する。
+- [x] `_objc_alloc_init` fixture delegate substitute の `host_pointer_u64` を raw
+  cross-process pointer として扱わず、fixture-scoped host object / session / handle
+  boundary または same-helper-process substitute の実行条件として stable report する。
+- [x] public Objective-C / AppKit API helper で
+  `NSApp setDelegate:<BaraGuiHelloWorldDelegate instance>` を実行できる場合は execution
+  result を保存し、実行できない場合は host object / session continuity blocker として
+  stable に分類する。
+- [x] 次 blocker を `setDelegate:` return continuation (`return_to=4294973049`) または
+  host object / session continuity の次 action へ進める。
+
+PR に含めない:
+
+- 任意 Objective-C message send の一般実行。
+- raw Objective-C object pointer の process 間再利用。
+- delegate callback into translated code。
+- AppKit run loop / window lifecycle の一般化。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6s は完了し、次の gate は B8-G6t。
+
+#### PR Gate: B8-G6t Return-To Continuation setDelegate Void Return Continuation Decode
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [x] B8-G6s の
+  `return_to_continuation_objc_helper_void_return_continuation_unimplemented` を受けて、
+  `setDelegate:` の void return では x86_64 `rax` value を要求しない continuation
+  input model を追加する。
+- [x] `return_to=4294973049` から public Mach-O code segment bytes を decode し、
+  `mov rdi, qword ptr [r15]` / `mov rsi, qword ptr [rip+disp32]` / `call r14` を
+  stable report に保存する。
+- [x] preserved `r15` `_NSApp` import global と preserved `_objc_msgSend` target を使って、
+  receiver `NSApp` と selector `run` を available state として materialize する。
+- [x] 次 blocker を `NSApp run` helper execution boundary または focused unsupported
+  instruction / lifecycle boundary へ進める。
+
+PR に含めない:
+
+- AppKit run loop の一般実行。
+- window lifecycle / delegate callback into translated code。
+- arbitrary void-return Objective-C message continuation。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6t は完了し、次の gate は B8-G6u。
+
+#### PR Gate: B8-G6u Return-To Continuation NSApp run Helper Boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [x] B8-G6t の `return_to_continuation_objc_helper_execution_unimplemented` を受けて、
+  selector `run` の `_objc_msgSend(NSApp, run)` を no-argument Objective-C helper
+  request として扱い、x86_64 `rdx` argument を要求しない contract に分ける。
+- [x] public Objective-C / AppKit API と self-authored fixture の範囲で、`NSApp run`
+  を helper execution または AppKit run-loop lifecycle boundary として stable report
+  する。
+- [x] 次 blocker を `return_to=4294973062` continuation、window lifecycle / delegate
+  callback boundary、または focused AppKit run-loop boundary へ進める。
+
+PR に含めない:
+
+- AppKit run loop の一般実行。
+- window lifecycle / delegate callback into translated code の一般化。
+- arbitrary no-argument Objective-C message send。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6u は完了し、次の gate は B8-G6v。
+
+#### PR Gate: B8-G6v AppKit run-loop lifecycle observation boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [x] B8-G6u の `return_to_continuation_appkit_run_loop_lifecycle_unimplemented` を受けて、
+  `NSApp run` を self-authored B8 GUI fixture の AppKit lifecycle observation
+  boundary として扱う。
+- [x] public Objective-C / AppKit API helper で、fixture delegate の
+  `applicationDidFinishLaunching:` 相当が window / label creation event
+  `gui_window_created` を観測できる場合は stable report する。
+- [x] automated oracle mode では run loop が無期限化しないよう、self-authored fixture
+  の bounded termination policy を report し、必要なら次 blocker を timer /
+  termination lifecycle boundary へ進める。
+
+PR に含めない:
+
+- arbitrary AppKit application lifecycle の一般化。
+- translated-code delegate callback execution。
+- `.app` bundle / resource / nib / storyboard 一般対応。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6v は完了し、次の gate は B8-G6w。
+
+#### PR Gate: B8-G6w Post-Run main continuation unsupported instruction boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [x] B8-G6v の `return_to_continuation_unsupported_instruction` を受けて、
+  `NSApp run` 後の `return_to=4294973062` continuation を focused に扱う。
+- [x] self-authored B8 GUI fixture の post-run continuation 先頭命令
+  `48 89 df` / `mov rdi, rbx` を stable decode / report できるようにし、
+  `_objc_autoreleasePoolPop` へ渡す autorelease pool token handoff または
+  focused blocker を保存する。
+- [x] 次 blocker を `_objc_autoreleasePoolPop` helper boundary、post-run epilogue
+  decode、または narrower continuation blocker へ進める。
+
+PR に含めない:
+
+- arbitrary register-to-register move の一般化。
+- arbitrary autorelease pool lifecycle execution。
+- full x86_64 function epilogue completion。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6w は完了し、次の gate は B8-G6x。
+
+#### PR Gate: B8-G6x Autorelease pool saved-register token materialization boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [x] B8-G6w の
+  `return_to_continuation_saved_register_value_materialization_unimplemented` を受けて、
+  post-run `mov rdi, rbx` の source register `rbx` を focused に扱う。
+- [x] self-authored B8 GUI fixture の initial `_objc_autoreleasePoolPush` return value が
+  `mov rbx, rax` で saved register に保持され、`NSApp run` 後の
+  `_objc_autoreleasePoolPop` argument へ渡る handoff を stable report する。
+- [x] 次 blocker を `_objc_autoreleasePoolPop` helper boundary、post-run epilogue
+  decode、または narrower continuation blocker へ進める。
+
+PR に含めない:
+
+- arbitrary callee-saved register dataflow generalization。
+- arbitrary autorelease pool lifecycle execution。
+- full x86_64 function epilogue completion。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6x は完了し、次の gate は B8-G6y。
+
+#### PR Gate: B8-G6y Autorelease pool pop helper boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [x] B8-G6x の
+  `return_to_continuation_call_rel32_helper_execution_unimplemented` を受けて、
+  post-run `call_rel32` at `4294973065` / target `_objc_autoreleasePoolPop` を
+  focused helper boundary として扱う。
+- [x] `rdi` token argument は initial `_objc_autoreleasePoolPush` return value 由来の
+  saved `rbx` handoff であることを保ったまま、public Objective-C runtime
+  autorelease pool helper contract を stable report する。
+- [x] 次 blocker を post-run epilogue decode、function return completion、または
+  narrower continuation blocker へ進める。
+
+PR に含めない:
+
+- arbitrary call-rel32 helper execution。
+- arbitrary autorelease pool lifecycle execution。
+- raw helper-process pointer reuse across helper processes。
+- full x86_64 function epilogue completion。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6y は完了し、次の gate は B8-G6z。
+
+#### PR Gate: B8-G6z Post-run epilogue stack adjustment boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [x] B8-G6y の `return_to_continuation_unsupported_instruction` を受けて、
+  post-run epilogue の `48 83 c4 08` / `add rsp, 8` at `4294973072` を
+  focused に decode / report する。
+- [x] stack restore instruction は post-run helper boundary 後の epilogue として
+  stable report し、次 blocker を `pop rbx`、`pop r14`、`pop r15`、`pop rbp`、
+  `ret`、または narrower epilogue blocker へ進める。
+- [x] `_objc_autoreleasePoolPop` helper boundary が executed のまま維持されることを
+  regression として確認する。
+
+PR に含めない:
+
+- arbitrary stack pointer arithmetic。
+- full x86_64 epilogue completion。
+- general stack frame unwinding。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6z は完了し、次の gate は B8-G6aa。
+
+#### PR Gate: B8-G6aa Post-run epilogue preserved rbx restore boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [x] B8-G6z の `return_to_continuation_unsupported_instruction` を受けて、
+  post-run epilogue の `5b` / `pop rbx` at `4294973076` を focused に decode /
+  report する。
+- [x] `pop rbx` は post-run epilogue の preserved-register restore として stable
+  report し、次 blocker を `pop r14` at `4294973077`、`pop r15`、`pop rbp`、
+  `ret`、または narrower epilogue blocker へ進める。
+- [x] B8-G6z の `_objc_autoreleasePoolPop` executed boundary と
+  `b8_return_to_continuation_epilogue_stack_adjustment_v0` regression を維持する。
+
+PR に含めない:
+
+- arbitrary pop / stack-memory semantics。
+- full callee-saved register restoration。
+- full epilogue completion。
+- general stack frame unwinding。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6aa は完了し、次の gate は B8-G6ab。
+
+#### PR Gate: B8-G6ab Post-run epilogue preserved r14 restore boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [x] B8-G6aa の `return_to_continuation_unsupported_instruction` を受けて、
+  post-run epilogue の `41 5e` / `pop r14` at `4294973077` を focused に decode /
+  report する。
+- [x] `pop r14` は post-run epilogue の preserved-register restore として stable
+  report し、次 blocker を `pop r15` at `4294973079`、`pop rbp`、`ret`、または
+  narrower epilogue blocker へ進める。
+- [x] B8-G6z/G6aa の `_objc_autoreleasePoolPop` executed boundary、
+  `b8_return_to_continuation_epilogue_stack_adjustment_v0`、
+  `b8_return_to_continuation_epilogue_register_restore_v0` regression を維持する。
+
+PR に含めない:
+
+- arbitrary REX-prefixed pop semantics。
+- full callee-saved register restoration。
+- full epilogue completion。
+- general stack frame unwinding。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6ab は完了し、次の gate は B8-G6ac。
+
+#### PR Gate: B8-G6ac Post-run epilogue preserved r15 restore boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [x] B8-G6ab の `return_to_continuation_unsupported_instruction` を受けて、
+  post-run epilogue の `41 5f` / `pop r15` at `4294973079` を focused に decode /
+  report する。
+- [x] `pop r15` は post-run epilogue の preserved-register restore として stable
+  report し、次 blocker を `pop rbp` at `4294973081`、`ret`、または narrower
+  epilogue blocker へ進める。
+- [x] B8-G6z-G6ab の `_objc_autoreleasePoolPop` executed boundary、
+  epilogue stack adjustment report、epilogue register restore report regression を維持する。
+
+PR に含めない:
+
+- arbitrary REX-prefixed pop semantics。
+- full callee-saved register restoration。
+- full epilogue completion。
+- general stack frame unwinding。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6ac は完了し、次の gate は B8-G6ad。
+
+#### PR Gate: B8-G6ad Post-run epilogue frame-pointer restore boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [x] B8-G6ac の `return_to_continuation_unsupported_instruction` を受けて、
+  post-run epilogue の `5d` / `pop rbp` at `4294973081` を focused に decode /
+  report する。
+- [x] `pop rbp` は post-run epilogue の frame-pointer restore として stable report し、
+  次 blocker を `ret` at `4294973082`、function completion、または narrower epilogue
+  blocker へ進める。
+- [x] B8-G6z-G6ac の `_objc_autoreleasePoolPop` executed boundary、epilogue stack
+  adjustment report、epilogue register restore report regression を維持する。
+
+PR に含めない:
+
+- arbitrary pop / stack-memory semantics。
+- full frame unwinding。
+- full epilogue completion。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6ad は完了し、次の gate は B8-G6ae。
+
+#### PR Gate: B8-G6ae Post-run epilogue return terminator completion boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [x] B8-G6ad の `return_to_continuation_unsupported_instruction` を受けて、
+  post-run epilogue の `c3` / `ret` at `4294973082` を focused に stable report する。
+- [x] `ret` 後の trailing zero / padding blocker `DecodeUnsupportedOpcode { opcode: 0 }`
+  at `4294973083` は function completion または post-ret padding boundary として
+  分離し、Hello World GUI 完遂に必要な次 blocker を stable に分類する。
+- [x] B8-G6z-G6ad の `_objc_autoreleasePoolPop` executed boundary、epilogue stack
+  adjustment report、epilogue register restore / frame-pointer restore report regression を
+  維持する。
+
+PR に含めない:
+
+- general return-to-continuation execution。
+- arbitrary post-ret byte interpretation。
+- whole-function unwinding / stack-frame validation。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6ae は完了し、次の gate は B8-G6af。
+
+#### PR Gate: B8-G6af Self-authored continuation execution completion boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [x] B8-G6ae の `return_to_continuation_execution_unimplemented` を受けて、
+  self-authored GUI fixture の modeled return-to-continuation execution completion を
+  focused に stable report する。
+- [x] `b8_return_to_continuation_epilogue_return_completion_v0` と
+  AppKit run loop / autorelease pool / epilogue restore reports を維持したまま、
+  Hello World GUI 完遂に必要な次 blocker が残るか、modeled real-entry launch path が
+  completed と見なせるかを stable に分類する。
+- [x] B8-HWGUI 大目標の完遂条件に対して、automated expected/actual comparison と
+  manual visible mode に残る差分を reviewable に報告できる。
+
+PR に含めない:
+
+- general return-to-continuation execution。
+- arbitrary Objective-C message send / arbitrary continuation call execution。
+- decoded continuation block の native execution。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。
+
+#### PR Gate: B8-HWGUI Final expected/actual and manual visible review boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [x] B8-G6af の `review_b8_hello_world_gui_completion` を受けて、self-authored
+  GUI fixture の real-entry modeled helper continuation chain が
+  `b8_return_to_continuation_modeled_execution_completion_v0` /
+  `launch_path_status=completed` で安定していることを確認する。
+- [x] automated mode で Rosetta expected / Bara actual の stable JSON comparison が
+  Hello World GUI 完遂条件に対して一致するか、残る差分が B8-HWGUI 完遂 blocker か
+  post-completion 拡張対象かを stable report / review package に記録する。
+- [x] manual visible mode で Bara 経由の実 entry path から `hello world` window / label を
+  表示できるか、実行環境上の制約があれば blocker として記録する。
+- [x] B8-HWGUI 大目標の完遂条件を満たした場合は、TODO / progress を完了状態にし、
+  branch を push して draft PR を開き、review gate で停止する。
+
+PR に含めない:
+
+- B8-OSS0 source-built OSS GUI app automation。
+- general continuation execution、arbitrary Objective-C message send、
+  translation cache、fallback JIT/interpreter。
+- `.app` bundle / resource 一般化。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+- manual visible mode の実行手順と結果を review package に記録する。
+
+review gate:
+
+- B8-HWGUI 完遂時点で draft PR を開いて停止する。merge までは B8-OSS0 に進まない。
+- Draft PR: https://github.com/serika12345/Bara/pull/49
+
+completion evidence:
+
+- 2026-06-13 19:53 JST: automated expected / actual は
+  `target/b8-hwgui-review/expected.json` と `target/b8-hwgui-review/actual.json` の
+  `compare-expected-actual` が `{"issues":[]}` で一致した。debug bundle の real-entry
+  modeled helper continuation chain も
+  `b8_return_to_continuation_modeled_execution_completion_v0` /
+  `launch_path_status=completed` を確認した。
+- 2026-06-13 20:01 JST: manual visible は
+  `run-arm64-gui-hello-world-translated-visible` で
+  `target/b8-hwgui-review/manual-visible.launch-report.json` を保存した。
+  WindowServer から `Bara GUI Hello World` window の on-screen title / bounds を確認し、
+  launch report は `mode=manual_visible`、`status=gui_visible_ready`、
+  `stdout={"event":"gui_window_created","title":"Bara GUI Hello World","text":"hello world"}`、
+  `exit_status=0` を保存している。
+- 2026-06-13 20:09 JST: B8-HWGUI review gate として draft PR
+  https://github.com/serika12345/Bara/pull/49 を開いた。merge review までは
+  B8-OSS0 に進まない。
 
 - [ ] B8-G6: Objective-C runtime / AppKit helper bridge を B8-G1 専用 lifecycle
   event から一般化する。
@@ -1558,24 +2290,24 @@ branch: `task/b8-hello-world-gui-complete`
 
 目的:
 
-- [ ] self-authored x86_64 Mach-O GUI Hello World fixture を、B8-G1 専用
+- [x] self-authored x86_64 Mach-O GUI Hello World fixture を、B8-G1 専用
   sentinel / host trap ではなく、実 `LC_MAIN` entry から進めて GUI 起動完遂まで通す。
-- [ ] public Mach-O metadata、public Objective-C runtime / AppKit API、自前 fixture、
+- [x] public Mach-O metadata、public Objective-C runtime / AppKit API、自前 fixture、
   Rosetta black-box observable result だけを根拠にする。
-- [ ] debug bundle の next blocker を source of truth にし、必要な ISA / loader /
+- [x] debug bundle の next blocker を source of truth にし、必要な ISA / loader /
   helper / process-state boundary を focused step として追加する。
 
 完遂条件:
 
-- [ ] automated mode で Rosetta expected / Bara actual の stable JSON comparison が通る。
-- [ ] manual visible mode で Bara 経由の実 entry path から `hello world` window / label を
+- [x] automated mode で Rosetta expected / Bara actual の stable JSON comparison が通る。
+- [x] manual visible mode で Bara 経由の実 entry path から `hello world` window / label を
   表示できる。
-- [ ] launch report / debug bundle が、実 `LC_MAIN` entry から GUI lifecycle helper
+- [x] launch report / debug bundle が、実 `LC_MAIN` entry から GUI lifecycle helper
   boundary まで進んだ事実を保存し、B8-G1 専用 sentinel / host trap path と区別できる。
-- [ ] self-authored GUI Hello World fixture の expected launch path 上に残る blocker が
+- [x] self-authored GUI Hello World fixture の expected launch path 上に残る blocker が
   `unsupported_instruction` / `unsupported_import` / `unsupported_loader_feature` /
   Objective-C / AppKit helper boundary として未処理ではない。
-- [ ] 完遂後に残る next blocker が、Hello World GUI 完遂後の拡張対象
+- [x] 完遂後に残る next blocker が、Hello World GUI 完遂後の拡張対象
   （例: arbitrary ObjC message send、translation cache、OSS app 固有 boundary）として
   stable report されている。
 
@@ -1612,9 +2344,147 @@ review gate:
 - 完遂したら commit / push / draft PR 作成で停止する。review / merge 後に、
   B8-OSS0 へ進むか、x86 32-bit / PE-Wine 前段へ戻るかを判断する。
 
+#### PR Gate: B8-ARCH0 Post-HWGUI Runtime Architecture Record
+
+branch: `task/b8-hello-world-gui-complete`
+
+目的:
+
+- [x] B8-HWGUI 完遂後の議論を、Rosetta 同等の user-space runtime と Wine 接続を見据えた
+  architecture direction として固定する。
+- [x] Bara の主経路を、ユーザー visible な変換済み app 出力ではなく、内部
+  translation artifact / cache / dispatcher / OS personality として定義する。
+- [x] 同 OS / 異アーキテクチャを主対象にし、異 OS 互換性は Wine などの OS personality
+  へ委譲する責務分担を記録する。
+
+完了条件:
+
+- [x] [docs/runtime-architecture-roadmap.md](docs/runtime-architecture-roadmap.md) に
+  final goal、layer boundaries、Wine 接続、B8-HWGUI 後の roadmap が記録されている。
+- [x] [docs/design-todo.md](docs/design-todo.md) に B8-HWGUI 後の architecture decision が
+  記録されている。
+- [x] B8-HWGUI 後に進む抽象化 milestone が TODO に定義されている。
+- [x] [docs/progress.md](docs/progress.md) の snapshot が review gate と次 action を
+  反映している。
+
+PR に含めない:
+
+- code refactor / module extraction。
+- translation artifact / cache 実装。
+- runtime dispatcher 実装。
+- B8-OSS0 target app 選定。
+- Wine bridge 実装。
+
+検証:
+
+- `git diff --check`
+- `nix develop -c ./scripts/check-no-invisible-chars`
+
+review gate:
+
+- docs-only architecture record と milestone definition を commit / push したら停止する。
+  merge review 後は B8-ARCH1 から開始し、B8-OSS0 は抽象化 milestone の進行状況を見て
+  開始する。
+
+#### Future Target: B8-ARCH1 Post-HWGUI Responsibility Split Audit
+
+B8-HWGUI / B8-ARCH0 が review / merge 済みになるまで開始しない。
+
+- [ ] merge 後の最初の作業として、この Future Target を concrete `PR Gate` に落とす。
+  branch は `task/b8-arch1-responsibility-split-audit` を基本候補にする。
+- [ ] 最初の PR は audit / classification / extraction order 決定を主対象にし、
+  behavior-changing refactor や大きな file move から始めない。
+- [ ] `crates/btbc-cli/src/b8_debug_bundle.rs`、`crates/btbc-cli/src/main.rs`、
+  `crates/bara-oracle/src/binary_format/` に残る B8-specific logic を棚卸しする。
+- [ ] logic を loader image model、runtime modeling、helper bridge、report DTO、
+  fixture / oracle I/O、CLI boundary に分類する。
+- [ ] 抽出順を smallest coherent PR Gate として定義する。
+- [ ] behavior は変えず、既存 B8-HWGUI verification を維持する。
+- [ ] audit 結果を [docs/design-todo.md](docs/design-todo.md) と
+  [docs/runtime-architecture-roadmap.md](docs/runtime-architecture-roadmap.md) に反映する。
+
+#### Future Target: B8-ARCH1a ISA Semantic Coverage Plan
+
+B8-HWGUI / B8-ARCH0 が review / merge 済みになるまで開始しない。B8-ARCH1 の
+responsibility split audit と同じ docs / design phase で実施してよい。
+
+- [ ] 一般アプリ化で必要になる x86_64 instruction coverage を、opcode list ではなく
+  semantic bucket catalog として整理する。
+- [ ] B8-HWGUI で追加した focused instruction slice を、prologue / epilogue、
+  RIP-relative addressing、register-indirect load、integer zeroing、import/helper call、
+  fixture-scoped host service などの bucket に再分類する。
+- [ ] decode-only、lift-ready、direct ARM64 lowering、helper-required、
+  fallback-required、stable blocker の状態語彙を固定する。
+- [ ] direct lowering へ進める bucket と、helper / interpreter fallback へ逃がす bucket の
+  判断基準を design TODO に記録する。
+- [ ] unsupported instruction report が opcode だけでなく semantic bucket、operand shape、
+  required runtime service を返せるようにするための report schema 方針を定義する。
+- [ ] permissive decoder 依存を検討する場合の clean-room / license / supply-chain
+  checklist を定義する。lift / IR / runtime semantics は Bara の domain model として保持する。
+- [ ] Intel SDM / Arm A64 docs / ABI specs / Mach-O public docs を primary source とし、
+  Intel XED / iced-x86 / Zydis / Capstone / Remill / McSema / FEX / Box64 / DynamoRIO を
+  dependency candidate または research reference として分類した reference inventory を作る。
+- [ ] permissive dependency を採用する前の gate として、license / notice / transitive
+  dependency / Nix packaging / `verify-supply-chain` の確認項目を定義する。
+
+#### Future Target: B8-ARCH2 Guest Image Model Extraction
+
+- [ ] public Mach-O metadata から runtime が使う `GuestImage` / `MachOImage` domain model を
+  切り出す。
+- [ ] entry point、segments、mapped bytes、imports、fixups、symbol identity を domain type で
+  表現する。
+- [ ] `bara-oracle` は external observation / expected generation / comparison の責務に寄せ、
+  loader domain logic を分離する。
+- [ ] B8 debug bundle は新しい image model API を使い、既存 JSON output を維持する。
+- [ ] 将来 PE / ELF を同じ interface に載せる前提を document する。
+
+#### Future Target: B8-ARCH3 Translation Artifact And Debug Export
+
+- [ ] ARM64 block bytes、pcmap、fixups、helper requirements、source identity、
+  cache validation identity を `TranslationArtifact` としてまとめる。
+- [ ] translation artifact は内部 runtime / cache 用の domain object とし、ユーザー visible
+  converted app output を主経路にしない。
+- [ ] debug / review 用 export command で artifact bytes と metadata を保存できるようにする。
+- [ ] simple fixture expected/actual は artifact path 経由でも通るようにする。
+- [ ] B8-HWGUI では変換済み app ではなく artifact / launch report / debug bundle を見る、
+  という運用を明文化する。
+
+#### Future Target: B8-ARCH4 Runtime Dispatcher Foundation
+
+- [ ] modeled continuation chain を、typed runtime state と dispatcher boundary へ移す。
+- [ ] guest PC、register state、stack state、helper return state、host executable memory
+  handle を domain type で表現する。
+- [ ] direct fallthrough、direct call、return、helper return writeback の最小 path を
+  dispatcher で扱う。
+- [ ] indirect target、callback、exception、signal、thread、TLS は stable blocker として
+  分類し、silent fallback しない。
+- [ ] translation cache / fallback interpreter / JIT は dispatcher interface 上の
+  future capability として定義する。
+
+#### Future Target: B8-ARCH5 Helper And ABI Bridge Generalization
+
+- [ ] B8 fixture 専用 Objective-C / AppKit helper を
+  `GuestCall -> HostService -> GuestReturn` contract に一般化する。
+- [ ] x86_64 macOS SysV argument materialization、return writeback、error classification を
+  reusable helper bridge model にする。
+- [ ] Objective-C helper、libSystem helper、future Wine thunk が同じ boundary model に載る
+  ようにする。
+- [ ] B8-HWGUI の `sharedApplication` / `setActivationPolicy:` / `setDelegate:` / `run` /
+  autorelease pool は generic helper bridge 上の fixture-specific case に移す。
+
+#### Future Target: B8-ARCH6 OS Personality Boundary
+
+- [ ] core translator が OS を知らない boundary を固定する。
+- [ ] macOS x86_64-on-macOS arm64 personality を最初の concrete personality として整理する。
+- [ ] Linux x86_64-on-Linux arm64 と Windows x64-on-Wine は同じ interface の future
+  personality として設計する。
+- [ ] loader、ABI、syscall / libc / Objective-C / Win32 helper、TLS、thread、signal、
+  exception の責務分担を document する。
+
 #### Future Target: B8-OSS0 Source-Built OSS GUI App Automation
 
-B8-HWGUI が review / merge 済みになるまで開始しない。
+B8-HWGUI と B8-ARCH0 が review / merge 済みになるまで開始しない。B8-ARCH1 以降の
+抽象化 milestone をどこまで先に進めるかは、review 後に判断する。
 
 - [ ] public source から reproducible に x86_64 macOS binary を build できる、小さい OSS
   GUI app を候補にする。最初は任意の downloaded binary ではなく source-built fixture を
@@ -1625,6 +2495,18 @@ B8-HWGUI が review / merge 済みになるまで開始しない。
   unsupported boundary を 1 つずつ stable report へ落とす。
 - [ ] OSS app target の最初の作業は実装ではなく、候補選定、scope、success criteria、
   clean-room / supply-chain checklist の TODO 追加にする。
+
+#### Future Target: B8-WINE0 Wine Bridge Planning
+
+B8-ARCH1 以降で core / personality boundary が整理されるまで実装しない。
+
+- [ ] Wine が担う PE loader / Windows API / registry / filesystem / windowing semantics と、
+  Bara が担う x86_64 CPU/runtime backend の責務を分ける。
+- [ ] Windows x64 ABI、guest callbacks、exception handoff、TLS、thread、thunk call boundary を
+  first design scope として定義する。
+- [ ] 最初の Windows x64 CLI fixture target と success criteria を定義する。
+- [ ] Wine bridge は OS personality の 1 つとして扱い、Bara core に Win32 semantics を
+  埋め込まない。
 
 ### B9: 実 x86 32-bit アプリ対応
 

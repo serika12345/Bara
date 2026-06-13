@@ -61,6 +61,7 @@ pub enum DecodedInstructionKind {
     },
     MovRaxRdi,
     MovRbxRax,
+    MovRdiRbx,
     MovRaxQwordPtrRipRelative {
         displacement: X86Imm32,
         address: X86Va,
@@ -83,6 +84,7 @@ pub enum DecodedInstructionKind {
     },
     MovRdiQwordPtrR15,
     MovRdxQwordPtrRax,
+    MovRdxRax,
     LeaRdiRipRelative {
         displacement: X86Imm32,
         address: X86Va,
@@ -96,6 +98,9 @@ pub enum DecodedInstructionKind {
         imm: X86Imm32,
     },
     AddEaxImm8 {
+        imm: X86Imm8,
+    },
+    AddRspImm8 {
         imm: X86Imm8,
     },
     SubEaxImm32 {
@@ -118,6 +123,10 @@ pub enum DecodedInstructionKind {
     PushR14,
     PushR15,
     PopRax,
+    PopRbx,
+    PopRbp,
+    PopR14,
+    PopR15,
     XorEaxEax,
     XorEdxEdx,
     JccRel8 {

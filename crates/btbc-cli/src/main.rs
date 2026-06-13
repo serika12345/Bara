@@ -2472,8 +2472,7 @@ mod tests {
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"helper_boundary_request\"")
         );
-        assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"reason\":\"return_to_continuation_objc_helper_execution_unimplemented\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"reason\":null"));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"kind\":\"import_helper_call\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
@@ -2582,9 +2581,7 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_source_pc\":4294972999"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register_state\""));
-        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"blocker\":\"return_to_continuation_objc_helper_execution_unimplemented\""
-        ));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"blocker\":null"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"continuation_block\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"schema\":\"b8_return_to_continuation_decode_boundary_v0\""));
@@ -2600,7 +2597,7 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"entry\":4294972999"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"next_instruction\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"next_action\":\"inspect_return_to_continuation_blocker\""));
+            .contains("\"next_action\":\"review_b8_hello_world_gui_completion\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"start\":4294972999"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"end\":4294973006"));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
@@ -2667,7 +2664,7 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"argument_state\":\"available\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"execution_state\":\"blocked\""));
+            .contains("\"execution_state\":\"executed\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"selector_name\":\"setActivationPolicy:\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"argument_value\":0"));
@@ -2691,16 +2688,401 @@ mod tests {
             .contains("\"name\":\"setActivationPolicy:\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"resolved_vm_address\":4294975544"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"host_execution\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_return_to_continuation_objc_helper_host_execution_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"status\":\"executed\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"effect\":\"set_activation_policy\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"representation\":\"bool_as_u64\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"return_value\":"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_source_pc\":4294973021"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"next_continuation\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"source_pc\":4294973021")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"kind\":\"mov_rdi_qword_ptr_rip_relative\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"kind\":\"mov_rdx_rax\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"register_copy_from_rax\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"source_register\":\"rax\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"source_call_return\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_return_to_continuation_call_rel32_helper_boundary_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_return_to_continuation_mach_o_stub_symbol_resolution_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"section_name\":\"__stubs\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"stub_address\":4294973108")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"stub_byte_size\":6"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"stub_index\":4"));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"symbol_table_index\":46")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"symbol_name\":\"_objc_alloc_init\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"blocker\":\"return_to_continuation_objc_helper_execution_unimplemented\""
+            "\"schema\":\"b8_return_to_continuation_call_rel32_helper_execution_request_v0\""
         ));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"unsupported_instruction\":null"));
+            .contains("\"kind\":\"objc_alloc_init\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"required_capability\":\"objc_alloc_init_helper\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"class_argument\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"role\":\"objc_class\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register\":\"rdi\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"address\":4294988128"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"fixup_resolution\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"resolved_rebase\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_return_to_continuation_objc_alloc_init_class_bridge_v0\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"next_action\":\"implement_return_to_continuation_objc_helper_execution\""
+            "\"schema\":\"b8_return_to_continuation_objc_alloc_init_class_identity_v0\""
+        ));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"public_mach_o_symtab_nlist64\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"class_symbol_name\":\"_OBJC_CLASS_$_BaraGuiHelloWorldDelegate\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"class_name\":\"BaraGuiHelloWorldDelegate\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"symbol_vm_address\":4294988184"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"bridge_state\":\"fixture_delegate_host_execution_executed\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"schema\":\"b8_return_to_continuation_objc_alloc_init_fixture_delegate_bridge_contract_v0\""
+        ));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"scope\":\"self_authored_b8_gui_hello_world_delegate_fixture\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"public_mach_o_symtab_nlist64_and_self_authored_fixture\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"required_capability\":\"objc_alloc_init_fixture_delegate_host_substitute\""
+        ));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"helper_symbol_name\":\"_objc_alloc_init\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"class_argument_register\":\"rdi\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"class_argument_role\":\"objc_class\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"output_representation\":\"host_pointer_u64\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"return_value_handling\":\"captured_as_x86_64_rax_return_value\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"consumer_selector_name\":\"setDelegate:\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"schema\":\"b8_return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_boundary_v0\""
+        ));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"schema\":\"b8_return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_v0\""
+        ));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"status\":\"executed\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"representation\":\"host_pointer_u64\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"return_writeback\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"destination\":\"x86_64_rax\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"written_value\":"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"effect\":\"alloc_init_fixture_delegate\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"schema\":\"b8_return_to_continuation_call_rel32_return_value_dataflow_v0\""
+        ));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"consumer_register\":\"rdx\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"consumer_source_register\":\"rax\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"call_site\":4294973028")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"target\":4294973108"));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"return_register\":\"rax\"")
+        );
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"name\":\"setDelegate:\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"receiver\":\"ns_app_shared_application_value\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"effect\":\"set_delegate\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"schema\":\"b8_return_to_continuation_set_delegate_host_object_boundary_v0\""
+        ));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"objc_alloc_init_fixture_delegate_host_substitute\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"process_model\":\"same_helper_process_fixture_substitute\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"raw_argument_pointer_reuse\":\"not_reused_across_helper_processes\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"substitute_class_name\":\"BaraGuiHelloWorldDelegate\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"helper_output\":\"objc_helper_void_return\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"representation\":\"void_no_return_value\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"return_value\":null"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"return_value_handling\":\"no_x86_64_return_value_observed\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_source_pc\":4294973049"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"blocker\":null"));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"source_pc\":4294973049")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"input_register_state\":null"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"start\":4294973049"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"end\":4294973052"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"kind\":\"mov_rdi_qword_ptr_r15\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"start\":4294973052"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"end\":4294973059"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"kind\":\"mov_rsi_qword_ptr_rip_relative\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"address\":4294987992"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"resolved_vm_address\":4294973451"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"name\":\"run\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"call_site\":4294973059")
+        );
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"return_to\":4294973062")
+        );
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"selector_name\":\"run\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"effect\":\"run_application\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"argument\":null"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"argument_model\":\"no_arguments\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"argument_register\":null")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"argument_state\":\"not_required\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"execution_state\":\"executed\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"appkit_run_loop_boundary\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_return_to_continuation_appkit_run_loop_boundary_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"status\":\"executed\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"execution_model\":\"ns_application_run_loop_entry\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"lifecycle_scope\":\"self_authored_b8_gui_fixture\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"lifecycle_observation\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"delegate_class_name\":\"BaraGuiHelloWorldDelegate\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"delegate_callback\":\"applicationDidFinishLaunching:\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"observed_event\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"event\":\"gui_window_created\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"title\":\"Bara GUI Hello World\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"text\":\"hello world\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"bounded_termination_policy\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"trigger\":\"timer_after_gui_window_created\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"delay_millis\":100"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"termination_request\":\"ns_app_terminate_nil\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"return_value_handling\":\"no_x86_64_return_value_observed\""));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"appkit_run_loop_lifecycle_unimplemented\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"unsupported_instruction\":null"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_action\":\"review_b8_hello_world_gui_completion\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"source_pc\":4294973062")
+        );
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"kind\":\"mov_rdi_rbx\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"blocked_register_materializations\":[]"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register\":\"rdi\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"register_copy_from_rbx\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"source_register\":\"rbx\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source_saved_register_value\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_return_to_continuation_saved_register_value_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"preserved_register_values\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"producer_call_site\":4294972938"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"producer_symbol_name\":\"_objc_autoreleasePoolPush\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"consumer_instruction_start\":4294972943"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"consumer_register\":\"rbx\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"value_source\":\"objc_autorelease_pool_push_helper_return_value\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"raw_pointer_reuse\":\"not_reused_across_helper_processes\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_return_to_continuation_autorelease_pool_pop_boundary_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"kind\":\"autorelease_pool_pop\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"call_site\":4294973065")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"symbol_name\":\"_objc_autoreleasePoolPop\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"role\":\"autorelease_pool_token\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"saved_rbx_from_autorelease_pool_push\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"schema\":\"b8_return_to_continuation_autorelease_pool_pop_host_execution_v0\""
+        ));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"effect\":\"autorelease_pool_push_pop\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"input_token_model\":\"fresh_helper_process_push_pop_token\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"helper_token_observation\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"helper_output\":\"objc_helper_void_return\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"representation\":\"void_no_return_value\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_return_to_continuation_epilogue_stack_adjustment_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"role\":\"post_run_helper_boundary_stack_restore\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"after_autorelease_pool_pop_helper_return\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"add_rsp_imm8\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"stack_pointer_register\":\"rsp\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"stack_pointer_delta\":\"X86Imm8(8)\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_blocker_after_adjustment\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_blocker_after_adjustment\":null"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_return_to_continuation_epilogue_register_restore_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"role\":\"post_run_epilogue_preserved_register_restore\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"after_epilogue_stack_adjustment\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"pop_rbx\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register\":\"rbx\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"stack_slot_source\":\"post_adjustment_stack_top\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"after_previous_epilogue_register_restore\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"pop_r14\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register\":\"r14\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"pop_r15\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register\":\"r15\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"role\":\"post_run_epilogue_frame_pointer_restore\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"pop_rbp\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register\":\"rbp\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"stack_slot_source\":\"sequential_epilogue_stack_top\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_blocker_after_restore\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_blocker_after_restore\":null"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"start\":4294973081"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"start\":4294973082"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"kind\":\"ret\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_return_to_continuation_epilogue_return_completion_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"role\":\"post_run_epilogue_return_terminator\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"after_epilogue_frame_pointer_restore\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_return_to_continuation_post_ret_padding_boundary_v0\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"status\":\"classified\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"role\":\"post_run_trailing_zero_padding_after_return\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"start\":4294973083"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("DecodeUnsupportedOpcode { opcode: 0"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"classification\":\"ignored_after_return_terminator\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"effect\":\"does_not_extend_function_body\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_return_to_continuation_modeled_execution_completion_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"role\":\"self_authored_hello_world_gui_launch_path\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"completion_model\":\"modeled_real_entry_helper_continuation_chain\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"launch_path_status\":\"completed\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"remaining_b8_hwgui_blocker\":null"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"automated_expected_actual_comparison\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"manual_visible_mode\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"remaining_difference\":\"pending_large_target_review\""));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("DecodeUnsupportedOpcode { opcode: 93"));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("DecodeUnsupportedOpcode { opcode: 65"));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("DecodeUnsupportedOpcode { opcode: 91"));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("DecodeUnsupportedOpcode { opcode: 72"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"blocker\":null"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_action\":\"review_b8_hello_world_gui_completion\""));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"return_to_continuation_execution_unimplemented\""));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_action\":\"implement_return_to_continuation_execution\""));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"return_to_continuation_call_rel32_helper_execution_unimplemented\""));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"return_to_continuation_saved_register_value_materialization_unimplemented\""
+        ));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"next_action\":\"materialize_return_to_continuation_saved_register_value\""
+        ));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"return_to_continuation_call_rel32_return_value_materialization_unimplemented\""
+        ));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"return_to_continuation_objc_helper_void_return_continuation_unimplemented\""
         ));
         assert!(!read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"return_to_continuation_unsupported_instruction\""));
+            .contains("\"model_return_to_continuation_objc_helper_void_return\""));
         assert!(!read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"return_to_continuation_import_global_load_unimplemented\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"error\":null"));
@@ -2762,8 +3144,7 @@ mod tests {
         assert!(launch_report.contains("\"processed_source_pc_range\":{\"start\":"));
         assert!(launch_report.contains("\"b8_g1_host_trap_path\":\"not_used\""));
         assert!(launch_report.contains("\"helper_boundary_request\""));
-        assert!(launch_report
-            .contains("\"reason\":\"return_to_continuation_objc_helper_execution_unimplemented\""));
+        assert!(launch_report.contains("\"reason\":null"));
         assert!(launch_report.contains("\"symbol_name\":\"_objc_msgSend\""));
         assert!(launch_report.contains("\"call_site\":4294972996"));
         assert!(launch_report.contains("\"return_to\":4294972999"));
@@ -2821,9 +3202,7 @@ mod tests {
         assert!(launch_report.contains("\"kind\":\"register_indirect_call_return\""));
         assert!(launch_report.contains("\"next_source_pc\":4294972999"));
         assert!(launch_report.contains("\"register_state\""));
-        assert!(launch_report.contains(
-            "\"blocker\":\"return_to_continuation_objc_helper_execution_unimplemented\""
-        ));
+        assert!(launch_report.contains("\"blocker\":null"));
         assert!(launch_report.contains("\"continuation_block\""));
         assert!(
             launch_report.contains("\"schema\":\"b8_return_to_continuation_decode_boundary_v0\"")
@@ -2834,9 +3213,7 @@ mod tests {
         assert!(launch_report.contains("\"decode_report\""));
         assert!(launch_report.contains("\"entry\":4294972999"));
         assert!(launch_report.contains("\"next_instruction\""));
-        assert!(
-            launch_report.contains("\"next_action\":\"inspect_return_to_continuation_blocker\"")
-        );
+        assert!(launch_report.contains("\"next_action\":\"review_b8_hello_world_gui_completion\""));
         assert!(launch_report.contains("\"start\":4294972999"));
         assert!(launch_report.contains("\"end\":4294973006"));
         assert!(launch_report.contains("\"kind\":\"mov_r15_qword_ptr_rip_relative\""));
@@ -2876,7 +3253,7 @@ mod tests {
         assert!(launch_report.contains("\"receiver_state\":\"available\""));
         assert!(launch_report.contains("\"selector_state\":\"available\""));
         assert!(launch_report.contains("\"argument_state\":\"available\""));
-        assert!(launch_report.contains("\"execution_state\":\"blocked\""));
+        assert!(launch_report.contains("\"execution_state\":\"executed\""));
         assert!(launch_report.contains("\"selector_name\":\"setActivationPolicy:\""));
         assert!(launch_report.contains("\"argument_value\":0"));
         assert!(launch_report.contains("\"call_site\":4294973018"));
@@ -2890,14 +3267,269 @@ mod tests {
         assert!(launch_report.contains("\"selector_identity\""));
         assert!(launch_report.contains("\"name\":\"setActivationPolicy:\""));
         assert!(launch_report.contains("\"resolved_vm_address\":4294975544"));
+        assert!(launch_report.contains("\"host_execution\""));
+        assert!(launch_report
+            .contains("\"schema\":\"b8_return_to_continuation_objc_helper_host_execution_v0\""));
+        assert!(launch_report.contains("\"status\":\"executed\""));
+        assert!(launch_report.contains("\"effect\":\"set_activation_policy\""));
+        assert!(launch_report.contains("\"representation\":\"bool_as_u64\""));
+        assert!(launch_report.contains("\"return_value\":"));
+        assert!(launch_report.contains("\"next_source_pc\":4294973021"));
+        assert!(launch_report.contains("\"next_continuation\""));
+        assert!(launch_report.contains("\"source_pc\":4294973021"));
+        assert!(launch_report.contains("\"kind\":\"mov_rdi_qword_ptr_rip_relative\""));
+        assert!(launch_report.contains("\"kind\":\"mov_rdx_rax\""));
+        assert!(launch_report.contains("\"source\":\"register_copy_from_rax\""));
+        assert!(launch_report.contains("\"source_register\":\"rax\""));
+        assert!(launch_report.contains("\"source_call_return\""));
+        assert!(launch_report
+            .contains("\"schema\":\"b8_return_to_continuation_call_rel32_helper_boundary_v0\""));
+        assert!(launch_report
+            .contains("\"schema\":\"b8_return_to_continuation_mach_o_stub_symbol_resolution_v0\""));
+        assert!(launch_report.contains("\"section_name\":\"__stubs\""));
+        assert!(launch_report.contains("\"stub_address\":4294973108"));
+        assert!(launch_report.contains("\"stub_byte_size\":6"));
+        assert!(launch_report.contains("\"stub_index\":4"));
+        assert!(launch_report.contains("\"symbol_table_index\":46"));
+        assert!(launch_report.contains("\"symbol_name\":\"_objc_alloc_init\""));
         assert!(launch_report.contains(
-            "\"blocker\":\"return_to_continuation_objc_helper_execution_unimplemented\""
+            "\"schema\":\"b8_return_to_continuation_call_rel32_helper_execution_request_v0\""
         ));
+        assert!(launch_report.contains("\"kind\":\"objc_alloc_init\""));
+        assert!(launch_report.contains("\"required_capability\":\"objc_alloc_init_helper\""));
+        assert!(launch_report.contains("\"class_argument\""));
+        assert!(launch_report.contains("\"role\":\"objc_class\""));
+        assert!(launch_report.contains("\"register\":\"rdi\""));
+        assert!(launch_report.contains("\"address\":4294988128"));
+        assert!(launch_report.contains("\"fixup_resolution\""));
+        assert!(launch_report.contains("\"resolved_rebase\""));
+        assert!(launch_report
+            .contains("\"schema\":\"b8_return_to_continuation_objc_alloc_init_class_bridge_v0\""));
+        assert!(launch_report.contains(
+            "\"schema\":\"b8_return_to_continuation_objc_alloc_init_class_identity_v0\""
+        ));
+        assert!(launch_report.contains("\"source\":\"public_mach_o_symtab_nlist64\""));
+        assert!(launch_report
+            .contains("\"class_symbol_name\":\"_OBJC_CLASS_$_BaraGuiHelloWorldDelegate\""));
+        assert!(launch_report.contains("\"class_name\":\"BaraGuiHelloWorldDelegate\""));
+        assert!(launch_report.contains("\"symbol_vm_address\":4294988184"));
+        assert!(
+            launch_report.contains("\"bridge_state\":\"fixture_delegate_host_execution_executed\"")
+        );
+        assert!(launch_report.contains(
+            "\"schema\":\"b8_return_to_continuation_objc_alloc_init_fixture_delegate_bridge_contract_v0\""
+        ));
+        assert!(launch_report
+            .contains("\"scope\":\"self_authored_b8_gui_hello_world_delegate_fixture\""));
+        assert!(launch_report
+            .contains("\"source\":\"public_mach_o_symtab_nlist64_and_self_authored_fixture\""));
+        assert!(launch_report.contains(
+            "\"required_capability\":\"objc_alloc_init_fixture_delegate_host_substitute\""
+        ));
+        assert!(launch_report.contains("\"helper_symbol_name\":\"_objc_alloc_init\""));
+        assert!(launch_report.contains("\"class_argument_register\":\"rdi\""));
+        assert!(launch_report.contains("\"class_argument_role\":\"objc_class\""));
+        assert!(launch_report.contains("\"output_representation\":\"host_pointer_u64\""));
+        assert!(launch_report
+            .contains("\"return_value_handling\":\"captured_as_x86_64_rax_return_value\""));
+        assert!(launch_report.contains("\"consumer_selector_name\":\"setDelegate:\""));
+        assert!(launch_report.contains(
+            "\"schema\":\"b8_return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_boundary_v0\""
+        ));
+        assert!(launch_report.contains(
+            "\"schema\":\"b8_return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_v0\""
+        ));
+        assert!(launch_report.contains("\"status\":\"executed\""));
+        assert!(launch_report.contains("\"representation\":\"host_pointer_u64\""));
+        assert!(launch_report.contains("\"return_writeback\""));
+        assert!(launch_report.contains("\"destination\":\"x86_64_rax\""));
+        assert!(launch_report.contains("\"written_value\":"));
+        assert!(launch_report.contains("\"effect\":\"alloc_init_fixture_delegate\""));
+        assert!(launch_report.contains(
+            "\"schema\":\"b8_return_to_continuation_call_rel32_return_value_dataflow_v0\""
+        ));
+        assert!(launch_report.contains("\"consumer_register\":\"rdx\""));
+        assert!(launch_report.contains("\"consumer_source_register\":\"rax\""));
+        assert!(launch_report.contains("\"call_site\":4294973028"));
+        assert!(launch_report.contains("\"target\":4294973108"));
+        assert!(launch_report.contains("\"return_register\":\"rax\""));
+        assert!(launch_report.contains("\"name\":\"setDelegate:\""));
+        assert!(launch_report.contains("\"receiver\":\"ns_app_shared_application_value\""));
+        assert!(launch_report.contains("\"effect\":\"set_delegate\""));
+        assert!(launch_report.contains(
+            "\"schema\":\"b8_return_to_continuation_set_delegate_host_object_boundary_v0\""
+        ));
+        assert!(launch_report
+            .contains("\"source\":\"objc_alloc_init_fixture_delegate_host_substitute\""));
+        assert!(
+            launch_report.contains("\"process_model\":\"same_helper_process_fixture_substitute\"")
+        );
+        assert!(launch_report
+            .contains("\"raw_argument_pointer_reuse\":\"not_reused_across_helper_processes\""));
+        assert!(launch_report.contains("\"substitute_class_name\":\"BaraGuiHelloWorldDelegate\""));
+        assert!(launch_report.contains("\"helper_output\":\"objc_helper_void_return\""));
+        assert!(launch_report.contains("\"representation\":\"void_no_return_value\""));
+        assert!(launch_report.contains("\"return_value\":null"));
+        assert!(
+            launch_report.contains("\"return_value_handling\":\"no_x86_64_return_value_observed\"")
+        );
+        assert!(launch_report.contains("\"next_source_pc\":4294973049"));
+        assert!(launch_report.contains("\"blocker\":null"));
+        assert!(launch_report.contains("\"source_pc\":4294973049"));
+        assert!(launch_report.contains("\"input_register_state\":null"));
+        assert!(launch_report.contains("\"start\":4294973049"));
+        assert!(launch_report.contains("\"end\":4294973052"));
+        assert!(launch_report.contains("\"kind\":\"mov_rdi_qword_ptr_r15\""));
+        assert!(launch_report.contains("\"start\":4294973052"));
+        assert!(launch_report.contains("\"end\":4294973059"));
+        assert!(launch_report.contains("\"kind\":\"mov_rsi_qword_ptr_rip_relative\""));
+        assert!(launch_report.contains("\"address\":4294987992"));
+        assert!(launch_report.contains("\"resolved_vm_address\":4294973451"));
+        assert!(launch_report.contains("\"name\":\"run\""));
+        assert!(launch_report.contains("\"call_site\":4294973059"));
+        assert!(launch_report.contains("\"return_to\":4294973062"));
+        assert!(launch_report.contains("\"selector_name\":\"run\""));
+        assert!(launch_report.contains("\"effect\":\"run_application\""));
+        assert!(launch_report.contains("\"argument\":null"));
+        assert!(launch_report.contains("\"argument_model\":\"no_arguments\""));
+        assert!(launch_report.contains("\"argument_register\":null"));
+        assert!(launch_report.contains("\"argument_state\":\"not_required\""));
+        assert!(launch_report.contains("\"execution_state\":\"executed\""));
+        assert!(launch_report.contains("\"appkit_run_loop_boundary\""));
+        assert!(launch_report
+            .contains("\"schema\":\"b8_return_to_continuation_appkit_run_loop_boundary_v0\""));
+        assert!(launch_report.contains("\"status\":\"executed\""));
+        assert!(launch_report.contains("\"execution_model\":\"ns_application_run_loop_entry\""));
+        assert!(launch_report.contains("\"lifecycle_scope\":\"self_authored_b8_gui_fixture\""));
+        assert!(launch_report.contains("\"lifecycle_observation\""));
+        assert!(launch_report.contains("\"delegate_class_name\":\"BaraGuiHelloWorldDelegate\""));
+        assert!(launch_report.contains("\"delegate_callback\":\"applicationDidFinishLaunching:\""));
+        assert!(launch_report.contains("\"observed_event\""));
+        assert!(launch_report.contains("\"event\":\"gui_window_created\""));
+        assert!(launch_report.contains("\"title\":\"Bara GUI Hello World\""));
+        assert!(launch_report.contains("\"text\":\"hello world\""));
+        assert!(launch_report.contains("\"bounded_termination_policy\""));
+        assert!(launch_report.contains("\"trigger\":\"timer_after_gui_window_created\""));
+        assert!(launch_report.contains("\"delay_millis\":100"));
+        assert!(launch_report.contains("\"termination_request\":\"ns_app_terminate_nil\""));
+        assert!(
+            launch_report.contains("\"return_value_handling\":\"no_x86_64_return_value_observed\"")
+        );
+        assert!(!launch_report.contains("\"appkit_run_loop_lifecycle_unimplemented\""));
         assert!(launch_report.contains("\"unsupported_instruction\":null"));
+        assert!(launch_report.contains("\"next_action\":\"review_b8_hello_world_gui_completion\""));
+        assert!(launch_report.contains("\"source_pc\":4294973062"));
+        assert!(launch_report.contains("\"kind\":\"mov_rdi_rbx\""));
+        assert!(launch_report.contains("\"blocked_register_materializations\":[]"));
+        assert!(launch_report.contains("\"register\":\"rdi\""));
+        assert!(launch_report.contains("\"source\":\"register_copy_from_rbx\""));
+        assert!(launch_report.contains("\"source_register\":\"rbx\""));
+        assert!(launch_report.contains("\"source_saved_register_value\""));
+        assert!(launch_report
+            .contains("\"schema\":\"b8_return_to_continuation_saved_register_value_v0\""));
+        assert!(launch_report.contains("\"preserved_register_values\""));
+        assert!(launch_report.contains("\"producer_call_site\":4294972938"));
+        assert!(launch_report.contains("\"producer_symbol_name\":\"_objc_autoreleasePoolPush\""));
+        assert!(launch_report.contains("\"consumer_instruction_start\":4294972943"));
+        assert!(launch_report.contains("\"consumer_register\":\"rbx\""));
+        assert!(launch_report
+            .contains("\"value_source\":\"objc_autorelease_pool_push_helper_return_value\""));
+        assert!(
+            launch_report.contains("\"raw_pointer_reuse\":\"not_reused_across_helper_processes\"")
+        );
+        assert!(launch_report
+            .contains("\"schema\":\"b8_return_to_continuation_autorelease_pool_pop_boundary_v0\""));
+        assert!(launch_report.contains("\"kind\":\"autorelease_pool_pop\""));
+        assert!(launch_report.contains("\"call_site\":4294973065"));
+        assert!(launch_report.contains("\"symbol_name\":\"_objc_autoreleasePoolPop\""));
+        assert!(launch_report.contains("\"role\":\"autorelease_pool_token\""));
+        assert!(launch_report.contains("\"source\":\"saved_rbx_from_autorelease_pool_push\""));
         assert!(launch_report.contains(
-            "\"next_action\":\"implement_return_to_continuation_objc_helper_execution\""
+            "\"schema\":\"b8_return_to_continuation_autorelease_pool_pop_host_execution_v0\""
         ));
-        assert!(!launch_report.contains("\"return_to_continuation_unsupported_instruction\""));
+        assert!(launch_report.contains("\"effect\":\"autorelease_pool_push_pop\""));
+        assert!(
+            launch_report.contains("\"input_token_model\":\"fresh_helper_process_push_pop_token\"")
+        );
+        assert!(launch_report.contains("\"helper_token_observation\""));
+        assert!(launch_report.contains("\"helper_output\":\"objc_helper_void_return\""));
+        assert!(launch_report.contains("\"representation\":\"void_no_return_value\""));
+        assert!(launch_report
+            .contains("\"schema\":\"b8_return_to_continuation_epilogue_stack_adjustment_v0\""));
+        assert!(launch_report.contains("\"role\":\"post_run_helper_boundary_stack_restore\""));
+        assert!(launch_report.contains("\"source\":\"after_autorelease_pool_pop_helper_return\""));
+        assert!(launch_report.contains("\"add_rsp_imm8\""));
+        assert!(launch_report.contains("\"stack_pointer_register\":\"rsp\""));
+        assert!(launch_report.contains("\"stack_pointer_delta\":\"X86Imm8(8)\""));
+        assert!(launch_report.contains("\"next_blocker_after_adjustment\""));
+        assert!(launch_report.contains("\"next_blocker_after_adjustment\":null"));
+        assert!(launch_report
+            .contains("\"schema\":\"b8_return_to_continuation_epilogue_register_restore_v0\""));
+        assert!(launch_report.contains("\"role\":\"post_run_epilogue_preserved_register_restore\""));
+        assert!(launch_report.contains("\"source\":\"after_epilogue_stack_adjustment\""));
+        assert!(launch_report.contains("\"pop_rbx\""));
+        assert!(launch_report.contains("\"register\":\"rbx\""));
+        assert!(launch_report.contains("\"stack_slot_source\":\"post_adjustment_stack_top\""));
+        assert!(launch_report.contains("\"source\":\"after_previous_epilogue_register_restore\""));
+        assert!(launch_report.contains("\"pop_r14\""));
+        assert!(launch_report.contains("\"register\":\"r14\""));
+        assert!(launch_report.contains("\"pop_r15\""));
+        assert!(launch_report.contains("\"register\":\"r15\""));
+        assert!(launch_report.contains("\"role\":\"post_run_epilogue_frame_pointer_restore\""));
+        assert!(launch_report.contains("\"pop_rbp\""));
+        assert!(launch_report.contains("\"register\":\"rbp\""));
+        assert!(launch_report.contains("\"stack_slot_source\":\"sequential_epilogue_stack_top\""));
+        assert!(launch_report.contains("\"next_blocker_after_restore\""));
+        assert!(launch_report.contains("\"next_blocker_after_restore\":null"));
+        assert!(launch_report.contains("\"start\":4294973081"));
+        assert!(launch_report.contains("\"start\":4294973082"));
+        assert!(launch_report.contains("\"kind\":\"ret\""));
+        assert!(launch_report
+            .contains("\"schema\":\"b8_return_to_continuation_epilogue_return_completion_v0\""));
+        assert!(launch_report.contains("\"role\":\"post_run_epilogue_return_terminator\""));
+        assert!(launch_report.contains("\"source\":\"after_epilogue_frame_pointer_restore\""));
+        assert!(launch_report
+            .contains("\"schema\":\"b8_return_to_continuation_post_ret_padding_boundary_v0\""));
+        assert!(launch_report.contains("\"status\":\"classified\""));
+        assert!(launch_report.contains("\"role\":\"post_run_trailing_zero_padding_after_return\""));
+        assert!(launch_report.contains("\"start\":4294973083"));
+        assert!(launch_report.contains("DecodeUnsupportedOpcode { opcode: 0"));
+        assert!(launch_report.contains("\"classification\":\"ignored_after_return_terminator\""));
+        assert!(launch_report.contains("\"effect\":\"does_not_extend_function_body\""));
+        assert!(launch_report
+            .contains("\"schema\":\"b8_return_to_continuation_modeled_execution_completion_v0\""));
+        assert!(launch_report.contains("\"role\":\"self_authored_hello_world_gui_launch_path\""));
+        assert!(launch_report
+            .contains("\"completion_model\":\"modeled_real_entry_helper_continuation_chain\""));
+        assert!(launch_report.contains("\"launch_path_status\":\"completed\""));
+        assert!(launch_report.contains("\"remaining_b8_hwgui_blocker\":null"));
+        assert!(launch_report.contains("\"automated_expected_actual_comparison\""));
+        assert!(launch_report.contains("\"manual_visible_mode\""));
+        assert!(launch_report.contains("\"remaining_difference\":\"pending_large_target_review\""));
+        assert!(!launch_report.contains("DecodeUnsupportedOpcode { opcode: 93"));
+        assert!(!launch_report.contains("DecodeUnsupportedOpcode { opcode: 65"));
+        assert!(!launch_report.contains("DecodeUnsupportedOpcode { opcode: 91"));
+        assert!(!launch_report.contains("DecodeUnsupportedOpcode { opcode: 72"));
+        assert!(launch_report.contains("\"blocker\":null"));
+        assert!(launch_report.contains("\"next_action\":\"review_b8_hello_world_gui_completion\""));
+        assert!(!launch_report.contains("\"return_to_continuation_execution_unimplemented\""));
+        assert!(!launch_report
+            .contains("\"next_action\":\"implement_return_to_continuation_execution\""));
+        assert!(!launch_report
+            .contains("\"return_to_continuation_call_rel32_helper_execution_unimplemented\""));
+        assert!(!launch_report.contains(
+            "\"return_to_continuation_saved_register_value_materialization_unimplemented\""
+        ));
+        assert!(!launch_report.contains(
+            "\"next_action\":\"materialize_return_to_continuation_saved_register_value\""
+        ));
+        assert!(!launch_report.contains(
+            "\"return_to_continuation_call_rel32_return_value_materialization_unimplemented\""
+        ));
+        assert!(!launch_report.contains(
+            "\"return_to_continuation_objc_helper_void_return_continuation_unimplemented\""
+        ));
+        assert!(!launch_report.contains("\"model_return_to_continuation_objc_helper_void_return\""));
         assert!(
             !launch_report.contains("\"return_to_continuation_import_global_load_unimplemented\"")
         );

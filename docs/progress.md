@@ -7,9 +7,52 @@
 [docs/design-todo.md](design-todo.md)、`hello world` までの詳細な段階履歴は
 [docs/hello-world-roadmap.md](hello-world-roadmap.md) に置く。
 
+## 新コンテキスト引き継ぎメモ
+
+このメモは、B8-HWGUI / B8-ARCH0 merge 後に新しい agent context で作業を再開するための
+最短 handoff である。
+
+開始時に読むもの:
+
+1. [TODO.md](../TODO.md) の `B8-ARCH1 Post-HWGUI Responsibility Split Audit` と
+   `B8-ARCH1a ISA Semantic Coverage Plan`
+2. [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) の `R1` / `R1a` と
+   `Instruction Coverage Strategy`
+3. [design-todo.md](design-todo.md) の `D4a: x86_64 ISA semantic coverage strategy`
+4. この `docs/progress.md` の現在の作業スナップショット
+
+merge 後の最初の作業:
+
+- `main` を最新化したうえで、`task/b8-arch1-responsibility-split-audit` のような
+  dedicated branch を作る。
+- まず B8-ARCH1 を具体的な `PR Gate` に落とす。実装や大きな file move から始めない。
+- `crates/btbc-cli/src/b8_debug_bundle.rs`、`crates/btbc-cli/src/main.rs`、
+  `crates/bara-oracle/src/binary_format/` に残る B8-specific logic を棚卸しし、
+  loader image model、runtime modeling、helper bridge、report DTO、
+  fixture / oracle I/O、CLI boundary に分類する。
+- B8-ARCH1a は同じ design/audit phase で進めてよいが、依存追加はしない。
+  Intel XED / iced-x86 / Zydis などは候補分類までに留め、採用する場合は別 PR で
+  supply-chain gate を通す。
+
+merge 後にすぐ始めないもの:
+
+- B8-OSS0 source-built OSS GUI app automation
+- B8-ARCH2 `GuestImage` extraction の実装
+- arbitrary Objective-C message send、general continuation execution、
+  translation cache、fallback JIT/interpreter、Wine bridge
+- B8-HWGUI fixture 専用 path のさらなる機能追加
+
+最初の review package で示すべきもの:
+
+- B8-specific logic の分類表
+- 抽出順の smallest coherent PR Gate
+- behavior を変えていないこと
+- docs-only なら `git diff --check` と `nix develop -c ./scripts/check-no-invisible-chars`
+- code / script / config を触った場合は `nix develop -c ./scripts/verify`
+
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 14:34 JST
+最終更新: 2026-06-13 21:55 JST
 
 状態:
 
@@ -104,33 +147,146 @@
   receiver `_NSApp` value、selector `setActivationPolicy:`、argument `rdx=0` の
   helper request / bridge contract / available-or-blocked state を stable report に保存する。
   next blocker は `return_to_continuation_objc_helper_execution_unimplemented` である。
+  B8-G6l では `_objc_msgSend(NSApp, setActivationPolicy:, 0)` を public Objective-C
+  runtime / AppKit API helper process で実行し、
+  `b8_return_to_continuation_objc_helper_host_execution_v0` に helper output
+  `bool_as_u64`、`next_source_pc=4294973021`、次の continuation decode boundary、
+  next blocker `return_to_continuation_unsupported_instruction` を保存する。次の blocker
+  は `4294973043` の `48 89 c2` / `mov rdx, rax` decode 未対応であり、直前の
+  `_objc_alloc_init` `call rel32` return value materialization と一緒に扱う必要がある。
+  B8-G6m では `48 89 c2` / `mov rdx, rax` を focused x86_64 register-copy
+  slice として decode / lift / emit / debug report に追加し、`rdx` の
+  `source=register_copy_from_rax`、`source_call_return.call_site=4294973028`、
+  `source_call_return.target=4294973108`、`source_call_return.return_register=rax` を
+  stable report に保存する。next blocker は
+  `return_to_continuation_call_rel32_return_value_materialization_unimplemented` である。
+  B8-G6n では public Mach-O `section_64.reserved1/reserved2`、`LC_DYSYMTAB` indirect
+  symbol table、`LC_SYMTAB` / string table から `call_rel32` target `4294973108` を
+  `_objc_alloc_init` に解決し、`b8_return_to_continuation_call_rel32_helper_boundary_v0` と
+  `b8_return_to_continuation_call_rel32_return_value_dataflow_v0` を保存する。`objc_alloc_init`
+  return value は `rax` から `mov rdx, rax` で `setDelegate:` argument に渡る。next
+  blocker は `return_to_continuation_call_rel32_helper_execution_unimplemented` である。
+  B8-G6o では `_objc_alloc_init` helper execution request として、`rdi` class argument を
+  public mapped bytes / chained fixups から materialize し、`address=4294988128` /
+  `resolved_rebase=4294988184` を保存する。next blocker は
+  `return_to_continuation_objc_alloc_init_class_bridge_unimplemented` である。
+  B8-G6p では `class_rebase.resolved_vm_address=4294988184` を public `LC_SYMTAB` /
+  `nlist_64.n_value` から `_OBJC_CLASS_$_BaraGuiHelloWorldDelegate` に解決し、
+  `b8_return_to_continuation_objc_alloc_init_class_identity_v0` と
+  `b8_return_to_continuation_mach_o_symbol_address_resolution_v0` を保存する。next
+  blocker は `return_to_continuation_objc_alloc_init_fixture_delegate_bridge_unimplemented`
+  である。
+  B8-G6q ではこの delegate identity を
+  `b8_return_to_continuation_objc_alloc_init_fixture_delegate_bridge_contract_v0` に接続し、
+  `objc_alloc_init_fixture_delegate_host_substitute` capability、`host_pointer_u64` output、
+  x86_64 `rax` return writeback、後続 `mov rdx, rax` / `setDelegate:` dataflow を
+  contract として保存する。next blocker は
+  `return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_unimplemented` である。
+  B8-G6r ではこの fixture delegate substitute を public Objective-C / AppKit API helper
+  で実行し、
+  `b8_return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_v0` に
+  `status=executed`、`representation=host_pointer_u64`、x86_64 `rax` writeback、
+  後続 `mov rdx, rax` / `setDelegate:` argument dataflow を保存する。next blocker は
+  `setDelegate:` の
+  `return_to_continuation_objc_helper_execution_unimplemented` に進む。
+  B8-G6s では `setDelegate:` の helper request / bridge contract / host execution を
+  `setActivationPolicy:` から分離し、same-helper-process fixture substitute で
+  `BaraGuiHelloWorldDelegate` を `NSApp.delegate` に設定した。
+  `b8_return_to_continuation_set_delegate_host_object_boundary_v0` は raw
+  cross-process pointer を再利用しないことを
+  `raw_argument_pointer_reuse=not_reused_across_helper_processes` として保存し、output は
+  `objc_helper_void_return` / `void_no_return_value` / `no_x86_64_return_value_observed` として
+  report される。B8-G6t ではこの void return の後続 continuation を x86_64 `rax`
+  value なしで decode し、`return_to=4294973049` から `mov rdi, qword ptr [r15]` /
+  `mov rsi, qword ptr [rip+disp32]` / `call r14` を stable report に保存した。
+  preserved `r15` `_NSApp` import global と preserved `_objc_msgSend` target により、
+  receiver `NSApp` と selector `run` は available state として materialize される。
+  B8-G6u では selector `run` の `_objc_msgSend(NSApp, run)` を no-argument
+  Objective-C helper request として扱い、x86_64 `rdx` argument を要求しない
+  `argument_model=no_arguments` / `argument_state=not_required` contract に分けた。
+  B8-G6v では `NSApp run` を public AppKit helper process で実行し、
+  fixture delegate の `applicationDidFinishLaunching:` 相当から
+  `gui_window_created` event を観測した。run loop は
+  `timer_after_gui_window_created` / `delay_millis=100` /
+  `termination_request=ns_app_terminate_nil` の bounded policy で戻り、
+  next blocker は post-run continuation の
+  `return_to_continuation_unsupported_instruction` at `source_pc=4294973062` に進む。
+  B8-G6w では post-run continuation 先頭の `48 89 df` / `mov rdi, rbx` を
+  decode / lift / emit / stable report に追加し、`rdi` は `register_copy_from_rbx`
+  として `_objc_autoreleasePoolPop` argument になるが、`rbx` value はまだ
+  materialize せず、next blocker は
+  `return_to_continuation_saved_register_value_materialization_unimplemented` に進む。
+  B8-G6x では initial `_objc_autoreleasePoolPush` return value を
+  `mov rbx, rax` の preserved saved-register token として report し、post-run
+  `mov rdi, rbx` は `rdi` に `source_saved_register_value` を持つ available state へ進む。
+  `_objc_autoreleasePoolPop` の `call_rel32` helper boundary は
+  `b8_return_to_continuation_autorelease_pool_pop_boundary_v0` として保存され、next blocker は
+  `return_to_continuation_call_rel32_helper_execution_unimplemented` に進む。
+  B8-G6y では `_objc_autoreleasePoolPop` boundary を public Objective-C runtime helper
+  の fresh push/pop token observation として executed に進め、raw fixture token pointer は
+  helper process 間で再利用しない。next blocker は post-run epilogue の
+  `return_to_continuation_unsupported_instruction` at `source_pc=4294973072` に進む。
+  B8-G6z では `48 83 c4 08` / `add rsp, 8` を post-run helper boundary 後の
+  epilogue stack restore として `b8_return_to_continuation_epilogue_stack_adjustment_v0`
+  に保存し、next blocker は `5b` / `pop rbx` at `source_pc=4294973076` に進む。
+  B8-G6aa では `5b` / `pop rbx` を epilogue preserved-register restore として
+  `b8_return_to_continuation_epilogue_register_restore_v0` に保存し、next blocker は
+  `41 5e` / `pop r14` prefix at `source_pc=4294973077` に進む。
+  B8-G6ab では `41 5e` / `pop r14` も epilogue preserved-register restore 配列に
+  保存し、next blocker は `41 5f` / `pop r15` prefix at `source_pc=4294973079` に進む。
+  B8-G6ac では `41 5f` / `pop r15` も epilogue preserved-register restore 配列に
+  保存し、next blocker は `5d` / `pop rbp` at `source_pc=4294973081` に進む。
+  B8-G6ad では `5d` / `pop rbp` を epilogue frame-pointer restore として保存し、
+  `ret` at `source_pc=4294973082` まで decode が進む。remaining blocker は `ret`
+  後の `DecodeUnsupportedOpcode { opcode: 0 }` at `source_pc=4294973083` である。
+  B8-G6ae では `c3` / `ret` を epilogue return completion として
+  `b8_return_to_continuation_epilogue_return_completion_v0` に保存し、`ret` 後の zero
+  padding は `b8_return_to_continuation_post_ret_padding_boundary_v0` で
+  `ignored_after_return_terminator` として分類した。B8-G6af では final continuation を
+  `b8_return_to_continuation_modeled_execution_completion_v0` で executed completion とし、
+  nested helper request / continuation boundary は `blocker=null`、
+  `next_action=review_b8_hello_world_gui_completion` に進む。
   arbitrary dynamic library data symbol read、return-to continuation の一般実行、
-  arbitrary indirect call target execution、translation cache、fallback JIT/interpreter は
-  まだ行わない。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G6k Return-To Continuation
-  setActivationPolicy Helper Boundary: G6j の
-  `return_to_continuation_execution_unimplemented` を受けて、
-  `_objc_msgSend(NSApp, setActivationPolicy:, 0)` を focused Objective-C helper boundary
-  として扱い、helper request / bridge contract / available-or-blocked state と
-  `return_to_continuation_objc_helper_execution_unimplemented` blocker を stable report に保存する。
-- active_design_focus: B8-HWGUI Self-Authored Hello World GUI Completion を大目標として
-  明文化した。B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
-  実 Mach-O entry から GUI lifecycle helper boundary までを通す。`/advance-large` を
-  使う場合でも、debug bundle blocker 由来の focused slice として進め、arbitrary
-  Objective-C message send、general continuation execution、arbitrary indirect target
-  execution、translation cache / JIT、`.app` bundle / resource が必要になったら
-  TODO 上の focused gate または sub-target へ分割する。AppKit / Objective-C runtime /
-  dyld の private behavior は使わず、public metadata、public API、自前 fixture、
-  Rosetta black-box observable result を根拠にする。
-- active_branch: `main`。最新 commit は `0d1967c`
-  (`Merge pull request #48 from serika12345:task/b8-g6k-continuation-set-activation-policy-helper`)。
-  B8-G6k draft PR #48 は merge 済み。
+  arbitrary call-rel32 execution、translation cache、fallback JIT/interpreter はまだ行わない。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-HWGUI Self-Authored Hello
+  World GUI Completion と B8-ARCH0 Post-HWGUI Runtime Architecture Record を
+  `task/b8-hello-world-gui-complete` 上で完了した。B8-HWGUI は automated expected/actual、
+  real-entry modeled completion、manual visible mode の launch report 保存まで完了し、
+  draft PR https://github.com/serika12345/Bara/pull/49 を開いて review gate で停止中。
+  B8-ARCH0 では、B8-HWGUI 後の主経路をユーザー visible な converted app 出力ではなく、
+  internal translation artifact / runtime cache / dispatcher / OS personality として
+  [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) に固定した。
+- active_design_focus: Bara の主対象は同 OS / 異アーキテクチャ実行である。
+  `macOS x86_64 -> macOS arm64` を最初の concrete target とし、将来
+  `Linux x86_64 -> Linux arm64` と `Windows x64 -> Wine on arm64` を OS personality として
+  接続する。Bara core は ISA translation、IR、artifact/cache、dispatcher、guest CPU state
+  を担当し、loader、ABI、OS service、Wine bridge は差し替え可能な personality に分離する。
+  B8-HWGUI 後の抽象化順は B8-ARCH1 responsibility split audit、B8-ARCH2 guest image
+  model extraction、B8-ARCH3 translation artifact/debug export、B8-ARCH4 runtime
+  dispatcher、B8-ARCH5 helper/ABI bridge、B8-ARCH6 OS personality boundary とする。
+  一般アプリ化の x86_64 coverage は opcode checklist ではなく semantic bucket catalog
+  として扱い、B8-ARCH1a で decode / canonical instruction / operand semantics /
+  guest semantic IR / direct lowering / helper / fallback / stable blocker の責務分担を
+  design audit する。primary source は Intel SDM、Arm A64 docs、ABI specs、Mach-O
+  public docs とし、Intel XED、iced-x86、Zydis、Capstone、Remill / McSema、FEX、
+  Box64、DynamoRIO などの permissive candidate / prior art は dependency candidate と
+  research reference に分けて扱う。
+- active_branch: `task/b8-hello-world-gui-complete`。branch base は `2258806`
+  (`docs: define b8 hello world gui completion target`)。latest completed implementation commit is
+  `32c8afb` (`feat: complete b8 modeled gui continuation`)。latest completed documentation commit
+  before this handoff update is `7bde631` (`docs: record isa coverage references`)。
+  この snapshot は B8-HWGUI / B8-ARCH0 completed state として更新されており、draft
+  PR #49 の merge review までは B8-OSS0 や B8-ARCH1 implementation に進まない。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
   B8-G5b-G5e / B8-G6a / B8-G6b / B8-G6c / B8-G6d / B8-G6e / B8-G6f /
-  B8-G6g / B8-G6h / B8-G6i / B8-G6j / B8-G6k / B8-G6l / B8-HWGUI /
-  B8-OSS0。
+  B8-G6g / B8-G6h / B8-G6i / B8-G6j / B8-G6k / B8-G6l / B8-G6m /
+  B8-G6n / B8-G6o / B8-G6p / B8-G6q / B8-G6r / B8-G6s / B8-G6t / B8-G6u /
+  B8-G6v / B8-G6w / B8-G6x / B8-G6y / B8-G6z / B8-G6aa / B8-G6ab /
+  B8-G6ac / B8-G6ad / B8-G6ae / B8-G6af / B8-HWGUI / B8-ARCH0 /
+  B8-ARCH1 / B8-ARCH1a / B8-ARCH2 / B8-ARCH3 / B8-ARCH4 / B8-ARCH5 / B8-ARCH6 /
+  B8-OSS0 / B8-WINE0。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -275,26 +431,313 @@
   available-or-blocked state を stable report に保存する。continuation block と
   helper boundary request の blocker は
   `return_to_continuation_objc_helper_execution_unimplemented` に進む。
+- B8-G6l として
+  `b8_return_to_continuation_objc_helper_host_execution_v0` を追加し、
+  `_objc_msgSend(NSApp, setActivationPolicy:, 0)` だけを public Objective-C runtime /
+  AppKit API helper process で実行する。helper output は `bool_as_u64` として保存し、
+  helper 実行後の `next_source_pc=4294973021`、次の continuation decode boundary、
+  next blocker `return_to_continuation_unsupported_instruction` を stable report に保存する。
+- B8-G6m として `48 89 c2` / `mov rdx, rax` を decode / lift / emit / debug report に
+  追加し、直前の `call_rel32` at `4294973028` / target `4294973108` / return_to
+  `4294973033` の return value が `rax` source であることを
+  `source_call_return` として保存する。`call r14` at `4294973046` /
+  return_to `4294973049` と selector `setDelegate:` まで report し、next blocker は
+  `return_to_continuation_call_rel32_return_value_materialization_unimplemented` に進む。
+- B8-G6n として public Mach-O `section_64.reserved1/reserved2`、`LC_DYSYMTAB` indirect
+  symbol table、`LC_SYMTAB` / string table から `__stubs` target `4294973108` を
+  `_objc_alloc_init` に解決する focused resolver を追加した。debug bundle は
+  `b8_return_to_continuation_call_rel32_helper_boundary_v0` に `call_site=4294973028`、
+  `target=4294973108`、`symbol_table_index=46`、`symbol_name=_objc_alloc_init` を保存し、
+  `b8_return_to_continuation_call_rel32_return_value_dataflow_v0` に `rax` return value が
+  `mov rdx, rax` で `setDelegate:` argument へ渡ることを保存する。next blocker は
+  `return_to_continuation_call_rel32_helper_execution_unimplemented` に進む。
+- B8-G6o として `_objc_alloc_init` helper execution request を
+  `b8_return_to_continuation_call_rel32_helper_execution_request_v0` として保存した。`rdi`
+  class argument は `mov rdi, qword ptr [rip+disp32]` から
+  `address=4294988128` / `fixup_resolution.status=resolved_rebase` /
+  `resolved_vm_address=4294988184` として materialize される。class bridge は
+  `b8_return_to_continuation_objc_alloc_init_class_bridge_v0` として保存し、next blocker は
+  `return_to_continuation_objc_alloc_init_class_bridge_unimplemented` に進む。
+- B8-G6p として public `LC_SYMTAB` / `nlist_64.n_value` から
+  `resolved_vm_address=4294988184` を `_OBJC_CLASS_$_BaraGuiHelloWorldDelegate` に解決する
+  focused resolver を追加した。debug bundle は
+  `b8_return_to_continuation_objc_alloc_init_class_identity_v0`、
+  `class_symbol_name=_OBJC_CLASS_$_BaraGuiHelloWorldDelegate`、
+  `class_name=BaraGuiHelloWorldDelegate`、`symbol_vm_address=4294988184`、
+  `bridge_state=fixture_delegate_bridge_unimplemented` を保存し、next blocker は
+  `return_to_continuation_objc_alloc_init_fixture_delegate_bridge_unimplemented` に進む。
+- B8-G6q として `_objc_alloc_init` fixture delegate bridge contract を
+  `b8_return_to_continuation_objc_alloc_init_fixture_delegate_bridge_contract_v0` として保存した。
+  contract は `scope=self_authored_b8_gui_hello_world_delegate_fixture`、
+  `source=public_mach_o_symtab_nlist64_and_self_authored_fixture`、
+  `required_capability=objc_alloc_init_fixture_delegate_host_substitute`、
+  `output_representation=host_pointer_u64`、`return_register=rax`、
+  `consumer_register=rdx`、`consumer_selector_name=setDelegate:` を保持する。next blocker は
+  `return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_unimplemented` に進む。
+- B8-G6r として self-authored fixture delegate substitute を public Objective-C /
+  AppKit API helper で実行し、
+  `b8_return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_v0` に
+  `status=executed`、`effect=alloc_init_fixture_delegate`、
+  `representation=host_pointer_u64`、`return_writeback.destination=x86_64_rax` を保存した。
+  `_objc_alloc_init` return value は `mov rdx, rax` で `setDelegate:` argument として
+  available になり、`source_call_return` と
+  `b8_return_to_continuation_call_rel32_return_value_dataflow_v0` に producer/consumer dataflow
+  を保持する。next blocker は `setDelegate:` の
+  `return_to_continuation_objc_helper_execution_unimplemented` に進む。
+- B8-G6s として `setDelegate:` の helper request / bridge contract / host execution を
+  `setActivationPolicy:` から分離し、public Objective-C / AppKit API helper で
+  `NSApp setDelegate:<BaraGuiHelloWorldDelegate instance>` を実行した。
+  `b8_return_to_continuation_set_delegate_host_object_boundary_v0` は
+  `process_model=same_helper_process_fixture_substitute` と
+  `raw_argument_pointer_reuse=not_reused_across_helper_processes` を保存する。
+  `setDelegate:` output は `objc_helper_void_return` / `void_no_return_value` /
+  `return_value_handling=no_x86_64_return_value_observed` であり、next blocker は
+  `return_to_continuation_objc_helper_void_return_continuation_unimplemented` に進む。
 - B8-HWGUI として、self-authored x86_64 Mach-O GUI Hello World fixture を実 `LC_MAIN`
   entry から GUI 起動完遂まで通す大目標、`/advance-large` 利用時の stop 条件、
   および B8-HWGUI merge 後に開始する B8-OSS0 source-built OSS GUI app automation target を
   TODO / design TODO に追加した。
-- remaining_work: B8-G6l。G6k が残す
-  `return_to_continuation_objc_helper_execution_unimplemented` を受けて、
-  `_objc_msgSend(NSApp, setActivationPolicy:, 0)` だけの focused host execution slice を
-  扱う。`setActivationPolicy:` 以外の arbitrary Objective-C message send、
-  return-to continuation の一般実行、arbitrary indirect call target execution、
-  translation cache、fallback JIT/interpreter はまだ行わない。
-- next_action: 次の小 step は B8-G6l Return-To Continuation setActivationPolicy Host
-  Execution Slice。大きく進める場合は、B8-HWGUI を明示対象として `/advance-large` を使い、
-  Hello World GUI 完遂 review gate で停止する。
+- B8-ARCH0 として、B8-HWGUI 後の runtime architecture record を追加した。
+  主経路は user-visible converted app output ではなく、internal translation artifact /
+  runtime cache / dispatcher / OS personality とする。Wine 接続は Windows API 実装ではなく、
+  Windows x64-on-Wine OS personality として扱う。
+- B8-ARCH0 follow-up docs として、一般アプリ化時の x86_64 instruction coverage は
+  opcode を平たく潰すのではなく、semantic bucket、canonical instruction、
+  operand semantics、guest semantic IR、direct lowering、helper/fallback、stable blocker
+  に分けて進める方針を追加した。参照資料として Intel SDM などの primary source と、
+  Intel XED / iced-x86 / Zydis / Capstone / Remill / McSema / FEX / Box64 / DynamoRIO
+  などの permissive candidate / prior art を分類した。この docs-only 更新はユーザー指示に
+  よりコミットしない。
+- remaining_work: B8-HWGUI / B8-ARCH0 review gate。draft PR #49 の review / merge までは
+  B8-ARCH1 implementation や B8-OSS0 に進まない。general continuation execution、
+  arbitrary Objective-C message send、translation cache、fallback JIT/interpreter、
+  `.app` bundle / resource 一般化、Wine bridge 実装はまだ行わない。
+- next_action: https://github.com/serika12345/Bara/pull/49 を review する。承認後は
+  `/merge-reviewed` で main に取り込む。次の実装は B8-ARCH1 responsibility split audit から
+  開始し、B8-OSS0 は抽象化 milestone の進行状況を見て開始する。
 - verification:
-  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
-  `nix develop -c ./scripts/verify` が通過した。今回の docs-only planning update 後に
-  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
+  `nix develop -c cargo check -p btbc-cli`、
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`、
+  `nix develop -c cargo run -q -p btbc-cli -- generate-b8-debug-bundle target/b8/b8_gui_hello_world_x86_64 /tmp/bara-b8-g6af-inspect`
+  は通過。format 後に `nix develop -c ./scripts/verify` も通過した。
+  Final review boundary では `target/b8-hwgui-review/expected.json` と
+  `target/b8-hwgui-review/actual.json` の `compare-expected-actual` が `{"issues":[]}` で
+  一致し、debug bundle の modeled completion も確認済み。manual visible は WindowServer で
+  `Bara GUI Hello World` window title / bounds を確認し、
+  `target/b8-hwgui-review/manual-visible.launch-report.json` が `mode=manual_visible`、
+  `status=gui_visible_ready`、`exit_status=0`、`text=hello world` を保存している。
+  B8-ARCH0 は docs-only change として `git diff --check` と
+  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。今回の
+  B8-ARCH0 follow-up docs-only change でも同じ 2 checks が通過した。
 
 直近で完了した作業:
 
+- 2026-06-13 21:16 JST: B8-ARCH0 Post-HWGUI Runtime Architecture Record を追加した。
+  [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) に最終目標、同 OS /
+  異アーキテクチャ主軸、internal translation artifact / cache 主経路、layer boundaries、
+  Wine 接続の責務分担、B8-ARCH1 以降の roadmap を記録した。TODO には
+  B8-ARCH1 responsibility split audit、B8-ARCH2 guest image model、B8-ARCH3 translation
+  artifact/debug export、B8-ARCH4 runtime dispatcher、B8-ARCH5 helper/ABI bridge、
+  B8-ARCH6 OS personality boundary、B8-WINE0 Wine bridge planning を追加した。
+- 2026-06-13 21:45 JST: B8-ARCH0 follow-up として、一般アプリ実行へ拡張する際の
+  ISA coverage 方針を追記した。x86_64 opcode を個別 checklist として潰すのではなく、
+  semantic bucket catalog、canonical instruction、operand semantics、guest semantic IR、
+  direct ARM64 lowering、helper/fallback、stable blocker report の責務分担として扱う。
+  TODO には B8-ARCH1a ISA Semantic Coverage Plan を追加した。検証は
+  `git diff --check` と `nix develop -c ./scripts/check-no-invisible-chars` が通過し、
+  後続の reference inventory と合わせて `7bde631` にコミット済みである。
+- 2026-06-13 21:50 JST: B8-ARCH1a の reference inventory として、Intel SDM、
+  Arm A64 docs、ABI specs、Mach-O public docs を primary source にし、Intel XED、
+  iced-x86、Zydis、Capstone、object、goblin、LIEF、AsmJit、Cranelift、Remill / McSema、
+  FEX、Box64、DynamoRIO を permissive dependency candidate または prior-art reference
+  として [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) に追記した。
+  GPL / LGPL / proprietary tool は permissive dependency candidate にしない方針も記録した。
+  検証は `git diff --check` と `nix develop -c ./scripts/check-no-invisible-chars` が通過し、
+  `7bde631` にコミット済みである。
+- 2026-06-13 21:55 JST: merge 後に新しい agent context で再開しても迷わないよう、
+  `新コンテキスト引き継ぎメモ` を追加した。merge 後の最初の作業は B8-ARCH1 を
+  concrete PR Gate に落とす responsibility split audit であり、B8-OSS0、B8-ARCH2 実装、
+  translation cache、fallback JIT/interpreter、Wine bridge には進まないことを明記した。
+  検証は `git diff --check` と `nix develop -c ./scripts/check-no-invisible-chars` を使う。
+- 2026-06-13 19:53 JST: B8-HWGUI Final expected/actual and manual visible review boundary を
+  開始した。automated expected / actual は
+  `target/b8-hwgui-review/expected.json` と `target/b8-hwgui-review/actual.json` の
+  `compare-expected-actual` が `{"issues":[]}` で一致し、
+  `feedback-report.json` は `status=matched` / `next_action=review_b8_milestone` /
+  `current_blocker.classification=none` になった。debug bundle の launch report は
+  `helper_boundary_request.status=executed`、`reason=null`、
+  `review_b8_hello_world_gui_completion`、および
+  `b8_return_to_continuation_modeled_execution_completion_v0` /
+  `launch_path_status=completed` を保存している。
+- 2026-06-13 20:01 JST: B8-HWGUI manual visible mode を確認した。
+  `run-arm64-gui-hello-world-translated-visible` で helper process を起動し、WindowServer から
+  `Bara GUI Hello World` window の on-screen title / bounds を確認した。AppKit terminate
+  で window close まで通し、`target/b8-hwgui-review/manual-visible.launch-report.json` は
+  `mode=manual_visible`、`status=gui_visible_ready`、`exit_status=0`、
+  `stdout={"event":"gui_window_created","title":"Bara GUI Hello World","text":"hello world"}` を
+  保存した。
+- 2026-06-13 20:09 JST: B8-HWGUI completion docs を commit / push し、draft PR
+  https://github.com/serika12345/Bara/pull/49 を開いた。review gate で停止し、merge
+  review までは B8-OSS0 に進まない。
+- 2026-06-13 19:32 JST: B8-G6af Self-authored continuation execution completion boundary を
+  実装した。final continuation は
+  `b8_return_to_continuation_modeled_execution_completion_v0` を保存し、
+  `role=self_authored_hello_world_gui_launch_path`、
+  `completion_model=modeled_real_entry_helper_continuation_chain`、
+  `launch_path_status=completed`、`remaining_b8_hwgui_blocker=null` になる。
+  `NSApp run` の no-argument selector では未使用 `rdx` argument blocker を残さず、
+  import helper request / return continuation / nested continuation decode boundary は
+  `status=executed`、`blocker=null`、`next_action=review_b8_hello_world_gui_completion`
+  に進む。automated expected/actual comparison と manual visible mode は final
+  B8-HWGUI review boundary の `pending_large_target_review` 差分として保存した。
+- 2026-06-13 19:14 JST: B8-G6ae Post-run epilogue return terminator completion boundary を
+  実装した。`c3` / `ret` at `4294973082..4294973083` を
+  `b8_return_to_continuation_epilogue_return_completion_v0` として executed report に保存し、
+  `DecodeUnsupportedOpcode { opcode: 0 }` at `4294973083` は
+  `b8_return_to_continuation_post_ret_padding_boundary_v0` で
+  `ignored_after_return_terminator` / `does_not_extend_function_body` として分類する。
+  continuation boundary の `unsupported_instruction` は `null` になり、next blocker は
+  `return_to_continuation_execution_unimplemented`。
+- 2026-06-13 19:00 JST: B8-G6ad Post-run epilogue frame-pointer restore boundary を実装した。
+  `5d` / `pop rbp` at `4294973081..4294973082` を `pop_rbp` として decode / lift し、
+  `b8_return_to_continuation_epilogue_register_restore_v0` 配列に
+  `role=post_run_epilogue_frame_pointer_restore`、`register=rbp`、
+  `stack_slot_source=sequential_epilogue_stack_top` として保存する。`ret` at
+  `4294973082..4294973083` まで decode され、next blocker は
+  `DecodeUnsupportedOpcode { opcode: 0 }` at `4294973083`。
+- 2026-06-13 18:51 JST: B8-G6ac Post-run epilogue preserved r15 restore boundary を実装した。
+  `41 5f` / `pop r15` at `4294973079..4294973081` を `pop_r15` として decode / lift
+  し、`b8_return_to_continuation_epilogue_register_restore_v0` 配列に
+  `source=after_previous_epilogue_register_restore`、`register=r15`、
+  `stack_slot_source=sequential_epilogue_stack_top` として保存する。next blocker は
+  `DecodeUnsupportedOpcode { opcode: 93 }` / `5d` `pop rbp` at `4294973081`。
+- 2026-06-13 18:40 JST: B8-G6ab Post-run epilogue preserved r14 restore boundary を実装した。
+  `41 5e` / `pop r14` at `4294973077..4294973079` を `pop_r14` として decode / lift
+  し、`b8_return_to_continuation_epilogue_register_restore_v0` 配列に
+  `source=after_previous_epilogue_register_restore`、`register=r14`、
+  `stack_slot_source=sequential_epilogue_stack_top` として保存する。next blocker は
+  `DecodeUnsupportedOpcode { opcode: 65 }` / `41 5f` `pop r15` prefix at `4294973079`。
+- 2026-06-13 18:29 JST: B8-G6aa Post-run epilogue preserved rbx restore boundary を実装した。
+  `5b` / `pop rbx` at `4294973076..4294973077` を `pop_rbx` として decode / lift し、
+  `b8_return_to_continuation_epilogue_register_restore_v0` に
+  `role=post_run_epilogue_preserved_register_restore`、
+  `source=after_epilogue_stack_adjustment`、`register=rbx`、
+  `stack_slot_source=post_adjustment_stack_top` を保存する。next blocker は
+  `DecodeUnsupportedOpcode { opcode: 65 }` / `41 5e` `pop r14` prefix at `4294973077`。
+- 2026-06-13 18:20 JST: B8-G6z Post-run epilogue stack adjustment boundary を実装した。
+  `48 83 c4 08` / `add rsp, 8` at `4294973072..4294973076` を
+  `add_rsp_imm8` として decode / lift し、
+  `b8_return_to_continuation_epilogue_stack_adjustment_v0` に
+  `role=post_run_helper_boundary_stack_restore`、
+  `source=after_autorelease_pool_pop_helper_return`、
+  `stack_pointer_register=rsp`、`stack_pointer_delta=X86Imm8(8)` を保存する。
+  `next_blocker_after_adjustment` は `DecodeUnsupportedOpcode { opcode: 91 }` /
+  `pop rbx` at `4294973076`。
+- 2026-06-13 18:08 JST: B8-G6y Autorelease pool pop helper boundary を実装した。
+  `b8_return_to_continuation_autorelease_pool_pop_boundary_v0` は `status=executed`、
+  `target_resolution.symbol_name=_objc_autoreleasePoolPop`、
+  `token_argument.source=saved_rbx_from_autorelease_pool_push` を保存する。
+  `b8_return_to_continuation_autorelease_pool_pop_host_execution_v0` は
+  `effect=autorelease_pool_push_pop`、`input_token_model=fresh_helper_process_push_pop_token`、
+  `raw_pointer_reuse=not_reused_across_helper_processes`、`output.helper_output=objc_helper_void_return`
+  を保存する。next blocker は post-run epilogue の
+  `return_to_continuation_unsupported_instruction` at `4294973072`。
+- 2026-06-13 17:58 JST: B8-G6x Autorelease pool saved-register token materialization
+  boundary を実装した。entry decode の `call_rel32` at `4294972938` /
+  target `_objc_autoreleasePoolPush` と直後の `mov rbx, rax` を
+  `b8_return_to_continuation_saved_register_value_v0` として report し、post-run
+  `mov rdi, rbx` は `source_saved_register_value` 付きの available `rdi` state へ進む。
+  `b8_return_to_continuation_autorelease_pool_pop_boundary_v0` は
+  `_objc_autoreleasePoolPop` at `4294973065`、`role=autorelease_pool_token`、
+  `source=saved_rbx_from_autorelease_pool_push` を保存し、next blocker は
+  `return_to_continuation_call_rel32_helper_execution_unimplemented`。
+- 2026-06-13 17:38 JST: B8-G6w Post-Run main continuation unsupported instruction
+  boundary を実装した。`48 89 df` は `mov_rdi_rbx` として decode / lift / emit /
+  debug report される。`return_to=4294973062` の continuation は
+  `mov_rdi_rbx`、`call_rel32` to `_objc_autoreleasePoolPop` stub、`xor_eax_eax` まで
+  decode し、`rdi` materialization は `source=register_copy_from_rbx` /
+  `source_register=rbx` として block される。next blocker は
+  `return_to_continuation_saved_register_value_materialization_unimplemented`、next action は
+  `materialize_return_to_continuation_saved_register_value`。
+- 2026-06-13 17:24 JST: B8-G6v AppKit run-loop lifecycle observation boundary
+  を実装した。selector `run` の `_objc_msgSend(NSApp, run)` は public AppKit
+  helper process で実行され、`b8_return_to_continuation_appkit_run_loop_boundary_v0`
+  は `status=executed`、`lifecycle_observation.observed_event.event=gui_window_created`、
+  `delegate_callback=applicationDidFinishLaunching:`、`bounded_termination_policy.trigger=timer_after_gui_window_created`、
+  `delay_millis=100`、`termination_request=ns_app_terminate_nil` を report する。
+  `run` は `objc_helper_void_return` / `void_no_return_value` /
+  `return_value_handling=no_x86_64_return_value_observed` として扱われ、次 blocker は
+  post-run continuation の `return_to_continuation_unsupported_instruction` at
+  `source_pc=4294973062` に進む。
+- 2026-06-13 17:09 JST: B8-G6u Return-To Continuation NSApp run Helper Boundary
+  を実装した。selector `run` の `_objc_msgSend(NSApp, run)` は no-argument request
+  として扱われ、`argument_model=no_arguments`、`argument_register=null`、
+  `argument_state=not_required` を report する。`NSApp run` は
+  `b8_return_to_continuation_appkit_run_loop_boundary_v0` で
+  `execution_model=ns_application_run_loop_entry` として block され、next blocker は
+  `return_to_continuation_appkit_run_loop_lifecycle_unimplemented` に進む。
+- 2026-06-13 16:58 JST: B8-G6t Return-To Continuation setDelegate Void Return
+  Continuation Decode を実装した。`setDelegate:` の void return 後は x86_64 `rax`
+  value を要求せず、preserved `r15` `_NSApp` と preserved `_objc_msgSend` target から
+  `return_to=4294973049` の `mov rdi, qword ptr [r15]` / `mov rsi, qword ptr
+  [rip+disp32]` / `call r14` を decode した。selector `run` は available state になり、
+  next blocker は `return_to_continuation_objc_helper_execution_unimplemented` である。
+- 2026-06-13 16:46 JST: B8-G6s Return-To Continuation setDelegate Helper Execution
+  Boundary を実装した。`setDelegate:` を `setActivationPolicy:` 専用 contract から分離し、
+  same-helper-process fixture substitute で `BaraGuiHelloWorldDelegate` を `NSApp.delegate`
+  に設定する public AppKit helper execution を保存した。raw pointer は process 間再利用せず、
+  output は void return として扱う。next blocker は
+  `return_to_continuation_objc_helper_void_return_continuation_unimplemented` であり、次は
+  B8-G6t の void return continuation decode。
+- 2026-06-13 16:31 JST: B8-G6r Return-To Continuation objc_alloc_init Fixture Delegate
+  Host Execution を実装した。public Objective-C / AppKit API helper で self-authored
+  `BaraGuiHelloWorldDelegate` substitute を alloc/init し、host pointer output を x86_64
+  `rax` writeback として保存した。後続 `mov rdx, rax` は
+  `source=register_copy_from_rax`、`source_call_return`、dataflow producer
+  `_objc_alloc_init` として materialize され、`setDelegate:` argument が available になった。
+  next blocker は `return_to_continuation_objc_helper_execution_unimplemented` であり、次は
+  B8-G6s の `setDelegate:` helper execution boundary。
+- 2026-06-13 16:14 JST: B8-G6q Return-To Continuation objc_alloc_init Fixture Delegate
+  Bridge Contract を実装した。`BaraGuiHelloWorldDelegate` class identity を contract input
+  に接続し、fixture scope、host substitute capability、`host_pointer_u64` output、x86_64
+  `rax` writeback、後続 `mov rdx, rax` / `setDelegate:` dataflow を stable report に保存する。
+  next blocker は
+  `return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_unimplemented` であり、
+  次は B8-G6r の fixture delegate host execution。
+- 2026-06-13 15:59 JST: B8-G6p Return-To Continuation objc_alloc_init Delegate Class
+  Bridge を実装した。public `LC_SYMTAB` / `nlist_64.n_value` から
+  `resolved_vm_address=4294988184` を `_OBJC_CLASS_$_BaraGuiHelloWorldDelegate` に解決し、
+  `b8_return_to_continuation_objc_alloc_init_class_identity_v0` と
+  `b8_return_to_continuation_mach_o_symbol_address_resolution_v0` を stable report に保存する。
+  next blocker は
+  `return_to_continuation_objc_alloc_init_fixture_delegate_bridge_unimplemented` であり、次は
+  B8-G6q の fixture delegate bridge contract。
+- 2026-06-13 15:44 JST: B8-G6o Return-To Continuation objc_alloc_init Helper
+  Execution Boundary を実装した。`_objc_alloc_init` helper execution request、`rdi`
+  class argument materialization、`x86_64_rax` return writeback boundary、class bridge
+  blocker を stable report に保存する。class argument は public mapped bytes /
+  chained fixups から `address=4294988128`、`resolved_rebase=4294988184` として
+  materialized state になり、next blocker は
+  `return_to_continuation_objc_alloc_init_class_bridge_unimplemented` になった。arbitrary
+  Objective-C allocation / initialization、general call-rel32 execution、general dynamic
+  symbol resolver、translation cache / fallback JIT は追加していない。targeted 検証は
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`
+  が通過した。full verify は `nix develop -c ./scripts/verify` が通過した。
+- 2026-06-13 15:27 JST: B8-G6n Return-To Continuation call_rel32
+  objc_alloc_init Helper Boundary を実装した。public Mach-O `section_64.reserved1/reserved2`、
+  `LC_DYSYMTAB` indirect symbol table、`LC_SYMTAB` / string table から `__stubs` target
+  `4294973108` を `_objc_alloc_init` に解決し、`call_rel32` at `4294973028` /
+  return_to `4294973033` を helper boundary として保存する。`rax` return value が
+  `mov rdx, rax` で `setDelegate:` argument へ渡る dataflow も保存し、next blocker は
+  `return_to_continuation_call_rel32_helper_execution_unimplemented` になった。domain primitive
+  baseline は `MachOStub*` newtype の constructor/accessor だけを追加した。これは B8 debug
+  report が public Mach-O stub virtual address、stub index、indirect symbol table slot、
+  symbol table index を JSON 境界で安定表示するための accessor 例外であり、raw byte reader
+  や general dynamic symbol resolver を公開するものではない。targeted 検証は
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
+  `nix develop -c cargo test -p bara-oracle`、
+  `nix develop -c cargo test -p btbc-cli mach_o_stdout_input_reaches_pure_writer_serialization_plan -- --nocapture`
+  が通過した。full verify は `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-13 14:03 JST: B8-G6j Return-To Continuation Call R14 Boundary Planning
   を実装した。continuation block 内の `call_r14` at `4294973018` / `return_to=4294973021` を
   `b8_return_to_continuation_call_boundary_v0` として保存し、target は `_objc_msgSend` import

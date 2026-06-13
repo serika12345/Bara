@@ -101,6 +101,14 @@ fn lift_instruction(
             dst: Operand::Reg(X86Reg::Rbx),
             src: Operand::Reg(X86Reg::Rax),
         })),
+        DecodedInstructionKind::MovRdiRbx => Ok(LiftedInstruction::Op(IrOp::Mov {
+            dst: Operand::Reg(X86Reg::Rdi),
+            src: Operand::Reg(X86Reg::Rbx),
+        })),
+        DecodedInstructionKind::MovRdxRax => Ok(LiftedInstruction::Op(IrOp::Mov {
+            dst: Operand::Reg(X86Reg::Rdx),
+            src: Operand::Reg(X86Reg::Rax),
+        })),
         DecodedInstructionKind::MovRaxQwordPtrRipRelative { address, .. } => {
             Ok(LiftedInstruction::Op(IrOp::Mov {
                 dst: Operand::Reg(X86Reg::Rax),
@@ -188,6 +196,10 @@ fn lift_instruction(
             dst: Operand::Reg(X86Reg::Rax),
             src: Operand::ImmU64(imm.as_i64() as u64),
         })),
+        DecodedInstructionKind::AddRspImm8 { imm } => Ok(LiftedInstruction::Op(IrOp::Add {
+            dst: Operand::Reg(X86Reg::Rsp),
+            src: Operand::ImmU64(imm.as_i64() as u64),
+        })),
         DecodedInstructionKind::SubEaxImm32 { imm } => Ok(LiftedInstruction::Op(IrOp::Sub {
             dst: Operand::Reg(X86Reg::Rax),
             src: Operand::ImmU64(imm.as_i64() as u64),
@@ -225,6 +237,18 @@ fn lift_instruction(
         })),
         DecodedInstructionKind::PopRax => Ok(LiftedInstruction::Op(IrOp::Pop {
             dst: Operand::Reg(X86Reg::Rax),
+        })),
+        DecodedInstructionKind::PopRbx => Ok(LiftedInstruction::Op(IrOp::Pop {
+            dst: Operand::Reg(X86Reg::Rbx),
+        })),
+        DecodedInstructionKind::PopRbp => Ok(LiftedInstruction::Op(IrOp::Pop {
+            dst: Operand::Reg(X86Reg::Rbp),
+        })),
+        DecodedInstructionKind::PopR14 => Ok(LiftedInstruction::Op(IrOp::Pop {
+            dst: Operand::Reg(X86Reg::R14),
+        })),
+        DecodedInstructionKind::PopR15 => Ok(LiftedInstruction::Op(IrOp::Pop {
+            dst: Operand::Reg(X86Reg::R15),
         })),
         DecodedInstructionKind::XorEaxEax => Ok(LiftedInstruction::Op(IrOp::Mov {
             dst: Operand::Reg(X86Reg::Rax),
@@ -496,6 +520,34 @@ mod tests {
     }
 
     #[test]
+    fn lifts_mov_rdx_rax_to_register_move() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(3),
+                    DecodedInstructionKind::MovRdxRax,
+                ),
+                DecodedInstruction::new(X86Va::new(3), X86Va::new(4), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded register move lifts");
+        let block = &program.blocks()[0];
+
+        assert_eq!(
+            block.ops(),
+            &[IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rdx),
+                src: Operand::Reg(X86Reg::Rax)
+            }]
+        );
+        assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
     fn lifts_movzx_eax_byte_ptr_rdi_to_memory_load() {
         let decoded = DecodedFunction::new(
             X86Va::new(0),
@@ -664,6 +716,36 @@ mod tests {
                     src: Operand::ImmU64(3)
                 }
             ]
+        );
+        assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_add_rsp_imm8_to_stack_pointer_adjustment() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(4),
+                    DecodedInstructionKind::AddRspImm8 {
+                        imm: crate::X86Imm8::new(8),
+                    },
+                ),
+                DecodedInstruction::new(X86Va::new(4), X86Va::new(5), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded stack adjustment lifts");
+        let block = &program.blocks()[0];
+
+        assert_eq!(
+            block.ops(),
+            &[IrOp::Add {
+                dst: Operand::Reg(X86Reg::Rsp),
+                src: Operand::ImmU64(8)
+            }]
         );
         assert_eq!(block.terminator(), &Terminator::Return);
     }
@@ -911,6 +993,110 @@ mod tests {
                     dst: Operand::Reg(X86Reg::Rax)
                 }
             ]
+        );
+        assert_eq!(program.blocks()[0].terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_pop_rbx_to_preserved_register_restore() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(1),
+                    DecodedInstructionKind::PopRbx,
+                ),
+                DecodedInstruction::new(X86Va::new(1), X86Va::new(2), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded pop rbx function lifts");
+
+        assert_eq!(
+            program.blocks()[0].ops(),
+            &[IrOp::Pop {
+                dst: Operand::Reg(X86Reg::Rbx)
+            }]
+        );
+        assert_eq!(program.blocks()[0].terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_pop_r14_to_preserved_register_restore() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(2),
+                    DecodedInstructionKind::PopR14,
+                ),
+                DecodedInstruction::new(X86Va::new(2), X86Va::new(3), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded pop r14 function lifts");
+
+        assert_eq!(
+            program.blocks()[0].ops(),
+            &[IrOp::Pop {
+                dst: Operand::Reg(X86Reg::R14)
+            }]
+        );
+        assert_eq!(program.blocks()[0].terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_pop_r15_to_preserved_register_restore() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(2),
+                    DecodedInstructionKind::PopR15,
+                ),
+                DecodedInstruction::new(X86Va::new(2), X86Va::new(3), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded pop r15 function lifts");
+
+        assert_eq!(
+            program.blocks()[0].ops(),
+            &[IrOp::Pop {
+                dst: Operand::Reg(X86Reg::R15)
+            }]
+        );
+        assert_eq!(program.blocks()[0].terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_pop_rbp_to_frame_pointer_restore() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(1),
+                    DecodedInstructionKind::PopRbp,
+                ),
+                DecodedInstruction::new(X86Va::new(1), X86Va::new(2), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded pop rbp function lifts");
+
+        assert_eq!(
+            program.blocks()[0].ops(),
+            &[IrOp::Pop {
+                dst: Operand::Reg(X86Reg::Rbp)
+            }]
         );
         assert_eq!(program.blocks()[0].terminator(), &Terminator::Return);
     }
@@ -1297,6 +1483,34 @@ mod tests {
                     address: X86Va::new(0x1a1b),
                     width: MemoryReadWidth::Bits64,
                 }
+            }]
+        );
+        assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_mov_rdi_rbx_to_register_move() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(3),
+                    DecodedInstructionKind::MovRdiRbx,
+                ),
+                DecodedInstruction::new(X86Va::new(3), X86Va::new(4), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded register move lifts");
+        let block = &program.blocks()[0];
+
+        assert_eq!(
+            block.ops(),
+            &[IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rdi),
+                src: Operand::Reg(X86Reg::Rbx)
             }]
         );
         assert_eq!(block.terminator(), &Terminator::Return);

@@ -181,6 +181,26 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                         ));
                         offset = end_offset;
                     }
+                    0x5e => {
+                        let end_offset = offset + 2;
+                        let end = instruction_end(input, at, end_offset, 2)?;
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::PopR14,
+                        ));
+                        offset = end_offset;
+                    }
+                    0x5f => {
+                        let end_offset = offset + 2;
+                        let end = instruction_end(input, at, end_offset, 2)?;
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::PopR15,
+                        ));
+                        offset = end_offset;
+                    }
                     0xff => {
                         let operand = read_u8(input, offset + 2, at, opcode)?;
                         let end_offset = offset + 3;
@@ -318,6 +338,26 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                         ));
                         offset = end_offset;
                     }
+                    (0x89, 0xdf) => {
+                        let end_offset = offset + 3;
+                        let end = instruction_end(input, at, end_offset, 3)?;
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::MovRdiRbx,
+                        ));
+                        offset = end_offset;
+                    }
+                    (0x89, 0xc2) => {
+                        let end_offset = offset + 3;
+                        let end = instruction_end(input, at, end_offset, 3)?;
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::MovRdxRax,
+                        ));
+                        offset = end_offset;
+                    }
                     (0x89, 0xe5) => {
                         let end_offset = offset + 3;
                         let end = instruction_end(input, at, end_offset, 3)?;
@@ -325,6 +365,19 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                             at,
                             end,
                             DecodedInstructionKind::MovRbpRsp,
+                        ));
+                        offset = end_offset;
+                    }
+                    (0x83, 0xc4) => {
+                        let end_offset = offset + 4;
+                        let imm = read_u8(input, offset + 3, at, opcode)?;
+                        let end = instruction_end(input, at, end_offset, 4)?;
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::AddRspImm8 {
+                                imm: X86Imm8::new(i8::from_le_bytes([imm])),
+                            },
                         ));
                         offset = end_offset;
                     }
@@ -432,6 +485,24 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                     at,
                     end,
                     DecodedInstructionKind::PopRax,
+                ));
+                offset += 1;
+            }
+            0x5b => {
+                let end = instruction_end(input, at, offset + 1, 1)?;
+                instructions.push(DecodedInstruction::new(
+                    at,
+                    end,
+                    DecodedInstructionKind::PopRbx,
+                ));
+                offset += 1;
+            }
+            0x5d => {
+                let end = instruction_end(input, at, offset + 1, 1)?;
+                instructions.push(DecodedInstruction::new(
+                    at,
+                    end,
+                    DecodedInstructionKind::PopRbp,
                 ));
                 offset += 1;
             }

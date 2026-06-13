@@ -157,7 +157,10 @@ fn reads_mach_o_segment_64_section_metadata_as_typed_values() {
                                         "align": 2,
                                         "reloff": 0,
                                         "nreloc": 0,
-                                        "flags": 2147745792_u32
+                                        "flags": 2147745792_u32,
+                                        "reserved1": 0,
+                                        "reserved2": 0,
+                                        "reserved3": 0
                                     }
                                 ]
                             }

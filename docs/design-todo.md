@@ -82,6 +82,59 @@
   `spec/` 配下の独立仕様モデルと property/shrink が必要になり、schema と
   Nix toolchain 追加の必要性がテストで示された時点で導入する。
 
+## D4a: x86_64 ISA semantic coverage strategy
+
+- [ ] x86_64 coverage を opcode checklist ではなく semantic bucket catalog として管理する。
+- [ ] decode、canonical instruction、operand semantics、guest semantic IR、backend lowering、
+  helper/fallback の責務を分ける。
+- [ ] unsupported instruction report は opcode だけでなく、operand shape、semantic bucket、
+  required runtime service、fallback possibility を含める。
+- [ ] direct ARM64 lowering へ進める bucket と、helper / interpreter fallback へ逃がす
+  bucket の判断基準を固定する。
+- [ ] permissive license decoder を採用する場合でも、lift / IR / runtime semantics は
+  Bara の clean-room domain model として保持する。
+- [ ] Intel SDM、Arm A64 docs、ABI specs、Mach-O public docs を primary source として
+  coverage catalog に紐づける。
+- [ ] Intel XED、iced-x86、Zydis、Capstone、Remill / McSema、FEX、Box64、DynamoRIO を
+  dependency candidate / research reference / non-candidate に分類する。
+- [ ] dependency candidate を採用する前に、license、NOTICE、transitive dependency、
+  Nix packaging、`verify-supply-chain` 対象を audit する。
+
+メモ:
+
+- 一般アプリ実行に広げるとき、Bara は x86 opcode を 1 つずつ平たく潰す設計にはしない。
+  実装単位は opcode ではなく、命令を構成する意味の部品とする。
+- 典型的な流れは
+  `x86 bytes -> decoder -> canonical instruction -> operand semantics -> guest semantic IR -> lowering/helper/fallback`
+  である。
+- 抽象化できる bucket は、prefix / width / ModRM / SIB / immediate decode、
+  register / memory / immediate operand read-write、RIP-relative / register-indirect /
+  base+index*scale+disp addressing、integer ALU family、common flags builder、
+  condition-code evaluation、stack / direct control-flow family、helper request boundary である。
+- 個別に頑張る bucket は、x86 flags の細かい差分、partial register aliasing、
+  implicit operands、string instructions、atomic / `LOCK`、SIMD / FP / x87 / MXCSR、
+  environment-dependent instruction、self-modifying code、indirect branch / callback /
+  exception / signal / TLS / thread である。
+- hot path かつ共通性が高い bucket は direct ARM64 lowering へ進める。rare または複雑な
+  bucket は最初は helper または interpreter fallback へ逃がしてよいが、silent fallback は
+  禁止し、report に条件と不足している runtime service を保存する。
+- B8-HWGUI で追加した focused instruction slice は、今後は
+  `prologue/epilogue stack-control`、`RIP-relative data access`、`ObjC import helper call`、
+  `fixture-scoped host service` などの semantic bucket へ再分類する。B8-ARCH1a はこの分類を
+  implementation 前の design audit として扱う。
+- OSS app cycle では、debug bundle の observed blocker を source of truth にしつつ、
+  TODO は「次の opcode」ではなく「次の semantic bucket」として切る。
+- 参照するとよい primary sources と permissive candidates は
+  [Runtime Architecture Roadmap](runtime-architecture-roadmap.md) の
+  `Reference Materials And Permissive Candidates` を source of truth とする。
+  特に Intel SDM は x86_64 semantics の primary source、Intel XED / iced-x86 / Zydis は
+  decoder dependency 候補、Capstone は debug disassembly 候補、Remill / McSema は
+  lifting の責務分離の先行研究、FEX / Box64 / DynamoRIO は user-mode runtime /
+  dispatcher / code cache の比較研究とする。
+- QEMU user-mode、Valgrind、Ghidra、Binary Ninja、Rosetta は有用な比較対象になり得るが、
+  GPL / LGPL / proprietary license または clean-room 境界の理由により、Bara core の
+  permissive dependency candidate にはしない。
+
 ## D5: Host helper / OS boundary
 
 - [ ] stdout、file I/O、time、memory allocation、process exit を capability として分ける。
@@ -472,6 +525,79 @@
   continuation block の一般実行、arbitrary indirect call target execution、
   translation cache / fallback JIT を追加するものではない。次の B8-G6l では
   `_objc_msgSend(NSApp, setActivationPolicy:, 0)` だけの focused host execution slice を扱う。
+- 2026-06-13 の B8-G6l として、`_objc_msgSend(NSApp, setActivationPolicy:, 0)` を
+  public Objective-C runtime / AppKit API helper process で実行し、
+  `b8_return_to_continuation_objc_helper_host_execution_v0` に helper output
+  `bool_as_u64`、`next_source_pc=4294973021`、次の continuation decode boundary、
+  次 blocker `return_to_continuation_unsupported_instruction` を保存する。これは
+  `setActivationPolicy:` 以外の arbitrary Objective-C message send、return-to
+  continuation の一般実行、arbitrary indirect call target execution、translation cache /
+  fallback JIT を追加するものではない。次の B8-G6m では `4294973043` の
+  `48 89 c2` / `mov rdx, rax` を扱うが、source `rax` は直前の `_objc_alloc_init`
+  `call rel32` return value なので、単なる register-copy decode だけでなく return
+  materialization blocker として扱う。
+- 2026-06-13 の B8-G6m として、`48 89 c2` / `mov rdx, rax` を focused x86_64
+  register-copy slice として decode / lift / emit / debug report に追加した。debug
+  bundle では直前の `call_rel32` at `4294973028` / target `4294973108` /
+  return_to `4294973033` を `source_call_return` として `rdx` materialization blocker に
+  保存し、next blocker を
+  `return_to_continuation_call_rel32_return_value_materialization_unimplemented` に進める。
+  同じ continuation block は `call r14` at `4294973046` / return_to `4294973049` と
+  selector `setDelegate:` まで decode / report するが、`objc_alloc_init` 全般、
+  arbitrary register-copy execution、general call-rel32 helper execution、arbitrary
+  Objective-C message send、translation cache / fallback JIT は追加しない。次の B8-G6n
+  では public Mach-O stub / symbol / import metadata を使って、この `call_rel32`
+  return value の helper boundary または stable unresolved-stub blocker を扱う。
+- 2026-06-13 の B8-G6n として、public Mach-O `section_64.reserved1/reserved2`、
+  `LC_DYSYMTAB` indirect symbol table、`LC_SYMTAB` / string table から `__stubs`
+  target `4294973108` を `_objc_alloc_init` に解決する focused resolver を
+  `bara-oracle` に追加した。B8 debug bundle は `call_rel32` at `4294973028` /
+  return_to `4294973033` を
+  `b8_return_to_continuation_call_rel32_helper_boundary_v0` として保存し、`rax` return
+  value が `mov rdx, rax` により `setDelegate:` argument へ渡る dataflow を
+  `b8_return_to_continuation_call_rel32_return_value_dataflow_v0` として記録する。次
+  blocker は `return_to_continuation_call_rel32_helper_execution_unimplemented` である。
+  これは arbitrary call-rel32 execution、general dyld stub binding、arbitrary Objective-C
+  allocation / initialization、translation cache / fallback JIT を追加するものではない。
+  次の B8-G6o では `_objc_alloc_init` helper execution request と class argument
+  materialization / bridge blocker を focused slice として扱う。
+- 2026-06-13 の B8-G6o として、`_objc_alloc_init` call-rel32 helper boundary に
+  `b8_return_to_continuation_call_rel32_helper_execution_request_v0` を追加した。直前の
+  `mov rdi, qword ptr [rip+disp32]` を mapped bytes と public chained fixups から
+  materialize し、class argument は `address=4294988128`、`resolved_rebase=4294988184`
+  として available state になる。helper execution request は `_objc_alloc_init`、
+  `objc_alloc_init_helper` capability、`x86_64_rax` writeback boundary、class bridge
+  `b8_return_to_continuation_objc_alloc_init_class_bridge_v0` を保存し、next blocker を
+  `return_to_continuation_objc_alloc_init_class_bridge_unimplemented` に進める。これは
+  arbitrary Objective-C class allocation / initialization bridge、general call-rel32
+  execution、general dynamic symbol resolver、translation cache / fallback JIT を追加する
+  ものではない。次の B8-G6p では `BaraGuiHelloWorldDelegate` に限る self-authored fixture
+  class bridge / identity blocker を扱う。
+- 2026-06-13 の B8-G6p として、`class_rebase.resolved_vm_address=4294988184` を
+  public `LC_SYMTAB` / `nlist_64.n_value` で
+  `_OBJC_CLASS_$_BaraGuiHelloWorldDelegate` に解決する focused resolver を追加した。
+  B8 debug bundle は
+  `b8_return_to_continuation_objc_alloc_init_class_identity_v0` と
+  `b8_return_to_continuation_mach_o_symbol_address_resolution_v0` を保存し、
+  `bridge_state=fixture_delegate_bridge_unimplemented`、next blocker
+  `return_to_continuation_objc_alloc_init_fixture_delegate_bridge_unimplemented` に進める。
+  これは arbitrary Objective-C class / instance bridge、Objective-C object layout、
+  private runtime metadata、general `_objc_alloc_init` execution、translation cache /
+  fallback JIT を追加するものではない。次の B8-G6q では
+  `BaraGuiHelloWorldDelegate` に限る host-side substitute bridge contract を扱う。
+- 2026-06-13 の B8-G6q として、`_objc_alloc_init` の
+  `BaraGuiHelloWorldDelegate` fixture 専用 bridge contract を
+  `b8_return_to_continuation_objc_alloc_init_fixture_delegate_bridge_contract_v0` として
+  保存した。contract は `public_mach_o_symtab_nlist64` class identity、self-authored
+  fixture scope、`objc_alloc_init_fixture_delegate_host_substitute` capability、
+  `host_pointer_u64` output、x86_64 `rax` return writeback、後続 `mov rdx, rax` /
+  `setDelegate:` dataflow を明示し、next blocker を
+  `return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_unimplemented` に
+  進める。これは x86_64 binary 内の Objective-C object layout / method table / isa
+  pointer 解釈、任意 class allocation、general `_objc_alloc_init` execution、
+  delegate callback into translated code、translation cache / fallback JIT を追加するもの
+  ではない。次の B8-G6r では public Objective-C / AppKit API helper による
+  self-authored fixture delegate substitute の host execution を扱う。
 - 2026-06-13 の planning update として、B8-HWGUI を self-authored Hello World GUI
   completion の大目標として明文化した。大目標の対象は、実 `LC_MAIN` entry から
   GUI lifecycle helper boundary までを通し、automated expected / actual と manual visible
@@ -480,6 +606,104 @@
   arbitrary Objective-C message send、general continuation execution、arbitrary indirect
   target execution、translation cache / JIT、`.app` bundle / resource が必要になったら
   先に TODO 上の focused gate または sub-target へ分割する。
+- 2026-06-13 の B8-G6v として、`NSApp run` は arbitrary AppKit lifecycle ではなく
+  self-authored B8 GUI fixture 専用の public AppKit helper observation boundary とする。
+  helper は fixture delegate の `applicationDidFinishLaunching:` 相当で
+  `gui_window_created` event を stdout observation として保存し、
+  `timer_after_gui_window_created` / `delay_millis=100` /
+  `termination_request=ns_app_terminate_nil` で bounded に戻る。translated-code delegate
+  callback execution、window lifecycle 一般化、`.app` bundle / nib / storyboard、
+  translation cache / fallback JIT はこの boundary に含めない。
+- 2026-06-13 の B8-G6w として、post-run continuation の `48 89 df` /
+  `mov rdi, rbx` は `_objc_autoreleasePoolPop` へ渡す saved-register token handoff
+  として扱う。`rbx` の値はこの命令で推測せず、
+  `return_to_continuation_saved_register_value_materialization_unimplemented` として
+  initial `_objc_autoreleasePoolPush` return value から別 gate で接続する。
+- 2026-06-13 の B8-G6x として、initial `_objc_autoreleasePoolPush` の
+  `call_rel32` return value が `mov rbx, rax` で preserved `rbx` に保存され、
+  post-run `mov rdi, rbx` で `_objc_autoreleasePoolPop` token argument へ渡る
+  handoff を `b8_return_to_continuation_saved_register_value_v0` として report する。
+  `objc_autoreleasePoolPush` token value は public Objective-C runtime helper で
+  push/pop した観測値として保存するが、raw helper-process pointer は
+  `not_reused_across_helper_processes` と明示し、実 `_objc_autoreleasePoolPop`
+  helper execution は次 gate へ分離する。
+- 2026-06-13 の B8-G6y として、post-run `_objc_autoreleasePoolPop` は
+  focused call-rel32 helper boundary として扱う。fixture の raw token pointer は
+  helper process 間で再利用せず、public Objective-C runtime helper は fresh
+  helper-process token で push/pop capability を観測する。boundary が executed の場合、
+  continuation blocker は `_objc_autoreleasePoolPop` ではなく post-run epilogue の
+  `48 83 c4 08` / `add rsp, 8` に進める。
+- 2026-06-13 の B8-G6z として、post-run `48 83 c4 08` / `add rsp, 8` は
+  arbitrary stack arithmetic ではなく `_objc_autoreleasePoolPop` 後の epilogue
+  stack restore として扱う。`b8_return_to_continuation_epilogue_stack_adjustment_v0`
+  は `instruction=add_rsp_imm8`、`stack_pointer_register=rsp`、
+  `stack_pointer_delta=X86Imm8(8)`、次 blocker `DecodeUnsupportedOpcode { opcode: 91 }`
+  at `4294973076` を保存し、次 gate は preserved `rbx` restore に分離する。
+- 2026-06-13 の B8-G6aa として、post-run `5b` / `pop rbx` は arbitrary pop /
+  stack-memory semantics ではなく epilogue preserved-register restore として扱う。
+  `b8_return_to_continuation_epilogue_register_restore_v0` は `instruction=pop_rbx`、
+  `register=rbx`、`stack_slot_source=post_adjustment_stack_top`、次 blocker
+  `DecodeUnsupportedOpcode { opcode: 65 }` at `4294973077` を保存し、次 gate は
+  `41 5e` / `pop r14` に分離する。
+- 2026-06-13 の B8-G6ab として、post-run `41 5e` / `pop r14` も
+  epilogue preserved-register restore として同じ register restore report 配列へ保存する。
+  `source=after_previous_epilogue_register_restore`、
+  `stack_slot_source=sequential_epilogue_stack_top` として `pop_rbx` からの連続性を残し、
+  next blocker は `DecodeUnsupportedOpcode { opcode: 65 }` at `4294973079` /
+  `41 5f` `pop r15` prefix に進める。
+- 2026-06-13 の B8-G6ac として、post-run `41 5f` / `pop r15` も同じ
+  epilogue register restore 配列に追加する。`pop_rbx` / `pop_r14` / `pop_r15` は
+  sequential restore として保存され、next blocker は
+  `DecodeUnsupportedOpcode { opcode: 93 }` at `4294973081` / `5d` `pop rbp` に進む。
+  frame-pointer restore と function return completion は次 gate へ分離する。
+- 2026-06-13 の B8-G6ad として、post-run `5d` / `pop rbp` は arbitrary pop ではなく
+  epilogue frame-pointer restore として同じ register restore report 配列に追加する。
+  `role=post_run_epilogue_frame_pointer_restore`、`register=rbp` として保存し、`ret` at
+  `4294973082` まで decode が進む。remaining blocker は `ret` 後の
+  `DecodeUnsupportedOpcode { opcode: 0 }` at `4294973083` なので、return terminator /
+  post-ret padding completion は次 gate へ分離する。
+- 2026-06-13 の B8-G6ae として、post-run `c3` / `ret` は
+  `b8_return_to_continuation_epilogue_return_completion_v0` として executed report に分離する。
+  `ret` 直後の `DecodeUnsupportedOpcode { opcode: 0 }` at `4294973083` は
+  `b8_return_to_continuation_post_ret_padding_boundary_v0` で
+  `ignored_after_return_terminator` / `does_not_extend_function_body` として分類し、
+  continuation boundary の `unsupported_instruction` は `null` に戻す。remaining blocker は
+  `return_to_continuation_execution_unimplemented` に進むため、self-authored fixture の modeled
+  completion 判定は次 gate へ分離する。
+- 2026-06-13 の B8-G6af として、G6ae の final continuation は
+  `b8_return_to_continuation_modeled_execution_completion_v0` を持つ executed boundary へ進める。
+  条件は `NSApp run` helper chain 後の autorelease pool pop、epilogue stack/register restore、
+  `ret` completion、post-ret zero padding classification がすべて揃うことに限定する。
+  `NSApp run` は no-argument selector として未使用 `rdx` blocker を残さず、
+  nested helper request / continuation boundary は `blocker=null`、
+  `next_action=review_b8_hello_world_gui_completion` になる。automated expected/actual と
+  manual visible mode は final B8-HWGUI review boundary の差分として report に残す。
+- 2026-06-13 の B8-HWGUI final review として、automated expected/actual は
+  `{"issues":[]}` で一致し、manual visible mode は WindowServer の on-screen window title /
+  bounds と `manual-visible.launch-report.json` の `gui_window_created` event で確認した。
+  この時点で self-authored Hello World GUI は review gate 到達とし、B8-OSS0 は branch
+  review / merge 後に開始する。
+- 2026-06-13 の B8-ARCH0 として、B8-HWGUI 後の主経路を「ユーザー visible な
+  converted `.app` / arm64 executable 出力」ではなく、内部 `TranslationArtifact` /
+  runtime cache / dispatcher / OS personality として固定する。file export は debug /
+  review / regression 用の補助機能に留める。Rosetta 2 の公開情報では JIT は process
+  内変換、AOT は system service 管理の storage artifact であり、通常の変換済み app として
+  ユーザーが扱うものではないため、Bara も同じ問題分割を採用する。ただし Rosetta の内部
+  artifact layout、private signing/cache mechanism、private dyld / kernel integration は
+  実装根拠にしない。
+- B8-ARCH0 以降の architecture は、同 OS / 異アーキテクチャを主対象にする。
+  `macOS x86_64 -> macOS arm64`、`Linux x86_64 -> Linux arm64`、および
+  `Windows x64 -> Wine on arm64` を代表形とする。異 OS 互換性は Bara core に埋め込まず、
+  OS personality / Wine bridge に分離する。Wine 接続では PE loader、Windows API、
+  registry、filesystem、windowing semantics は Wine の責務とし、Bara は x86_64
+  guest code execution、Windows x64 ABI state、guest callback、exception / TLS /
+  thunk boundary、translation cache を担当する。
+- B8-HWGUI で `btbc-cli` と `b8_debug_bundle.rs` に集まった logic は、次の順で
+  抽象化する。まず responsibility split audit、次に `GuestImage` / `MachOImage`
+  extraction、`TranslationArtifact` / debug export、runtime dispatcher foundation、
+  helper / ABI bridge generalization、OS personality boundary を進める。この順序は
+  [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) と TODO の
+  B8-ARCH1 以降を source of truth にする。
 - B8-HWGUI 完遂後の OSS app cycle は、任意の downloaded binary ではなく、まず public
   source から x86_64 macOS binary を reproducible に build できる小さい OSS GUI app を
   source-built fixture として扱う。候補選定、license / redistribution、supply-chain、

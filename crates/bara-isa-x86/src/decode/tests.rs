@@ -128,6 +128,54 @@ fn decodes_mov_rax_rdi_then_ret() {
 }
 
 #[test]
+fn decodes_mov_rdx_rax_then_ret() {
+    let input = X86Bytes::new(X86Va::new(0x1000), vec![0x48, 0x89, 0xc2, 0xc3])
+        .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0x1000),
+                X86Va::new(0x1003),
+                DecodedInstructionKind::MovRdxRax
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x1003),
+                X86Va::new(0x1004),
+                DecodedInstructionKind::Ret
+            )
+        ]
+    );
+}
+
+#[test]
+fn decodes_mov_rdi_rbx_then_ret() {
+    let input = X86Bytes::new(X86Va::new(0x1000), vec![0x48, 0x89, 0xdf, 0xc3])
+        .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0x1000),
+                X86Va::new(0x1003),
+                DecodedInstructionKind::MovRdiRbx
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x1003),
+                X86Va::new(0x1004),
+                DecodedInstructionKind::Ret
+            )
+        ]
+    );
+}
+
+#[test]
 fn decodes_movzx_eax_byte_ptr_rdi_then_ret() {
     let input = X86Bytes::new(X86Va::new(0x1000), vec![0x0f, 0xb6, 0x07, 0xc3])
         .expect("test bytes are non-empty");
@@ -432,6 +480,148 @@ fn decodes_push_rax_pop_rax_between_mov_and_ret() {
             ),
             DecodedInstruction::new(X86Va::new(6), X86Va::new(7), DecodedInstructionKind::PopRax),
             DecodedInstruction::new(X86Va::new(7), X86Va::new(8), DecodedInstructionKind::Ret)
+        ]
+    );
+}
+
+#[test]
+fn decodes_add_rsp_imm8_before_next_unsupported_opcode() {
+    let input = X86Bytes::new(X86Va::new(0x1700), vec![0x48, 0x83, 0xc4, 0x08, 0x41])
+        .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0x1700),
+                X86Va::new(0x1704),
+                DecodedInstructionKind::AddRspImm8 {
+                    imm: crate::decode::X86Imm8::new(8)
+                }
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x1704),
+                X86Va::new(0x1705),
+                DecodedInstructionKind::Unsupported {
+                    reason: UnsupportedReason::DecodeUnsupportedOpcode {
+                        opcode: 0x41,
+                        at: X86Va::new(0x1704)
+                    }
+                }
+            )
+        ]
+    );
+}
+
+#[test]
+fn decodes_pop_rbx_before_next_unsupported_rex_opcode() {
+    let input = X86Bytes::new(X86Va::new(0x1800), vec![0x5b, 0x41, 0x40])
+        .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0x1800),
+                X86Va::new(0x1801),
+                DecodedInstructionKind::PopRbx
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x1801),
+                X86Va::new(0x1802),
+                DecodedInstructionKind::Unsupported {
+                    reason: UnsupportedReason::DecodeUnsupportedOpcode {
+                        opcode: 0x41,
+                        at: X86Va::new(0x1801)
+                    }
+                }
+            )
+        ]
+    );
+}
+
+#[test]
+fn decodes_pop_r14_before_next_unsupported_rex_opcode() {
+    let input = X86Bytes::new(X86Va::new(0x1900), vec![0x41, 0x5e, 0x41, 0x40])
+        .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0x1900),
+                X86Va::new(0x1902),
+                DecodedInstructionKind::PopR14
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x1902),
+                X86Va::new(0x1903),
+                DecodedInstructionKind::Unsupported {
+                    reason: UnsupportedReason::DecodeUnsupportedOpcode {
+                        opcode: 0x41,
+                        at: X86Va::new(0x1902)
+                    }
+                }
+            )
+        ]
+    );
+}
+
+#[test]
+fn decodes_pop_r15_before_next_unsupported_opcode() {
+    let input = X86Bytes::new(X86Va::new(0x1a00), vec![0x41, 0x5f, 0x40])
+        .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0x1a00),
+                X86Va::new(0x1a02),
+                DecodedInstructionKind::PopR15
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x1a02),
+                X86Va::new(0x1a03),
+                DecodedInstructionKind::Unsupported {
+                    reason: UnsupportedReason::DecodeUnsupportedOpcode {
+                        opcode: 0x40,
+                        at: X86Va::new(0x1a02)
+                    }
+                }
+            )
+        ]
+    );
+}
+
+#[test]
+fn decodes_pop_rbp_then_ret() {
+    let input =
+        X86Bytes::new(X86Va::new(0x1b00), vec![0x5d, 0xc3]).expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0x1b00),
+                X86Va::new(0x1b01),
+                DecodedInstructionKind::PopRbp
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x1b01),
+                X86Va::new(0x1b02),
+                DecodedInstructionKind::Ret
+            )
         ]
     );
 }
