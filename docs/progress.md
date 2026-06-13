@@ -9,11 +9,11 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 10:37 JST
+最終更新: 2026-06-13 10:42 JST
 
 状態:
 
-- project_state: in_progress。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
+- project_state: paused。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
   reviewable GUI 起動 slice の積み上げとして扱う。B8-G6c までで、self-authored
   x86_64 GUI fixture の実 `LC_MAIN` entry から
   `push rbp; mov rbp,rsp; push r15; push r14; push rbx; push rax; call rel32;
@@ -89,7 +89,8 @@
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
 - active_branch: `task/b8-g6e-return-to-continuation-decode`。base branch は
   最新 `main` の `d11dfb6` (`Merge pull request #41 from
-  serika12345:task/b8-g6d-objc-helper-return-continuation`)。draft PR は作成予定。
+  serika12345:task/b8-g6d-objc-helper-return-continuation`)。draft PR は
+  <https://github.com/serika12345/Bara/pull/42>。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
@@ -217,9 +218,11 @@
   `4c 8b 3d ...` を x86_64 `mov r15, qword ptr [rip+disp32]` の focused ISA slice
   として扱う。`return_to` 以降の一般実行、arbitrary indirect call target execution、
   translation cache、fallback JIT/interpreter はまだ行わない。
-- next_action: B8-G6e の commit / push / draft PR を作成する。
+- next_action: B8-G6e draft PR #42 を review / merge する。merge 後の次 PR Gate は
+  B8-G6f Return-To Continuation R15 RIP-Relative Load Slice。
 - verification: `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
-  と `nix develop -c ./scripts/verify` が通過した。
+  と `nix develop -c ./scripts/verify` が通過した。PR URL 記録後に
+  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 
 直近で完了した作業:
 
@@ -233,6 +236,8 @@
   stable report に保存する。helper boundary の current blocker は
   `return_to_continuation_unsupported_instruction` に進む。`return_to` block の実行、
   arbitrary indirect call target execution、translation cache、fallback JIT/interpreter は追加しない。
+  targeted check と full `nix develop -c ./scripts/verify` が通過し、draft PR
+  <https://github.com/serika12345/Bara/pull/42> を開いた。
 - 2026-06-13 10:11 JST: B8-G6d ObjC Helper Return Continuation Boundary を実装した。
   B8 debug bundle の helper execution request に
   `b8_objc_helper_return_continuation_boundary_v0` を追加し、`call r14` の
