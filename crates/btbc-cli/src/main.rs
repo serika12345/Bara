@@ -2473,7 +2473,7 @@ mod tests {
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"helper_boundary_request\"")
         );
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"reason\":\"return_to_continuation_unsupported_instruction\""));
+            .contains("\"reason\":\"return_to_continuation_import_global_load_unimplemented\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"kind\":\"import_helper_call\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
@@ -2583,7 +2583,7 @@ mod tests {
             .contains("\"next_source_pc\":4294972999"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register_state\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"blocker\":\"return_to_continuation_unsupported_instruction\""));
+            .contains("\"blocker\":\"return_to_continuation_import_global_load_unimplemented\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"continuation_block\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"schema\":\"b8_return_to_continuation_decode_boundary_v0\""));
@@ -2607,17 +2607,40 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"displacement\":\"X86Imm32 { value: 6578 }\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"address\":4294979584"));
-        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"end\":4294973007"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"materialized_register_states\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register\":\"r15\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"rip_relative_qword_load\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"value\":9227875636482146304"));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"symbol_name\":\"_NSApp\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"end\":4294973009"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"kind\":\"mov_rdi_qword_ptr_r15\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"blocked_register_materializations\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register\":\"rdi\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"register_indirect_qword_load\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"base_register\":\"r15\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"base_value\":9227875636482146304"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"end\":4294973018"));
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"kind\":\"unsupported\"")
         );
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"reason\":\"DecodeUnsupportedOpcode { opcode: 73"));
+            .contains("\"reason\":\"DecodeUnsupportedOpcode { opcode: 49"));
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"unsupported_instruction\"")
         );
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"next_action\":\"add_return_to_continuation_instruction_support\""));
+            .contains("\"next_action\":\"materialize_return_to_continuation_import_global_load\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"error\":null"));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"materialization_boundary\""));
@@ -2677,9 +2700,8 @@ mod tests {
         assert!(launch_report.contains("\"processed_source_pc_range\":{\"start\":"));
         assert!(launch_report.contains("\"b8_g1_host_trap_path\":\"not_used\""));
         assert!(launch_report.contains("\"helper_boundary_request\""));
-        assert!(
-            launch_report.contains("\"reason\":\"return_to_continuation_unsupported_instruction\"")
-        );
+        assert!(launch_report
+            .contains("\"reason\":\"return_to_continuation_import_global_load_unimplemented\""));
         assert!(launch_report.contains("\"symbol_name\":\"_objc_msgSend\""));
         assert!(launch_report.contains("\"call_site\":4294972996"));
         assert!(launch_report.contains("\"return_to\":4294972999"));
@@ -2738,7 +2760,7 @@ mod tests {
         assert!(launch_report.contains("\"next_source_pc\":4294972999"));
         assert!(launch_report.contains("\"register_state\""));
         assert!(launch_report
-            .contains("\"blocker\":\"return_to_continuation_unsupported_instruction\""));
+            .contains("\"blocker\":\"return_to_continuation_import_global_load_unimplemented\""));
         assert!(launch_report.contains("\"continuation_block\""));
         assert!(
             launch_report.contains("\"schema\":\"b8_return_to_continuation_decode_boundary_v0\"")
@@ -2757,12 +2779,24 @@ mod tests {
         assert!(launch_report.contains("\"kind\":\"mov_r15_qword_ptr_rip_relative\""));
         assert!(launch_report.contains("\"displacement\":\"X86Imm32 { value: 6578 }\""));
         assert!(launch_report.contains("\"address\":4294979584"));
-        assert!(launch_report.contains("\"end\":4294973007"));
+        assert!(launch_report.contains("\"materialized_register_states\""));
+        assert!(launch_report.contains("\"register\":\"r15\""));
+        assert!(launch_report.contains("\"source\":\"rip_relative_qword_load\""));
+        assert!(launch_report.contains("\"value\":9227875636482146304"));
+        assert!(launch_report.contains("\"symbol_name\":\"_NSApp\""));
+        assert!(launch_report.contains("\"end\":4294973009"));
+        assert!(launch_report.contains("\"kind\":\"mov_rdi_qword_ptr_r15\""));
+        assert!(launch_report.contains("\"blocked_register_materializations\""));
+        assert!(launch_report.contains("\"register\":\"rdi\""));
+        assert!(launch_report.contains("\"source\":\"register_indirect_qword_load\""));
+        assert!(launch_report.contains("\"base_register\":\"r15\""));
+        assert!(launch_report.contains("\"base_value\":9227875636482146304"));
+        assert!(launch_report.contains("\"end\":4294973018"));
         assert!(launch_report.contains("\"kind\":\"unsupported\""));
-        assert!(launch_report.contains("\"reason\":\"DecodeUnsupportedOpcode { opcode: 73"));
+        assert!(launch_report.contains("\"reason\":\"DecodeUnsupportedOpcode { opcode: 49"));
         assert!(launch_report.contains("\"unsupported_instruction\""));
         assert!(launch_report
-            .contains("\"next_action\":\"add_return_to_continuation_instruction_support\""));
+            .contains("\"next_action\":\"materialize_return_to_continuation_import_global_load\""));
         assert!(launch_report.contains("\"error\":null"));
         assert!(
             launch_report.contains("\"schema\":\"b8_objc_message_materialization_boundary_v0\"")

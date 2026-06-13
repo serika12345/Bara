@@ -327,6 +327,28 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                     }
                 }
             }
+            0x49 => {
+                let opcode2 = read_u8(input, offset + 1, at, opcode)?;
+                let operand = read_u8(input, offset + 2, at, opcode)?;
+
+                match (opcode2, operand) {
+                    (0x8b, 0x3f) => {
+                        let end_offset = offset + 3;
+                        let end = instruction_end(input, at, end_offset, 3)?;
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::MovRdiQwordPtrR15,
+                        ));
+                        offset = end_offset;
+                    }
+                    _ => {
+                        let end = instruction_end(input, at, offset + 3, 3)?;
+                        instructions.push(unsupported_instruction(at, end, opcode));
+                        return DecodedFunction::new(input.entry(), instructions);
+                    }
+                }
+            }
             0x4c => {
                 let opcode2 = read_u8(input, offset + 1, at, opcode)?;
                 let operand = read_u8(input, offset + 2, at, opcode)?;
