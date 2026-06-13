@@ -2246,6 +2246,7 @@ PR に含めない:
 review gate:
 
 - B8-HWGUI 完遂時点で draft PR を開いて停止する。merge までは B8-OSS0 に進まない。
+- Draft PR: https://github.com/serika12345/Bara/pull/49
 
 completion evidence:
 
@@ -2262,6 +2263,9 @@ completion evidence:
   launch report は `mode=manual_visible`、`status=gui_visible_ready`、
   `stdout={"event":"gui_window_created","title":"Bara GUI Hello World","text":"hello world"}`、
   `exit_status=0` を保存している。
+- 2026-06-13 20:09 JST: B8-HWGUI review gate として draft PR
+  https://github.com/serika12345/Bara/pull/49 を開いた。merge review までは
+  B8-OSS0 に進まない。
 
 - [ ] B8-G6: Objective-C runtime / AppKit helper bridge を B8-G1 専用 lifecycle
   event から一般化する。

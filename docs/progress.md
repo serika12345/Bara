@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 20:07 JST
+最終更新: 2026-06-13 20:09 JST
 
 状態:
 
@@ -210,7 +210,7 @@
   blocker-driven slice を継続中。B8-G6af は完了し、B8-HWGUI Final expected/actual
   and manual visible review boundary のうち automated expected/actual と real-entry
   modeled completion 確認、および manual visible mode の launch report 保存まで完了した。
-  draft PR を開いて review gate で停止する。
+  draft PR https://github.com/serika12345/Bara/pull/49 を開き、review gate で停止中。
 - active_design_focus: B8-HWGUI Self-Authored Hello World GUI Completion を大目標として
   明文化した。B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から GUI lifecycle helper boundary までを通す。`/advance-large` を
@@ -223,9 +223,9 @@
 - active_branch: `task/b8-hello-world-gui-complete`。branch base は `2258806`
   (`docs: define b8 hello world gui completion target`)。latest pushed implementation commit is
   `32c8afb` (`feat: complete b8 modeled gui continuation`)。latest pushed documentation commit
-  before this completion update is `996e622` (`docs: record b8 hwgui visible blocker`)。
+  before this PR-open record is `b18697b` (`docs: complete b8 hwgui review gate`)。
   この snapshot は B8-HWGUI final review boundary completed state として更新されており、
-  draft PR を開いて merge review までは B8-OSS0 に進まない。
+  draft PR #49 の merge review までは B8-OSS0 に進まない。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
@@ -444,11 +444,12 @@
   entry から GUI 起動完遂まで通す大目標、`/advance-large` 利用時の stop 条件、
   および B8-HWGUI merge 後に開始する B8-OSS0 source-built OSS GUI app automation target を
   TODO / design TODO に追加した。
-- remaining_work: B8-HWGUI review gate。draft PR を開き、merge までは B8-OSS0 に進まない。
+- remaining_work: B8-HWGUI review gate。draft PR #49 の review / merge までは
+  B8-OSS0 に進まない。
   B8-OSS0、general continuation execution、arbitrary Objective-C message send、
   translation cache、fallback JIT/interpreter、`.app` bundle / resource 一般化はまだ行わない。
-- next_action: B8-HWGUI completion docs を commit / push し、draft PR を開いて review gate
-  で停止する。
+- next_action: https://github.com/serika12345/Bara/pull/49 を review する。承認後は
+  `/merge-reviewed` で main に取り込み、B8-OSS0 はその後に開始する。
 - verification:
   `nix develop -c cargo check -p btbc-cli`、
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`、
@@ -480,6 +481,9 @@
   `mode=manual_visible`、`status=gui_visible_ready`、`exit_status=0`、
   `stdout={"event":"gui_window_created","title":"Bara GUI Hello World","text":"hello world"}` を
   保存した。
+- 2026-06-13 20:09 JST: B8-HWGUI completion docs を commit / push し、draft PR
+  https://github.com/serika12345/Bara/pull/49 を開いた。review gate で停止し、merge
+  review までは B8-OSS0 に進まない。
 - 2026-06-13 19:32 JST: B8-G6af Self-authored continuation execution completion boundary を
   実装した。final continuation は
   `b8_return_to_continuation_modeled_execution_completion_v0` を保存し、
