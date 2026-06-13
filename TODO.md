@@ -1613,15 +1613,15 @@ branch: `task/b8-hello-world-gui-complete`
 
 完了条件:
 
-- [ ] B8-G6n の
+- [x] B8-G6n の
   `return_to_continuation_call_rel32_helper_execution_unimplemented` を受けて、
   `_objc_alloc_init` helper execution request を focused boundary として保存する。
-- [ ] `call_rel32` at `4294973028` の x86_64 argument `rdi` を public Mach-O mapped
+- [x] `call_rel32` at `4294973028` の x86_64 argument `rdi` を public Mach-O mapped
   image / chained fixup metadata から materialize し、class identity を解決できる場合は
   保存する。解決できない場合は stable class-argument blocker として分類する。
-- [ ] `_objc_alloc_init` の return value が `rax` に入り、後続の `mov rdx, rax` で
+- [x] `_objc_alloc_init` の return value が `rax` に入り、後続の `mov rdx, rax` で
   `setDelegate:` argument へ渡る execution/dataflow 境界を更新する。
-- [ ] arbitrary Objective-C class allocation / initialization bridge、arbitrary call-rel32
+- [x] arbitrary Objective-C class allocation / initialization bridge、arbitrary call-rel32
   execution、general dynamic symbol resolver、translation cache、fallback JIT/interpreter は
   行わない。
 
@@ -1629,6 +1629,42 @@ PR に含めない:
 
 - 一般的な call-rel32 execution engine。
 - arbitrary Objective-C allocation / initialization bridge。
+- dynamic linker / dyld stub binding の一般実装。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6o は完了し、次の gate は B8-G6p。
+
+#### PR Gate: B8-G6p Return-To Continuation objc_alloc_init Delegate Class Bridge
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [ ] B8-G6o の
+  `return_to_continuation_objc_alloc_init_class_bridge_unimplemented` を受けて、
+  `class_rebase.resolved_vm_address=4294988184` を self-authored fixture の delegate class
+  bridge boundary として扱う。
+- [ ] public Mach-O / Objective-C metadata から `BaraGuiHelloWorldDelegate` identity を
+  解決できる場合は保存し、まだ解決できない場合は stable class-identity blocker として
+  分類する。
+- [ ] `_objc_alloc_init` の host-side substitute が必要な場合は、self-authored B8 GUI
+  fixture の delegate class に限る bridge contract として保存する。arbitrary Objective-C
+  class allocation / initialization bridge にはしない。
+- [ ] `_objc_alloc_init` return value が `rax` に入り、後続の `mov rdx, rax` で
+  `setDelegate:` argument へ渡る dataflow を維持する。
+
+PR に含めない:
+
+- 任意の Objective-C class / instance bridge。
+- 一般的な call-rel32 execution engine。
 - dynamic linker / dyld stub binding の一般実装。
 - translation cache、fallback JIT/interpreter。
 

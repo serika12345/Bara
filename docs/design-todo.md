@@ -508,6 +508,18 @@
   allocation / initialization、translation cache / fallback JIT を追加するものではない。
   次の B8-G6o では `_objc_alloc_init` helper execution request と class argument
   materialization / bridge blocker を focused slice として扱う。
+- 2026-06-13 の B8-G6o として、`_objc_alloc_init` call-rel32 helper boundary に
+  `b8_return_to_continuation_call_rel32_helper_execution_request_v0` を追加した。直前の
+  `mov rdi, qword ptr [rip+disp32]` を mapped bytes と public chained fixups から
+  materialize し、class argument は `address=4294988128`、`resolved_rebase=4294988184`
+  として available state になる。helper execution request は `_objc_alloc_init`、
+  `objc_alloc_init_helper` capability、`x86_64_rax` writeback boundary、class bridge
+  `b8_return_to_continuation_objc_alloc_init_class_bridge_v0` を保存し、next blocker を
+  `return_to_continuation_objc_alloc_init_class_bridge_unimplemented` に進める。これは
+  arbitrary Objective-C class allocation / initialization bridge、general call-rel32
+  execution、general dynamic symbol resolver、translation cache / fallback JIT を追加する
+  ものではない。次の B8-G6p では `BaraGuiHelloWorldDelegate` に限る self-authored fixture
+  class bridge / identity blocker を扱う。
 - 2026-06-13 の planning update として、B8-HWGUI を self-authored Hello World GUI
   completion の大目標として明文化した。大目標の対象は、実 `LC_MAIN` entry から
   GUI lifecycle helper boundary までを通し、automated expected / actual と manual visible

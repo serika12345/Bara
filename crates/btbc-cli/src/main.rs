@@ -2473,7 +2473,7 @@ mod tests {
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"helper_boundary_request\"")
         );
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"reason\":\"return_to_continuation_call_rel32_helper_execution_unimplemented\""
+            "\"reason\":\"return_to_continuation_objc_alloc_init_class_bridge_unimplemented\""
         ));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"kind\":\"import_helper_call\""));
@@ -2584,7 +2584,7 @@ mod tests {
             .contains("\"next_source_pc\":4294972999"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register_state\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"blocker\":\"return_to_continuation_call_rel32_helper_execution_unimplemented\""
+            "\"blocker\":\"return_to_continuation_objc_alloc_init_class_bridge_unimplemented\""
         ));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"continuation_block\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
@@ -2735,6 +2735,23 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"symbol_name\":\"_objc_alloc_init\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"schema\":\"b8_return_to_continuation_call_rel32_helper_execution_request_v0\""
+        ));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"kind\":\"objc_alloc_init\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"required_capability\":\"objc_alloc_init_helper\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"class_argument\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"role\":\"objc_class\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register\":\"rdi\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"address\":4294988128"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"fixup_resolution\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"resolved_rebase\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_return_to_continuation_objc_alloc_init_class_bridge_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"bridge_state\":\"unimplemented\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
             "\"schema\":\"b8_return_to_continuation_call_rel32_return_value_dataflow_v0\""
         ));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
@@ -2752,14 +2769,14 @@ mod tests {
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"name\":\"setDelegate:\"")
         );
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"blocker\":\"return_to_continuation_call_rel32_helper_execution_unimplemented\""
+            "\"blocker\":\"return_to_continuation_objc_alloc_init_class_bridge_unimplemented\""
         ));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"unsupported_instruction\":null"));
         assert!(!read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"return_to_continuation_unsupported_instruction\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"next_action\":\"implement_return_to_continuation_call_rel32_helper_execution\""
+            "\"next_action\":\"define_return_to_continuation_objc_alloc_init_class_bridge\""
         ));
         assert!(!read_file(&bundle_dir.join("loader.plan.json")).contains(
             "\"return_to_continuation_call_rel32_return_value_materialization_unimplemented\""
@@ -2828,7 +2845,7 @@ mod tests {
         assert!(launch_report.contains("\"b8_g1_host_trap_path\":\"not_used\""));
         assert!(launch_report.contains("\"helper_boundary_request\""));
         assert!(launch_report.contains(
-            "\"reason\":\"return_to_continuation_call_rel32_helper_execution_unimplemented\""
+            "\"reason\":\"return_to_continuation_objc_alloc_init_class_bridge_unimplemented\""
         ));
         assert!(launch_report.contains("\"symbol_name\":\"_objc_msgSend\""));
         assert!(launch_report.contains("\"call_site\":4294972996"));
@@ -2888,7 +2905,7 @@ mod tests {
         assert!(launch_report.contains("\"next_source_pc\":4294972999"));
         assert!(launch_report.contains("\"register_state\""));
         assert!(launch_report.contains(
-            "\"blocker\":\"return_to_continuation_call_rel32_helper_execution_unimplemented\""
+            "\"blocker\":\"return_to_continuation_objc_alloc_init_class_bridge_unimplemented\""
         ));
         assert!(launch_report.contains("\"continuation_block\""));
         assert!(
@@ -2982,6 +2999,20 @@ mod tests {
         assert!(launch_report.contains("\"symbol_table_index\":46"));
         assert!(launch_report.contains("\"symbol_name\":\"_objc_alloc_init\""));
         assert!(launch_report.contains(
+            "\"schema\":\"b8_return_to_continuation_call_rel32_helper_execution_request_v0\""
+        ));
+        assert!(launch_report.contains("\"kind\":\"objc_alloc_init\""));
+        assert!(launch_report.contains("\"required_capability\":\"objc_alloc_init_helper\""));
+        assert!(launch_report.contains("\"class_argument\""));
+        assert!(launch_report.contains("\"role\":\"objc_class\""));
+        assert!(launch_report.contains("\"register\":\"rdi\""));
+        assert!(launch_report.contains("\"address\":4294988128"));
+        assert!(launch_report.contains("\"fixup_resolution\""));
+        assert!(launch_report.contains("\"resolved_rebase\""));
+        assert!(launch_report
+            .contains("\"schema\":\"b8_return_to_continuation_objc_alloc_init_class_bridge_v0\""));
+        assert!(launch_report.contains("\"bridge_state\":\"unimplemented\""));
+        assert!(launch_report.contains(
             "\"schema\":\"b8_return_to_continuation_call_rel32_return_value_dataflow_v0\""
         ));
         assert!(launch_report.contains("\"consumer_register\":\"rdx\""));
@@ -2991,12 +3022,12 @@ mod tests {
         assert!(launch_report.contains("\"return_register\":\"rax\""));
         assert!(launch_report.contains("\"name\":\"setDelegate:\""));
         assert!(launch_report.contains(
-            "\"blocker\":\"return_to_continuation_call_rel32_helper_execution_unimplemented\""
+            "\"blocker\":\"return_to_continuation_objc_alloc_init_class_bridge_unimplemented\""
         ));
         assert!(launch_report.contains("\"unsupported_instruction\":null"));
         assert!(!launch_report.contains("\"return_to_continuation_unsupported_instruction\""));
         assert!(launch_report.contains(
-            "\"next_action\":\"implement_return_to_continuation_call_rel32_helper_execution\""
+            "\"next_action\":\"define_return_to_continuation_objc_alloc_init_class_bridge\""
         ));
         assert!(!launch_report.contains(
             "\"return_to_continuation_call_rel32_return_value_materialization_unimplemented\""

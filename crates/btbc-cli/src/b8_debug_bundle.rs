@@ -2268,6 +2268,8 @@ enum B8DebugObjcHelperExecutionBlocker {
     ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented,
     ReturnToContinuationExecutionUnimplemented,
     ReturnToContinuationImportGlobalLoadUnimplemented,
+    ReturnToContinuationObjcAllocInitClassArgumentMaterializationUnimplemented,
+    ReturnToContinuationObjcAllocInitClassBridgeUnimplemented,
     ReturnToContinuationObjcHelperExecutionUnimplemented,
     ReturnToContinuationUnsupportedInstruction,
     SelectorVmAddressUnavailable,
@@ -2445,9 +2447,11 @@ enum B8DebugObjcHelperReturnContinuationRegisterSource {
 enum B8DebugObjcHelperReturnContinuationNextAction {
     AddReturnToContinuationInstructionSupport,
     DecodeReturnToContinuationBlock,
+    DefineReturnToContinuationObjcAllocInitClassBridge,
     ImplementReturnToContinuationCallRel32HelperExecution,
     ImplementReturnToContinuationObjcHelperExecution,
     ImplementReturnToContinuationExecution,
+    MaterializeReturnToContinuationObjcAllocInitClassArgument,
     ResolveReturnToContinuationCallRel32StubSymbol,
     MaterializeReturnToContinuationCallRel32ReturnValue,
     MaterializeReturnToContinuationImportGlobalLoad,
@@ -2569,6 +2573,18 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
                     B8DebugReturnToContinuationDecodeNextAction::ResolveReturnToContinuationCallRel32StubSymbol
                 } else if materialization_blocker
                     == Some(
+                        B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcAllocInitClassArgumentMaterializationUnimplemented,
+                    )
+                {
+                    B8DebugReturnToContinuationDecodeNextAction::MaterializeReturnToContinuationObjcAllocInitClassArgument
+                } else if materialization_blocker
+                    == Some(
+                        B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcAllocInitClassBridgeUnimplemented,
+                    )
+                {
+                    B8DebugReturnToContinuationDecodeNextAction::DefineReturnToContinuationObjcAllocInitClassBridge
+                } else if materialization_blocker
+                    == Some(
                         B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented,
                     )
                 {
@@ -2637,6 +2653,9 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
             B8DebugReturnToContinuationDecodeNextAction::AddReturnToContinuationInstructionSupport => {
                 B8DebugObjcHelperReturnContinuationNextAction::AddReturnToContinuationInstructionSupport
             }
+            B8DebugReturnToContinuationDecodeNextAction::DefineReturnToContinuationObjcAllocInitClassBridge => {
+                B8DebugObjcHelperReturnContinuationNextAction::DefineReturnToContinuationObjcAllocInitClassBridge
+            }
             B8DebugReturnToContinuationDecodeNextAction::ImplementReturnToContinuationCallRel32HelperExecution => {
                 B8DebugObjcHelperReturnContinuationNextAction::ImplementReturnToContinuationCallRel32HelperExecution
             }
@@ -2657,6 +2676,9 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
             }
             B8DebugReturnToContinuationDecodeNextAction::MaterializeReturnToContinuationImportGlobalLoad => {
                 B8DebugObjcHelperReturnContinuationNextAction::MaterializeReturnToContinuationImportGlobalLoad
+            }
+            B8DebugReturnToContinuationDecodeNextAction::MaterializeReturnToContinuationObjcAllocInitClassArgument => {
+                B8DebugObjcHelperReturnContinuationNextAction::MaterializeReturnToContinuationObjcAllocInitClassArgument
             }
             B8DebugReturnToContinuationDecodeNextAction::ResolveReturnToContinuationCallRel32StubSymbol => {
                 B8DebugObjcHelperReturnContinuationNextAction::ResolveReturnToContinuationCallRel32StubSymbol
@@ -2701,6 +2723,7 @@ enum B8DebugReturnToContinuationByteSource {
 #[serde(rename_all = "snake_case")]
 enum B8DebugReturnToContinuationDecodeNextAction {
     AddReturnToContinuationInstructionSupport,
+    DefineReturnToContinuationObjcAllocInitClassBridge,
     ImplementReturnToContinuationCallRel32HelperExecution,
     ImplementReturnToContinuationObjcHelperExecution,
     ImplementReturnToContinuationExecution,
@@ -2708,6 +2731,7 @@ enum B8DebugReturnToContinuationDecodeNextAction {
     InspectReturnToContinuationObjcHelperExecutionFailure,
     MaterializeReturnToContinuationCallRel32ReturnValue,
     MaterializeReturnToContinuationImportGlobalLoad,
+    MaterializeReturnToContinuationObjcAllocInitClassArgument,
     ResolveReturnToContinuationCallRel32StubSymbol,
     RunReturnToContinuationObjcHelperOnSupportedMacosHost,
 }
@@ -2749,15 +2773,48 @@ impl B8DebugReturnToContinuationMaterializedRegisterStateReport {
         for instruction in decoded.instructions() {
             match instruction.kind() {
                 DecodedInstructionKind::CallRel32 { target, return_to } => {
+                    let class_argument = latest_materialized_register_state_before(
+                        &states,
+                        B8DebugRegisterName::Rdi,
+                        instruction.start().value(),
+                    )
+                    .cloned();
                     rax_call_return = Some(
                         B8DebugReturnToContinuationCallRel32ReturnValueReport::from_call_rel32(
                             instruction.start().value(),
                             return_to.value(),
                             target.value(),
+                            class_argument,
                             input,
                             input_probe,
                         ),
                     );
+                }
+                DecodedInstructionKind::MovRdiQwordPtrRipRelative { address, .. } => {
+                    if let Some(value) = mapped_bytes.read_u64_le(*address) {
+                        let fixup_resolution =
+                            B8DebugObjcArgumentFixupResolutionReport::from_mapped_pointer(
+                                input,
+                                input_probe,
+                                address.value(),
+                                value,
+                            );
+                        states.push(Self {
+                            register: B8DebugRegisterName::Rdi,
+                            source:
+                                B8DebugReturnToContinuationMaterializedRegisterSource::RipRelativeQword,
+                            instruction_start: instruction.start().value(),
+                            instruction_end: instruction.end().value(),
+                            address: Some(address.value()),
+                            base_register: None,
+                            base_value: None,
+                            base_fixup_resolution: None,
+                            value,
+                            value_source: None,
+                            fixup_resolution: Some(fixup_resolution),
+                            width: B8DebugMemoryReadWidthReport::Bits64,
+                        });
+                    }
                 }
                 DecodedInstructionKind::MovR15QwordPtrRipRelative { address, .. } => {
                     if let Some(value) = mapped_bytes.read_u64_le(*address) {
@@ -2946,6 +3003,17 @@ impl B8DebugReturnToContinuationMaterializedRegisterStateReport {
     }
 }
 
+fn latest_materialized_register_state_before(
+    states: &[B8DebugReturnToContinuationMaterializedRegisterStateReport],
+    register: B8DebugRegisterName,
+    source_pc: u64,
+) -> Option<&B8DebugReturnToContinuationMaterializedRegisterStateReport> {
+    states
+        .iter()
+        .rev()
+        .find(|state| state.register == register && state.instruction_end <= source_pc)
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 struct B8DebugReturnToContinuationBlockedRegisterMaterializationReport {
     register: B8DebugRegisterName,
@@ -2977,6 +3045,7 @@ impl B8DebugReturnToContinuationCallRel32ReturnValueReport {
         call_site: u64,
         return_to: u64,
         target: u64,
+        class_argument: Option<B8DebugReturnToContinuationMaterializedRegisterStateReport>,
         input: &BinaryInput,
         input_probe: &BinaryFormatProbeReport,
     ) -> Self {
@@ -2991,6 +3060,7 @@ impl B8DebugReturnToContinuationCallRel32ReturnValueReport {
                     call_site,
                     return_to,
                     target,
+                    class_argument,
                     input,
                     input_probe,
                 ),
@@ -3009,6 +3079,8 @@ struct B8DebugReturnToContinuationCallRel32HelperBoundaryReport {
     target: u64,
     return_register: B8DebugRegisterName,
     target_resolution: B8DebugReturnToContinuationMachOStubSymbolResolutionReport,
+    helper_execution_request:
+        Option<B8DebugReturnToContinuationCallRel32HelperExecutionRequestReport>,
     blocker: B8DebugObjcHelperExecutionBlocker,
     next_action: B8DebugReturnToContinuationCallRel32HelperBoundaryNextAction,
 }
@@ -3018,6 +3090,7 @@ impl B8DebugReturnToContinuationCallRel32HelperBoundaryReport {
         call_site: u64,
         return_to: u64,
         target: u64,
+        class_argument: Option<B8DebugReturnToContinuationMaterializedRegisterStateReport>,
         input: &BinaryInput,
         input_probe: &BinaryFormatProbeReport,
     ) -> Self {
@@ -3029,7 +3102,17 @@ impl B8DebugReturnToContinuationCallRel32HelperBoundaryReport {
                     MachOStubVirtualAddress::new(target),
                 ),
             );
-        let (blocker, next_action) = if resolution.is_resolved() {
+        let helper_execution_request =
+            B8DebugReturnToContinuationCallRel32HelperExecutionRequestReport::from_boundary_inputs(
+                &resolution,
+                call_site,
+                return_to,
+                target,
+                class_argument,
+            );
+        let (blocker, next_action) = if let Some(request) = helper_execution_request.as_ref() {
+            (request.blocker, request.next_action)
+        } else if resolution.is_resolved() {
             (
                 B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32HelperExecutionUnimplemented,
                 B8DebugReturnToContinuationCallRel32HelperBoundaryNextAction::ImplementReturnToContinuationCallRel32HelperExecution,
@@ -3052,6 +3135,7 @@ impl B8DebugReturnToContinuationCallRel32HelperBoundaryReport {
             target,
             return_register: B8DebugRegisterName::Rax,
             target_resolution: resolution,
+            helper_execution_request,
             blocker,
             next_action,
         }
@@ -3073,8 +3157,188 @@ enum B8DebugReturnToContinuationCallRel32HelperBoundarySource {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum B8DebugReturnToContinuationCallRel32HelperBoundaryNextAction {
+    DefineReturnToContinuationObjcAllocInitClassBridge,
     ImplementReturnToContinuationCallRel32HelperExecution,
+    MaterializeReturnToContinuationObjcAllocInitClassArgument,
     ResolveReturnToContinuationCallRel32StubSymbol,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationCallRel32HelperExecutionRequestReport {
+    schema: &'static str,
+    status: B8DebugImportBoundaryStatus,
+    kind: B8DebugReturnToContinuationCallRel32HelperExecutionRequestKind,
+    source_symbol_name: String,
+    call_site: u64,
+    return_to: u64,
+    target: u64,
+    class_argument: B8DebugReturnToContinuationObjcAllocInitClassArgumentReport,
+    return_writeback_boundary: B8DebugObjcHelperReturnWritebackBoundaryReport,
+    required_capability: B8DebugReturnToContinuationCallRel32HelperExecutionCapability,
+    class_bridge: B8DebugReturnToContinuationObjcAllocInitClassBridgeReport,
+    blocker: B8DebugObjcHelperExecutionBlocker,
+    next_action: B8DebugReturnToContinuationCallRel32HelperBoundaryNextAction,
+}
+
+impl B8DebugReturnToContinuationCallRel32HelperExecutionRequestReport {
+    fn from_boundary_inputs(
+        target_resolution: &B8DebugReturnToContinuationMachOStubSymbolResolutionReport,
+        call_site: u64,
+        return_to: u64,
+        target: u64,
+        class_argument: Option<B8DebugReturnToContinuationMaterializedRegisterStateReport>,
+    ) -> Option<Self> {
+        if target_resolution.symbol_name.as_deref() != Some("_objc_alloc_init") {
+            return None;
+        }
+
+        let class_argument =
+            B8DebugReturnToContinuationObjcAllocInitClassArgumentReport::from_materialized_state(
+                class_argument,
+            );
+        let class_bridge =
+            B8DebugReturnToContinuationObjcAllocInitClassBridgeReport::from_class_argument(
+                &class_argument,
+            );
+        let blocker = class_bridge.blocker;
+        let next_action = if class_argument.is_available() {
+            B8DebugReturnToContinuationCallRel32HelperBoundaryNextAction::DefineReturnToContinuationObjcAllocInitClassBridge
+        } else {
+            B8DebugReturnToContinuationCallRel32HelperBoundaryNextAction::MaterializeReturnToContinuationObjcAllocInitClassArgument
+        };
+
+        Some(Self {
+            schema: "b8_return_to_continuation_call_rel32_helper_execution_request_v0",
+            status: B8DebugImportBoundaryStatus::Blocked,
+            kind: B8DebugReturnToContinuationCallRel32HelperExecutionRequestKind::ObjcAllocInit,
+            source_symbol_name: "_objc_alloc_init".to_owned(),
+            call_site,
+            return_to,
+            target,
+            class_argument,
+            return_writeback_boundary: B8DebugObjcHelperReturnWritebackBoundaryReport::blocked(),
+            required_capability:
+                B8DebugReturnToContinuationCallRel32HelperExecutionCapability::ObjcAllocInitHelper,
+            class_bridge,
+            blocker,
+            next_action,
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationCallRel32HelperExecutionRequestKind {
+    ObjcAllocInit,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationCallRel32HelperExecutionCapability {
+    ObjcAllocInitHelper,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationObjcAllocInitClassArgumentReport {
+    status: B8DebugValueMaterializationStatus,
+    role: B8DebugReturnToContinuationObjcAllocInitArgumentRole,
+    register: B8DebugRegisterName,
+    materialized_state: Option<B8DebugReturnToContinuationMaterializedRegisterStateReport>,
+    class_import: Option<MachOChainedImportIdentityReport>,
+    class_rebase: Option<MachOChainedRebaseTargetIdentityReport>,
+    blocker: Option<B8DebugObjcHelperExecutionBlocker>,
+}
+
+impl B8DebugReturnToContinuationObjcAllocInitClassArgumentReport {
+    fn from_materialized_state(
+        materialized_state: Option<B8DebugReturnToContinuationMaterializedRegisterStateReport>,
+    ) -> Self {
+        let class_import = materialized_state
+            .as_ref()
+            .and_then(|state| state.fixup_resolution.as_ref())
+            .and_then(|resolution| resolution.import.clone());
+        let class_rebase = materialized_state
+            .as_ref()
+            .and_then(|state| state.fixup_resolution.as_ref())
+            .and_then(|resolution| resolution.rebase);
+        let is_available =
+            materialized_state.is_some() && (class_import.is_some() || class_rebase.is_some());
+        Self {
+            status: if is_available {
+                B8DebugValueMaterializationStatus::Available
+            } else {
+                B8DebugValueMaterializationStatus::Blocked
+            },
+            role: B8DebugReturnToContinuationObjcAllocInitArgumentRole::ObjcClass,
+            register: B8DebugRegisterName::Rdi,
+            materialized_state,
+            class_import,
+            class_rebase,
+            blocker: if is_available {
+                None
+            } else {
+                Some(B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcAllocInitClassArgumentMaterializationUnimplemented)
+            },
+        }
+    }
+
+    const fn is_available(&self) -> bool {
+        matches!(self.status, B8DebugValueMaterializationStatus::Available)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationObjcAllocInitArgumentRole {
+    ObjcClass,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationObjcAllocInitClassBridgeReport {
+    schema: &'static str,
+    status: B8DebugImportBoundaryStatus,
+    bridge_state: B8DebugReturnToContinuationObjcAllocInitClassBridgeState,
+    class_import: Option<MachOChainedImportIdentityReport>,
+    class_rebase: Option<MachOChainedRebaseTargetIdentityReport>,
+    blocker: B8DebugObjcHelperExecutionBlocker,
+    next_action: B8DebugReturnToContinuationCallRel32HelperBoundaryNextAction,
+}
+
+impl B8DebugReturnToContinuationObjcAllocInitClassBridgeReport {
+    fn from_class_argument(
+        class_argument: &B8DebugReturnToContinuationObjcAllocInitClassArgumentReport,
+    ) -> Self {
+        let (bridge_state, blocker, next_action) = if class_argument.is_available() {
+            (
+                B8DebugReturnToContinuationObjcAllocInitClassBridgeState::Unimplemented,
+                B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcAllocInitClassBridgeUnimplemented,
+                B8DebugReturnToContinuationCallRel32HelperBoundaryNextAction::DefineReturnToContinuationObjcAllocInitClassBridge,
+            )
+        } else {
+            (
+                B8DebugReturnToContinuationObjcAllocInitClassBridgeState::Blocked,
+                B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcAllocInitClassArgumentMaterializationUnimplemented,
+                B8DebugReturnToContinuationCallRel32HelperBoundaryNextAction::MaterializeReturnToContinuationObjcAllocInitClassArgument,
+            )
+        };
+
+        Self {
+            schema: "b8_return_to_continuation_objc_alloc_init_class_bridge_v0",
+            status: B8DebugImportBoundaryStatus::Blocked,
+            bridge_state,
+            class_import: class_argument.class_import.clone(),
+            class_rebase: class_argument.class_rebase,
+            blocker,
+            next_action,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationObjcAllocInitClassBridgeState {
+    Blocked,
+    Unimplemented,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -5000,6 +5264,8 @@ enum B8DebugHelperBoundaryBlockedReason {
     ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented,
     ReturnToContinuationExecutionUnimplemented,
     ReturnToContinuationImportGlobalLoadUnimplemented,
+    ReturnToContinuationObjcAllocInitClassArgumentMaterializationUnimplemented,
+    ReturnToContinuationObjcAllocInitClassBridgeUnimplemented,
     ReturnToContinuationObjcHelperExecutionUnimplemented,
     ReturnToContinuationUnsupportedInstruction,
 }
@@ -5034,6 +5300,12 @@ impl B8DebugHelperBoundaryBlockedReason {
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationImportGlobalLoadUnimplemented => {
                 Self::ReturnToContinuationImportGlobalLoadUnimplemented
+            }
+            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcAllocInitClassArgumentMaterializationUnimplemented => {
+                Self::ReturnToContinuationObjcAllocInitClassArgumentMaterializationUnimplemented
+            }
+            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcAllocInitClassBridgeUnimplemented => {
+                Self::ReturnToContinuationObjcAllocInitClassBridgeUnimplemented
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcHelperExecutionUnimplemented => {
                 Self::ReturnToContinuationObjcHelperExecutionUnimplemented
@@ -5070,6 +5342,8 @@ enum B8DebugHelperBoundaryBlocker {
     ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented,
     ReturnToContinuationExecutionUnimplemented,
     ReturnToContinuationImportGlobalLoadUnimplemented,
+    ReturnToContinuationObjcAllocInitClassArgumentMaterializationUnimplemented,
+    ReturnToContinuationObjcAllocInitClassBridgeUnimplemented,
     ReturnToContinuationObjcHelperExecutionUnimplemented,
     ReturnToContinuationUnsupportedInstruction,
 }
@@ -5110,6 +5384,12 @@ impl B8DebugHelperBoundaryBlocker {
             }
             B8DebugHelperBoundaryBlockedReason::ReturnToContinuationImportGlobalLoadUnimplemented => {
                 vec![Self::ReturnToContinuationImportGlobalLoadUnimplemented]
+            }
+            B8DebugHelperBoundaryBlockedReason::ReturnToContinuationObjcAllocInitClassArgumentMaterializationUnimplemented => {
+                vec![Self::ReturnToContinuationObjcAllocInitClassArgumentMaterializationUnimplemented]
+            }
+            B8DebugHelperBoundaryBlockedReason::ReturnToContinuationObjcAllocInitClassBridgeUnimplemented => {
+                vec![Self::ReturnToContinuationObjcAllocInitClassBridgeUnimplemented]
             }
             B8DebugHelperBoundaryBlockedReason::ReturnToContinuationObjcHelperExecutionUnimplemented => {
                 vec![Self::ReturnToContinuationObjcHelperExecutionUnimplemented]
@@ -5159,6 +5439,12 @@ impl B8DebugHelperBoundaryBlocker {
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationImportGlobalLoadUnimplemented => {
                 Self::ReturnToContinuationImportGlobalLoadUnimplemented
+            }
+            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcAllocInitClassArgumentMaterializationUnimplemented => {
+                Self::ReturnToContinuationObjcAllocInitClassArgumentMaterializationUnimplemented
+            }
+            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcAllocInitClassBridgeUnimplemented => {
+                Self::ReturnToContinuationObjcAllocInitClassBridgeUnimplemented
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcHelperExecutionUnimplemented => {
                 Self::ReturnToContinuationObjcHelperExecutionUnimplemented
