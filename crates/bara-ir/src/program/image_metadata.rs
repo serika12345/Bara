@@ -161,6 +161,12 @@ impl ProgramImageMappedBytes {
             .iter()
             .find_map(|segment| segment.read_u64_le(address))
     }
+
+    pub fn read_nul_terminated_utf8(&self, address: X86Va) -> Option<&str> {
+        self.segments
+            .iter()
+            .find_map(|segment| segment.read_nul_terminated_utf8(address))
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -200,6 +206,19 @@ impl ProgramImageMappedByteSegment {
         Some(u64::from_le_bytes([
             bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
         ]))
+    }
+
+    fn read_nul_terminated_utf8(&self, address: X86Va) -> Option<&str> {
+        if address.value() < self.range.start().value()
+            || address.value() >= self.range.end().value()
+        {
+            return None;
+        }
+
+        let offset = usize::try_from(address.value() - self.range.start().value()).ok()?;
+        let bytes = self.bytes.get(offset..)?;
+        let nul_offset = bytes.iter().position(|byte| *byte == 0)?;
+        std::str::from_utf8(bytes.get(..nul_offset)?).ok()
     }
 }
 

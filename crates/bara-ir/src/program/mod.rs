@@ -228,4 +228,31 @@ mod tests {
         assert_eq!(mapped_bytes.read_u64_le(X86Va::new(0x0fff)), None);
         assert_eq!(mapped_bytes.read_u64_le(X86Va::new(0x1001)), None);
     }
+
+    #[test]
+    fn mapped_image_bytes_read_nul_terminated_utf8_by_vm_address() {
+        let range = ProgramImageRange::new(X86Va::new(0x1000), X86Va::new(0x1010))
+            .expect("range is non-empty");
+        let mapped_segment =
+            ProgramImageMappedByteSegment::new(range, b"prefix\0shared\0xx".to_vec())
+                .expect("mapped bytes match range");
+        let mapped_bytes = ProgramImageMappedBytes::from_segments([mapped_segment]);
+
+        assert_eq!(
+            mapped_bytes.read_nul_terminated_utf8(X86Va::new(0x1000)),
+            Some("prefix")
+        );
+        assert_eq!(
+            mapped_bytes.read_nul_terminated_utf8(X86Va::new(0x1007)),
+            Some("shared")
+        );
+        assert_eq!(
+            mapped_bytes.read_nul_terminated_utf8(X86Va::new(0x100e)),
+            None
+        );
+        assert_eq!(
+            mapped_bytes.read_nul_terminated_utf8(X86Va::new(0x1010)),
+            None
+        );
+    }
 }
