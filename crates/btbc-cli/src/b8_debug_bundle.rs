@@ -2274,6 +2274,7 @@ enum B8DebugObjcHelperExecutionBlocker {
     ReturnToContinuationObjcAllocInitClassIdentityUnresolved,
     ReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionUnimplemented,
     ReturnToContinuationObjcHelperExecutionUnimplemented,
+    ReturnToContinuationObjcHelperVoidReturnContinuationUnimplemented,
     ReturnToContinuationUnsupportedInstruction,
     SelectorVmAddressUnavailable,
 }
@@ -2331,6 +2332,8 @@ impl B8DebugObjcHelperReturnContinuationBoundaryReport {
         let continuation_inputs = B8DebugReturnToContinuationDecodeInputs {
             imported_global_value,
             preserved_call_target_import: Some(host_execution.invocation.source_import.clone()),
+            preserved_r15_value: None,
+            preserved_r15_fixup_resolution: None,
         };
         let continuation_block = B8DebugReturnToContinuationDecodeBoundaryReport::from_code_bytes(
             call_boundary.return_to,
@@ -2456,6 +2459,7 @@ enum B8DebugObjcHelperReturnContinuationNextAction {
     ImplementReturnToContinuationObjcHelperExecution,
     ImplementReturnToContinuationExecution,
     MaterializeReturnToContinuationObjcAllocInitClassArgument,
+    ModelReturnToContinuationObjcHelperVoidReturn,
     ResolveReturnToContinuationObjcAllocInitClassIdentity,
     ResolveReturnToContinuationCallRel32StubSymbol,
     MaterializeReturnToContinuationCallRel32ReturnValue,
@@ -2487,6 +2491,8 @@ struct B8DebugReturnToContinuationDecodeBoundaryReport {
 struct B8DebugReturnToContinuationDecodeInputs {
     imported_global_value: Option<B8DebugReturnToContinuationImportedGlobalValue>,
     preserved_call_target_import: Option<MachOChainedImportIdentityReport>,
+    preserved_r15_value: Option<u64>,
+    preserved_r15_fixup_resolution: Option<B8DebugObjcArgumentFixupResolutionReport>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -2529,7 +2535,7 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
                         image_metadata.mapped_bytes(),
                         input,
                         input_probe,
-                        continuation_inputs.imported_global_value,
+                        &continuation_inputs,
                     );
                 let host_execution_context = B8DebugReturnToContinuationHostExecutionContext {
                     code_bytes,
@@ -2700,6 +2706,9 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
             B8DebugReturnToContinuationDecodeNextAction::MaterializeReturnToContinuationObjcAllocInitClassArgument => {
                 B8DebugObjcHelperReturnContinuationNextAction::MaterializeReturnToContinuationObjcAllocInitClassArgument
             }
+            B8DebugReturnToContinuationDecodeNextAction::ModelReturnToContinuationObjcHelperVoidReturn => {
+                B8DebugObjcHelperReturnContinuationNextAction::ModelReturnToContinuationObjcHelperVoidReturn
+            }
             B8DebugReturnToContinuationDecodeNextAction::ResolveReturnToContinuationObjcAllocInitClassIdentity => {
                 B8DebugObjcHelperReturnContinuationNextAction::ResolveReturnToContinuationObjcAllocInitClassIdentity
             }
@@ -2756,6 +2765,7 @@ enum B8DebugReturnToContinuationDecodeNextAction {
     MaterializeReturnToContinuationCallRel32ReturnValue,
     MaterializeReturnToContinuationImportGlobalLoad,
     MaterializeReturnToContinuationObjcAllocInitClassArgument,
+    ModelReturnToContinuationObjcHelperVoidReturn,
     ResolveReturnToContinuationObjcAllocInitClassIdentity,
     ResolveReturnToContinuationCallRel32StubSymbol,
     RunReturnToContinuationObjcHelperOnSupportedMacosHost,
@@ -2787,15 +2797,15 @@ impl B8DebugReturnToContinuationMaterializedRegisterStateReport {
         mapped_bytes: &ProgramImageMappedBytes,
         input: &BinaryInput,
         input_probe: &BinaryFormatProbeReport,
-        imported_global_value: Option<B8DebugReturnToContinuationImportedGlobalValue>,
+        continuation_inputs: &B8DebugReturnToContinuationDecodeInputs,
     ) -> (
         Vec<Self>,
         Vec<B8DebugReturnToContinuationBlockedRegisterMaterializationReport>,
     ) {
         let mut states = Vec::new();
         let mut r15_address = None;
-        let mut r15_value = None;
-        let mut r15_fixup_resolution = None;
+        let mut r15_value = continuation_inputs.preserved_r15_value;
+        let mut r15_fixup_resolution = continuation_inputs.preserved_r15_fixup_resolution.clone();
         let mut rax_call_return = None;
         let mut blocked = Vec::new();
 
@@ -2915,7 +2925,7 @@ impl B8DebugReturnToContinuationMaterializedRegisterStateReport {
                 }
                 DecodedInstructionKind::MovRdiQwordPtrR15 => {
                     if let Some(imported_global_value) = imported_global_value_for_resolution(
-                        imported_global_value,
+                        continuation_inputs.imported_global_value,
                         r15_fixup_resolution.as_ref(),
                     ) {
                         states.push(Self {
@@ -4367,6 +4377,38 @@ impl B8DebugReturnToContinuationObjcHelperRequestReport {
             && self.required_capability
                 == B8DebugObjcHelperExecutionCapability::ObjcRuntimeMessageSendHelper
     }
+
+    fn is_supported_b8_set_delegate_message(&self) -> bool {
+        is_objc_msg_send_import(&self.source_import)
+            && B8DebugReturnToContinuationObjcHelperReceiver::from_argument(&self.receiver)
+                == B8DebugReturnToContinuationObjcHelperReceiver::NsAppSharedApplicationValue
+            && self.selector_name() == Some(B8_GUI_HELLO_WORLD_SET_DELEGATE_SELECTOR_NAME)
+            && self.argument_is_fixture_delegate_host_substitute()
+            && self.required_capability
+                == B8DebugObjcHelperExecutionCapability::ObjcRuntimeMessageSendHelper
+    }
+
+    fn argument_is_fixture_delegate_host_substitute(&self) -> bool {
+        self.argument
+            .materialized_state
+            .as_ref()
+            .and_then(|state| state.source_call_return.as_ref())
+            .and_then(|call_return| {
+                call_return
+                    .helper_boundary
+                    .helper_execution_request
+                    .as_ref()
+            })
+            .is_some_and(|request| {
+                request.kind
+                    == B8DebugReturnToContinuationCallRel32HelperExecutionRequestKind::ObjcAllocInit
+                    && request
+                        .class_bridge
+                        .fixture_delegate_bridge_contract
+                        .is_some()
+                    && request.return_writeback.is_some()
+            })
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -4378,6 +4420,8 @@ struct B8DebugReturnToContinuationObjcHelperHostExecutionReport {
     effect: B8DebugReturnToContinuationObjcHelperEffect,
     selector_name: Option<String>,
     argument_value: Option<u64>,
+    host_object_boundary:
+        Option<B8DebugReturnToContinuationObjcHelperSetDelegateHostObjectBoundaryReport>,
     output: Option<B8DebugReturnToContinuationObjcHelperHostOutputReport>,
     next_source_pc: u64,
     next_continuation: Option<Box<B8DebugReturnToContinuationDecodeBoundaryReport>>,
@@ -4394,12 +4438,32 @@ impl B8DebugReturnToContinuationObjcHelperHostExecutionReport {
         input_probe: &BinaryFormatProbeReport,
         image_metadata: &ProgramImageMetadata,
     ) -> Self {
-        if !request.is_supported_b8_set_activation_policy_message() {
-            return Self::blocked(
+        if request.is_supported_b8_set_activation_policy_message() {
+            return Self::execute_set_activation_policy(
                 request,
-                B8DebugObjcRuntimeHelperErrorClassification::UnsupportedHelperContract,
+                code_bytes,
+                input,
+                input_probe,
+                image_metadata,
             );
         }
+        if request.is_supported_b8_set_delegate_message() {
+            return Self::execute_set_delegate(request);
+        }
+
+        Self::blocked(
+            request,
+            B8DebugObjcRuntimeHelperErrorClassification::UnsupportedHelperContract,
+        )
+    }
+
+    fn execute_set_activation_policy(
+        request: &B8DebugReturnToContinuationObjcHelperRequestReport,
+        code_bytes: &X86Bytes,
+        input: &BinaryInput,
+        input_probe: &BinaryFormatProbeReport,
+        image_metadata: &ProgramImageMetadata,
+    ) -> Self {
         if !cfg!(target_os = "macos") {
             return Self::skipped(
                 request,
@@ -4408,24 +4472,30 @@ impl B8DebugReturnToContinuationObjcHelperHostExecutionReport {
         }
 
         match run_public_objc_msg_send_set_activation_policy_helper() {
-            Ok(observation) => {
-                let output =
-                    B8DebugReturnToContinuationObjcHelperHostOutputReport::from_observation(
-                        observation,
-                    );
+            Ok(observation) => match B8DebugReturnToContinuationObjcHelperHostOutputReport::from_set_activation_policy_observation(
+                observation,
+            ) {
+                Ok(output) => {
                 let register_state = B8DebugObjcHelperReturnContinuationRegisterStateReport {
                     register: B8DebugRegisterName::Rax,
                     source:
                         B8DebugObjcHelperReturnContinuationRegisterSource::ObjcHelperReturnValue,
-                    value: output.return_value,
+                    value: output.return_value.unwrap_or(0),
                     width: B8DebugMemoryReadWidthReport::Bits64,
                 };
+                let preserved_r15_state =
+                    request.receiver.materialized_state.as_ref().filter(|state| {
+                        state.base_register == Some(B8DebugRegisterName::R15)
+                    });
                 let continuation_inputs = B8DebugReturnToContinuationDecodeInputs {
                     imported_global_value:
                         B8DebugReturnToContinuationImportedGlobalValue::nsapp_from_set_activation_policy_request(
                             request,
                         ),
                     preserved_call_target_import: Some(request.source_import.clone()),
+                    preserved_r15_value: preserved_r15_state.and_then(|state| state.base_value),
+                    preserved_r15_fixup_resolution: preserved_r15_state
+                        .and_then(|state| state.base_fixup_resolution.clone()),
                 };
                 let next_continuation =
                     B8DebugReturnToContinuationDecodeBoundaryReport::from_code_bytes(
@@ -4454,12 +4524,55 @@ impl B8DebugReturnToContinuationObjcHelperHostExecutionReport {
                     effect: B8DebugReturnToContinuationObjcHelperEffect::SetActivationPolicy,
                     selector_name: request.selector_name().map(str::to_owned),
                     argument_value: request.argument_value(),
+                    host_object_boundary: None,
                     output: Some(output),
                     next_source_pc: request.return_to,
                     next_continuation: next_continuation.map(Box::new),
                     error: None,
                     next_blocker,
                     next_action,
+                }
+                }
+                Err(error) => Self::failed(request, error),
+            },
+            Err(error) => Self::failed(request, error),
+        }
+    }
+
+    fn execute_set_delegate(request: &B8DebugReturnToContinuationObjcHelperRequestReport) -> Self {
+        if !cfg!(target_os = "macos") {
+            return Self::skipped(
+                request,
+                B8DebugObjcRuntimeHelperErrorClassification::UnsupportedHost,
+            );
+        }
+
+        match run_public_objc_msg_send_set_delegate_helper() {
+            Ok(observation) => {
+                let output =
+                    B8DebugReturnToContinuationObjcHelperHostOutputReport::from_set_delegate_observation(
+                        observation,
+                    );
+                Self {
+                    schema: "b8_return_to_continuation_objc_helper_host_execution_v0",
+                    status: B8DebugObjcRuntimeHelperHostExecutionStatus::Executed,
+                    api_boundary: B8DebugObjcRuntimeHelperHostApiBoundary::PublicObjcRuntimeAppKit,
+                    fixture_scope: B8DebugObjcRuntimeHelperFixtureScope::SelfAuthoredB8GuiFixture,
+                    effect: B8DebugReturnToContinuationObjcHelperEffect::SetDelegate,
+                    selector_name: request.selector_name().map(str::to_owned),
+                    argument_value: request.argument_value(),
+                    host_object_boundary:
+                        B8DebugReturnToContinuationObjcHelperSetDelegateHostObjectBoundaryReport::from_request(
+                            request,
+                        ),
+                    output: Some(output),
+                    next_source_pc: request.return_to,
+                    next_continuation: None,
+                    error: None,
+                    next_blocker:
+                        B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcHelperVoidReturnContinuationUnimplemented,
+                    next_action:
+                        B8DebugReturnToContinuationDecodeNextAction::ModelReturnToContinuationObjcHelperVoidReturn,
                 }
             }
             Err(error) => Self::failed(request, error),
@@ -4521,9 +4634,13 @@ impl B8DebugReturnToContinuationObjcHelperHostExecutionReport {
             status,
             api_boundary: B8DebugObjcRuntimeHelperHostApiBoundary::PublicObjcRuntimeAppKit,
             fixture_scope: B8DebugObjcRuntimeHelperFixtureScope::SelfAuthoredB8GuiFixture,
-            effect: B8DebugReturnToContinuationObjcHelperEffect::SetActivationPolicy,
+            effect: B8DebugReturnToContinuationObjcHelperEffect::from_request(request),
             selector_name: request.selector_name().map(str::to_owned),
             argument_value: request.argument_value(),
+            host_object_boundary:
+                B8DebugReturnToContinuationObjcHelperSetDelegateHostObjectBoundaryReport::from_request(
+                    request,
+                ),
             output: None,
             next_source_pc: request.return_to,
             next_continuation: None,
@@ -4554,7 +4671,60 @@ impl B8DebugReturnToContinuationObjcHelperHostExecutionReport {
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct B8DebugReturnToContinuationObjcHelperHostObservation {
-    return_value: u64,
+    #[serde(default)]
+    return_value: Option<u64>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationObjcHelperSetDelegateHostObjectBoundaryReport {
+    schema: &'static str,
+    status: B8DebugImportBoundaryStatus,
+    selector_name: &'static str,
+    argument_register: B8DebugRegisterName,
+    argument_value: Option<u64>,
+    source: B8DebugReturnToContinuationObjcHelperSetDelegateHostObjectSource,
+    process_model: B8DebugReturnToContinuationObjcHelperSetDelegateHostObjectProcessModel,
+    raw_argument_pointer_reuse: B8DebugReturnToContinuationObjcHelperSetDelegateRawPointerReuse,
+    substitute_class_name: &'static str,
+}
+
+impl B8DebugReturnToContinuationObjcHelperSetDelegateHostObjectBoundaryReport {
+    fn from_request(request: &B8DebugReturnToContinuationObjcHelperRequestReport) -> Option<Self> {
+        (request.selector_name() == Some(B8_GUI_HELLO_WORLD_SET_DELEGATE_SELECTOR_NAME)).then(
+            || Self {
+                schema: "b8_return_to_continuation_set_delegate_host_object_boundary_v0",
+                status: B8DebugImportBoundaryStatus::Executed,
+                selector_name: B8_GUI_HELLO_WORLD_SET_DELEGATE_SELECTOR_NAME,
+                argument_register: request.argument.register,
+                argument_value: request.argument_value(),
+                source:
+                    B8DebugReturnToContinuationObjcHelperSetDelegateHostObjectSource::ObjcAllocInitFixtureDelegateHostSubstitute,
+                process_model:
+                    B8DebugReturnToContinuationObjcHelperSetDelegateHostObjectProcessModel::SameHelperProcessFixtureSubstitute,
+                raw_argument_pointer_reuse:
+                    B8DebugReturnToContinuationObjcHelperSetDelegateRawPointerReuse::NotReusedAcrossHelperProcesses,
+                substitute_class_name: B8_GUI_HELLO_WORLD_DELEGATE_CLASS_NAME,
+            },
+        )
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationObjcHelperSetDelegateHostObjectSource {
+    ObjcAllocInitFixtureDelegateHostSubstitute,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationObjcHelperSetDelegateHostObjectProcessModel {
+    SameHelperProcessFixtureSubstitute,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationObjcHelperSetDelegateRawPointerReuse {
+    NotReusedAcrossHelperProcesses,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -4562,18 +4732,36 @@ struct B8DebugReturnToContinuationObjcHelperHostOutputReport {
     helper_output: B8DebugObjcRuntimeHelperOutput,
     representation: B8DebugReturnToContinuationObjcHelperOutputRepresentation,
     effect: B8DebugReturnToContinuationObjcHelperEffect,
-    return_value: u64,
+    return_value: Option<u64>,
 }
 
 impl B8DebugReturnToContinuationObjcHelperHostOutputReport {
-    const fn from_observation(
+    fn from_set_activation_policy_observation(
         observation: B8DebugReturnToContinuationObjcHelperHostObservation,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, B8DebugObjcRuntimeHelperHostExecutionErrorReport> {
+        let return_value = observation.return_value.ok_or_else(|| {
+            B8DebugObjcRuntimeHelperHostExecutionErrorReport::message(
+                B8DebugObjcRuntimeHelperErrorClassification::InvalidHelperOutput,
+                "Objective-C setActivationPolicy helper emitted no return value",
+            )
+        })?;
+        Ok(Self {
             helper_output: B8DebugObjcRuntimeHelperOutput::ObjcHelperReturnValue,
             representation: B8DebugReturnToContinuationObjcHelperOutputRepresentation::BoolAsU64,
             effect: B8DebugReturnToContinuationObjcHelperEffect::SetActivationPolicy,
-            return_value: observation.return_value,
+            return_value: Some(return_value),
+        })
+    }
+
+    const fn from_set_delegate_observation(
+        _observation: B8DebugReturnToContinuationObjcHelperHostObservation,
+    ) -> Self {
+        Self {
+            helper_output: B8DebugObjcRuntimeHelperOutput::ObjcHelperVoidReturn,
+            representation:
+                B8DebugReturnToContinuationObjcHelperOutputRepresentation::VoidNoReturnValue,
+            effect: B8DebugReturnToContinuationObjcHelperEffect::SetDelegate,
+            return_value: None,
         }
     }
 }
@@ -4583,6 +4771,7 @@ impl B8DebugReturnToContinuationObjcHelperHostOutputReport {
 enum B8DebugReturnToContinuationObjcHelperOutputRepresentation {
     #[serde(rename = "bool_as_u64")]
     BoolAsU64,
+    VoidNoReturnValue,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -4709,13 +4898,23 @@ impl B8DebugReturnToContinuationObjcHelperOutputContractReport {
             B8DebugImportBoundaryStatus::Blocked
         };
         let return_value_handling = if host_execution.is_executed() {
-            B8DebugReturnToContinuationObjcHelperReturnValueHandling::CapturedAsX8664RaxReturnValue
+            match host_execution.effect {
+                B8DebugReturnToContinuationObjcHelperEffect::SetActivationPolicy => {
+                    B8DebugReturnToContinuationObjcHelperReturnValueHandling::CapturedAsX8664RaxReturnValue
+                }
+                B8DebugReturnToContinuationObjcHelperEffect::SetDelegate => {
+                    B8DebugReturnToContinuationObjcHelperReturnValueHandling::NoX8664ReturnValueObserved
+                }
+                B8DebugReturnToContinuationObjcHelperEffect::Unknown => {
+                    B8DebugReturnToContinuationObjcHelperReturnValueHandling::DeferredUntilHelperExecution
+                }
+            }
         } else {
             B8DebugReturnToContinuationObjcHelperReturnValueHandling::DeferredUntilHelperExecution
         };
         Self {
             status,
-            effect: B8DebugReturnToContinuationObjcHelperEffect::SetActivationPolicy,
+            effect: host_execution.effect,
             return_value_handling,
             blocker: if host_execution.is_executed() {
                 None
@@ -4730,6 +4929,18 @@ impl B8DebugReturnToContinuationObjcHelperOutputContractReport {
 #[serde(rename_all = "snake_case")]
 enum B8DebugReturnToContinuationObjcHelperEffect {
     SetActivationPolicy,
+    SetDelegate,
+    Unknown,
+}
+
+impl B8DebugReturnToContinuationObjcHelperEffect {
+    fn from_request(request: &B8DebugReturnToContinuationObjcHelperRequestReport) -> Self {
+        match request.selector_name() {
+            Some("setActivationPolicy:") => Self::SetActivationPolicy,
+            Some(B8_GUI_HELLO_WORLD_SET_DELEGATE_SELECTOR_NAME) => Self::SetDelegate,
+            _ => Self::Unknown,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -4738,6 +4949,8 @@ enum B8DebugReturnToContinuationObjcHelperReturnValueHandling {
     #[serde(rename = "captured_as_x86_64_rax_return_value")]
     CapturedAsX8664RaxReturnValue,
     DeferredUntilHelperExecution,
+    #[serde(rename = "no_x86_64_return_value_observed")]
+    NoX8664ReturnValueObserved,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -5367,6 +5580,21 @@ fn run_public_objc_msg_send_set_activation_policy_helper() -> Result<
     })
 }
 
+fn run_public_objc_msg_send_set_delegate_helper() -> Result<
+    B8DebugReturnToContinuationObjcHelperHostObservation,
+    B8DebugObjcRuntimeHelperHostExecutionErrorReport,
+> {
+    let stdout = run_public_objc_runtime_helper_source(B8_OBJC_RUNTIME_SET_DELEGATE_HELPER_SOURCE)?;
+    serde_json::from_str(&stdout).map_err(|error| {
+        B8DebugObjcRuntimeHelperHostExecutionErrorReport::message(
+            B8DebugObjcRuntimeHelperErrorClassification::InvalidHelperOutput,
+            format!(
+                "Objective-C setDelegate helper emitted invalid JSON: {error}; stdout={stdout:?}"
+            ),
+        )
+    })
+}
+
 fn run_public_objc_alloc_init_fixture_delegate_helper(
 ) -> Result<B8DebugObjcRuntimeHelperHostObservation, B8DebugObjcRuntimeHelperHostExecutionErrorReport>
 {
@@ -5537,6 +5765,46 @@ int main(void) {
 }
 "#;
 
+const B8_OBJC_RUNTIME_SET_DELEGATE_HELPER_SOURCE: &str = r#"
+#import <AppKit/AppKit.h>
+#import <objc/message.h>
+#import <objc/runtime.h>
+#include <stdint.h>
+#include <stdio.h>
+
+@interface BaraGuiHelloWorldDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate>
+@end
+
+@implementation BaraGuiHelloWorldDelegate
+@end
+
+int main(void) {
+    @autoreleasepool {
+        Class application_class = NSClassFromString(@"NSApplication");
+        SEL shared_application = sel_registerName("sharedApplication");
+        SEL set_delegate = sel_registerName("setDelegate:");
+        SEL delegate_selector = sel_registerName("delegate");
+        id (*send_id)(id, SEL) = (id (*)(id, SEL))objc_msgSend;
+        void (*send_void_id)(id, SEL, id) = (void (*)(id, SEL, id))objc_msgSend;
+        id app = send_id((id)application_class, shared_application);
+        if ((uintptr_t)app == 0) {
+            return 2;
+        }
+        id delegate = [[BaraGuiHelloWorldDelegate alloc] init];
+        if ((uintptr_t)delegate == 0) {
+            return 3;
+        }
+        send_void_id(app, set_delegate, delegate);
+        id observed_delegate = send_id(app, delegate_selector);
+        if (observed_delegate != delegate) {
+            return 4;
+        }
+        printf("{\"schema\":\"b8_return_to_continuation_objc_helper_set_delegate_host_observation_v0\",\"return_value\":null}\n");
+    }
+    return 0;
+}
+"#;
+
 const B8_OBJC_ALLOC_INIT_FIXTURE_DELEGATE_HELPER_SOURCE: &str = r#"
 #import <AppKit/AppKit.h>
 #include <stdint.h>
@@ -5680,6 +5948,7 @@ impl B8DebugObjcRuntimeHelperBridgeErrorContractReport {
 #[serde(rename_all = "snake_case")]
 enum B8DebugObjcRuntimeHelperOutput {
     ObjcHelperReturnValue,
+    ObjcHelperVoidReturn,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -5909,6 +6178,7 @@ enum B8DebugHelperBoundaryBlockedReason {
     ReturnToContinuationObjcAllocInitClassIdentityUnresolved,
     ReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionUnimplemented,
     ReturnToContinuationObjcHelperExecutionUnimplemented,
+    ReturnToContinuationObjcHelperVoidReturnContinuationUnimplemented,
     ReturnToContinuationUnsupportedInstruction,
 }
 
@@ -5958,6 +6228,9 @@ impl B8DebugHelperBoundaryBlockedReason {
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcHelperExecutionUnimplemented => {
                 Self::ReturnToContinuationObjcHelperExecutionUnimplemented
             }
+            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcHelperVoidReturnContinuationUnimplemented => {
+                Self::ReturnToContinuationObjcHelperVoidReturnContinuationUnimplemented
+            }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationUnsupportedInstruction => {
                 Self::ReturnToContinuationUnsupportedInstruction
             }
@@ -5995,6 +6268,7 @@ enum B8DebugHelperBoundaryBlocker {
     ReturnToContinuationObjcAllocInitClassIdentityUnresolved,
     ReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionUnimplemented,
     ReturnToContinuationObjcHelperExecutionUnimplemented,
+    ReturnToContinuationObjcHelperVoidReturnContinuationUnimplemented,
     ReturnToContinuationUnsupportedInstruction,
 }
 
@@ -6049,6 +6323,9 @@ impl B8DebugHelperBoundaryBlocker {
             }
             B8DebugHelperBoundaryBlockedReason::ReturnToContinuationObjcHelperExecutionUnimplemented => {
                 vec![Self::ReturnToContinuationObjcHelperExecutionUnimplemented]
+            }
+            B8DebugHelperBoundaryBlockedReason::ReturnToContinuationObjcHelperVoidReturnContinuationUnimplemented => {
+                vec![Self::ReturnToContinuationObjcHelperVoidReturnContinuationUnimplemented]
             }
             B8DebugHelperBoundaryBlockedReason::ReturnToContinuationUnsupportedInstruction => {
                 vec![Self::ReturnToContinuationUnsupportedInstruction]
@@ -6110,6 +6387,9 @@ impl B8DebugHelperBoundaryBlocker {
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcHelperExecutionUnimplemented => {
                 Self::ReturnToContinuationObjcHelperExecutionUnimplemented
+            }
+            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcHelperVoidReturnContinuationUnimplemented => {
+                Self::ReturnToContinuationObjcHelperVoidReturnContinuationUnimplemented
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationUnsupportedInstruction => {
                 Self::ReturnToContinuationUnsupportedInstruction

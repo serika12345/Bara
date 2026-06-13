@@ -2472,8 +2472,9 @@ mod tests {
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"helper_boundary_request\"")
         );
-        assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"reason\":\"return_to_continuation_objc_helper_execution_unimplemented\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"reason\":\"return_to_continuation_objc_helper_void_return_continuation_unimplemented\""
+        ));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"kind\":\"import_helper_call\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
@@ -2583,7 +2584,7 @@ mod tests {
             .contains("\"next_source_pc\":4294972999"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register_state\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"blocker\":\"return_to_continuation_objc_helper_execution_unimplemented\""
+            "\"blocker\":\"return_to_continuation_objc_helper_void_return_continuation_unimplemented\""
         ));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"continuation_block\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
@@ -2815,21 +2816,46 @@ mod tests {
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"name\":\"setDelegate:\"")
         );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"receiver\":\"ns_app_shared_application_value\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"effect\":\"set_delegate\"")
+        );
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"blocker\":\"return_to_continuation_objc_helper_execution_unimplemented\""
+            "\"schema\":\"b8_return_to_continuation_set_delegate_host_object_boundary_v0\""
+        ));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"objc_alloc_init_fixture_delegate_host_substitute\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"process_model\":\"same_helper_process_fixture_substitute\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"raw_argument_pointer_reuse\":\"not_reused_across_helper_processes\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"substitute_class_name\":\"BaraGuiHelloWorldDelegate\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"helper_output\":\"objc_helper_void_return\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"representation\":\"void_no_return_value\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"return_value\":null"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"return_value_handling\":\"no_x86_64_return_value_observed\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_source_pc\":4294973049"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"blocker\":\"return_to_continuation_objc_helper_void_return_continuation_unimplemented\""
         ));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"unsupported_instruction\":null"));
         assert!(!read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"return_to_continuation_unsupported_instruction\""));
-        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"next_action\":\"implement_return_to_continuation_objc_helper_execution\""
-        ));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_action\":\"model_return_to_continuation_objc_helper_void_return\""));
         assert!(!read_file(&bundle_dir.join("loader.plan.json")).contains(
             "\"return_to_continuation_call_rel32_return_value_materialization_unimplemented\""
         ));
-        assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"return_to_continuation_objc_helper_execution_unimplemented\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"return_to_continuation_objc_helper_void_return_continuation_unimplemented\""
+        ));
         assert!(!read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"return_to_continuation_import_global_load_unimplemented\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"error\":null"));
@@ -2891,8 +2917,9 @@ mod tests {
         assert!(launch_report.contains("\"processed_source_pc_range\":{\"start\":"));
         assert!(launch_report.contains("\"b8_g1_host_trap_path\":\"not_used\""));
         assert!(launch_report.contains("\"helper_boundary_request\""));
-        assert!(launch_report
-            .contains("\"reason\":\"return_to_continuation_objc_helper_execution_unimplemented\""));
+        assert!(launch_report.contains(
+            "\"reason\":\"return_to_continuation_objc_helper_void_return_continuation_unimplemented\""
+        ));
         assert!(launch_report.contains("\"symbol_name\":\"_objc_msgSend\""));
         assert!(launch_report.contains("\"call_site\":4294972996"));
         assert!(launch_report.contains("\"return_to\":4294972999"));
@@ -2951,7 +2978,7 @@ mod tests {
         assert!(launch_report.contains("\"next_source_pc\":4294972999"));
         assert!(launch_report.contains("\"register_state\""));
         assert!(launch_report.contains(
-            "\"blocker\":\"return_to_continuation_objc_helper_execution_unimplemented\""
+            "\"blocker\":\"return_to_continuation_objc_helper_void_return_continuation_unimplemented\""
         ));
         assert!(launch_report.contains("\"continuation_block\""));
         assert!(
@@ -3106,19 +3133,39 @@ mod tests {
         assert!(launch_report.contains("\"target\":4294973108"));
         assert!(launch_report.contains("\"return_register\":\"rax\""));
         assert!(launch_report.contains("\"name\":\"setDelegate:\""));
+        assert!(launch_report.contains("\"receiver\":\"ns_app_shared_application_value\""));
+        assert!(launch_report.contains("\"effect\":\"set_delegate\""));
         assert!(launch_report.contains(
-            "\"blocker\":\"return_to_continuation_objc_helper_execution_unimplemented\""
+            "\"schema\":\"b8_return_to_continuation_set_delegate_host_object_boundary_v0\""
+        ));
+        assert!(launch_report
+            .contains("\"source\":\"objc_alloc_init_fixture_delegate_host_substitute\""));
+        assert!(
+            launch_report.contains("\"process_model\":\"same_helper_process_fixture_substitute\"")
+        );
+        assert!(launch_report
+            .contains("\"raw_argument_pointer_reuse\":\"not_reused_across_helper_processes\""));
+        assert!(launch_report.contains("\"substitute_class_name\":\"BaraGuiHelloWorldDelegate\""));
+        assert!(launch_report.contains("\"helper_output\":\"objc_helper_void_return\""));
+        assert!(launch_report.contains("\"representation\":\"void_no_return_value\""));
+        assert!(launch_report.contains("\"return_value\":null"));
+        assert!(
+            launch_report.contains("\"return_value_handling\":\"no_x86_64_return_value_observed\"")
+        );
+        assert!(launch_report.contains("\"next_source_pc\":4294973049"));
+        assert!(launch_report.contains(
+            "\"blocker\":\"return_to_continuation_objc_helper_void_return_continuation_unimplemented\""
         ));
         assert!(launch_report.contains("\"unsupported_instruction\":null"));
         assert!(!launch_report.contains("\"return_to_continuation_unsupported_instruction\""));
-        assert!(launch_report.contains(
-            "\"next_action\":\"implement_return_to_continuation_objc_helper_execution\""
-        ));
+        assert!(launch_report
+            .contains("\"next_action\":\"model_return_to_continuation_objc_helper_void_return\""));
         assert!(!launch_report.contains(
             "\"return_to_continuation_call_rel32_return_value_materialization_unimplemented\""
         ));
-        assert!(launch_report
-            .contains("\"return_to_continuation_objc_helper_execution_unimplemented\""));
+        assert!(launch_report.contains(
+            "\"return_to_continuation_objc_helper_void_return_continuation_unimplemented\""
+        ));
         assert!(
             !launch_report.contains("\"return_to_continuation_import_global_load_unimplemented\"")
         );

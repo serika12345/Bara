@@ -1754,17 +1754,17 @@ branch: `task/b8-hello-world-gui-complete`
 
 完了条件:
 
-- [ ] B8-G6r の `return_to_continuation_objc_helper_execution_unimplemented` を受けて、
+- [x] B8-G6r の `return_to_continuation_objc_helper_execution_unimplemented` を受けて、
   selector `setDelegate:` の helper request / bridge contract / host execution report を
   `setActivationPolicy:` 専用 contract から分離する。
-- [ ] `_objc_alloc_init` fixture delegate substitute の `host_pointer_u64` を raw
+- [x] `_objc_alloc_init` fixture delegate substitute の `host_pointer_u64` を raw
   cross-process pointer として扱わず、fixture-scoped host object / session / handle
   boundary または same-helper-process substitute の実行条件として stable report する。
-- [ ] public Objective-C / AppKit API helper で
+- [x] public Objective-C / AppKit API helper で
   `NSApp setDelegate:<BaraGuiHelloWorldDelegate instance>` を実行できる場合は execution
   result を保存し、実行できない場合は host object / session continuity blocker として
   stable に分類する。
-- [ ] 次 blocker を `setDelegate:` return continuation (`return_to=4294973049`) または
+- [x] 次 blocker を `setDelegate:` return continuation (`return_to=4294973049`) または
   host object / session continuity の次 action へ進める。
 
 PR に含めない:
@@ -1773,6 +1773,41 @@ PR に含めない:
 - raw Objective-C object pointer の process 間再利用。
 - delegate callback into translated code。
 - AppKit run loop / window lifecycle の一般化。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6s は完了し、次の gate は B8-G6t。
+
+#### PR Gate: B8-G6t Return-To Continuation setDelegate Void Return Continuation Decode
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [ ] B8-G6s の
+  `return_to_continuation_objc_helper_void_return_continuation_unimplemented` を受けて、
+  `setDelegate:` の void return では x86_64 `rax` value を要求しない continuation
+  input model を追加する。
+- [ ] `return_to=4294973049` から public Mach-O code segment bytes を decode し、
+  `mov rdi, qword ptr [r15]` / `mov rsi, qword ptr [rip+disp32]` / `call r14` を
+  stable report に保存する。
+- [ ] preserved `r15` `_NSApp` import global と preserved `_objc_msgSend` target を使って、
+  receiver `NSApp` と selector `run` を available state として materialize する。
+- [ ] 次 blocker を `NSApp run` helper execution boundary または focused unsupported
+  instruction / lifecycle boundary へ進める。
+
+PR に含めない:
+
+- AppKit run loop の一般実行。
+- window lifecycle / delegate callback into translated code。
+- arbitrary void-return Objective-C message continuation。
 - translation cache、fallback JIT/interpreter。
 
 検証:
