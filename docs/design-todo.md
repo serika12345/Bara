@@ -408,6 +408,17 @@
   `return_to_continuation_execution_unimplemented` を次 blocker として report する。
   これは `return_to` block の実行、arbitrary indirect call target execution、
   translation cache、fallback JIT/interpreter を追加するものではない。
+- 2026-06-13 の B8-G6e として、G6d の
+  `return_to_continuation_execution_unimplemented` を
+  `b8_return_to_continuation_decode_boundary_v0` として stable report に分離した。
+  boundary は `next_source_pc=4294972999` を `return_to_source_pc` として扱い、
+  public Mach-O code segment bytes から continuation block 用の `X86Bytes` を作って
+  既存 decoder に渡す。input には G6d が保存した x86_64 `rax` register state を保持し、
+  `processed_source_pc_range`、`next_instruction`、`unsupported_instruction` を report する。
+  現 fixture の次 blocker は `return_to_continuation_unsupported_instruction` であり、
+  先頭 instruction は `4c 8b 3d ...` の unsupported REX/MOV である。これは
+  `return_to` block の実行、arbitrary indirect call target execution、translation cache、
+  fallback JIT/interpreter を追加するものではない。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、

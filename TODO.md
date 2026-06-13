@@ -1275,17 +1275,49 @@ branch: `task/b8-g6e-return-to-continuation-decode`
 
 完了条件:
 
-- [ ] B8-G6d の `return_to_continuation_execution_unimplemented` を受けて、
+- [x] B8-G6d の `return_to_continuation_execution_unimplemented` を受けて、
   continuation boundary の `next_source_pc` から読むべき x86_64 continuation block を
   stable report にする。
-- [ ] continuation input は G6d が保存した x86_64 `rax` register state を保持し、
+- [x] continuation input は G6d が保存した x86_64 `rax` register state を保持し、
   次の decoded instruction / boundary / blocker と関連付ける。
-- [ ] `return_to` 以降の一般実行、arbitrary indirect call target execution、
+- [x] `return_to` 以降の一般実行、arbitrary indirect call target execution、
   translation cache、fallback JIT/interpreter は行わない。
 
 PR に含めない:
 
 - `return_to` 以降の命令の一般実行。
+- arbitrary indirect call target execution、translation cache、fallback JIT/interpreter。
+- Objective-C runtime / AppKit lifecycle 全体の一般化。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止する。次の gate は continuation block
+  の next blocker を見て focused ISA / process-state / AppKit lifecycle slice として
+  更新する。
+
+#### PR Gate: B8-G6f Return-To Continuation R15 RIP-Relative Load Slice
+
+branch: `task/b8-g6f-continuation-r15-rip-relative-load`
+
+完了条件:
+
+- [ ] B8-G6e の `return_to_continuation_unsupported_instruction` を受けて、
+  `return_to` continuation block 先頭の `4c 8b 3d ...` を x86_64
+  `mov r15, qword ptr [rip+disp32]` として decode / lift / emit または stable boundary
+  に進める。
+- [ ] continuation input の x86_64 `rax` register state を保持したまま、次の decoded
+  instruction / boundary / blocker を stable report に保存する。
+- [ ] `return_to` 以降の一般実行、arbitrary indirect call target execution、
+  translation cache、fallback JIT/interpreter は行わない。
+
+PR に含めない:
+
+- `return_to` 以降の一般実行。
 - arbitrary indirect call target execution、translation cache、fallback JIT/interpreter。
 - Objective-C runtime / AppKit lifecycle 全体の一般化。
 

@@ -10,7 +10,7 @@ use bara_arm64::{emit_program, EmitError};
 use bara_ir::{Program, ProgramImageMetadata, Terminator, UnsupportedReason, X86Va};
 use bara_isa_x86::{
     decode_function, lift_decoded_function_with_image_metadata, DecodeError, DecodedFunction,
-    DecodedInstructionKind, LiftError,
+    DecodedInstructionKind, LiftError, X86Bytes,
 };
 use bara_oracle::{
     binary_format_probe_report_to_json, decode_mach_o_chained_fixups_for_target,
@@ -991,6 +991,7 @@ impl B8DebugLoaderPlanReport {
                 input,
                 input_probe,
                 decode_report,
+                code,
                 entry_input.program_image_metadata(),
             ),
             entry_source_for_this_bundle: B8DebugEntrySource::PublicLcMainEntryoff,
@@ -1064,6 +1065,7 @@ impl B8DebugImportBoundaryReport {
         input: &BinaryInput,
         input_probe: &BinaryFormatProbeReport,
         decode_report: &B8DebugDecodeReport,
+        code_bytes: &X86Bytes,
         image_metadata: &ProgramImageMetadata,
     ) -> Self {
         let public_metadata = B8DebugPublicImportMetadataReport::from_probe(input_probe);
@@ -1095,6 +1097,7 @@ impl B8DebugImportBoundaryReport {
                             input,
                             input_probe,
                             decode_report,
+                            code_bytes,
                             image_metadata,
                         ),
                     )
@@ -1335,6 +1338,7 @@ impl B8DebugHelperBoundaryRequestReport {
         input: &BinaryInput,
         input_probe: &BinaryFormatProbeReport,
         decode_report: &B8DebugDecodeReport,
+        code_bytes: &X86Bytes,
         image_metadata: &ProgramImageMetadata,
     ) -> Self {
         let request = B8DebugImportHelperRequestReport::from_boundary_and_import(
@@ -1343,6 +1347,7 @@ impl B8DebugHelperBoundaryRequestReport {
             input,
             input_probe,
             decode_report,
+            code_bytes,
             image_metadata,
         );
         let reason = request.boundary_blocked_reason();
@@ -1385,6 +1390,7 @@ impl B8DebugImportHelperRequestReport {
         input: &BinaryInput,
         input_probe: &BinaryFormatProbeReport,
         decode_report: &B8DebugDecodeReport,
+        code_bytes: &X86Bytes,
         image_metadata: &ProgramImageMetadata,
     ) -> Self {
         let required_marshaling = B8DebugHelperMarshalingReport::blocked(
@@ -1399,6 +1405,7 @@ impl B8DebugImportHelperRequestReport {
                 call_boundary,
                 &import,
                 &required_marshaling,
+                code_bytes,
                 image_metadata,
             );
         Self {
@@ -2096,6 +2103,7 @@ impl B8DebugObjcHelperExecutionRequestReport {
         call_boundary: B8DebugRegisterIndirectCallBoundaryReport,
         import: &MachOChainedImportIdentityReport,
         marshaling: &B8DebugHelperMarshalingReport,
+        code_bytes: &X86Bytes,
         image_metadata: &ProgramImageMetadata,
     ) -> Option<Self> {
         let contract = marshaling.contract.as_ref()?;
@@ -2133,6 +2141,7 @@ impl B8DebugObjcHelperExecutionRequestReport {
             B8DebugObjcHelperReturnContinuationBoundaryReport::from_host_execution(
                 call_boundary,
                 &host_execution,
+                code_bytes,
             );
         if let Some(return_continuation) = &return_continuation {
             blockers.extend(return_continuation.blockers());
@@ -2155,6 +2164,12 @@ impl B8DebugObjcHelperExecutionRequestReport {
             .any(|blocker| blocker.requires_materialization_inspection())
         {
             B8DebugObjcHelperExecutionNextAction::InspectObjcMessageMaterializationBoundary
+        } else if return_continuation
+            .as_ref()
+            .and_then(|continuation| continuation.continuation_block.as_ref())
+            .is_some()
+        {
+            B8DebugObjcHelperExecutionNextAction::InspectReturnToContinuationBlocker
         } else if host_execution.is_executed() {
             B8DebugObjcHelperExecutionNextAction::DecodeReturnToContinuationBlock
         } else if host_execution.is_skipped() {
@@ -2215,7 +2230,9 @@ enum B8DebugObjcHelperExecutionBlocker {
     ObjcRuntimeHelperHostExecutionFailed,
     ObjcRuntimeHelperHostExecutionUnsupported,
     ReceiverIdentityUnavailable,
+    ReturnToContinuationDecodeFailed,
     ReturnToContinuationExecutionUnimplemented,
+    ReturnToContinuationUnsupportedInstruction,
     SelectorVmAddressUnavailable,
 }
 
@@ -2232,6 +2249,7 @@ impl B8DebugObjcHelperExecutionBlocker {
 #[serde(rename_all = "snake_case")]
 enum B8DebugObjcHelperExecutionNextAction {
     DecodeReturnToContinuationBlock,
+    InspectReturnToContinuationBlocker,
     InspectObjcMessageMaterializationBoundary,
     InspectObjcRuntimeHelperExecutionFailure,
     RunOnSupportedMacosHost,
@@ -2245,6 +2263,7 @@ struct B8DebugObjcHelperReturnContinuationBoundaryReport {
     input: B8DebugObjcHelperReturnContinuationInputReport,
     register_state: B8DebugObjcHelperReturnContinuationRegisterStateReport,
     next_source_pc: u64,
+    continuation_block: Option<B8DebugReturnToContinuationDecodeBoundaryReport>,
     blocker: B8DebugObjcHelperExecutionBlocker,
     next_action: B8DebugObjcHelperReturnContinuationNextAction,
 }
@@ -2253,9 +2272,26 @@ impl B8DebugObjcHelperReturnContinuationBoundaryReport {
     fn from_host_execution(
         call_boundary: B8DebugRegisterIndirectCallBoundaryReport,
         host_execution: &B8DebugObjcRuntimeHelperHostExecutionReport,
+        code_bytes: &X86Bytes,
     ) -> Option<Self> {
         let output = host_execution.output?;
         let return_writeback = host_execution.return_writeback?;
+        let register_state = B8DebugObjcHelperReturnContinuationRegisterStateReport::from_writeback(
+            return_writeback,
+        );
+        let continuation_block = B8DebugReturnToContinuationDecodeBoundaryReport::from_code_bytes(
+            call_boundary.return_to,
+            register_state,
+            code_bytes,
+        );
+        let blocker = continuation_block.as_ref().map_or(
+            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationExecutionUnimplemented,
+            B8DebugReturnToContinuationDecodeBoundaryReport::blocker,
+        );
+        let next_action = continuation_block.as_ref().map_or(
+            B8DebugObjcHelperReturnContinuationNextAction::DecodeReturnToContinuationBlock,
+            B8DebugReturnToContinuationDecodeBoundaryReport::next_action,
+        );
         Some(Self {
             schema: "b8_objc_helper_return_continuation_boundary_v0",
             status: B8DebugImportBoundaryStatus::Blocked,
@@ -2263,13 +2299,11 @@ impl B8DebugObjcHelperReturnContinuationBoundaryReport {
                 call_boundary,
             ),
             input: B8DebugObjcHelperReturnContinuationInputReport::new(output, return_writeback),
-            register_state: B8DebugObjcHelperReturnContinuationRegisterStateReport::from_writeback(
-                return_writeback,
-            ),
+            register_state,
             next_source_pc: call_boundary.return_to,
-            blocker: B8DebugObjcHelperExecutionBlocker::ReturnToContinuationExecutionUnimplemented,
-            next_action:
-                B8DebugObjcHelperReturnContinuationNextAction::DecodeReturnToContinuationBlock,
+            continuation_block,
+            blocker,
+            next_action,
         })
     }
 
@@ -2357,7 +2391,148 @@ enum B8DebugObjcHelperReturnContinuationRegisterSource {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum B8DebugObjcHelperReturnContinuationNextAction {
+    AddReturnToContinuationInstructionSupport,
     DecodeReturnToContinuationBlock,
+    ImplementReturnToContinuationExecution,
+    InspectReturnToContinuationDecodeFailure,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationDecodeBoundaryReport {
+    schema: &'static str,
+    status: B8DebugImportBoundaryStatus,
+    source: B8DebugReturnToContinuationDecodeSourceReport,
+    input_register_state: B8DebugObjcHelperReturnContinuationRegisterStateReport,
+    decode_report: B8DebugDecodeReport,
+    processed_source_pc_range: Option<B8DebugProcessedPcRange>,
+    next_instruction: Option<B8DebugDecodedInstructionReport>,
+    unsupported_instruction: Option<B8DebugUnsupportedInstructionReport>,
+    blocker: B8DebugObjcHelperExecutionBlocker,
+    next_action: B8DebugReturnToContinuationDecodeNextAction,
+}
+
+impl B8DebugReturnToContinuationDecodeBoundaryReport {
+    fn from_code_bytes(
+        source_pc: u64,
+        input_register_state: B8DebugObjcHelperReturnContinuationRegisterStateReport,
+        code_bytes: &X86Bytes,
+    ) -> Option<Self> {
+        let continuation_bytes = continuation_x86_bytes_from_code_segment(source_pc, code_bytes)?;
+        let decoded_result = decode_function(&continuation_bytes);
+        let decode_report = B8DebugDecodeReport::from_result(decoded_result.as_ref());
+        let (
+            processed_source_pc_range,
+            next_instruction,
+            unsupported_instruction,
+            blocker,
+            next_action,
+        ) = match decoded_result {
+            Ok(decoded) => {
+                let unsupported_instruction =
+                    B8DebugUnsupportedInstructionReport::from_decoded(&decoded);
+                let blocker = if unsupported_instruction.is_some() {
+                    B8DebugObjcHelperExecutionBlocker::ReturnToContinuationUnsupportedInstruction
+                } else {
+                    B8DebugObjcHelperExecutionBlocker::ReturnToContinuationExecutionUnimplemented
+                };
+                let next_action = if unsupported_instruction.is_some() {
+                    B8DebugReturnToContinuationDecodeNextAction::AddReturnToContinuationInstructionSupport
+                } else {
+                    B8DebugReturnToContinuationDecodeNextAction::ImplementReturnToContinuationExecution
+                };
+
+                (
+                    Some(B8DebugProcessedPcRange::from_decoded(&decoded)),
+                    decoded
+                        .instructions()
+                        .first()
+                        .map(B8DebugDecodedInstructionReport::from_instruction),
+                    unsupported_instruction,
+                    blocker,
+                    next_action,
+                )
+            }
+            Err(_) => (
+                None,
+                None,
+                None,
+                B8DebugObjcHelperExecutionBlocker::ReturnToContinuationDecodeFailed,
+                B8DebugReturnToContinuationDecodeNextAction::InspectReturnToContinuationDecodeFailure,
+            ),
+        };
+
+        Some(Self {
+            schema: "b8_return_to_continuation_decode_boundary_v0",
+            status: B8DebugImportBoundaryStatus::Blocked,
+            source: B8DebugReturnToContinuationDecodeSourceReport {
+                kind: B8DebugReturnToContinuationDecodeSourceKind::ReturnToSourcePc,
+                source_pc,
+                byte_source: B8DebugReturnToContinuationByteSource::MachOCodeSegmentBytes,
+            },
+            input_register_state,
+            decode_report,
+            processed_source_pc_range,
+            next_instruction,
+            unsupported_instruction,
+            blocker,
+            next_action,
+        })
+    }
+
+    const fn blocker(&self) -> B8DebugObjcHelperExecutionBlocker {
+        self.blocker
+    }
+
+    const fn next_action(&self) -> B8DebugObjcHelperReturnContinuationNextAction {
+        match self.next_action {
+            B8DebugReturnToContinuationDecodeNextAction::AddReturnToContinuationInstructionSupport => {
+                B8DebugObjcHelperReturnContinuationNextAction::AddReturnToContinuationInstructionSupport
+            }
+            B8DebugReturnToContinuationDecodeNextAction::ImplementReturnToContinuationExecution => {
+                B8DebugObjcHelperReturnContinuationNextAction::ImplementReturnToContinuationExecution
+            }
+            B8DebugReturnToContinuationDecodeNextAction::InspectReturnToContinuationDecodeFailure => {
+                B8DebugObjcHelperReturnContinuationNextAction::InspectReturnToContinuationDecodeFailure
+            }
+        }
+    }
+}
+
+fn continuation_x86_bytes_from_code_segment(
+    source_pc: u64,
+    code_bytes: &X86Bytes,
+) -> Option<X86Bytes> {
+    let offset = source_pc.checked_sub(code_bytes.entry().value())?;
+    let offset = usize::try_from(offset).ok()?;
+    let bytes = code_bytes.bytes().get(offset..)?.to_vec();
+    X86Bytes::new(X86Va::new(source_pc), bytes).ok()
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationDecodeSourceReport {
+    kind: B8DebugReturnToContinuationDecodeSourceKind,
+    source_pc: u64,
+    byte_source: B8DebugReturnToContinuationByteSource,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationDecodeSourceKind {
+    ReturnToSourcePc,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationByteSource {
+    MachOCodeSegmentBytes,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationDecodeNextAction {
+    AddReturnToContinuationInstructionSupport,
+    ImplementReturnToContinuationExecution,
+    InspectReturnToContinuationDecodeFailure,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -3257,7 +3432,9 @@ enum B8DebugHelperBoundaryBlockedReason {
     ObjcHelperReturnContinuationUnimplemented,
     ObjcRuntimeHelperExecutionFailed,
     ObjcRuntimeHelperExecutionUnsupported,
+    ReturnToContinuationDecodeFailed,
     ReturnToContinuationExecutionUnimplemented,
+    ReturnToContinuationUnsupportedInstruction,
 }
 
 impl B8DebugHelperBoundaryBlockedReason {
@@ -3275,6 +3452,12 @@ impl B8DebugHelperBoundaryBlockedReason {
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationExecutionUnimplemented => {
                 Self::ReturnToContinuationExecutionUnimplemented
+            }
+            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationDecodeFailed => {
+                Self::ReturnToContinuationDecodeFailed
+            }
+            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationUnsupportedInstruction => {
+                Self::ReturnToContinuationUnsupportedInstruction
             }
             B8DebugObjcHelperExecutionBlocker::ObjcRuntimeHelperHostExecutionFailed => {
                 Self::ObjcRuntimeHelperExecutionFailed
@@ -3299,7 +3482,9 @@ enum B8DebugHelperBoundaryBlocker {
     ObjcHelperReturnContinuationUnimplemented,
     ObjcRuntimeHelperExecutionFailed,
     ObjcRuntimeHelperExecutionUnsupported,
+    ReturnToContinuationDecodeFailed,
     ReturnToContinuationExecutionUnimplemented,
+    ReturnToContinuationUnsupportedInstruction,
 }
 
 impl B8DebugHelperBoundaryBlocker {
@@ -3323,6 +3508,12 @@ impl B8DebugHelperBoundaryBlocker {
             }
             B8DebugHelperBoundaryBlockedReason::ReturnToContinuationExecutionUnimplemented => {
                 vec![Self::ReturnToContinuationExecutionUnimplemented]
+            }
+            B8DebugHelperBoundaryBlockedReason::ReturnToContinuationDecodeFailed => {
+                vec![Self::ReturnToContinuationDecodeFailed]
+            }
+            B8DebugHelperBoundaryBlockedReason::ReturnToContinuationUnsupportedInstruction => {
+                vec![Self::ReturnToContinuationUnsupportedInstruction]
             }
         }
     }
@@ -3351,6 +3542,12 @@ impl B8DebugHelperBoundaryBlocker {
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationExecutionUnimplemented => {
                 Self::ReturnToContinuationExecutionUnimplemented
+            }
+            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationDecodeFailed => {
+                Self::ReturnToContinuationDecodeFailed
+            }
+            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationUnsupportedInstruction => {
+                Self::ReturnToContinuationUnsupportedInstruction
             }
         }
     }

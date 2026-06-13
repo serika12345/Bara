@@ -2473,7 +2473,7 @@ mod tests {
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"helper_boundary_request\"")
         );
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"reason\":\"return_to_continuation_execution_unimplemented\""));
+            .contains("\"reason\":\"return_to_continuation_unsupported_instruction\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"kind\":\"import_helper_call\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
@@ -2583,9 +2583,35 @@ mod tests {
             .contains("\"next_source_pc\":4294972999"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register_state\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"blocker\":\"return_to_continuation_execution_unimplemented\""));
+            .contains("\"blocker\":\"return_to_continuation_unsupported_instruction\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"continuation_block\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"next_action\":\"decode_return_to_continuation_block\""));
+            .contains("\"schema\":\"b8_return_to_continuation_decode_boundary_v0\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"source_pc\":4294972999")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"byte_source\":\"mach_o_code_segment_bytes\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"input_register_state\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"decode_report\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"entry\":4294972999"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"next_instruction\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_action\":\"inspect_return_to_continuation_blocker\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"start\":4294972999"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"end\":4294973002"));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"kind\":\"unsupported\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"reason\":\"DecodeUnsupportedOpcode { opcode: 76"));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"unsupported_instruction\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_action\":\"add_return_to_continuation_instruction_support\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"error\":null"));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"materialization_boundary\""));
@@ -2646,7 +2672,7 @@ mod tests {
         assert!(launch_report.contains("\"b8_g1_host_trap_path\":\"not_used\""));
         assert!(launch_report.contains("\"helper_boundary_request\""));
         assert!(
-            launch_report.contains("\"reason\":\"return_to_continuation_execution_unimplemented\"")
+            launch_report.contains("\"reason\":\"return_to_continuation_unsupported_instruction\"")
         );
         assert!(launch_report.contains("\"symbol_name\":\"_objc_msgSend\""));
         assert!(launch_report.contains("\"call_site\":4294972996"));
@@ -2706,8 +2732,27 @@ mod tests {
         assert!(launch_report.contains("\"next_source_pc\":4294972999"));
         assert!(launch_report.contains("\"register_state\""));
         assert!(launch_report
-            .contains("\"blocker\":\"return_to_continuation_execution_unimplemented\""));
-        assert!(launch_report.contains("\"next_action\":\"decode_return_to_continuation_block\""));
+            .contains("\"blocker\":\"return_to_continuation_unsupported_instruction\""));
+        assert!(launch_report.contains("\"continuation_block\""));
+        assert!(
+            launch_report.contains("\"schema\":\"b8_return_to_continuation_decode_boundary_v0\"")
+        );
+        assert!(launch_report.contains("\"source_pc\":4294972999"));
+        assert!(launch_report.contains("\"byte_source\":\"mach_o_code_segment_bytes\""));
+        assert!(launch_report.contains("\"input_register_state\""));
+        assert!(launch_report.contains("\"decode_report\""));
+        assert!(launch_report.contains("\"entry\":4294972999"));
+        assert!(launch_report.contains("\"next_instruction\""));
+        assert!(
+            launch_report.contains("\"next_action\":\"inspect_return_to_continuation_blocker\"")
+        );
+        assert!(launch_report.contains("\"start\":4294972999"));
+        assert!(launch_report.contains("\"end\":4294973002"));
+        assert!(launch_report.contains("\"kind\":\"unsupported\""));
+        assert!(launch_report.contains("\"reason\":\"DecodeUnsupportedOpcode { opcode: 76"));
+        assert!(launch_report.contains("\"unsupported_instruction\""));
+        assert!(launch_report
+            .contains("\"next_action\":\"add_return_to_continuation_instruction_support\""));
         assert!(launch_report.contains("\"error\":null"));
         assert!(
             launch_report.contains("\"schema\":\"b8_objc_message_materialization_boundary_v0\"")
