@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 16:14 JST
+最終更新: 2026-06-13 16:31 JST
 
 状態:
 
@@ -139,12 +139,19 @@
   x86_64 `rax` return writeback、後続 `mov rdx, rax` / `setDelegate:` dataflow を
   contract として保存する。next blocker は
   `return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_unimplemented` である。
+  B8-G6r ではこの fixture delegate substitute を public Objective-C / AppKit API helper
+  で実行し、
+  `b8_return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_v0` に
+  `status=executed`、`representation=host_pointer_u64`、x86_64 `rax` writeback、
+  後続 `mov rdx, rax` / `setDelegate:` argument dataflow を保存する。next blocker は
+  `setDelegate:` の
+  `return_to_continuation_objc_helper_execution_unimplemented` に進む。
   arbitrary dynamic library data symbol read、return-to continuation の一般実行、
   arbitrary call-rel32 execution、translation cache、fallback JIT/interpreter はまだ行わない。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8-HWGUI Self-Authored Hello
   World GUI Completion を大目標として、`task/b8-hello-world-gui-complete` 上で
-  blocker-driven slice を継続中。B8-G6q は完了し、次は B8-G6r Return-To Continuation
-  `objc_alloc_init` Fixture Delegate Host Execution。
+  blocker-driven slice を継続中。B8-G6r は完了し、次は B8-G6s Return-To Continuation
+  `setDelegate:` Helper Execution Boundary。
 - active_design_focus: B8-HWGUI Self-Authored Hello World GUI Completion を大目標として
   明文化した。B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から GUI lifecycle helper boundary までを通す。`/advance-large` を
@@ -155,7 +162,7 @@
   dyld の private behavior は使わず、public metadata、public API、自前 fixture、
   Rosetta black-box observable result を根拠にする。
 - active_branch: `task/b8-hello-world-gui-complete`。branch base は `2258806`
-  (`docs: define b8 hello world gui completion target`)。この snapshot は B8-G6q
+  (`docs: define b8 hello world gui completion target`)。この snapshot は B8-G6r
   coherent step で更新されており、B8-HWGUI 完遂まではこの branch で coherent step
   ごとに commit / push する。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
@@ -163,7 +170,7 @@
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
   B8-G5b-G5e / B8-G6a / B8-G6b / B8-G6c / B8-G6d / B8-G6e / B8-G6f /
   B8-G6g / B8-G6h / B8-G6i / B8-G6j / B8-G6k / B8-G6l / B8-G6m /
-  B8-G6n / B8-G6o / B8-G6p / B8-G6q / B8-G6r / B8-HWGUI / B8-OSS0。
+  B8-G6n / B8-G6o / B8-G6p / B8-G6q / B8-G6r / B8-G6s / B8-HWGUI / B8-OSS0。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -351,26 +358,44 @@
   `output_representation=host_pointer_u64`、`return_register=rax`、
   `consumer_register=rdx`、`consumer_selector_name=setDelegate:` を保持する。next blocker は
   `return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_unimplemented` に進む。
+- B8-G6r として self-authored fixture delegate substitute を public Objective-C /
+  AppKit API helper で実行し、
+  `b8_return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_v0` に
+  `status=executed`、`effect=alloc_init_fixture_delegate`、
+  `representation=host_pointer_u64`、`return_writeback.destination=x86_64_rax` を保存した。
+  `_objc_alloc_init` return value は `mov rdx, rax` で `setDelegate:` argument として
+  available になり、`source_call_return` と
+  `b8_return_to_continuation_call_rel32_return_value_dataflow_v0` に producer/consumer dataflow
+  を保持する。next blocker は `setDelegate:` の
+  `return_to_continuation_objc_helper_execution_unimplemented` に進む。
 - B8-HWGUI として、self-authored x86_64 Mach-O GUI Hello World fixture を実 `LC_MAIN`
   entry から GUI 起動完遂まで通す大目標、`/advance-large` 利用時の stop 条件、
   および B8-HWGUI merge 後に開始する B8-OSS0 source-built OSS GUI app automation target を
   TODO / design TODO に追加した。
-- remaining_work: B8-G6r。G6q が残す
-  `return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_unimplemented` を受けて、
-  self-authored fixture delegate substitute を public Objective-C / AppKit API helper で実行し、
-  `_objc_alloc_init` return value を x86_64 `rax` writeback に接続する。x86_64 binary 内の
-  Objective-C object layout / method table / isa pointer 解釈、任意 Objective-C class /
-  instance bridge、delegate callback into translated code、translation cache、fallback
-  JIT/interpreter はまだ行わない。
-- next_action: 次の小 step は B8-G6r Return-To Continuation `objc_alloc_init`
-  Fixture Delegate Host Execution。B8-HWGUI 大目標の途中なので、coherent step ごとに verify /
+- remaining_work: B8-G6s。G6r が残す
+  `return_to_continuation_objc_helper_execution_unimplemented` を受けて、`setDelegate:` の
+  helper request / bridge contract / host execution report を `setActivationPolicy:` 専用
+  contract から分離し、fixture delegate substitute の host object / session continuity
+  boundary を stable にする。raw Objective-C object pointer の process 間再利用、任意
+  Objective-C message send、delegate callback into translated code、translation cache、
+  fallback JIT/interpreter はまだ行わない。
+- next_action: 次の小 step は B8-G6s Return-To Continuation `setDelegate:` Helper
+  Execution Boundary。B8-HWGUI 大目標の途中なので、coherent step ごとに verify /
   commit / push し、Hello World GUI 完遂 review gate で draft PR を開いて停止する。
 - verification:
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`
-  が通過した。B8-G6q 実装後の full `nix develop -c ./scripts/verify` も通過した。
+  が通過した。B8-G6r 実装後の full `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-13 16:31 JST: B8-G6r Return-To Continuation objc_alloc_init Fixture Delegate
+  Host Execution を実装した。public Objective-C / AppKit API helper で self-authored
+  `BaraGuiHelloWorldDelegate` substitute を alloc/init し、host pointer output を x86_64
+  `rax` writeback として保存した。後続 `mov rdx, rax` は
+  `source=register_copy_from_rax`、`source_call_return`、dataflow producer
+  `_objc_alloc_init` として materialize され、`setDelegate:` argument が available になった。
+  next blocker は `return_to_continuation_objc_helper_execution_unimplemented` であり、次は
+  B8-G6s の `setDelegate:` helper execution boundary。
 - 2026-06-13 16:14 JST: B8-G6q Return-To Continuation objc_alloc_init Fixture Delegate
   Bridge Contract を実装した。`BaraGuiHelloWorldDelegate` class identity を contract input
   に接続し、fixture scope、host substitute capability、`host_pointer_u64` output、x86_64

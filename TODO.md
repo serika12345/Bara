@@ -1719,16 +1719,16 @@ branch: `task/b8-hello-world-gui-complete`
 
 完了条件:
 
-- [ ] B8-G6q の
+- [x] B8-G6q の
   `return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_unimplemented` を受けて、
   self-authored fixture delegate substitute を public Objective-C / AppKit API helper で
   実行する。
-- [ ] host execution result を
+- [x] host execution result を
   `b8_return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_v0` として保存し、
   `host_pointer_u64` output を `_objc_alloc_init` return value として扱う。
-- [ ] `_objc_alloc_init` return value を x86_64 `rax` writeback に接続し、後続の
+- [x] `_objc_alloc_init` return value を x86_64 `rax` writeback に接続し、後続の
   `mov rdx, rax` が `setDelegate:` argument として available になることを保存する。
-- [ ] 次 blocker を `setDelegate:` helper execution boundary へ進める。
+- [x] 次 blocker を `setDelegate:` helper execution boundary へ進める。
 
 PR に含めない:
 
@@ -1736,6 +1736,43 @@ PR に含めない:
 - 任意の Objective-C class / instance bridge。
 - 一般的な `_objc_alloc_init` execution engine。
 - delegate callback into translated code。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6r は完了し、次の gate は B8-G6s。
+
+#### PR Gate: B8-G6s Return-To Continuation setDelegate Helper Execution Boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [ ] B8-G6r の `return_to_continuation_objc_helper_execution_unimplemented` を受けて、
+  selector `setDelegate:` の helper request / bridge contract / host execution report を
+  `setActivationPolicy:` 専用 contract から分離する。
+- [ ] `_objc_alloc_init` fixture delegate substitute の `host_pointer_u64` を raw
+  cross-process pointer として扱わず、fixture-scoped host object / session / handle
+  boundary または same-helper-process substitute の実行条件として stable report する。
+- [ ] public Objective-C / AppKit API helper で
+  `NSApp setDelegate:<BaraGuiHelloWorldDelegate instance>` を実行できる場合は execution
+  result を保存し、実行できない場合は host object / session continuity blocker として
+  stable に分類する。
+- [ ] 次 blocker を `setDelegate:` return continuation (`return_to=4294973049`) または
+  host object / session continuity の次 action へ進める。
+
+PR に含めない:
+
+- 任意 Objective-C message send の一般実行。
+- raw Objective-C object pointer の process 間再利用。
+- delegate callback into translated code。
+- AppKit run loop / window lifecycle の一般化。
 - translation cache、fallback JIT/interpreter。
 
 検証:
