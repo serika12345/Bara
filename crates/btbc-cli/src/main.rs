@@ -3000,8 +3000,14 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"stack_slot_source\":\"post_adjustment_stack_top\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"after_previous_epilogue_register_restore\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"pop_r14\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register\":\"r14\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"stack_slot_source\":\"sequential_epilogue_stack_top\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_blocker_after_restore\""));
-        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"start\":4294973077"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"start\":4294973079"));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("DecodeUnsupportedOpcode { opcode: 65"));
         assert!(!read_file(&bundle_dir.join("loader.plan.json"))
@@ -3420,8 +3426,12 @@ mod tests {
         assert!(launch_report.contains("\"pop_rbx\""));
         assert!(launch_report.contains("\"register\":\"rbx\""));
         assert!(launch_report.contains("\"stack_slot_source\":\"post_adjustment_stack_top\""));
+        assert!(launch_report.contains("\"source\":\"after_previous_epilogue_register_restore\""));
+        assert!(launch_report.contains("\"pop_r14\""));
+        assert!(launch_report.contains("\"register\":\"r14\""));
+        assert!(launch_report.contains("\"stack_slot_source\":\"sequential_epilogue_stack_top\""));
         assert!(launch_report.contains("\"next_blocker_after_restore\""));
-        assert!(launch_report.contains("\"start\":4294973077"));
+        assert!(launch_report.contains("\"start\":4294973079"));
         assert!(launch_report.contains("DecodeUnsupportedOpcode { opcode: 65"));
         assert!(!launch_report.contains("DecodeUnsupportedOpcode { opcode: 91"));
         assert!(!launch_report.contains("DecodeUnsupportedOpcode { opcode: 72"));

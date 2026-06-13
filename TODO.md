@@ -2054,15 +2054,48 @@ branch: `task/b8-hello-world-gui-complete`
 
 完了条件:
 
-- [ ] B8-G6aa の `return_to_continuation_unsupported_instruction` を受けて、
+- [x] B8-G6aa の `return_to_continuation_unsupported_instruction` を受けて、
   post-run epilogue の `41 5e` / `pop r14` at `4294973077` を focused に decode /
   report する。
-- [ ] `pop r14` は post-run epilogue の preserved-register restore として stable
+- [x] `pop r14` は post-run epilogue の preserved-register restore として stable
   report し、次 blocker を `pop r15` at `4294973079`、`pop rbp`、`ret`、または
   narrower epilogue blocker へ進める。
-- [ ] B8-G6z/G6aa の `_objc_autoreleasePoolPop` executed boundary、
+- [x] B8-G6z/G6aa の `_objc_autoreleasePoolPop` executed boundary、
   `b8_return_to_continuation_epilogue_stack_adjustment_v0`、
   `b8_return_to_continuation_epilogue_register_restore_v0` regression を維持する。
+
+PR に含めない:
+
+- arbitrary REX-prefixed pop semantics。
+- full callee-saved register restoration。
+- full epilogue completion。
+- general stack frame unwinding。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6ab は完了し、次の gate は B8-G6ac。
+
+#### PR Gate: B8-G6ac Post-run epilogue preserved r15 restore boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [ ] B8-G6ab の `return_to_continuation_unsupported_instruction` を受けて、
+  post-run epilogue の `41 5f` / `pop r15` at `4294973079` を focused に decode /
+  report する。
+- [ ] `pop r15` は post-run epilogue の preserved-register restore として stable
+  report し、次 blocker を `pop rbp` at `4294973081`、`ret`、または narrower
+  epilogue blocker へ進める。
+- [ ] B8-G6z-G6ab の `_objc_autoreleasePoolPop` executed boundary、
+  epilogue stack adjustment report、epilogue register restore report regression を維持する。
 
 PR に含めない:
 
