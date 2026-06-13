@@ -2153,12 +2153,12 @@ branch: `task/b8-hello-world-gui-complete`
 
 完了条件:
 
-- [ ] B8-G6ad の `return_to_continuation_unsupported_instruction` を受けて、
+- [x] B8-G6ad の `return_to_continuation_unsupported_instruction` を受けて、
   post-run epilogue の `c3` / `ret` at `4294973082` を focused に stable report する。
-- [ ] `ret` 後の trailing zero / padding blocker `DecodeUnsupportedOpcode { opcode: 0 }`
+- [x] `ret` 後の trailing zero / padding blocker `DecodeUnsupportedOpcode { opcode: 0 }`
   at `4294973083` は function completion または post-ret padding boundary として
   分離し、Hello World GUI 完遂に必要な次 blocker を stable に分類する。
-- [ ] B8-G6z-G6ad の `_objc_autoreleasePoolPop` executed boundary、epilogue stack
+- [x] B8-G6z-G6ad の `_objc_autoreleasePoolPop` executed boundary、epilogue stack
   adjustment report、epilogue register restore / frame-pointer restore report regression を
   維持する。
 
@@ -2167,6 +2167,39 @@ PR に含めない:
 - general return-to-continuation execution。
 - arbitrary post-ret byte interpretation。
 - whole-function unwinding / stack-frame validation。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6ae は完了し、次の gate は B8-G6af。
+
+#### PR Gate: B8-G6af Self-authored continuation execution completion boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [ ] B8-G6ae の `return_to_continuation_execution_unimplemented` を受けて、
+  self-authored GUI fixture の modeled return-to-continuation execution completion を
+  focused に stable report する。
+- [ ] `b8_return_to_continuation_epilogue_return_completion_v0` と
+  AppKit run loop / autorelease pool / epilogue restore reports を維持したまま、
+  Hello World GUI 完遂に必要な次 blocker が残るか、modeled real-entry launch path が
+  completed と見なせるかを stable に分類する。
+- [ ] B8-HWGUI 大目標の完遂条件に対して、automated expected/actual comparison と
+  manual visible mode に残る差分を reviewable に報告できる。
+
+PR に含めない:
+
+- general return-to-continuation execution。
+- arbitrary Objective-C message send / arbitrary continuation call execution。
+- decoded continuation block の native execution。
 - translation cache、fallback JIT/interpreter。
 
 検証:

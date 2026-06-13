@@ -2523,6 +2523,7 @@ struct B8DebugReturnToContinuationDecodeBoundaryReport {
         Option<B8DebugReturnToContinuationAutoreleasePoolPopBoundaryReport>,
     epilogue_stack_adjustment: Option<B8DebugReturnToContinuationEpilogueStackAdjustmentReport>,
     epilogue_register_restores: Vec<B8DebugReturnToContinuationEpilogueRegisterRestoreReport>,
+    epilogue_return_completion: Option<B8DebugReturnToContinuationEpilogueReturnCompletionReport>,
     continuation_call_boundary: Option<B8DebugReturnToContinuationCallBoundaryReport>,
     decode_report: B8DebugDecodeReport,
     processed_source_pc_range: Option<B8DebugProcessedPcRange>,
@@ -2588,12 +2589,7 @@ impl B8DebugReturnToContinuationEpilogueStackAdjustmentReport {
             return None;
         };
         let next_blocker_after_adjustment = decoded
-            .instructions()
-            .iter()
-            .find(|candidate| {
-                candidate.start() >= instruction.end()
-                    && matches!(candidate.kind(), DecodedInstructionKind::Unsupported { .. })
-            })
+            .next_unsupported_instruction_before_next_return(instruction.end())
             .map(B8DebugUnsupportedInstructionReport::from_instruction);
 
         Some(Self {
@@ -2676,12 +2672,7 @@ impl B8DebugReturnToContinuationEpilogueRegisterRestoreReport {
                 B8DebugReturnToContinuationEpilogueRegisterRestoreRole::PostRunEpiloguePreservedRegisterRestore
             };
             let next_blocker_after_restore = decoded
-                .instructions()
-                .iter()
-                .find(|candidate| {
-                    candidate.start() >= instruction.end()
-                        && matches!(candidate.kind(), DecodedInstructionKind::Unsupported { .. })
-                })
+                .next_unsupported_instruction_before_next_return(instruction.end())
                 .map(B8DebugUnsupportedInstructionReport::from_instruction);
 
             reports.push(Self {
@@ -2738,6 +2729,174 @@ enum B8DebugReturnToContinuationEpilogueRegisterRestoreStackSlotSource {
     SequentialEpilogueStackTop,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationEpilogueReturnCompletionReport {
+    schema: &'static str,
+    status: B8DebugImportBoundaryStatus,
+    role: B8DebugReturnToContinuationEpilogueReturnCompletionRole,
+    source: B8DebugReturnToContinuationEpilogueReturnCompletionSource,
+    instruction: B8DebugDecodedInstructionReport,
+    post_ret_padding_boundary: Option<B8DebugReturnToContinuationPostRetPaddingBoundaryReport>,
+    next_blocker: B8DebugObjcHelperExecutionBlocker,
+    next_action: B8DebugReturnToContinuationDecodeNextAction,
+}
+
+impl B8DebugReturnToContinuationEpilogueReturnCompletionReport {
+    fn from_decoded(
+        decoded: &DecodedFunction,
+        epilogue_register_restores: &[B8DebugReturnToContinuationEpilogueRegisterRestoreReport],
+    ) -> Option<Self> {
+        let last_restore = epilogue_register_restores.last()?;
+        if last_restore.role
+            != B8DebugReturnToContinuationEpilogueRegisterRestoreRole::PostRunEpilogueFramePointerRestore
+        {
+            return None;
+        }
+        let instruction = decoded.instructions().iter().find(|instruction| {
+            instruction.start().value() == last_restore.instruction.end
+                && matches!(instruction.kind(), DecodedInstructionKind::Ret)
+        })?;
+        let post_ret_padding_boundary =
+            B8DebugReturnToContinuationPostRetPaddingBoundaryReport::from_decoded(
+                decoded,
+                instruction,
+            );
+
+        Some(Self {
+            schema: "b8_return_to_continuation_epilogue_return_completion_v0",
+            status: B8DebugImportBoundaryStatus::Executed,
+            role: B8DebugReturnToContinuationEpilogueReturnCompletionRole::PostRunEpilogueReturnTerminator,
+            source: B8DebugReturnToContinuationEpilogueReturnCompletionSource::AfterEpilogueFramePointerRestore,
+            instruction: B8DebugDecodedInstructionReport::from_instruction(instruction),
+            post_ret_padding_boundary,
+            next_blocker:
+                B8DebugObjcHelperExecutionBlocker::ReturnToContinuationExecutionUnimplemented,
+            next_action:
+                B8DebugReturnToContinuationDecodeNextAction::ImplementReturnToContinuationExecution,
+        })
+    }
+
+    fn classifies_unsupported_instruction(
+        &self,
+        unsupported_instruction: Option<&B8DebugUnsupportedInstructionReport>,
+    ) -> bool {
+        let Some(post_ret_padding_boundary) = &self.post_ret_padding_boundary else {
+            return false;
+        };
+        let Some(unsupported_instruction) = unsupported_instruction else {
+            return false;
+        };
+
+        post_ret_padding_boundary.instruction.start == unsupported_instruction.start
+            && post_ret_padding_boundary.instruction.end == unsupported_instruction.end
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationEpilogueReturnCompletionRole {
+    PostRunEpilogueReturnTerminator,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationEpilogueReturnCompletionSource {
+    AfterEpilogueFramePointerRestore,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationPostRetPaddingBoundaryReport {
+    schema: &'static str,
+    status: B8DebugReturnToContinuationPostRetPaddingBoundaryStatus,
+    role: B8DebugReturnToContinuationPostRetPaddingBoundaryRole,
+    instruction: B8DebugUnsupportedInstructionReport,
+    classification: B8DebugReturnToContinuationPostRetPaddingClassification,
+    effect: B8DebugReturnToContinuationPostRetPaddingEffect,
+}
+
+impl B8DebugReturnToContinuationPostRetPaddingBoundaryReport {
+    fn from_decoded(
+        decoded: &DecodedFunction,
+        return_instruction: &bara_isa_x86::DecodedInstruction,
+    ) -> Option<Self> {
+        let instruction = decoded.instructions().iter().find(|candidate| {
+            candidate.start().value() == return_instruction.end().value()
+                && matches!(
+                    candidate.kind(),
+                    DecodedInstructionKind::Unsupported {
+                        reason: UnsupportedReason::DecodeUnsupportedOpcode { opcode: 0, .. }
+                    }
+                )
+        })?;
+
+        Some(Self {
+            schema: "b8_return_to_continuation_post_ret_padding_boundary_v0",
+            status: B8DebugReturnToContinuationPostRetPaddingBoundaryStatus::Classified,
+            role:
+                B8DebugReturnToContinuationPostRetPaddingBoundaryRole::PostRunTrailingZeroPaddingAfterReturn,
+            instruction: B8DebugUnsupportedInstructionReport::from_instruction(instruction),
+            classification:
+                B8DebugReturnToContinuationPostRetPaddingClassification::IgnoredAfterReturnTerminator,
+            effect: B8DebugReturnToContinuationPostRetPaddingEffect::DoesNotExtendFunctionBody,
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationPostRetPaddingBoundaryStatus {
+    Classified,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationPostRetPaddingBoundaryRole {
+    PostRunTrailingZeroPaddingAfterReturn,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationPostRetPaddingClassification {
+    IgnoredAfterReturnTerminator,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationPostRetPaddingEffect {
+    DoesNotExtendFunctionBody,
+}
+
+trait B8DebugDecodedFunctionExt {
+    fn next_unsupported_instruction_before_next_return(
+        &self,
+        start: X86Va,
+    ) -> Option<&bara_isa_x86::DecodedInstruction>;
+}
+
+impl B8DebugDecodedFunctionExt for DecodedFunction {
+    fn next_unsupported_instruction_before_next_return(
+        &self,
+        start: X86Va,
+    ) -> Option<&bara_isa_x86::DecodedInstruction> {
+        let next_return_start = self
+            .instructions()
+            .iter()
+            .find(|candidate| {
+                candidate.start().value() >= start.value()
+                    && matches!(candidate.kind(), DecodedInstructionKind::Ret)
+            })
+            .map(|instruction| instruction.start().value());
+
+        self.instructions().iter().find(|candidate| {
+            candidate.start().value() >= start.value()
+                && next_return_start
+                    .map(|return_start| candidate.start().value() < return_start)
+                    .unwrap_or(true)
+                && matches!(candidate.kind(), DecodedInstructionKind::Unsupported { .. })
+        })
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 struct B8DebugReturnToContinuationHostExecutionContext<'a> {
     code_bytes: &'a X86Bytes,
@@ -2769,12 +2928,13 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
             autorelease_pool_pop_boundary,
             epilogue_stack_adjustment,
             epilogue_register_restores,
+            epilogue_return_completion,
             continuation_call_boundary,
             blocker,
             next_action,
         ) = match decoded_result {
             Ok(decoded) => {
-                let unsupported_instruction =
+                let decoded_unsupported_instruction =
                     B8DebugUnsupportedInstructionReport::from_decoded(&decoded);
                 let (materialized_register_states, blocked_register_materializations) =
                     B8DebugReturnToContinuationMaterializedRegisterStateReport::from_decoded(
@@ -2808,6 +2968,22 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
                         &decoded,
                         epilogue_stack_adjustment.as_ref(),
                     );
+                let epilogue_return_completion =
+                    B8DebugReturnToContinuationEpilogueReturnCompletionReport::from_decoded(
+                        &decoded,
+                        &epilogue_register_restores,
+                    );
+                let unsupported_instruction = if epilogue_return_completion
+                    .as_ref()
+                    .is_some_and(|completion| {
+                        completion.classifies_unsupported_instruction(
+                            decoded_unsupported_instruction.as_ref(),
+                        )
+                    }) {
+                    None
+                } else {
+                    decoded_unsupported_instruction
+                };
                 let continuation_call_boundary =
                     B8DebugReturnToContinuationCallBoundaryReport::from_decoded(
                         &decoded,
@@ -2913,6 +3089,7 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
                     autorelease_pool_pop_boundary,
                     epilogue_stack_adjustment,
                     epilogue_register_restores,
+                    epilogue_return_completion,
                     continuation_call_boundary,
                     blocker,
                     next_action,
@@ -2927,6 +3104,7 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
                 None,
                 None,
                 Vec::new(),
+                None,
                 None,
                 B8DebugObjcHelperExecutionBlocker::ReturnToContinuationDecodeFailed,
                 B8DebugReturnToContinuationDecodeNextAction::InspectReturnToContinuationDecodeFailure,
@@ -2947,6 +3125,7 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
             autorelease_pool_pop_boundary,
             epilogue_stack_adjustment,
             epilogue_register_restores,
+            epilogue_return_completion,
             continuation_call_boundary,
             decode_report,
             processed_source_pc_range,

@@ -609,6 +609,14 @@
   `4294973082` まで decode が進む。remaining blocker は `ret` 後の
   `DecodeUnsupportedOpcode { opcode: 0 }` at `4294973083` なので、return terminator /
   post-ret padding completion は次 gate へ分離する。
+- 2026-06-13 の B8-G6ae として、post-run `c3` / `ret` は
+  `b8_return_to_continuation_epilogue_return_completion_v0` として executed report に分離する。
+  `ret` 直後の `DecodeUnsupportedOpcode { opcode: 0 }` at `4294973083` は
+  `b8_return_to_continuation_post_ret_padding_boundary_v0` で
+  `ignored_after_return_terminator` / `does_not_extend_function_body` として分類し、
+  continuation boundary の `unsupported_instruction` は `null` に戻す。remaining blocker は
+  `return_to_continuation_execution_unimplemented` に進むため、self-authored fixture の modeled
+  completion 判定は次 gate へ分離する。
 - B8-HWGUI 完遂後の OSS app cycle は、任意の downloaded binary ではなく、まず public
   source から x86_64 macOS binary を reproducible に build できる小さい OSS GUI app を
   source-built fixture として扱う。候補選定、license / redistribution、supply-chain、

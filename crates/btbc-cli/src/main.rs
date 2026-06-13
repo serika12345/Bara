@@ -2473,7 +2473,7 @@ mod tests {
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"helper_boundary_request\"")
         );
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"reason\":\"return_to_continuation_unsupported_instruction\""));
+            .contains("\"reason\":\"return_to_continuation_execution_unimplemented\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"kind\":\"import_helper_call\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
@@ -2583,7 +2583,7 @@ mod tests {
             .contains("\"next_source_pc\":4294972999"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register_state\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"blocker\":\"return_to_continuation_unsupported_instruction\""));
+            .contains("\"blocker\":\"return_to_continuation_execution_unimplemented\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"continuation_block\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"schema\":\"b8_return_to_continuation_decode_boundary_v0\""));
@@ -2840,7 +2840,7 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_source_pc\":4294973049"));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"blocker\":\"return_to_continuation_unsupported_instruction\""));
+            .contains("\"blocker\":\"return_to_continuation_execution_unimplemented\""));
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"source_pc\":4294973049")
         );
@@ -2917,7 +2917,7 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"unsupported_instruction\":null"));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"return_to_continuation_unsupported_instruction\""));
+            .contains("\"return_to_continuation_execution_unimplemented\""));
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"source_pc\":4294973062")
         );
@@ -2990,6 +2990,8 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_blocker_after_adjustment\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_blocker_after_adjustment\":null"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"schema\":\"b8_return_to_continuation_epilogue_register_restore_v0\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"role\":\"post_run_epilogue_preserved_register_restore\""));
@@ -3013,12 +3015,31 @@ mod tests {
             .contains("\"stack_slot_source\":\"sequential_epilogue_stack_top\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_blocker_after_restore\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_blocker_after_restore\":null"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"start\":4294973081"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"start\":4294973082"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"kind\":\"ret\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_return_to_continuation_epilogue_return_completion_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"role\":\"post_run_epilogue_return_terminator\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"after_epilogue_frame_pointer_restore\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_return_to_continuation_post_ret_padding_boundary_v0\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"status\":\"classified\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"role\":\"post_run_trailing_zero_padding_after_return\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"start\":4294973083"));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("DecodeUnsupportedOpcode { opcode: 0"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"classification\":\"ignored_after_return_terminator\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"effect\":\"does_not_extend_function_body\""));
         assert!(!read_file(&bundle_dir.join("loader.plan.json"))
             .contains("DecodeUnsupportedOpcode { opcode: 93"));
         assert!(!read_file(&bundle_dir.join("loader.plan.json"))
@@ -3028,9 +3049,9 @@ mod tests {
         assert!(!read_file(&bundle_dir.join("loader.plan.json"))
             .contains("DecodeUnsupportedOpcode { opcode: 72"));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"blocker\":\"return_to_continuation_unsupported_instruction\""));
+            .contains("\"blocker\":\"return_to_continuation_execution_unimplemented\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"next_action\":\"add_return_to_continuation_instruction_support\""));
+            .contains("\"next_action\":\"implement_return_to_continuation_execution\""));
         assert!(!read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"return_to_continuation_call_rel32_helper_execution_unimplemented\""));
         assert!(!read_file(&bundle_dir.join("loader.plan.json")).contains(
@@ -3109,7 +3130,7 @@ mod tests {
         assert!(launch_report.contains("\"b8_g1_host_trap_path\":\"not_used\""));
         assert!(launch_report.contains("\"helper_boundary_request\""));
         assert!(
-            launch_report.contains("\"reason\":\"return_to_continuation_unsupported_instruction\"")
+            launch_report.contains("\"reason\":\"return_to_continuation_execution_unimplemented\"")
         );
         assert!(launch_report.contains("\"symbol_name\":\"_objc_msgSend\""));
         assert!(launch_report.contains("\"call_site\":4294972996"));
@@ -3169,7 +3190,7 @@ mod tests {
         assert!(launch_report.contains("\"next_source_pc\":4294972999"));
         assert!(launch_report.contains("\"register_state\""));
         assert!(launch_report
-            .contains("\"blocker\":\"return_to_continuation_unsupported_instruction\""));
+            .contains("\"blocker\":\"return_to_continuation_execution_unimplemented\""));
         assert!(launch_report.contains("\"continuation_block\""));
         assert!(
             launch_report.contains("\"schema\":\"b8_return_to_continuation_decode_boundary_v0\"")
@@ -3344,7 +3365,7 @@ mod tests {
         );
         assert!(launch_report.contains("\"next_source_pc\":4294973049"));
         assert!(launch_report
-            .contains("\"blocker\":\"return_to_continuation_unsupported_instruction\""));
+            .contains("\"blocker\":\"return_to_continuation_execution_unimplemented\""));
         assert!(launch_report.contains("\"source_pc\":4294973049"));
         assert!(launch_report.contains("\"input_register_state\":null"));
         assert!(launch_report.contains("\"start\":4294973049"));
@@ -3387,7 +3408,7 @@ mod tests {
         );
         assert!(!launch_report.contains("\"appkit_run_loop_lifecycle_unimplemented\""));
         assert!(launch_report.contains("\"unsupported_instruction\":null"));
-        assert!(launch_report.contains("\"return_to_continuation_unsupported_instruction\""));
+        assert!(launch_report.contains("\"return_to_continuation_execution_unimplemented\""));
         assert!(launch_report.contains("\"source_pc\":4294973062"));
         assert!(launch_report.contains("\"kind\":\"mov_rdi_rbx\""));
         assert!(launch_report.contains("\"blocked_register_materializations\":[]"));
@@ -3432,6 +3453,7 @@ mod tests {
         assert!(launch_report.contains("\"stack_pointer_register\":\"rsp\""));
         assert!(launch_report.contains("\"stack_pointer_delta\":\"X86Imm8(8)\""));
         assert!(launch_report.contains("\"next_blocker_after_adjustment\""));
+        assert!(launch_report.contains("\"next_blocker_after_adjustment\":null"));
         assert!(launch_report
             .contains("\"schema\":\"b8_return_to_continuation_epilogue_register_restore_v0\""));
         assert!(launch_report.contains("\"role\":\"post_run_epilogue_preserved_register_restore\""));
@@ -3449,19 +3471,30 @@ mod tests {
         assert!(launch_report.contains("\"register\":\"rbp\""));
         assert!(launch_report.contains("\"stack_slot_source\":\"sequential_epilogue_stack_top\""));
         assert!(launch_report.contains("\"next_blocker_after_restore\""));
+        assert!(launch_report.contains("\"next_blocker_after_restore\":null"));
         assert!(launch_report.contains("\"start\":4294973081"));
         assert!(launch_report.contains("\"start\":4294973082"));
         assert!(launch_report.contains("\"kind\":\"ret\""));
+        assert!(launch_report
+            .contains("\"schema\":\"b8_return_to_continuation_epilogue_return_completion_v0\""));
+        assert!(launch_report.contains("\"role\":\"post_run_epilogue_return_terminator\""));
+        assert!(launch_report.contains("\"source\":\"after_epilogue_frame_pointer_restore\""));
+        assert!(launch_report
+            .contains("\"schema\":\"b8_return_to_continuation_post_ret_padding_boundary_v0\""));
+        assert!(launch_report.contains("\"status\":\"classified\""));
+        assert!(launch_report.contains("\"role\":\"post_run_trailing_zero_padding_after_return\""));
         assert!(launch_report.contains("\"start\":4294973083"));
         assert!(launch_report.contains("DecodeUnsupportedOpcode { opcode: 0"));
+        assert!(launch_report.contains("\"classification\":\"ignored_after_return_terminator\""));
+        assert!(launch_report.contains("\"effect\":\"does_not_extend_function_body\""));
         assert!(!launch_report.contains("DecodeUnsupportedOpcode { opcode: 93"));
         assert!(!launch_report.contains("DecodeUnsupportedOpcode { opcode: 65"));
         assert!(!launch_report.contains("DecodeUnsupportedOpcode { opcode: 91"));
         assert!(!launch_report.contains("DecodeUnsupportedOpcode { opcode: 72"));
         assert!(launch_report
-            .contains("\"blocker\":\"return_to_continuation_unsupported_instruction\""));
+            .contains("\"blocker\":\"return_to_continuation_execution_unimplemented\""));
         assert!(launch_report
-            .contains("\"next_action\":\"add_return_to_continuation_instruction_support\""));
+            .contains("\"next_action\":\"implement_return_to_continuation_execution\""));
         assert!(!launch_report
             .contains("\"return_to_continuation_call_rel32_helper_execution_unimplemented\""));
         assert!(!launch_report.contains(
