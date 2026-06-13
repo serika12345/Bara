@@ -630,6 +630,27 @@
   bounds と `manual-visible.launch-report.json` の `gui_window_created` event で確認した。
   この時点で self-authored Hello World GUI は review gate 到達とし、B8-OSS0 は branch
   review / merge 後に開始する。
+- 2026-06-13 の B8-ARCH0 として、B8-HWGUI 後の主経路を「ユーザー visible な
+  converted `.app` / arm64 executable 出力」ではなく、内部 `TranslationArtifact` /
+  runtime cache / dispatcher / OS personality として固定する。file export は debug /
+  review / regression 用の補助機能に留める。Rosetta 2 の公開情報では JIT は process
+  内変換、AOT は system service 管理の storage artifact であり、通常の変換済み app として
+  ユーザーが扱うものではないため、Bara も同じ問題分割を採用する。ただし Rosetta の内部
+  artifact layout、private signing/cache mechanism、private dyld / kernel integration は
+  実装根拠にしない。
+- B8-ARCH0 以降の architecture は、同 OS / 異アーキテクチャを主対象にする。
+  `macOS x86_64 -> macOS arm64`、`Linux x86_64 -> Linux arm64`、および
+  `Windows x64 -> Wine on arm64` を代表形とする。異 OS 互換性は Bara core に埋め込まず、
+  OS personality / Wine bridge に分離する。Wine 接続では PE loader、Windows API、
+  registry、filesystem、windowing semantics は Wine の責務とし、Bara は x86_64
+  guest code execution、Windows x64 ABI state、guest callback、exception / TLS /
+  thunk boundary、translation cache を担当する。
+- B8-HWGUI で `btbc-cli` と `b8_debug_bundle.rs` に集まった logic は、次の順で
+  抽象化する。まず responsibility split audit、次に `GuestImage` / `MachOImage`
+  extraction、`TranslationArtifact` / debug export、runtime dispatcher foundation、
+  helper / ABI bridge generalization、OS personality boundary を進める。この順序は
+  [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) と TODO の
+  B8-ARCH1 以降を source of truth にする。
 - B8-HWGUI 完遂後の OSS app cycle は、任意の downloaded binary ではなく、まず public
   source から x86_64 macOS binary を reproducible に build できる小さい OSS GUI app を
   source-built fixture として扱う。候補選定、license / redistribution、supply-chain、

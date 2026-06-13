@@ -68,6 +68,7 @@ Rosetta から使う情報は、テスト harness が出力する外部挙動だ
 - [Rosetta Oracle 検証ワークフロー](docs/test-oracle.md): expected/actual 比較の流れ
 - [進行履歴](docs/progress.md): タイムスタンプ付きの現在地、進行中作業、完了履歴
 - [Public ABI / import boundary](docs/public-abi-import-boundary.md): public ABI、imports、host helpers、syscall 相当境界の clean-room 設計
+- [Runtime architecture roadmap](docs/runtime-architecture-roadmap.md): B8-HWGUI 後の runtime、translation artifact、OS personality、Wine 接続の設計方向
 - [将来構想メモ](docs/future-research-concepts.md): 本流 TODO から外した未確立な派生研究の置き場
 
 ## 現在の実装順
@@ -75,10 +76,11 @@ Rosetta から使う情報は、テスト harness が出力する外部挙動だ
 実装順は [TODO.md](TODO.md) の `線形実装ロードマップ` に一本化しています。
 README には独立したマイルストーン一覧を置きません。
 
-現在の本流は、完了済みの最小 `hello world` 成果物から、B4-B7 を通って
-B8: 実 x86_64 macOS アプリ起動へ進みます。B8 後は、推奨ステップとして
-B9: 実 x86 32-bit アプリ対応を扱い、その後 B10: PE / Wine 接続前段へ
-進みます。
+現在の本流は、B8-HWGUI Self-Authored Hello World GUI Completion 後の
+runtime architecture 整理に移っています。B8-ARCH 系で responsibility split、
+guest image model、translation artifact / debug export、runtime dispatcher、
+helper / ABI bridge、OS personality boundary を整えたうえで、B8-OSS0 の
+source-built OSS GUI app automation や B8-WINE0 の Wine bridge planning へ進みます。
 
 初期成功ケースは以下でした。
 

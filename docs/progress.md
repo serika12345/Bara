@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 20:09 JST
+最終更新: 2026-06-13 21:16 JST
 
 状態:
 
@@ -206,26 +206,27 @@
   arbitrary dynamic library data symbol read、return-to continuation の一般実行、
   arbitrary call-rel32 execution、translation cache、fallback JIT/interpreter はまだ行わない。
 - active_milestone: completed。[TODO.md](../TODO.md) の B8-HWGUI Self-Authored Hello
-  World GUI Completion を大目標として、`task/b8-hello-world-gui-complete` 上で
-  blocker-driven slice を継続中。B8-G6af は完了し、B8-HWGUI Final expected/actual
-  and manual visible review boundary のうち automated expected/actual と real-entry
-  modeled completion 確認、および manual visible mode の launch report 保存まで完了した。
-  draft PR https://github.com/serika12345/Bara/pull/49 を開き、review gate で停止中。
-- active_design_focus: B8-HWGUI Self-Authored Hello World GUI Completion を大目標として
-  明文化した。B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
-  実 Mach-O entry から GUI lifecycle helper boundary までを通す。`/advance-large` を
-  使う場合でも、debug bundle blocker 由来の focused slice として進め、arbitrary
-  Objective-C message send、general continuation execution、arbitrary indirect target
-  execution、translation cache / JIT、`.app` bundle / resource が必要になったら
-  TODO 上の focused gate または sub-target へ分割する。AppKit / Objective-C runtime /
-  dyld の private behavior は使わず、public metadata、public API、自前 fixture、
-  Rosetta black-box observable result を根拠にする。
+  World GUI Completion と B8-ARCH0 Post-HWGUI Runtime Architecture Record を
+  `task/b8-hello-world-gui-complete` 上で完了した。B8-HWGUI は automated expected/actual、
+  real-entry modeled completion、manual visible mode の launch report 保存まで完了し、
+  draft PR https://github.com/serika12345/Bara/pull/49 を開いて review gate で停止中。
+  B8-ARCH0 では、B8-HWGUI 後の主経路をユーザー visible な converted app 出力ではなく、
+  internal translation artifact / runtime cache / dispatcher / OS personality として
+  [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) に固定した。
+- active_design_focus: Bara の主対象は同 OS / 異アーキテクチャ実行である。
+  `macOS x86_64 -> macOS arm64` を最初の concrete target とし、将来
+  `Linux x86_64 -> Linux arm64` と `Windows x64 -> Wine on arm64` を OS personality として
+  接続する。Bara core は ISA translation、IR、artifact/cache、dispatcher、guest CPU state
+  を担当し、loader、ABI、OS service、Wine bridge は差し替え可能な personality に分離する。
+  B8-HWGUI 後の抽象化順は B8-ARCH1 responsibility split audit、B8-ARCH2 guest image
+  model extraction、B8-ARCH3 translation artifact/debug export、B8-ARCH4 runtime
+  dispatcher、B8-ARCH5 helper/ABI bridge、B8-ARCH6 OS personality boundary とする。
 - active_branch: `task/b8-hello-world-gui-complete`。branch base は `2258806`
   (`docs: define b8 hello world gui completion target`)。latest pushed implementation commit is
   `32c8afb` (`feat: complete b8 modeled gui continuation`)。latest pushed documentation commit
-  before this PR-open record is `b18697b` (`docs: complete b8 hwgui review gate`)。
-  この snapshot は B8-HWGUI final review boundary completed state として更新されており、
-  draft PR #49 の merge review までは B8-OSS0 に進まない。
+  before this architecture record is `7248baf` (`docs: record b8 hwgui draft pr`)。
+  この snapshot は B8-HWGUI / B8-ARCH0 completed state として更新されており、draft
+  PR #49 の merge review までは B8-OSS0 や B8-ARCH1 implementation に進まない。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
@@ -233,7 +234,9 @@
   B8-G6g / B8-G6h / B8-G6i / B8-G6j / B8-G6k / B8-G6l / B8-G6m /
   B8-G6n / B8-G6o / B8-G6p / B8-G6q / B8-G6r / B8-G6s / B8-G6t / B8-G6u /
   B8-G6v / B8-G6w / B8-G6x / B8-G6y / B8-G6z / B8-G6aa / B8-G6ab /
-  B8-G6ac / B8-G6ad / B8-G6ae / B8-G6af / B8-HWGUI / B8-OSS0。
+  B8-G6ac / B8-G6ad / B8-G6ae / B8-G6af / B8-HWGUI / B8-ARCH0 /
+  B8-ARCH1 / B8-ARCH2 / B8-ARCH3 / B8-ARCH4 / B8-ARCH5 / B8-ARCH6 /
+  B8-OSS0 / B8-WINE0。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -444,12 +447,17 @@
   entry から GUI 起動完遂まで通す大目標、`/advance-large` 利用時の stop 条件、
   および B8-HWGUI merge 後に開始する B8-OSS0 source-built OSS GUI app automation target を
   TODO / design TODO に追加した。
-- remaining_work: B8-HWGUI review gate。draft PR #49 の review / merge までは
-  B8-OSS0 に進まない。
-  B8-OSS0、general continuation execution、arbitrary Objective-C message send、
-  translation cache、fallback JIT/interpreter、`.app` bundle / resource 一般化はまだ行わない。
+- B8-ARCH0 として、B8-HWGUI 後の runtime architecture record を追加した。
+  主経路は user-visible converted app output ではなく、internal translation artifact /
+  runtime cache / dispatcher / OS personality とする。Wine 接続は Windows API 実装ではなく、
+  Windows x64-on-Wine OS personality として扱う。
+- remaining_work: B8-HWGUI / B8-ARCH0 review gate。draft PR #49 の review / merge までは
+  B8-ARCH1 implementation や B8-OSS0 に進まない。general continuation execution、
+  arbitrary Objective-C message send、translation cache、fallback JIT/interpreter、
+  `.app` bundle / resource 一般化、Wine bridge 実装はまだ行わない。
 - next_action: https://github.com/serika12345/Bara/pull/49 を review する。承認後は
-  `/merge-reviewed` で main に取り込み、B8-OSS0 はその後に開始する。
+  `/merge-reviewed` で main に取り込む。次の実装は B8-ARCH1 responsibility split audit から
+  開始し、B8-OSS0 は抽象化 milestone の進行状況を見て開始する。
 - verification:
   `nix develop -c cargo check -p btbc-cli`、
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`、
@@ -461,9 +469,18 @@
   `Bara GUI Hello World` window title / bounds を確認し、
   `target/b8-hwgui-review/manual-visible.launch-report.json` が `mode=manual_visible`、
   `status=gui_visible_ready`、`exit_status=0`、`text=hello world` を保存している。
+  B8-ARCH0 は docs-only change として `git diff --check` と
+  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-13 21:16 JST: B8-ARCH0 Post-HWGUI Runtime Architecture Record を追加した。
+  [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) に最終目標、同 OS /
+  異アーキテクチャ主軸、internal translation artifact / cache 主経路、layer boundaries、
+  Wine 接続の責務分担、B8-ARCH1 以降の roadmap を記録した。TODO には
+  B8-ARCH1 responsibility split audit、B8-ARCH2 guest image model、B8-ARCH3 translation
+  artifact/debug export、B8-ARCH4 runtime dispatcher、B8-ARCH5 helper/ABI bridge、
+  B8-ARCH6 OS personality boundary、B8-WINE0 Wine bridge planning を追加した。
 - 2026-06-13 19:53 JST: B8-HWGUI Final expected/actual and manual visible review boundary を
   開始した。automated expected / actual は
   `target/b8-hwgui-review/expected.json` と `target/b8-hwgui-review/actual.json` の
