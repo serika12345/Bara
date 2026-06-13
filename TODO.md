@@ -1923,13 +1923,13 @@ branch: `task/b8-hello-world-gui-complete`
 
 完了条件:
 
-- [ ] B8-G6w の
+- [x] B8-G6w の
   `return_to_continuation_saved_register_value_materialization_unimplemented` を受けて、
   post-run `mov rdi, rbx` の source register `rbx` を focused に扱う。
-- [ ] self-authored B8 GUI fixture の initial `_objc_autoreleasePoolPush` return value が
+- [x] self-authored B8 GUI fixture の initial `_objc_autoreleasePoolPush` return value が
   `mov rbx, rax` で saved register に保持され、`NSApp run` 後の
   `_objc_autoreleasePoolPop` argument へ渡る handoff を stable report する。
-- [ ] 次 blocker を `_objc_autoreleasePoolPop` helper boundary、post-run epilogue
+- [x] 次 blocker を `_objc_autoreleasePoolPop` helper boundary、post-run epilogue
   decode、または narrower continuation blocker へ進める。
 
 PR に含めない:
@@ -1942,6 +1942,40 @@ PR に含めない:
 検証:
 
 - `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6x は完了し、次の gate は B8-G6y。
+
+#### PR Gate: B8-G6y Autorelease pool pop helper boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [ ] B8-G6x の
+  `return_to_continuation_call_rel32_helper_execution_unimplemented` を受けて、
+  post-run `call_rel32` at `4294973065` / target `_objc_autoreleasePoolPop` を
+  focused helper boundary として扱う。
+- [ ] `rdi` token argument は initial `_objc_autoreleasePoolPush` return value 由来の
+  saved `rbx` handoff であることを保ったまま、public Objective-C runtime
+  autorelease pool helper contract を stable report する。
+- [ ] 次 blocker を post-run epilogue decode、function return completion、または
+  narrower continuation blocker へ進める。
+
+PR に含めない:
+
+- arbitrary call-rel32 helper execution。
+- arbitrary autorelease pool lifecycle execution。
+- raw helper-process pointer reuse across helper processes。
+- full x86_64 function epilogue completion。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`
 - `nix develop -c ./scripts/verify`
 
 review gate:

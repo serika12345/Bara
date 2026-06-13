@@ -566,6 +566,14 @@
   として扱う。`rbx` の値はこの命令で推測せず、
   `return_to_continuation_saved_register_value_materialization_unimplemented` として
   initial `_objc_autoreleasePoolPush` return value から別 gate で接続する。
+- 2026-06-13 の B8-G6x として、initial `_objc_autoreleasePoolPush` の
+  `call_rel32` return value が `mov rbx, rax` で preserved `rbx` に保存され、
+  post-run `mov rdi, rbx` で `_objc_autoreleasePoolPop` token argument へ渡る
+  handoff を `b8_return_to_continuation_saved_register_value_v0` として report する。
+  `objc_autoreleasePoolPush` token value は public Objective-C runtime helper で
+  push/pop した観測値として保存するが、raw helper-process pointer は
+  `not_reused_across_helper_processes` と明示し、実 `_objc_autoreleasePoolPop`
+  helper execution は次 gate へ分離する。
 - B8-HWGUI 完遂後の OSS app cycle は、任意の downloaded binary ではなく、まず public
   source から x86_64 macOS binary を reproducible に build できる小さい OSS GUI app を
   source-built fixture として扱う。候補選定、license / redistribution、supply-chain、

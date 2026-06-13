@@ -2473,7 +2473,7 @@ mod tests {
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"helper_boundary_request\"")
         );
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"reason\":\"return_to_continuation_saved_register_value_materialization_unimplemented\""
+            "\"reason\":\"return_to_continuation_call_rel32_helper_execution_unimplemented\""
         ));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"kind\":\"import_helper_call\""));
@@ -2584,7 +2584,7 @@ mod tests {
             .contains("\"next_source_pc\":4294972999"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register_state\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"blocker\":\"return_to_continuation_saved_register_value_materialization_unimplemented\""
+            "\"blocker\":\"return_to_continuation_call_rel32_helper_execution_unimplemented\""
         ));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"continuation_block\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
@@ -2842,7 +2842,7 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_source_pc\":4294973049"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"blocker\":\"return_to_continuation_saved_register_value_materialization_unimplemented\""
+            "\"blocker\":\"return_to_continuation_call_rel32_helper_execution_unimplemented\""
         ));
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"source_pc\":4294973049")
@@ -2928,17 +2928,54 @@ mod tests {
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"kind\":\"mov_rdi_rbx\"")
         );
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"blocked_register_materializations\""));
+            .contains("\"blocked_register_materializations\":[]"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register\":\"rdi\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"source\":\"register_copy_from_rbx\""));
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"source_register\":\"rbx\"")
         );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source_saved_register_value\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_return_to_continuation_saved_register_value_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"preserved_register_values\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"producer_call_site\":4294972938"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"producer_symbol_name\":\"_objc_autoreleasePoolPush\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"consumer_instruction_start\":4294972943"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"consumer_register\":\"rbx\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"value_source\":\"objc_autorelease_pool_push_helper_return_value\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"raw_pointer_reuse\":\"not_reused_across_helper_processes\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_return_to_continuation_autorelease_pool_pop_boundary_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"kind\":\"autorelease_pool_pop\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"call_site\":4294973065")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"symbol_name\":\"_objc_autoreleasePoolPop\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"role\":\"autorelease_pool_token\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"saved_rbx_from_autorelease_pool_push\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"blocker\":\"return_to_continuation_saved_register_value_materialization_unimplemented\""
+            "\"blocker\":\"return_to_continuation_call_rel32_helper_execution_unimplemented\""
         ));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"next_action\":\"implement_return_to_continuation_call_rel32_helper_execution\""
+        ));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"return_to_continuation_saved_register_value_materialization_unimplemented\""
+        ));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json")).contains(
             "\"next_action\":\"materialize_return_to_continuation_saved_register_value\""
         ));
         assert!(!read_file(&bundle_dir.join("loader.plan.json")).contains(
@@ -3011,7 +3048,7 @@ mod tests {
         assert!(launch_report.contains("\"b8_g1_host_trap_path\":\"not_used\""));
         assert!(launch_report.contains("\"helper_boundary_request\""));
         assert!(launch_report.contains(
-            "\"reason\":\"return_to_continuation_saved_register_value_materialization_unimplemented\""
+            "\"reason\":\"return_to_continuation_call_rel32_helper_execution_unimplemented\""
         ));
         assert!(launch_report.contains("\"symbol_name\":\"_objc_msgSend\""));
         assert!(launch_report.contains("\"call_site\":4294972996"));
@@ -3071,7 +3108,7 @@ mod tests {
         assert!(launch_report.contains("\"next_source_pc\":4294972999"));
         assert!(launch_report.contains("\"register_state\""));
         assert!(launch_report.contains(
-            "\"blocker\":\"return_to_continuation_saved_register_value_materialization_unimplemented\""
+            "\"blocker\":\"return_to_continuation_call_rel32_helper_execution_unimplemented\""
         ));
         assert!(launch_report.contains("\"continuation_block\""));
         assert!(
@@ -3247,7 +3284,7 @@ mod tests {
         );
         assert!(launch_report.contains("\"next_source_pc\":4294973049"));
         assert!(launch_report.contains(
-            "\"blocker\":\"return_to_continuation_saved_register_value_materialization_unimplemented\""
+            "\"blocker\":\"return_to_continuation_call_rel32_helper_execution_unimplemented\""
         ));
         assert!(launch_report.contains("\"source_pc\":4294973049"));
         assert!(launch_report.contains("\"input_register_state\":null"));
@@ -3294,14 +3331,40 @@ mod tests {
         assert!(!launch_report.contains("\"return_to_continuation_unsupported_instruction\""));
         assert!(launch_report.contains("\"source_pc\":4294973062"));
         assert!(launch_report.contains("\"kind\":\"mov_rdi_rbx\""));
-        assert!(launch_report.contains("\"blocked_register_materializations\""));
+        assert!(launch_report.contains("\"blocked_register_materializations\":[]"));
         assert!(launch_report.contains("\"register\":\"rdi\""));
         assert!(launch_report.contains("\"source\":\"register_copy_from_rbx\""));
         assert!(launch_report.contains("\"source_register\":\"rbx\""));
+        assert!(launch_report.contains("\"source_saved_register_value\""));
+        assert!(launch_report
+            .contains("\"schema\":\"b8_return_to_continuation_saved_register_value_v0\""));
+        assert!(launch_report.contains("\"preserved_register_values\""));
+        assert!(launch_report.contains("\"producer_call_site\":4294972938"));
+        assert!(launch_report.contains("\"producer_symbol_name\":\"_objc_autoreleasePoolPush\""));
+        assert!(launch_report.contains("\"consumer_instruction_start\":4294972943"));
+        assert!(launch_report.contains("\"consumer_register\":\"rbx\""));
+        assert!(launch_report
+            .contains("\"value_source\":\"objc_autorelease_pool_push_helper_return_value\""));
+        assert!(
+            launch_report.contains("\"raw_pointer_reuse\":\"not_reused_across_helper_processes\"")
+        );
+        assert!(launch_report
+            .contains("\"schema\":\"b8_return_to_continuation_autorelease_pool_pop_boundary_v0\""));
+        assert!(launch_report.contains("\"kind\":\"autorelease_pool_pop\""));
+        assert!(launch_report.contains("\"call_site\":4294973065"));
+        assert!(launch_report.contains("\"symbol_name\":\"_objc_autoreleasePoolPop\""));
+        assert!(launch_report.contains("\"role\":\"autorelease_pool_token\""));
+        assert!(launch_report.contains("\"source\":\"saved_rbx_from_autorelease_pool_push\""));
         assert!(launch_report.contains(
-            "\"blocker\":\"return_to_continuation_saved_register_value_materialization_unimplemented\""
+            "\"blocker\":\"return_to_continuation_call_rel32_helper_execution_unimplemented\""
         ));
         assert!(launch_report.contains(
+            "\"next_action\":\"implement_return_to_continuation_call_rel32_helper_execution\""
+        ));
+        assert!(!launch_report.contains(
+            "\"return_to_continuation_saved_register_value_materialization_unimplemented\""
+        ));
+        assert!(!launch_report.contains(
             "\"next_action\":\"materialize_return_to_continuation_saved_register_value\""
         ));
         assert!(!launch_report.contains(
