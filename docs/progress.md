@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 14:20 JST
+最終更新: 2026-06-13 14:21 JST
 
 状態:
 
@@ -120,8 +120,9 @@
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
 - active_branch: `task/b8-g6k-continuation-set-activation-policy-helper`。base branch は
   最新 `main` の `5cbf712` (`Merge pull request #47 from
-  serika12345:task/b8-g6j-continuation-call-r14-boundary`)。implementation commit と draft PR は
-  このスナップショット更新時点では未作成。
+  serika12345:task/b8-g6j-continuation-call-r14-boundary`)。implementation commit は
+  `d717dc9` (`feat: add b8 g6k set activation policy helper boundary`)。draft PR は
+  <https://github.com/serika12345/Bara/pull/48>。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
@@ -277,8 +278,8 @@
   扱う。`setActivationPolicy:` 以外の arbitrary Objective-C message send、
   return-to continuation の一般実行、arbitrary indirect call target execution、
   translation cache、fallback JIT/interpreter はまだ行わない。
-- next_action: B8-G6k を verify し、commit / push / draft PR 作成で停止する。
-  次 PR Gate は B8-G6l Return-To Continuation setActivationPolicy Host Execution Slice。
+- next_action: B8-G6k draft PR #48 を review / merge する。
+  merge 後の次 PR Gate は B8-G6l Return-To Continuation setActivationPolicy Host Execution Slice。
 - verification:
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
   `nix develop -c ./scripts/verify` が通過した。progress 更新後に
