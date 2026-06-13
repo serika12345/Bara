@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 00:24 JST
+最終更新: 2026-06-13 10:16 JST
 
 状態:
 
@@ -68,26 +68,28 @@
   `b8_objc_runtime_helper_host_execution_v0` として保存する。helper output は
   `objc_helper_return_value` / `host_pointer_u64` として report され、既存の
   `b8_objc_helper_return_writeback_boundary_v0` は `available` になり、x86_64 `rax`
-  write-back value へ接続される。次の blocker は
-  `objc_helper_return_continuation_unimplemented` である。arbitrary indirect call target
-  execution、translation cache、fallback JIT/interpreter はまだ行わない。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G6c ObjC Runtime Helper
-  Bridge Host Execution Slice: B8-G6b の bridge contract が残した helper execution
-  blocker を self-authored fixture 限定の public Objective-C runtime / AppKit helper
-  execution として扱い、helper output を x86_64 `rax` return write-back boundary へ接続する。
+  write-back value へ接続される。B8-G6d では、この helper output と `rax`
+  write-back value を `b8_objc_helper_return_continuation_boundary_v0` に保存し、
+  `call r14` の `return_to=4294972999` を `next_source_pc` として report する。
+  次の blocker は `return_to_continuation_execution_unimplemented` である。arbitrary
+  indirect call target execution、translation cache、fallback JIT/interpreter はまだ行わない。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G6d ObjC Helper Return
+  Continuation Boundary: B8-G6c の helper execution result が残した continuation
+  blocker を、helper output 由来の x86_64 `rax` register state と `return_to` PC を持つ
+  stable boundary として保存する。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
   Objective-C runtime / dyld の private behavior は使わず、public metadata、
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
-- active_branch: `task/b8-g6c-objc-runtime-helper-bridge-execution`。base branch は
-  最新 `main` の `4d7f5ff` (`Merge pull request #39 from
-  serika12345:task/b8-g6b-objc-runtime-helper-bridge-contract`)。draft PR は
-  <https://github.com/serika12345/Bara/pull/40>。
+- active_branch: `task/b8-g6d-objc-helper-return-continuation`。base branch は
+  最新 `main` の `996918e` (`Merge pull request #40 from
+  serika12345/Bara:task/b8-g6c-objc-runtime-helper-bridge-execution`)。draft PR は
+  <https://github.com/serika12345/Bara/pull/41>。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
-  B8-G5b-G5e / B8-G6a / B8-G6b / B8-G6c。
+  B8-G5b-G5e / B8-G6a / B8-G6b / B8-G6c / B8-G6d。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -194,21 +196,36 @@
   `output.representation=host_pointer_u64`、`return_writeback.destination=x86_64_rax` を
   stable report に保存する。bridge contract の error classification は `null` になり、
   next blocker は `objc_helper_return_continuation_unimplemented`、next action は
-  `continue_after_objc_helper_return` である。
-- remaining_work: B8-G6d。B8-G6c の helper execution result が残す
-  `objc_helper_return_continuation_unimplemented` を、`return_to` PC からの continuation
-  boundary として report する。arbitrary indirect call target execution、translation
-  cache、fallback JIT/interpreter はまだ行わない。
-- next_action: B8-G6c draft PR #40 を review / merge する。merge 後の次 PR Gate は
-  B8-G6d ObjC Helper Return Continuation Boundary。
-- verification: `nix develop -c cargo test -p bara-ir
-  mapped_image_bytes_read_nul_terminated_utf8_by_vm_address`、
-  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
-  `nix develop -c ./scripts/verify`、PR URL 記録後の
+  `continue_after_objc_helper_return` である。B8-G6d として
+  `return_continuation.schema=b8_objc_helper_return_continuation_boundary_v0`、
+  `source.kind=register_indirect_call_return`、`next_source_pc=4294972999`、
+  `register_state.register=rax`、`register_state.source=objc_helper_return_value`、
+  `blocker=return_to_continuation_execution_unimplemented`、`next_action=decode_return_to_continuation_block`
+  を stable report に保存する。
+- remaining_work: B8-G6e。G6d の continuation boundary が残す
+  `return_to_continuation_execution_unimplemented` を、`next_source_pc` からの continuation
+  block decode/report boundary として扱う。`return_to` 以降の一般実行、arbitrary indirect
+  call target execution、translation cache、fallback JIT/interpreter はまだ行わない。
+- next_action: B8-G6d draft PR #41 を review / merge する。merge 後の次 PR Gate は
+  B8-G6e Return-To Continuation Decode Boundary。
+- verification: `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+  と `nix develop -c ./scripts/verify` が通過した。PR URL 記録後に
   `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-13 10:11 JST: B8-G6d ObjC Helper Return Continuation Boundary を実装した。
+  B8 debug bundle の helper execution request に
+  `b8_objc_helper_return_continuation_boundary_v0` を追加し、`call r14` の
+  `call_site=4294972996` / `return_to=4294972999`、helper output
+  `objc_helper_return_value` / `host_pointer_u64`、x86_64 `rax` への `written_value`、
+  `register_state.register=rax`、`next_source_pc=4294972999` を stable report に保存する。
+  host execution 内の `objc_helper_return_continuation_unimplemented` は履歴として残し、
+  helper boundary の current blocker は
+  `return_to_continuation_execution_unimplemented` に進める。`return_to` block の実行、
+  arbitrary indirect call target execution、translation cache、fallback JIT/interpreter は追加しない。
+  targeted check と full `nix develop -c ./scripts/verify` が通過し、draft PR
+  <https://github.com/serika12345/Bara/pull/41> を開いた。
 - 2026-06-13 00:22 JST: B8-G6c ObjC Runtime Helper Bridge Host Execution Slice を実装した。
   selector VM address を `ProgramImageMetadata.mapped_bytes` の NUL-terminated UTF-8 から
   `sharedApplication` として解決し、`_objc_msgSend` / `_OBJC_CLASS_$_NSApplication` /

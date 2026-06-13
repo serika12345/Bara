@@ -2473,7 +2473,7 @@ mod tests {
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"helper_boundary_request\"")
         );
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"reason\":\"objc_helper_return_continuation_unimplemented\""));
+            .contains("\"reason\":\"return_to_continuation_execution_unimplemented\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"kind\":\"import_helper_call\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
@@ -2574,6 +2574,18 @@ mod tests {
             .contains("\"next_blocker\":\"objc_helper_return_continuation_unimplemented\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_action\":\"continue_after_objc_helper_return\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"return_continuation\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_objc_helper_return_continuation_boundary_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"kind\":\"register_indirect_call_return\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_source_pc\":4294972999"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register_state\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"blocker\":\"return_to_continuation_execution_unimplemented\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_action\":\"decode_return_to_continuation_block\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"error\":null"));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"materialization_boundary\""));
@@ -2634,7 +2646,7 @@ mod tests {
         assert!(launch_report.contains("\"b8_g1_host_trap_path\":\"not_used\""));
         assert!(launch_report.contains("\"helper_boundary_request\""));
         assert!(
-            launch_report.contains("\"reason\":\"objc_helper_return_continuation_unimplemented\"")
+            launch_report.contains("\"reason\":\"return_to_continuation_execution_unimplemented\"")
         );
         assert!(launch_report.contains("\"symbol_name\":\"_objc_msgSend\""));
         assert!(launch_report.contains("\"call_site\":4294972996"));
@@ -2686,6 +2698,16 @@ mod tests {
         assert!(launch_report
             .contains("\"next_blocker\":\"objc_helper_return_continuation_unimplemented\""));
         assert!(launch_report.contains("\"next_action\":\"continue_after_objc_helper_return\""));
+        assert!(launch_report.contains("\"return_continuation\""));
+        assert!(
+            launch_report.contains("\"schema\":\"b8_objc_helper_return_continuation_boundary_v0\"")
+        );
+        assert!(launch_report.contains("\"kind\":\"register_indirect_call_return\""));
+        assert!(launch_report.contains("\"next_source_pc\":4294972999"));
+        assert!(launch_report.contains("\"register_state\""));
+        assert!(launch_report
+            .contains("\"blocker\":\"return_to_continuation_execution_unimplemented\""));
+        assert!(launch_report.contains("\"next_action\":\"decode_return_to_continuation_block\""));
         assert!(launch_report.contains("\"error\":null"));
         assert!(
             launch_report.contains("\"schema\":\"b8_objc_message_materialization_boundary_v0\"")

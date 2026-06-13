@@ -396,6 +396,18 @@
   translation cache、fallback JIT/interpreter、Objective-C / AppKit 内部構造の再実装ではない。
   次の blocker は `objc_helper_return_continuation_unimplemented` であり、B8-G6d では
   `return_to` PC からの continuation boundary を report する。
+- 2026-06-13 の B8-G6d として、B8-G6c の helper execution result が残した
+  `objc_helper_return_continuation_unimplemented` を
+  `b8_objc_helper_return_continuation_boundary_v0` として stable report に分離した。
+  boundary は `call r14` の `call_site` / `return_to` / `target_register` を source
+  として持ち、input には `objc_helper_return_value` / `host_pointer_u64` と既存の
+  `b8_objc_helper_return_writeback_boundary_v0`、x86_64 `rax` へ書き戻した
+  `written_value` を保存する。register state は `rax` が
+  `objc_helper_return_value` 由来の 64-bit value を持つことを明示し、
+  `next_source_pc=return_to` と
+  `return_to_continuation_execution_unimplemented` を次 blocker として report する。
+  これは `return_to` block の実行、arbitrary indirect call target execution、
+  translation cache、fallback JIT/interpreter を追加するものではない。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、

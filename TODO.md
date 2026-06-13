@@ -1230,11 +1230,11 @@ review gate:
 - 完了したら commit / push / draft PR 作成で停止する。次の gate は helper execution result
   の blocker を見て B8-G6d または focused process-state / AppKit lifecycle slice として
   更新する。
-- [ ] B8-G6d: ObjC helper return continuation boundary を追加する。
-  - [ ] B8-G6c の `objc_helper_return_continuation_unimplemented` を受けて、
+- [x] B8-G6d: ObjC helper return continuation boundary を追加する。
+  - [x] B8-G6c の `objc_helper_return_continuation_unimplemented` を受けて、
     `_objc_msgSend` helper output を x86_64 `rax` value として持ったまま `return_to`
     PC から継続する boundary を stable report にする。
-  - [ ] arbitrary indirect call target execution、translation cache、fallback JIT/interpreter
+  - [x] arbitrary indirect call target execution、translation cache、fallback JIT/interpreter
     はまだ行わず、継続対象 PC / register state / next blocker だけを明示する。
 
 #### PR Gate: B8-G6d ObjC Helper Return Continuation Boundary
@@ -1243,12 +1243,12 @@ branch: `task/b8-g6d-objc-helper-return-continuation`
 
 完了条件:
 
-- [ ] B8-G6c の helper execution result が残す
+- [x] B8-G6c の helper execution result が残す
   `objc_helper_return_continuation_unimplemented` を、`call r14` の `return_to`
   PC から再開するための explicit continuation boundary として扱う。
-- [ ] continuation input は helper output 由来の `objc_helper_return_value` と
+- [x] continuation input は helper output 由来の `objc_helper_return_value` と
   x86_64 `rax` write-back value を stable report に保存する。
-- [ ] continuation は次に読むべき source PC / register state / blocker を report するだけにし、
+- [x] continuation は次に読むべき source PC / register state / blocker を report するだけにし、
   arbitrary indirect call target execution、translation cache、fallback JIT/interpreter は
   行わない。
 
@@ -1267,6 +1267,37 @@ review gate:
 
 - 完了したら commit / push / draft PR 作成で停止する。次の gate は continuation
   report の next blocker を見て focused ISA / process-state / AppKit lifecycle slice として
+  更新する。
+
+#### PR Gate: B8-G6e Return-To Continuation Decode Boundary
+
+branch: `task/b8-g6e-return-to-continuation-decode`
+
+完了条件:
+
+- [ ] B8-G6d の `return_to_continuation_execution_unimplemented` を受けて、
+  continuation boundary の `next_source_pc` から読むべき x86_64 continuation block を
+  stable report にする。
+- [ ] continuation input は G6d が保存した x86_64 `rax` register state を保持し、
+  次の decoded instruction / boundary / blocker と関連付ける。
+- [ ] `return_to` 以降の一般実行、arbitrary indirect call target execution、
+  translation cache、fallback JIT/interpreter は行わない。
+
+PR に含めない:
+
+- `return_to` 以降の命令の一般実行。
+- arbitrary indirect call target execution、translation cache、fallback JIT/interpreter。
+- Objective-C runtime / AppKit lifecycle 全体の一般化。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止する。次の gate は continuation block
+  の next blocker を見て focused ISA / process-state / AppKit lifecycle slice として
   更新する。
 - [ ] B8-G6: Objective-C runtime / AppKit helper bridge を B8-G1 専用 lifecycle
   event から一般化する。
