@@ -101,6 +101,10 @@ fn lift_instruction(
             dst: Operand::Reg(X86Reg::Rbx),
             src: Operand::Reg(X86Reg::Rax),
         })),
+        DecodedInstructionKind::MovRdxRax => Ok(LiftedInstruction::Op(IrOp::Mov {
+            dst: Operand::Reg(X86Reg::Rdx),
+            src: Operand::Reg(X86Reg::Rax),
+        })),
         DecodedInstructionKind::MovRaxQwordPtrRipRelative { address, .. } => {
             Ok(LiftedInstruction::Op(IrOp::Mov {
                 dst: Operand::Reg(X86Reg::Rax),
@@ -490,6 +494,34 @@ mod tests {
             &[IrOp::Mov {
                 dst: Operand::Reg(X86Reg::Rax),
                 src: Operand::Reg(X86Reg::Rdi)
+            }]
+        );
+        assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_mov_rdx_rax_to_register_move() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(3),
+                    DecodedInstructionKind::MovRdxRax,
+                ),
+                DecodedInstruction::new(X86Va::new(3), X86Va::new(4), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded register move lifts");
+        let block = &program.blocks()[0];
+
+        assert_eq!(
+            block.ops(),
+            &[IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rdx),
+                src: Operand::Reg(X86Reg::Rax)
             }]
         );
         assert_eq!(block.terminator(), &Terminator::Return);

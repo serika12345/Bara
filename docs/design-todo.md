@@ -483,6 +483,18 @@
   `48 89 c2` / `mov rdx, rax` を扱うが、source `rax` は直前の `_objc_alloc_init`
   `call rel32` return value なので、単なる register-copy decode だけでなく return
   materialization blocker として扱う。
+- 2026-06-13 の B8-G6m として、`48 89 c2` / `mov rdx, rax` を focused x86_64
+  register-copy slice として decode / lift / emit / debug report に追加した。debug
+  bundle では直前の `call_rel32` at `4294973028` / target `4294973108` /
+  return_to `4294973033` を `source_call_return` として `rdx` materialization blocker に
+  保存し、next blocker を
+  `return_to_continuation_call_rel32_return_value_materialization_unimplemented` に進める。
+  同じ continuation block は `call r14` at `4294973046` / return_to `4294973049` と
+  selector `setDelegate:` まで decode / report するが、`objc_alloc_init` 全般、
+  arbitrary register-copy execution、general call-rel32 helper execution、arbitrary
+  Objective-C message send、translation cache / fallback JIT は追加しない。次の B8-G6n
+  では public Mach-O stub / symbol / import metadata を使って、この `call_rel32`
+  return value の helper boundary または stable unresolved-stub blocker を扱う。
 - 2026-06-13 の planning update として、B8-HWGUI を self-authored Hello World GUI
   completion の大目標として明文化した。大目標の対象は、実 `LC_MAIN` entry から
   GUI lifecycle helper boundary までを通し、automated expected / actual と manual visible

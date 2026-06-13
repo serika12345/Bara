@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 14:51 JST
+最終更新: 2026-06-13 15:10 JST
 
 状態:
 
@@ -111,13 +111,19 @@
   next blocker `return_to_continuation_unsupported_instruction` を保存する。次の blocker
   は `4294973043` の `48 89 c2` / `mov rdx, rax` decode 未対応であり、直前の
   `_objc_alloc_init` `call rel32` return value materialization と一緒に扱う必要がある。
+  B8-G6m では `48 89 c2` / `mov rdx, rax` を focused x86_64 register-copy
+  slice として decode / lift / emit / debug report に追加し、`rdx` の
+  `source=register_copy_from_rax`、`source_call_return.call_site=4294973028`、
+  `source_call_return.target=4294973108`、`source_call_return.return_register=rax` を
+  stable report に保存する。next blocker は
+  `return_to_continuation_call_rel32_return_value_materialization_unimplemented` である。
   arbitrary dynamic library data symbol read、return-to continuation の一般実行、
   arbitrary indirect call target execution、translation cache、fallback JIT/interpreter は
   まだ行わない。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8-HWGUI Self-Authored Hello
   World GUI Completion を大目標として、`task/b8-hello-world-gui-complete` 上で
-  blocker-driven slice を継続中。B8-G6l は完了し、次は B8-G6m Return-To Continuation
-  `objc_alloc_init` Return Value Register Copy Slice。
+  blocker-driven slice を継続中。B8-G6m は完了し、次は B8-G6n Return-To Continuation
+  `call_rel32` `objc_alloc_init` Helper Boundary。
 - active_design_focus: B8-HWGUI Self-Authored Hello World GUI Completion を大目標として
   明文化した。B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から GUI lifecycle helper boundary までを通す。`/advance-large` を
@@ -136,7 +142,7 @@
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
   B8-G5b-G5e / B8-G6a / B8-G6b / B8-G6c / B8-G6d / B8-G6e / B8-G6f /
   B8-G6g / B8-G6h / B8-G6i / B8-G6j / B8-G6k / B8-G6l / B8-G6m /
-  B8-HWGUI / B8-OSS0。
+  B8-G6n / B8-HWGUI / B8-OSS0。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -287,23 +293,32 @@
   AppKit API helper process で実行する。helper output は `bool_as_u64` として保存し、
   helper 実行後の `next_source_pc=4294973021`、次の continuation decode boundary、
   next blocker `return_to_continuation_unsupported_instruction` を stable report に保存する。
+- B8-G6m として `48 89 c2` / `mov rdx, rax` を decode / lift / emit / debug report に
+  追加し、直前の `call_rel32` at `4294973028` / target `4294973108` / return_to
+  `4294973033` の return value が `rax` source であることを
+  `source_call_return` として保存する。`call r14` at `4294973046` /
+  return_to `4294973049` と selector `setDelegate:` まで report し、next blocker は
+  `return_to_continuation_call_rel32_return_value_materialization_unimplemented` に進む。
 - B8-HWGUI として、self-authored x86_64 Mach-O GUI Hello World fixture を実 `LC_MAIN`
   entry から GUI 起動完遂まで通す大目標、`/advance-large` 利用時の stop 条件、
   および B8-HWGUI merge 後に開始する B8-OSS0 source-built OSS GUI app automation target を
   TODO / design TODO に追加した。
-- remaining_work: B8-G6m。G6l が残す
-  `return_to_continuation_unsupported_instruction` を受けて、`4294973043` の
-  `48 89 c2` / `mov rdx, rax` と、その source である直前の `_objc_alloc_init`
-  `call rel32` return value materialization boundary を focused slice として扱う。
-  arbitrary register-copy execution、general call-rel32 helper execution、arbitrary
-  Objective-C allocation / initialization bridge、translation cache、fallback
-  JIT/interpreter はまだ行わない。
-- next_action: 次の小 step は B8-G6m Return-To Continuation `objc_alloc_init` Return
-  Value Register Copy Slice。B8-HWGUI 大目標の途中なので、coherent step ごとに
+- remaining_work: B8-G6n。G6m が残す
+  `return_to_continuation_call_rel32_return_value_materialization_unimplemented` を受けて、
+  `call_rel32` at `4294973028` / target `4294973108` / return_to `4294973033` を
+  focused helper boundary として扱う。public Mach-O stub / symbol / import metadata で
+  `_objc_alloc_init` identity を解決できる場合は保存し、まだ解決できない場合は stable
+  unresolved-stub blocker に進める。arbitrary call-rel32 execution、general dynamic
+  symbol resolver、arbitrary Objective-C allocation / initialization bridge、translation
+  cache、fallback JIT/interpreter はまだ行わない。
+- next_action: 次の小 step は B8-G6n Return-To Continuation `call_rel32`
+  `objc_alloc_init` Helper Boundary。B8-HWGUI 大目標の途中なので、coherent step ごとに
   verify / commit / push し、Hello World GUI 完遂 review gate で draft PR を開いて停止する。
 - verification:
+  `nix develop -c cargo test -p bara-isa-x86 mov_rdx_rax -- --nocapture` が通過した。
+  `nix develop -c cargo test -p bara-arm64 emits_mov_rdx_rax -- --nocapture` が通過した。
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
-  B8-G6l 実装後の full `nix develop -c ./scripts/verify` が通過した。
+  B8-G6m 実装後の full `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 

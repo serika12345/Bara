@@ -318,6 +318,16 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                         ));
                         offset = end_offset;
                     }
+                    (0x89, 0xc2) => {
+                        let end_offset = offset + 3;
+                        let end = instruction_end(input, at, end_offset, 3)?;
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::MovRdxRax,
+                        ));
+                        offset = end_offset;
+                    }
                     (0x89, 0xe5) => {
                         let end_offset = offset + 3;
                         let end = instruction_end(input, at, end_offset, 3)?;

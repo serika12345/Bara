@@ -1541,16 +1541,16 @@ branch: `task/b8-hello-world-gui-complete`
 
 完了条件:
 
-- [ ] B8-G6l の `return_to_continuation_unsupported_instruction` を受けて、
+- [x] B8-G6l の `return_to_continuation_unsupported_instruction` を受けて、
   `4294973043` の `48 89 c2` / `mov rdx, rax` を focused x86_64 register-copy
   slice として decode / report する。
-- [ ] `mov rdx, rax` の source `rax` が直前の `_objc_alloc_init` `call rel32`
+- [x] `mov rdx, rax` の source `rax` が直前の `_objc_alloc_init` `call rel32`
   return value であることを stable boundary として扱い、まだ helper 実行できない場合は
   `objc_alloc_init` return materialization blocker として分類する。
-- [ ] `mov rdx, rax` 後の `call r14` が
+- [x] `mov rdx, rax` 後の `call r14` が
   `_objc_msgSend(NSApp, setDelegate:, delegate)` に進む事実または stable blocker を
   next boundary として保存する。
-- [ ] `objc_alloc_init` 全般、arbitrary class allocation、arbitrary register-copy execution、
+- [x] `objc_alloc_init` 全般、arbitrary class allocation、arbitrary register-copy execution、
   general call-rel32 helper execution、arbitrary Objective-C message send、
   translation cache、fallback JIT/interpreter は行わない。
 
@@ -1560,6 +1560,42 @@ PR に含めない:
 - arbitrary call-rel32 import/helper execution。
 - arbitrary Objective-C allocation / initialization bridge。
 - general continuation execution、translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として完了。次の gate は B8-G6n。
+
+#### PR Gate: B8-G6n Return-To Continuation call_rel32 objc_alloc_init Helper Boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [ ] B8-G6m の
+  `return_to_continuation_call_rel32_return_value_materialization_unimplemented` を受けて、
+  `call_rel32` at `4294973028` / target `4294973108` / return_to `4294973033` を
+  focused helper boundary として保存する。
+- [ ] public Mach-O stub / symbol / import metadata から `_objc_alloc_init` identity を
+  解決できる場合は保存し、まだ解決できない場合は stable unresolved-stub blocker として
+  分類する。
+- [ ] `objc_alloc_init` return value が `rax` に入り、`mov rdx, rax` によって
+  `setDelegate:` argument へ渡る dataflow を helper return materialization boundary として
+  保存する。
+- [ ] arbitrary call-rel32 helper execution、arbitrary Objective-C allocation /
+  initialization、general dynamic symbol resolver、translation cache、fallback
+  JIT/interpreter は行わない。
+
+PR に含めない:
+
+- 一般的な call-rel32 execution engine。
+- arbitrary Objective-C allocation / initialization bridge。
+- dynamic linker / dyld stub binding の一般実装。
+- translation cache、fallback JIT/interpreter。
 
 検証:
 

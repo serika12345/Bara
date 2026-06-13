@@ -762,6 +762,7 @@ enum B8DebugDecodedInstructionKindReport {
     },
     MovRdiQwordPtrR15,
     MovRdxQwordPtrRax,
+    MovRdxRax,
     LeaRdiRipRelative {
         displacement: String,
         address: u64,
@@ -876,6 +877,7 @@ impl B8DebugDecodedInstructionKindReport {
             },
             DecodedInstructionKind::MovRdiQwordPtrR15 => Self::MovRdiQwordPtrR15,
             DecodedInstructionKind::MovRdxQwordPtrRax => Self::MovRdxQwordPtrRax,
+            DecodedInstructionKind::MovRdxRax => Self::MovRdxRax,
             DecodedInstructionKind::LeaRdiRipRelative {
                 displacement,
                 address,
@@ -2259,6 +2261,7 @@ enum B8DebugObjcHelperExecutionBlocker {
     ObjcRuntimeHelperHostExecutionUnsupported,
     ReceiverIdentityUnavailable,
     ReturnToContinuationDecodeFailed,
+    ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented,
     ReturnToContinuationExecutionUnimplemented,
     ReturnToContinuationImportGlobalLoadUnimplemented,
     ReturnToContinuationObjcHelperExecutionUnimplemented,
@@ -2440,6 +2443,7 @@ enum B8DebugObjcHelperReturnContinuationNextAction {
     DecodeReturnToContinuationBlock,
     ImplementReturnToContinuationObjcHelperExecution,
     ImplementReturnToContinuationExecution,
+    MaterializeReturnToContinuationCallRel32ReturnValue,
     MaterializeReturnToContinuationImportGlobalLoad,
     InspectReturnToContinuationObjcHelperExecutionFailure,
     InspectReturnToContinuationDecodeFailure,
@@ -2545,6 +2549,12 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
                     )
                 {
                     B8DebugReturnToContinuationDecodeNextAction::MaterializeReturnToContinuationImportGlobalLoad
+                } else if materialization_blocker
+                    == Some(
+                        B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented,
+                    )
+                {
+                    B8DebugReturnToContinuationDecodeNextAction::MaterializeReturnToContinuationCallRel32ReturnValue
                 } else if unsupported_instruction.is_some() {
                     B8DebugReturnToContinuationDecodeNextAction::AddReturnToContinuationInstructionSupport
                 } else if let Some(boundary) = continuation_call_boundary.as_ref() {
@@ -2621,6 +2631,9 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
             B8DebugReturnToContinuationDecodeNextAction::InspectReturnToContinuationObjcHelperExecutionFailure => {
                 B8DebugObjcHelperReturnContinuationNextAction::InspectReturnToContinuationObjcHelperExecutionFailure
             }
+            B8DebugReturnToContinuationDecodeNextAction::MaterializeReturnToContinuationCallRel32ReturnValue => {
+                B8DebugObjcHelperReturnContinuationNextAction::MaterializeReturnToContinuationCallRel32ReturnValue
+            }
             B8DebugReturnToContinuationDecodeNextAction::MaterializeReturnToContinuationImportGlobalLoad => {
                 B8DebugObjcHelperReturnContinuationNextAction::MaterializeReturnToContinuationImportGlobalLoad
             }
@@ -2668,6 +2681,7 @@ enum B8DebugReturnToContinuationDecodeNextAction {
     ImplementReturnToContinuationExecution,
     InspectReturnToContinuationDecodeFailure,
     InspectReturnToContinuationObjcHelperExecutionFailure,
+    MaterializeReturnToContinuationCallRel32ReturnValue,
     MaterializeReturnToContinuationImportGlobalLoad,
     RunReturnToContinuationObjcHelperOnSupportedMacosHost,
 }
@@ -2703,10 +2717,19 @@ impl B8DebugReturnToContinuationMaterializedRegisterStateReport {
         let mut r15_address = None;
         let mut r15_value = None;
         let mut r15_fixup_resolution = None;
+        let mut rax_call_return = None;
         let mut blocked = Vec::new();
 
         for instruction in decoded.instructions() {
             match instruction.kind() {
+                DecodedInstructionKind::CallRel32 { target, return_to } => {
+                    rax_call_return = Some(B8DebugReturnToContinuationCallRel32ReturnValueReport {
+                        call_site: instruction.start().value(),
+                        return_to: return_to.value(),
+                        target: target.value(),
+                        return_register: B8DebugRegisterName::Rax,
+                    });
+                }
                 DecodedInstructionKind::MovR15QwordPtrRipRelative { address, .. } => {
                     if let Some(value) = mapped_bytes.read_u64_le(*address) {
                         let fixup_resolution =
@@ -2798,9 +2821,11 @@ impl B8DebugReturnToContinuationMaterializedRegisterStateReport {
                                         B8DebugReturnToContinuationMaterializedRegisterSource::RegisterIndirectQword,
                                     instruction_start: instruction.start().value(),
                                     instruction_end: instruction.end().value(),
-                                    base_register: B8DebugRegisterName::R15,
-                                    base_value,
+                                    base_register: Some(B8DebugRegisterName::R15),
+                                    base_value: Some(base_value),
                                     base_fixup_resolution: r15_fixup_resolution.clone(),
+                                    source_register: None,
+                                    source_call_return: None,
                                     blocker: B8DebugObjcHelperExecutionBlocker::ReturnToContinuationImportGlobalLoadUnimplemented,
                                 },
                             );
@@ -2849,6 +2874,23 @@ impl B8DebugReturnToContinuationMaterializedRegisterStateReport {
                         width: B8DebugMemoryReadWidthReport::Bits64,
                     });
                 }
+                DecodedInstructionKind::MovRdxRax => {
+                    blocked.push(
+                        B8DebugReturnToContinuationBlockedRegisterMaterializationReport {
+                            register: B8DebugRegisterName::Rdx,
+                            source:
+                                B8DebugReturnToContinuationMaterializedRegisterSource::RegisterCopyFromRax,
+                            instruction_start: instruction.start().value(),
+                            instruction_end: instruction.end().value(),
+                            base_register: None,
+                            base_value: None,
+                            base_fixup_resolution: None,
+                            source_register: Some(B8DebugRegisterName::Rax),
+                            source_call_return: rax_call_return,
+                            blocker: B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented,
+                        },
+                    );
+                }
                 _ => {}
             }
         }
@@ -2863,10 +2905,20 @@ struct B8DebugReturnToContinuationBlockedRegisterMaterializationReport {
     source: B8DebugReturnToContinuationMaterializedRegisterSource,
     instruction_start: u64,
     instruction_end: u64,
-    base_register: B8DebugRegisterName,
-    base_value: u64,
+    base_register: Option<B8DebugRegisterName>,
+    base_value: Option<u64>,
     base_fixup_resolution: Option<B8DebugObjcArgumentFixupResolutionReport>,
+    source_register: Option<B8DebugRegisterName>,
+    source_call_return: Option<B8DebugReturnToContinuationCallRel32ReturnValueReport>,
     blocker: B8DebugObjcHelperExecutionBlocker,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationCallRel32ReturnValueReport {
+    call_site: u64,
+    return_to: u64,
+    target: u64,
+    return_register: B8DebugRegisterName,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -2876,6 +2928,8 @@ enum B8DebugReturnToContinuationMaterializedRegisterSource {
     ImportedGlobalPointee,
     #[serde(rename = "register_indirect_qword_load")]
     RegisterIndirectQword,
+    #[serde(rename = "register_copy_from_rax")]
+    RegisterCopyFromRax,
     #[serde(rename = "rip_relative_qword_load")]
     RipRelativeQword,
     #[serde(rename = "xor_edx_edx_zero")]
@@ -4699,6 +4753,7 @@ enum B8DebugHelperBoundaryBlockedReason {
     ObjcRuntimeHelperExecutionFailed,
     ObjcRuntimeHelperExecutionUnsupported,
     ReturnToContinuationDecodeFailed,
+    ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented,
     ReturnToContinuationExecutionUnimplemented,
     ReturnToContinuationImportGlobalLoadUnimplemented,
     ReturnToContinuationObjcHelperExecutionUnimplemented,
@@ -4723,6 +4778,9 @@ impl B8DebugHelperBoundaryBlockedReason {
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationDecodeFailed => {
                 Self::ReturnToContinuationDecodeFailed
+            }
+            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented => {
+                Self::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationImportGlobalLoadUnimplemented => {
                 Self::ReturnToContinuationImportGlobalLoadUnimplemented
@@ -4757,6 +4815,7 @@ enum B8DebugHelperBoundaryBlocker {
     ObjcRuntimeHelperExecutionFailed,
     ObjcRuntimeHelperExecutionUnsupported,
     ReturnToContinuationDecodeFailed,
+    ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented,
     ReturnToContinuationExecutionUnimplemented,
     ReturnToContinuationImportGlobalLoadUnimplemented,
     ReturnToContinuationObjcHelperExecutionUnimplemented,
@@ -4787,6 +4846,9 @@ impl B8DebugHelperBoundaryBlocker {
             }
             B8DebugHelperBoundaryBlockedReason::ReturnToContinuationDecodeFailed => {
                 vec![Self::ReturnToContinuationDecodeFailed]
+            }
+            B8DebugHelperBoundaryBlockedReason::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented => {
+                vec![Self::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented]
             }
             B8DebugHelperBoundaryBlockedReason::ReturnToContinuationImportGlobalLoadUnimplemented => {
                 vec![Self::ReturnToContinuationImportGlobalLoadUnimplemented]
@@ -4827,6 +4889,9 @@ impl B8DebugHelperBoundaryBlocker {
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationDecodeFailed => {
                 Self::ReturnToContinuationDecodeFailed
+            }
+            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented => {
+                Self::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationImportGlobalLoadUnimplemented => {
                 Self::ReturnToContinuationImportGlobalLoadUnimplemented

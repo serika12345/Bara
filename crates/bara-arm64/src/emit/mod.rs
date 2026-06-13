@@ -386,6 +386,15 @@ pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
                     emit_mov_x19_x0(&mut code);
                 }
                 IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rdx),
+                    src: Operand::Reg(X86Reg::Rax),
+                } => {
+                    if !has_rax_value {
+                        return Err(EmitError::UnsupportedShape);
+                    }
+                    emit_mov_x2_x0(&mut code);
+                }
+                IrOp::Mov {
                     dst: Operand::Reg(X86Reg::Rbp),
                     src: Operand::Reg(X86Reg::Rsp),
                 } => {
@@ -902,6 +911,10 @@ fn emit_mov_x29_sp(code: &mut Vec<u8>) -> usize {
 
 fn emit_mov_x19_x0(code: &mut Vec<u8>) -> usize {
     emit_u32_le(code, 0xaa00_03f3)
+}
+
+fn emit_mov_x2_x0(code: &mut Vec<u8>) -> usize {
+    emit_u32_le(code, 0xaa00_03e2)
 }
 
 fn emit_pop_x0(code: &mut Vec<u8>) -> usize {
@@ -1781,6 +1794,30 @@ mod tests {
         assert_eq!(
             emitted.code().bytes(),
             &[0x40, 0x05, 0x80, 0xd2, 0xf3, 0x03, 0x00, 0xaa, 0xc0, 0x03, 0x5f, 0xd6]
+        );
+    }
+
+    #[test]
+    fn emits_mov_rdx_rax_as_argument_register_assignment() {
+        let program = program_with_ops(
+            vec![
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(42),
+                },
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rdx),
+                    src: Operand::Reg(X86Reg::Rax),
+                },
+            ],
+            Terminator::Return,
+        );
+
+        let emitted = emit_program(&program).expect("mov rdx,rax IR emits");
+
+        assert_eq!(
+            emitted.code().bytes(),
+            &[0x40, 0x05, 0x80, 0xd2, 0xe2, 0x03, 0x00, 0xaa, 0xc0, 0x03, 0x5f, 0xd6]
         );
     }
 
