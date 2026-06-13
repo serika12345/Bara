@@ -9,11 +9,11 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 12:53 JST
+最終更新: 2026-06-13 13:16 JST
 
 状態:
 
-- project_state: paused。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
+- project_state: completed。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
   reviewable GUI 起動 slice の積み上げとして扱う。B8-G6c までで、self-authored
   x86_64 GUI fixture の実 `LC_MAIN` entry から
   `push rbp; mov rbp,rsp; push r15; push r14; push rbx; push rax; call rel32;
@@ -81,30 +81,36 @@
   `unsupported_instruction.kind.reason=DecodeUnsupportedOpcode { opcode: 73, ... }` まで進める。
   B8-G6g では `49 8b 3f` を x86_64 `mov rdi, qword ptr [r15]` として
   decode / lift / debug report 境界に追加し、`r15` が public chained fixups 上で AppKit
-  `_NSApp` import に解決されることを保存する。`mov rdi, [r15]` は mapped image qword
-  read ではなく imported global pointee load であるため、次の blocker は
-  `return_to_continuation_import_global_load_unimplemented` である。arbitrary indirect call
-  target execution、translation cache、fallback JIT/interpreter はまだ行わない。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G6g Return-To Continuation
-  R15-Indirect RDI Load Slice: G6f の continuation block が残した
-  `return_to_continuation_unsupported_instruction` を受けて、`49 8b 3f` を
-  `mov rdi, qword ptr [r15]` として扱い、`r15` import identity と `rdi`
-  materialization blocker を stable report に保存する。
+  `_NSApp` import に解決されることを保存する。B8-G6h ではこの `_NSApp` imported global
+  pointee load を self-authored B8 GUI fixture の `_objc_msgSend(NSApplication,
+  sharedApplication)` host helper return value にだけ接続し、`rdi` を
+  `imported_global_pointee_load` / `value_source=objc_shared_application_helper_return_value`
+  として materialize する。continuation report は input の x86_64 `rax` register state、
+  `r15` import identity、`rdi` available state、`blocked_register_materializations=[]` を
+  保持し、次の blocker は `31 d2` at `4294973016` の
+  `return_to_continuation_unsupported_instruction` に進む。arbitrary dynamic library data
+  symbol read、return-to continuation の一般実行、arbitrary indirect call target
+  execution、translation cache、fallback JIT/interpreter はまだ行わない。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G6h Return-To Continuation
+  NSApp Global Load Boundary: G6g の
+  `return_to_continuation_import_global_load_unimplemented` を受けて、AppKit `_NSApp`
+  imported global pointee load を fixture-scoped helper value として扱い、次の
+  unsupported `31 d2` / `xor edx, edx` slice まで進める。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
   Objective-C runtime / dyld の private behavior は使わず、public metadata、
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
-- active_branch: `task/b8-g6g-continuation-r15-indirect-rdi-load`。base branch は
-  最新 `main` の `f1ea4db` (`Merge pull request #43 from
-  serika12345:task/b8-g6f-continuation-r15-rip-relative-load`)。implementation commit は
-  `43333ab` (`feat: add b8 g6g r15 indirect rdi load boundary`)。draft PR は
-  <https://github.com/serika12345/Bara/pull/44>。
+- active_branch: `task/b8-g6h-continuation-nsapp-global-load`。base branch は
+  最新 `main` の `518430a` (`Merge pull request #44 from
+  serika12345:task/b8-g6g-continuation-r15-indirect-rdi-load`)。implementation commit は
+  `514bd3a` (`feat: materialize b8 g6h nsapp global load`)。draft PR は
+  <https://github.com/serika12345/Bara/pull/45>。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
   B8-G5b-G5e / B8-G6a / B8-G6b / B8-G6c / B8-G6d / B8-G6e / B8-G6f /
-  B8-G6g。
+  B8-G6g / B8-G6h / B8-G6i。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -228,26 +234,37 @@
   `processed_source_pc_range=4294972999..4294973007`、
   `unsupported_instruction.kind.reason=DecodeUnsupportedOpcode { opcode: 73, ... }` まで進める。
   B8-G6g として `49 8b 3f` を `mov_rdi_qword_ptr_r15` として report し、
-  `r15` の `fixup_resolution` は AppKit `_NSApp` import に解決される。`rdi` は
-  imported global pointee load が未実装であるため
-  `blocked_register_materializations` と
-  `return_to_continuation_import_global_load_unimplemented` blocker に進む。
-- remaining_work: B8-G6h。G6g の continuation block が残す
-  `return_to_continuation_import_global_load_unimplemented` を受けて、AppKit `_NSApp`
-  imported global pointee load を focused boundary / fixture-scoped helper として扱う。
-  一般的な dynamic library data symbol memory model、`return_to` 以降の一般実行、
-  arbitrary indirect call target execution、translation cache、fallback JIT/interpreter は
-  まだ行わない。
-- next_action: B8-G6g draft PR #44 を review / merge する。merge 後の次 PR Gate は
-  B8-G6h Return-To Continuation NSApp Global Load Boundary。
+  `r15` の `fixup_resolution` は AppKit `_NSApp` import に解決される。B8-G6h として
+  `_NSApp` imported global pointee load を fixture-scoped helper value から
+  materialize し、`rdi` の `source=imported_global_pointee_load`、
+  `base_register=r15`、`base_value=9227875636482146304`、
+  `value_source=objc_shared_application_helper_return_value` を stable report に保存する。
+  `blocked_register_materializations=[]` になり、次の blocker は `31 d2` at
+  `4294973016` の `return_to_continuation_unsupported_instruction` へ進む。
+- remaining_work: B8-G6i。G6h の continuation block が残す
+  `return_to_continuation_unsupported_instruction` を受けて、`31 d2` を
+  x86_64 `xor edx, edx` / 32-bit zeroing semantics として扱う。一般的な
+  `xor r32, r32` 全体、`return_to` 以降の一般実行、arbitrary indirect call target
+  execution、translation cache、fallback JIT/interpreter はまだ行わない。
+- next_action: B8-G6h draft PR #45 を review / merge する。merge 後の次 PR Gate は
+  B8-G6i Return-To Continuation XOR EDX Zero Slice。
 - verification:
-  `nix develop -c cargo test -p bara-isa-x86 r15 -- --nocapture`、
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
-  `nix develop -c ./scripts/verify` が通過した。PR URL 記録後に
+  `nix develop -c ./scripts/verify` が通過した。progress 更新後に
   `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-13 13:06 JST: B8-G6h Return-To Continuation NSApp Global Load Boundary
+  を実装した。`r15` の public chained fixups 解決が AppKit `_NSApp` import である場合に限り、
+  self-authored B8 GUI fixture の `_objc_msgSend(NSApplication, sharedApplication)` host
+  helper return value を `_NSApp` imported global pointee load の fixture-scoped 値として
+  扱う。continuation report は input の `rax` state と `r15` import identity を保持し、
+  `rdi` を `imported_global_pointee_load` として materialize する。次 blocker は
+  `31 d2` at `4294973016` の `return_to_continuation_unsupported_instruction` である。
+  検証は `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
+  `nix develop -c ./scripts/verify` が通過した。progress 更新後に
+  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 - 2026-06-13 12:45 JST: B8-G6g Return-To Continuation R15-Indirect RDI Load Slice
   を実装した。`49 8b 3f` を x86_64 `mov rdi, qword ptr [r15]` として decode / lift /
   stable debug report に追加し、continuation report は input の `rax` state と

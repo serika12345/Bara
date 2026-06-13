@@ -2308,9 +2308,14 @@ impl B8DebugObjcHelperReturnContinuationBoundaryReport {
         let register_state = B8DebugObjcHelperReturnContinuationRegisterStateReport::from_writeback(
             return_writeback,
         );
+        let imported_global_value =
+            B8DebugReturnToContinuationImportedGlobalValue::nsapp_from_host_execution(
+                host_execution,
+            );
         let continuation_block = B8DebugReturnToContinuationDecodeBoundaryReport::from_code_bytes(
             call_boundary.return_to,
             register_state,
+            imported_global_value,
             code_bytes,
             input,
             input_probe,
@@ -2451,6 +2456,7 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
     fn from_code_bytes(
         source_pc: u64,
         input_register_state: B8DebugObjcHelperReturnContinuationRegisterStateReport,
+        imported_global_value: Option<B8DebugReturnToContinuationImportedGlobalValue>,
         code_bytes: &X86Bytes,
         input: &BinaryInput,
         input_probe: &BinaryFormatProbeReport,
@@ -2477,6 +2483,7 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
                         image_metadata.mapped_bytes(),
                         input,
                         input_probe,
+                        imported_global_value,
                     );
                 let materialization_blocker =
                     blocked_register_materializations.first().map(|blocked| blocked.blocker);
@@ -2609,9 +2616,12 @@ struct B8DebugReturnToContinuationMaterializedRegisterStateReport {
     source: B8DebugReturnToContinuationMaterializedRegisterSource,
     instruction_start: u64,
     instruction_end: u64,
-    address: u64,
+    address: Option<u64>,
     base_register: Option<B8DebugRegisterName>,
+    base_value: Option<u64>,
+    base_fixup_resolution: Option<B8DebugObjcArgumentFixupResolutionReport>,
     value: u64,
+    value_source: Option<B8DebugReturnToContinuationMaterializedRegisterValueSource>,
     fixup_resolution: Option<B8DebugObjcArgumentFixupResolutionReport>,
     width: B8DebugMemoryReadWidthReport,
 }
@@ -2622,6 +2632,7 @@ impl B8DebugReturnToContinuationMaterializedRegisterStateReport {
         mapped_bytes: &ProgramImageMappedBytes,
         input: &BinaryInput,
         input_probe: &BinaryFormatProbeReport,
+        imported_global_value: Option<B8DebugReturnToContinuationImportedGlobalValue>,
     ) -> (
         Vec<Self>,
         Vec<B8DebugReturnToContinuationBlockedRegisterMaterializationReport>,
@@ -2653,19 +2664,41 @@ impl B8DebugReturnToContinuationMaterializedRegisterStateReport {
                         states.push(Self {
                             register: B8DebugRegisterName::R15,
                             source:
-                                B8DebugReturnToContinuationMaterializedRegisterSource::RipRelativeQwordLoad,
+                                B8DebugReturnToContinuationMaterializedRegisterSource::RipRelativeQword,
                             instruction_start: instruction.start().value(),
                             instruction_end: instruction.end().value(),
-                            address: address.value(),
+                            address: Some(address.value()),
                             base_register: None,
+                            base_value: None,
+                            base_fixup_resolution: None,
                             value,
+                            value_source: None,
                             fixup_resolution: Some(fixup_resolution),
                             width: B8DebugMemoryReadWidthReport::Bits64,
                         });
                     }
                 }
                 DecodedInstructionKind::MovRdiQwordPtrR15 => {
-                    if r15_fixup_resolution
+                    if let Some(imported_global_value) = imported_global_value_for_resolution(
+                        imported_global_value,
+                        r15_fixup_resolution.as_ref(),
+                    ) {
+                        states.push(Self {
+                            register: B8DebugRegisterName::Rdi,
+                            source:
+                                B8DebugReturnToContinuationMaterializedRegisterSource::ImportedGlobalPointee,
+                            instruction_start: instruction.start().value(),
+                            instruction_end: instruction.end().value(),
+                            address: None,
+                            base_register: Some(B8DebugRegisterName::R15),
+                            base_value: r15_value,
+                            base_fixup_resolution: r15_fixup_resolution.clone(),
+                            value: imported_global_value.value,
+                            value_source: Some(imported_global_value.source),
+                            fixup_resolution: None,
+                            width: B8DebugMemoryReadWidthReport::Bits64,
+                        });
+                    } else if r15_fixup_resolution
                         .as_ref()
                         .is_some_and(|resolution| resolution.import.is_some())
                     {
@@ -2674,7 +2707,7 @@ impl B8DebugReturnToContinuationMaterializedRegisterStateReport {
                                 B8DebugReturnToContinuationBlockedRegisterMaterializationReport {
                                     register: B8DebugRegisterName::Rdi,
                                     source:
-                                        B8DebugReturnToContinuationMaterializedRegisterSource::RegisterIndirectQwordLoad,
+                                        B8DebugReturnToContinuationMaterializedRegisterSource::RegisterIndirectQword,
                                     instruction_start: instruction.start().value(),
                                     instruction_end: instruction.end().value(),
                                     base_register: B8DebugRegisterName::R15,
@@ -2696,12 +2729,15 @@ impl B8DebugReturnToContinuationMaterializedRegisterStateReport {
                             states.push(Self {
                                 register: B8DebugRegisterName::Rdi,
                                 source:
-                                    B8DebugReturnToContinuationMaterializedRegisterSource::RegisterIndirectQwordLoad,
+                                    B8DebugReturnToContinuationMaterializedRegisterSource::RegisterIndirectQword,
                                 instruction_start: instruction.start().value(),
                                 instruction_end: instruction.end().value(),
-                                address: address.value(),
+                                address: Some(address.value()),
                                 base_register: Some(B8DebugRegisterName::R15),
+                                base_value: r15_value,
+                                base_fixup_resolution: r15_fixup_resolution.clone(),
                                 value,
+                                value_source: None,
                                 fixup_resolution: Some(fixup_resolution),
                                 width: B8DebugMemoryReadWidthReport::Bits64,
                             });
@@ -2731,8 +2767,79 @@ struct B8DebugReturnToContinuationBlockedRegisterMaterializationReport {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum B8DebugReturnToContinuationMaterializedRegisterSource {
-    RegisterIndirectQwordLoad,
-    RipRelativeQwordLoad,
+    #[serde(rename = "imported_global_pointee_load")]
+    ImportedGlobalPointee,
+    #[serde(rename = "register_indirect_qword_load")]
+    RegisterIndirectQword,
+    #[serde(rename = "rip_relative_qword_load")]
+    RipRelativeQword,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationMaterializedRegisterValueSource {
+    ObjcSharedApplicationHelperReturnValue,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct B8DebugReturnToContinuationImportedGlobalValue {
+    symbol: B8DebugReturnToContinuationImportedGlobalSymbol,
+    value: u64,
+    source: B8DebugReturnToContinuationMaterializedRegisterValueSource,
+}
+
+impl B8DebugReturnToContinuationImportedGlobalValue {
+    fn nsapp_from_host_execution(
+        host_execution: &B8DebugObjcRuntimeHelperHostExecutionReport,
+    ) -> Option<Self> {
+        if !host_execution.is_executed()
+            || !host_execution
+                .invocation
+                .is_supported_b8_shared_application_message()
+        {
+            return None;
+        }
+
+        Some(Self {
+            symbol: B8DebugReturnToContinuationImportedGlobalSymbol::NsApp,
+            value: host_execution.output?.return_value,
+            source:
+                B8DebugReturnToContinuationMaterializedRegisterValueSource::ObjcSharedApplicationHelperReturnValue,
+        })
+    }
+
+    fn matches_import(self, import: &MachOChainedImportIdentityReport) -> bool {
+        self.symbol.matches_import(import)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum B8DebugReturnToContinuationImportedGlobalSymbol {
+    NsApp,
+}
+
+impl B8DebugReturnToContinuationImportedGlobalSymbol {
+    fn matches_import(self, import: &MachOChainedImportIdentityReport) -> bool {
+        match self {
+            Self::NsApp => {
+                import.symbol_name() == "_NSApp"
+                    && import.dylib_path().is_some_and(|path| {
+                        path == "/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit"
+                    })
+            }
+        }
+    }
+}
+
+fn imported_global_value_for_resolution(
+    imported_global_value: Option<B8DebugReturnToContinuationImportedGlobalValue>,
+    resolution: Option<&B8DebugObjcArgumentFixupResolutionReport>,
+) -> Option<B8DebugReturnToContinuationImportedGlobalValue> {
+    let imported_global_value = imported_global_value?;
+    let import = resolution?.import.as_ref()?;
+    imported_global_value
+        .matches_import(import)
+        .then_some(imported_global_value)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
