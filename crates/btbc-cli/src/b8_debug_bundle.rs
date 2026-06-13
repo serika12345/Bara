@@ -738,6 +738,7 @@ enum B8DebugDecodedInstructionKindReport {
     },
     MovRaxRdi,
     MovRbxRax,
+    MovRdiRbx,
     MovRaxQwordPtrRipRelative {
         displacement: String,
         address: u64,
@@ -838,6 +839,7 @@ impl B8DebugDecodedInstructionKindReport {
             DecodedInstructionKind::MovEaxImm32 { imm } => Self::MovEaxImm32 { imm: *imm },
             DecodedInstructionKind::MovRaxRdi => Self::MovRaxRdi,
             DecodedInstructionKind::MovRbxRax => Self::MovRbxRax,
+            DecodedInstructionKind::MovRdiRbx => Self::MovRdiRbx,
             DecodedInstructionKind::MovRaxQwordPtrRipRelative {
                 displacement,
                 address,
@@ -1210,6 +1212,7 @@ enum B8DebugTargetPointerLoadKind {
 #[serde(rename_all = "snake_case")]
 enum B8DebugRegisterName {
     Rax,
+    Rbx,
     Rdx,
     Rdi,
     Rsi,
@@ -2274,6 +2277,7 @@ enum B8DebugObjcHelperExecutionBlocker {
     ReturnToContinuationObjcAllocInitClassIdentityUnresolved,
     ReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionUnimplemented,
     ReturnToContinuationObjcHelperExecutionUnimplemented,
+    ReturnToContinuationSavedRegisterValueMaterializationUnimplemented,
     ReturnToContinuationUnsupportedInstruction,
     SelectorVmAddressUnavailable,
 }
@@ -2458,6 +2462,7 @@ enum B8DebugObjcHelperReturnContinuationNextAction {
     ImplementReturnToContinuationObjcHelperExecution,
     ImplementReturnToContinuationExecution,
     MaterializeReturnToContinuationObjcAllocInitClassArgument,
+    MaterializeReturnToContinuationSavedRegisterValue,
     ResolveReturnToContinuationObjcAllocInitClassIdentity,
     ResolveReturnToContinuationCallRel32StubSymbol,
     MaterializeReturnToContinuationCallRel32ReturnValue,
@@ -2610,6 +2615,12 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
                     )
                 {
                     B8DebugReturnToContinuationDecodeNextAction::MaterializeReturnToContinuationCallRel32ReturnValue
+                } else if materialization_blocker
+                    == Some(
+                        B8DebugObjcHelperExecutionBlocker::ReturnToContinuationSavedRegisterValueMaterializationUnimplemented,
+                    )
+                {
+                    B8DebugReturnToContinuationDecodeNextAction::MaterializeReturnToContinuationSavedRegisterValue
                 } else if unsupported_instruction.is_some() {
                     B8DebugReturnToContinuationDecodeNextAction::AddReturnToContinuationInstructionSupport
                 } else if let Some(boundary) = continuation_call_boundary.as_ref() {
@@ -2704,6 +2715,9 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
             B8DebugReturnToContinuationDecodeNextAction::MaterializeReturnToContinuationObjcAllocInitClassArgument => {
                 B8DebugObjcHelperReturnContinuationNextAction::MaterializeReturnToContinuationObjcAllocInitClassArgument
             }
+            B8DebugReturnToContinuationDecodeNextAction::MaterializeReturnToContinuationSavedRegisterValue => {
+                B8DebugObjcHelperReturnContinuationNextAction::MaterializeReturnToContinuationSavedRegisterValue
+            }
             B8DebugReturnToContinuationDecodeNextAction::ResolveReturnToContinuationObjcAllocInitClassIdentity => {
                 B8DebugObjcHelperReturnContinuationNextAction::ResolveReturnToContinuationObjcAllocInitClassIdentity
             }
@@ -2760,6 +2774,7 @@ enum B8DebugReturnToContinuationDecodeNextAction {
     MaterializeReturnToContinuationCallRel32ReturnValue,
     MaterializeReturnToContinuationImportGlobalLoad,
     MaterializeReturnToContinuationObjcAllocInitClassArgument,
+    MaterializeReturnToContinuationSavedRegisterValue,
     ResolveReturnToContinuationObjcAllocInitClassIdentity,
     ResolveReturnToContinuationCallRel32StubSymbol,
     RunReturnToContinuationObjcHelperOnSupportedMacosHost,
@@ -3066,6 +3081,25 @@ impl B8DebugReturnToContinuationMaterializedRegisterStateReport {
                             source_call_return,
                             source_call_return_dataflow,
                             blocker,
+                        },
+                    );
+                }
+                DecodedInstructionKind::MovRdiRbx => {
+                    blocked.push(
+                        B8DebugReturnToContinuationBlockedRegisterMaterializationReport {
+                            register: B8DebugRegisterName::Rdi,
+                            source:
+                                B8DebugReturnToContinuationMaterializedRegisterSource::RegisterCopyFromRbx,
+                            instruction_start: instruction.start().value(),
+                            instruction_end: instruction.end().value(),
+                            base_register: None,
+                            base_value: None,
+                            base_fixup_resolution: None,
+                            source_register: Some(B8DebugRegisterName::Rbx),
+                            source_call_return: None,
+                            source_call_return_dataflow: None,
+                            blocker:
+                                B8DebugObjcHelperExecutionBlocker::ReturnToContinuationSavedRegisterValueMaterializationUnimplemented,
                         },
                     );
                 }
@@ -4033,6 +4067,8 @@ enum B8DebugReturnToContinuationMaterializedRegisterSource {
     RegisterIndirectQword,
     #[serde(rename = "register_copy_from_rax")]
     RegisterCopyFromRax,
+    #[serde(rename = "register_copy_from_rbx")]
+    RegisterCopyFromRbx,
     #[serde(rename = "rip_relative_qword_load")]
     RipRelativeQword,
     #[serde(rename = "xor_edx_edx_zero")]
@@ -6696,6 +6732,7 @@ enum B8DebugHelperBoundaryBlockedReason {
     ReturnToContinuationObjcAllocInitClassIdentityUnresolved,
     ReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionUnimplemented,
     ReturnToContinuationObjcHelperExecutionUnimplemented,
+    ReturnToContinuationSavedRegisterValueMaterializationUnimplemented,
     ReturnToContinuationUnsupportedInstruction,
 }
 
@@ -6745,6 +6782,9 @@ impl B8DebugHelperBoundaryBlockedReason {
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcHelperExecutionUnimplemented => {
                 Self::ReturnToContinuationObjcHelperExecutionUnimplemented
             }
+            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationSavedRegisterValueMaterializationUnimplemented => {
+                Self::ReturnToContinuationSavedRegisterValueMaterializationUnimplemented
+            }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationUnsupportedInstruction => {
                 Self::ReturnToContinuationUnsupportedInstruction
             }
@@ -6782,6 +6822,7 @@ enum B8DebugHelperBoundaryBlocker {
     ReturnToContinuationObjcAllocInitClassIdentityUnresolved,
     ReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionUnimplemented,
     ReturnToContinuationObjcHelperExecutionUnimplemented,
+    ReturnToContinuationSavedRegisterValueMaterializationUnimplemented,
     ReturnToContinuationUnsupportedInstruction,
 }
 
@@ -6836,6 +6877,9 @@ impl B8DebugHelperBoundaryBlocker {
             }
             B8DebugHelperBoundaryBlockedReason::ReturnToContinuationObjcHelperExecutionUnimplemented => {
                 vec![Self::ReturnToContinuationObjcHelperExecutionUnimplemented]
+            }
+            B8DebugHelperBoundaryBlockedReason::ReturnToContinuationSavedRegisterValueMaterializationUnimplemented => {
+                vec![Self::ReturnToContinuationSavedRegisterValueMaterializationUnimplemented]
             }
             B8DebugHelperBoundaryBlockedReason::ReturnToContinuationUnsupportedInstruction => {
                 vec![Self::ReturnToContinuationUnsupportedInstruction]
@@ -6897,6 +6941,9 @@ impl B8DebugHelperBoundaryBlocker {
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcHelperExecutionUnimplemented => {
                 Self::ReturnToContinuationObjcHelperExecutionUnimplemented
+            }
+            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationSavedRegisterValueMaterializationUnimplemented => {
+                Self::ReturnToContinuationSavedRegisterValueMaterializationUnimplemented
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationUnsupportedInstruction => {
                 Self::ReturnToContinuationUnsupportedInstruction

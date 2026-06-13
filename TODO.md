@@ -1891,18 +1891,50 @@ branch: `task/b8-hello-world-gui-complete`
 
 完了条件:
 
-- [ ] B8-G6v の `return_to_continuation_unsupported_instruction` を受けて、
+- [x] B8-G6v の `return_to_continuation_unsupported_instruction` を受けて、
   `NSApp run` 後の `return_to=4294973062` continuation を focused に扱う。
-- [ ] self-authored B8 GUI fixture の post-run continuation 先頭命令
+- [x] self-authored B8 GUI fixture の post-run continuation 先頭命令
   `48 89 df` / `mov rdi, rbx` を stable decode / report できるようにし、
   `_objc_autoreleasePoolPop` へ渡す autorelease pool token handoff または
   focused blocker を保存する。
-- [ ] 次 blocker を `_objc_autoreleasePoolPop` helper boundary、post-run epilogue
+- [x] 次 blocker を `_objc_autoreleasePoolPop` helper boundary、post-run epilogue
   decode、または narrower continuation blocker へ進める。
 
 PR に含めない:
 
 - arbitrary register-to-register move の一般化。
+- arbitrary autorelease pool lifecycle execution。
+- full x86_64 function epilogue completion。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6w は完了し、次の gate は B8-G6x。
+
+#### PR Gate: B8-G6x Autorelease pool saved-register token materialization boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [ ] B8-G6w の
+  `return_to_continuation_saved_register_value_materialization_unimplemented` を受けて、
+  post-run `mov rdi, rbx` の source register `rbx` を focused に扱う。
+- [ ] self-authored B8 GUI fixture の initial `_objc_autoreleasePoolPush` return value が
+  `mov rbx, rax` で saved register に保持され、`NSApp run` 後の
+  `_objc_autoreleasePoolPop` argument へ渡る handoff を stable report する。
+- [ ] 次 blocker を `_objc_autoreleasePoolPop` helper boundary、post-run epilogue
+  decode、または narrower continuation blocker へ進める。
+
+PR に含めない:
+
+- arbitrary callee-saved register dataflow generalization。
 - arbitrary autorelease pool lifecycle execution。
 - full x86_64 function epilogue completion。
 - translation cache、fallback JIT/interpreter。

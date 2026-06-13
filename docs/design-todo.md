@@ -561,6 +561,11 @@
   `termination_request=ns_app_terminate_nil` で bounded に戻る。translated-code delegate
   callback execution、window lifecycle 一般化、`.app` bundle / nib / storyboard、
   translation cache / fallback JIT はこの boundary に含めない。
+- 2026-06-13 の B8-G6w として、post-run continuation の `48 89 df` /
+  `mov rdi, rbx` は `_objc_autoreleasePoolPop` へ渡す saved-register token handoff
+  として扱う。`rbx` の値はこの命令で推測せず、
+  `return_to_continuation_saved_register_value_materialization_unimplemented` として
+  initial `_objc_autoreleasePoolPush` return value から別 gate で接続する。
 - B8-HWGUI 完遂後の OSS app cycle は、任意の downloaded binary ではなく、まず public
   source から x86_64 macOS binary を reproducible に build できる小さい OSS GUI app を
   source-built fixture として扱う。候補選定、license / redistribution、supply-chain、

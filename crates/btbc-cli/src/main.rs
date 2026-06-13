@@ -2472,8 +2472,9 @@ mod tests {
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"helper_boundary_request\"")
         );
-        assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"reason\":\"return_to_continuation_unsupported_instruction\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"reason\":\"return_to_continuation_saved_register_value_materialization_unimplemented\""
+        ));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"kind\":\"import_helper_call\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
@@ -2582,8 +2583,9 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_source_pc\":4294972999"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register_state\""));
-        assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"blocker\":\"return_to_continuation_unsupported_instruction\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"blocker\":\"return_to_continuation_saved_register_value_materialization_unimplemented\""
+        ));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"continuation_block\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"schema\":\"b8_return_to_continuation_decode_boundary_v0\""));
@@ -2839,8 +2841,9 @@ mod tests {
             .contains("\"return_value_handling\":\"no_x86_64_return_value_observed\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_source_pc\":4294973049"));
-        assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"blocker\":\"return_to_continuation_unsupported_instruction\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"blocker\":\"return_to_continuation_saved_register_value_materialization_unimplemented\""
+        ));
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"source_pc\":4294973049")
         );
@@ -2916,15 +2919,28 @@ mod tests {
             .contains("\"appkit_run_loop_lifecycle_unimplemented\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"unsupported_instruction\":null"));
-        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"return_to_continuation_unsupported_instruction\""));
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"source_pc\":4294973062")
         );
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"kind\":\"mov_rdi_rbx\"")
+        );
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"unsupported_instruction\":{\"start\":4294973062"));
+            .contains("\"blocked_register_materializations\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register\":\"rdi\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"next_action\":\"add_return_to_continuation_instruction_support\""));
+            .contains("\"source\":\"register_copy_from_rbx\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"source_register\":\"rbx\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"blocker\":\"return_to_continuation_saved_register_value_materialization_unimplemented\""
+        ));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"next_action\":\"materialize_return_to_continuation_saved_register_value\""
+        ));
         assert!(!read_file(&bundle_dir.join("loader.plan.json")).contains(
             "\"return_to_continuation_call_rel32_return_value_materialization_unimplemented\""
         ));
@@ -2994,9 +3010,9 @@ mod tests {
         assert!(launch_report.contains("\"processed_source_pc_range\":{\"start\":"));
         assert!(launch_report.contains("\"b8_g1_host_trap_path\":\"not_used\""));
         assert!(launch_report.contains("\"helper_boundary_request\""));
-        assert!(
-            launch_report.contains("\"reason\":\"return_to_continuation_unsupported_instruction\"")
-        );
+        assert!(launch_report.contains(
+            "\"reason\":\"return_to_continuation_saved_register_value_materialization_unimplemented\""
+        ));
         assert!(launch_report.contains("\"symbol_name\":\"_objc_msgSend\""));
         assert!(launch_report.contains("\"call_site\":4294972996"));
         assert!(launch_report.contains("\"return_to\":4294972999"));
@@ -3054,8 +3070,9 @@ mod tests {
         assert!(launch_report.contains("\"kind\":\"register_indirect_call_return\""));
         assert!(launch_report.contains("\"next_source_pc\":4294972999"));
         assert!(launch_report.contains("\"register_state\""));
-        assert!(launch_report
-            .contains("\"blocker\":\"return_to_continuation_unsupported_instruction\""));
+        assert!(launch_report.contains(
+            "\"blocker\":\"return_to_continuation_saved_register_value_materialization_unimplemented\""
+        ));
         assert!(launch_report.contains("\"continuation_block\""));
         assert!(
             launch_report.contains("\"schema\":\"b8_return_to_continuation_decode_boundary_v0\"")
@@ -3229,8 +3246,9 @@ mod tests {
             launch_report.contains("\"return_value_handling\":\"no_x86_64_return_value_observed\"")
         );
         assert!(launch_report.contains("\"next_source_pc\":4294973049"));
-        assert!(launch_report
-            .contains("\"blocker\":\"return_to_continuation_unsupported_instruction\""));
+        assert!(launch_report.contains(
+            "\"blocker\":\"return_to_continuation_saved_register_value_materialization_unimplemented\""
+        ));
         assert!(launch_report.contains("\"source_pc\":4294973049"));
         assert!(launch_report.contains("\"input_register_state\":null"));
         assert!(launch_report.contains("\"start\":4294973049"));
@@ -3273,11 +3291,19 @@ mod tests {
         );
         assert!(!launch_report.contains("\"appkit_run_loop_lifecycle_unimplemented\""));
         assert!(launch_report.contains("\"unsupported_instruction\":null"));
-        assert!(launch_report.contains("\"return_to_continuation_unsupported_instruction\""));
+        assert!(!launch_report.contains("\"return_to_continuation_unsupported_instruction\""));
         assert!(launch_report.contains("\"source_pc\":4294973062"));
-        assert!(launch_report.contains("\"unsupported_instruction\":{\"start\":4294973062"));
-        assert!(launch_report
-            .contains("\"next_action\":\"add_return_to_continuation_instruction_support\""));
+        assert!(launch_report.contains("\"kind\":\"mov_rdi_rbx\""));
+        assert!(launch_report.contains("\"blocked_register_materializations\""));
+        assert!(launch_report.contains("\"register\":\"rdi\""));
+        assert!(launch_report.contains("\"source\":\"register_copy_from_rbx\""));
+        assert!(launch_report.contains("\"source_register\":\"rbx\""));
+        assert!(launch_report.contains(
+            "\"blocker\":\"return_to_continuation_saved_register_value_materialization_unimplemented\""
+        ));
+        assert!(launch_report.contains(
+            "\"next_action\":\"materialize_return_to_continuation_saved_register_value\""
+        ));
         assert!(!launch_report.contains(
             "\"return_to_continuation_call_rel32_return_value_materialization_unimplemented\""
         ));

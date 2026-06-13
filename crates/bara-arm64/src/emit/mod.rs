@@ -395,6 +395,14 @@ pub fn emit_program(program: &Program) -> Result<EmittedFunction, EmitError> {
                     emit_mov_x2_x0(&mut code);
                 }
                 IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rdi),
+                    src: Operand::Reg(X86Reg::Rbx),
+                } => {
+                    emit_mov_x0_x19(&mut code);
+                    has_rax_value = false;
+                    rax_known_value = None;
+                }
+                IrOp::Mov {
                     dst: Operand::Reg(X86Reg::Rbp),
                     src: Operand::Reg(X86Reg::Rsp),
                 } => {
@@ -911,6 +919,10 @@ fn emit_mov_x29_sp(code: &mut Vec<u8>) -> usize {
 
 fn emit_mov_x19_x0(code: &mut Vec<u8>) -> usize {
     emit_u32_le(code, 0xaa00_03f3)
+}
+
+fn emit_mov_x0_x19(code: &mut Vec<u8>) -> usize {
+    emit_u32_le(code, 0xaa13_03e0)
 }
 
 fn emit_mov_x2_x0(code: &mut Vec<u8>) -> usize {
@@ -1818,6 +1830,30 @@ mod tests {
         assert_eq!(
             emitted.code().bytes(),
             &[0x40, 0x05, 0x80, 0xd2, 0xe2, 0x03, 0x00, 0xaa, 0xc0, 0x03, 0x5f, 0xd6]
+        );
+    }
+
+    #[test]
+    fn emits_mov_rdi_rbx_as_argument_register_assignment() {
+        let program = program_with_ops(
+            vec![
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rdi),
+                    src: Operand::Reg(X86Reg::Rbx),
+                },
+                IrOp::Mov {
+                    dst: Operand::Reg(X86Reg::Rax),
+                    src: Operand::ImmU64(42),
+                },
+            ],
+            Terminator::Return,
+        );
+
+        let emitted = emit_program(&program).expect("mov rdi,rbx IR emits");
+
+        assert_eq!(
+            emitted.code().bytes(),
+            &[0xe0, 0x03, 0x13, 0xaa, 0x40, 0x05, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]
         );
     }
 

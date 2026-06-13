@@ -152,6 +152,30 @@ fn decodes_mov_rdx_rax_then_ret() {
 }
 
 #[test]
+fn decodes_mov_rdi_rbx_then_ret() {
+    let input = X86Bytes::new(X86Va::new(0x1000), vec![0x48, 0x89, 0xdf, 0xc3])
+        .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0x1000),
+                X86Va::new(0x1003),
+                DecodedInstructionKind::MovRdiRbx
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x1003),
+                X86Va::new(0x1004),
+                DecodedInstructionKind::Ret
+            )
+        ]
+    );
+}
+
+#[test]
 fn decodes_movzx_eax_byte_ptr_rdi_then_ret() {
     let input = X86Bytes::new(X86Va::new(0x1000), vec![0x0f, 0xb6, 0x07, 0xc3])
         .expect("test bytes are non-empty");
