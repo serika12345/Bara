@@ -137,6 +137,15 @@ fn lift_instruction(
                 },
             }))
         }
+        DecodedInstructionKind::MovR15QwordPtrRipRelative { address, .. } => {
+            Ok(LiftedInstruction::Op(IrOp::Mov {
+                dst: Operand::Reg(X86Reg::R15),
+                src: Operand::MemRipRelative {
+                    address: *address,
+                    width: MemoryReadWidth::Bits64,
+                },
+            }))
+        }
         DecodedInstructionKind::MovRdxQwordPtrRax => Ok(LiftedInstruction::Op(IrOp::Mov {
             dst: Operand::Reg(X86Reg::Rdx),
             src: Operand::MemRegIndirect {
@@ -1239,6 +1248,40 @@ mod tests {
             block.ops(),
             &[IrOp::Mov {
                 dst: Operand::Reg(X86Reg::R14),
+                src: Operand::MemRipRelative {
+                    address: X86Va::new(0x1a1b),
+                    width: MemoryReadWidth::Bits64,
+                }
+            }]
+        );
+        assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_mov_r15_qword_ptr_rip_relative_to_memory_load() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(7),
+                    DecodedInstructionKind::MovR15QwordPtrRipRelative {
+                        displacement: crate::decode::X86Imm32::new(0x1a14),
+                        address: X86Va::new(0x1a1b),
+                    },
+                ),
+                DecodedInstruction::new(X86Va::new(7), X86Va::new(8), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded RIP-relative R15 MOV lifts");
+        let block = &program.blocks()[0];
+
+        assert_eq!(
+            block.ops(),
+            &[IrOp::Mov {
+                dst: Operand::Reg(X86Reg::R15),
                 src: Operand::MemRipRelative {
                     address: X86Va::new(0x1a1b),
                     width: MemoryReadWidth::Bits64,

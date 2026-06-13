@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 10:42 JST
+最終更新: 2026-06-13 11:05 JST
 
 状態:
 
@@ -74,27 +74,33 @@
   B8-G6e では、この `next_source_pc` から public Mach-O code segment bytes を使って
   continuation block を decode し、
   `b8_return_to_continuation_decode_boundary_v0` に `next_instruction` /
-  `unsupported_instruction` / input x86_64 `rax` register state を保存する。次の blocker は
-  `return_to_continuation_unsupported_instruction` であり、先頭 instruction は `4c 8b 3d ...`
-  の unsupported REX/MOV である。arbitrary
-  indirect call target execution、translation cache、fallback JIT/interpreter はまだ行わない。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G6e Return-To Continuation
-  Decode Boundary: G6d の continuation boundary が残した `next_source_pc` から
-  continuation block を decode/report し、次の unsupported instruction blocker を
+  `unsupported_instruction` / input x86_64 `rax` register state を保存する。B8-G6f では
+  先頭 `4c 8b 3d ...` を x86_64 `mov r15, qword ptr [rip+disp32]` として
+  decode / lift / emit / debug report 境界に追加し、
+  `next_instruction.kind=mov_r15_qword_ptr_rip_relative`、
+  `unsupported_instruction.kind.reason=DecodeUnsupportedOpcode { opcode: 73, ... }` まで進める。
+  次の blocker は引き続き `return_to_continuation_unsupported_instruction` である。
+  arbitrary indirect call target execution、translation cache、fallback JIT/interpreter は
+  まだ行わない。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G6f Return-To Continuation
+  R15 RIP-Relative Load Slice: G6e の continuation block が残した
+  `return_to_continuation_unsupported_instruction` を受けて、`4c 8b 3d ...` を
+  `mov r15, qword ptr [rip+disp32]` として扱い、次の continuation blocker を
   stable report に保存する。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
   Objective-C runtime / dyld の private behavior は使わず、public metadata、
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
-- active_branch: `task/b8-g6e-return-to-continuation-decode`。base branch は
-  最新 `main` の `d11dfb6` (`Merge pull request #41 from
-  serika12345:task/b8-g6d-objc-helper-return-continuation`)。draft PR は
-  <https://github.com/serika12345/Bara/pull/42>。
+- active_branch: `task/b8-g6f-continuation-r15-rip-relative-load`。base branch は
+  最新 `main` の `7774f4a` (`Merge pull request #42 from
+  serika12345:task/b8-g6e-return-to-continuation-decode`)。implementation commit は `9d5328e`
+  (`feat: add b8 g6f r15 rip-relative continuation load`)。draft PR は
+  <https://github.com/serika12345/Bara/pull/43>。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
-  B8-G5b-G5e / B8-G6a / B8-G6b / B8-G6c / B8-G6d / B8-G6e。
+  B8-G5b-G5e / B8-G6a / B8-G6b / B8-G6c / B8-G6d / B8-G6e / B8-G6f。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -212,20 +218,39 @@
   `decode_report.entry=4294972999`、`next_instruction.kind=unsupported`、
   `unsupported_instruction.kind.reason=DecodeUnsupportedOpcode { opcode: 76, ... }`、
   `blocker=return_to_continuation_unsupported_instruction`、`next_action=add_return_to_continuation_instruction_support`
-  を stable report に保存する。
-- remaining_work: B8-G6f。G6e の continuation block が残す
-  `return_to_continuation_unsupported_instruction` を受けて、`return_to` 先頭の
-  `4c 8b 3d ...` を x86_64 `mov r15, qword ptr [rip+disp32]` の focused ISA slice
-  として扱う。`return_to` 以降の一般実行、arbitrary indirect call target execution、
+  を stable report に保存する。B8-G6f として
+  `4c 8b 3d b2 19 00 00` を
+  `mov_r15_qword_ptr_rip_relative`、`address=4294979584` として report し、
+  `processed_source_pc_range=4294972999..4294973007`、
+  `unsupported_instruction.kind.reason=DecodeUnsupportedOpcode { opcode: 73, ... }` まで進める。
+- remaining_work: B8-G6g。G6f の continuation block が残す
+  `return_to_continuation_unsupported_instruction` を受けて、次 bytes `49 8b 3f` を
+  x86_64 `mov rdi, qword ptr [r15]` の focused ISA / state materialization slice として
+  扱う。`return_to` 以降の一般実行、arbitrary indirect call target execution、
   translation cache、fallback JIT/interpreter はまだ行わない。
-- next_action: B8-G6e draft PR #42 を review / merge する。merge 後の次 PR Gate は
-  B8-G6f Return-To Continuation R15 RIP-Relative Load Slice。
-- verification: `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
-  と `nix develop -c ./scripts/verify` が通過した。PR URL 記録後に
+- next_action: B8-G6f draft PR #43 を review / merge する。merge 後の次 PR Gate は
+  B8-G6g Return-To Continuation R15-Indirect RDI Load Slice。
+- verification:
+  `nix develop -c cargo test -p bara-isa-x86 mov_r15 -- --nocapture`、
+  `nix develop -c cargo test -p bara-arm64 r15_from_rip -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
+  `nix develop -c ./scripts/verify` が通過した。PR URL 記録後に
   `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-13 11:04 JST: B8-G6f Return-To Continuation R15 RIP-Relative Load Slice
+  を実装した。continuation block 先頭の `4c 8b 3d b2 19 00 00` を
+  `mov r15, qword ptr [rip+disp32]` として decode / lift / emit / stable debug report
+  に追加し、`next_instruction.kind=mov_r15_qword_ptr_rip_relative`、
+  `address=4294979584`、`processed_source_pc_range=4294972999..4294973007` を保存する。
+  次 blocker は `0x49` at `4294973006` の
+  `return_to_continuation_unsupported_instruction` であり、次の B8-G6g では
+  `49 8b 3f` を `mov rdi, qword ptr [r15]` slice として扱う。検証は
+  `nix develop -c cargo test -p bara-isa-x86 mov_r15 -- --nocapture`、
+  `nix develop -c cargo test -p bara-arm64 r15_from_rip -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
+  `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-13 10:33 JST: B8-G6e Return-To Continuation Decode Boundary を実装した。
   G6d の `b8_objc_helper_return_continuation_boundary_v0` に
   `b8_return_to_continuation_decode_boundary_v0` を追加し、`next_source_pc=4294972999` から
