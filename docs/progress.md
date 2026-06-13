@@ -199,14 +199,16 @@
   B8-G6ae では `c3` / `ret` を epilogue return completion として
   `b8_return_to_continuation_epilogue_return_completion_v0` に保存し、`ret` 後の zero
   padding は `b8_return_to_continuation_post_ret_padding_boundary_v0` で
-  `ignored_after_return_terminator` として分類する。remaining blocker は
-  `return_to_continuation_execution_unimplemented` に進む。
+  `ignored_after_return_terminator` として分類した。B8-G6af では final continuation を
+  `b8_return_to_continuation_modeled_execution_completion_v0` で executed completion とし、
+  nested helper request / continuation boundary は `blocker=null`、
+  `next_action=review_b8_hello_world_gui_completion` に進む。
   arbitrary dynamic library data symbol read、return-to continuation の一般実行、
   arbitrary call-rel32 execution、translation cache、fallback JIT/interpreter はまだ行わない。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8-HWGUI Self-Authored Hello
   World GUI Completion を大目標として、`task/b8-hello-world-gui-complete` 上で
-  blocker-driven slice を継続中。B8-G6ae は完了し、次は B8-G6af Self-authored
-  continuation execution completion boundary。
+  blocker-driven slice を継続中。B8-G6af は完了し、次は B8-HWGUI Final
+  expected/actual and manual visible review boundary。
 - active_design_focus: B8-HWGUI Self-Authored Hello World GUI Completion を大目標として
   明文化した。B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から GUI lifecycle helper boundary までを通す。`/advance-large` を
@@ -217,8 +219,9 @@
   dyld の private behavior は使わず、public metadata、public API、自前 fixture、
   Rosetta black-box observable result を根拠にする。
 - active_branch: `task/b8-hello-world-gui-complete`。branch base は `2258806`
-  (`docs: define b8 hello world gui completion target`)。この snapshot は B8-G6ae
-  coherent step で更新されており、B8-HWGUI 完遂まではこの branch で coherent step
+  (`docs: define b8 hello world gui completion target`)。latest pushed commit before
+  this G6af change is `8d4f70f` (`feat: classify b8 epilogue return completion`)。
+  この snapshot は B8-G6af coherent step で更新されており、B8-HWGUI 完遂まではこの branch で coherent step
   ごとに commit / push する。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
@@ -438,29 +441,33 @@
   entry から GUI 起動完遂まで通す大目標、`/advance-large` 利用時の stop 条件、
   および B8-HWGUI merge 後に開始する B8-OSS0 source-built OSS GUI app automation target を
   TODO / design TODO に追加した。
-- remaining_work: B8-G6af。G6ae が残す
-  `return_to_continuation_execution_unimplemented` を受けて、self-authored GUI fixture の
-  modeled return-to-continuation execution completion を focused に stable report する。
-  AppKit run loop、autorelease pool pop、epilogue stack/register/frame-pointer restore、
-  epilogue return completion、post-ret padding boundary は維持し、Hello World GUI 完遂に
-  必要な次 blocker が残るか、modeled real-entry launch path が completed と見なせるかを
-  stable に分類する。
-  general return-to-continuation execution、arbitrary Objective-C message send /
-  arbitrary continuation call execution、decoded continuation block の native execution、
-  translation cache、fallback JIT/interpreter はまだ行わない。
-- next_action: 次の小 step は B8-G6af Self-authored continuation execution completion
-  boundary。
-  B8-HWGUI 大目標の途中なので、coherent step ごとに verify /
-  commit / push し、Hello World GUI 完遂 review gate で draft PR を開いて停止する。
+- remaining_work: B8-HWGUI Final expected/actual and manual visible review boundary。
+  B8-G6af の `review_b8_hello_world_gui_completion` を受けて、automated expected/actual
+  comparison と manual visible mode の結果を review package に固定し、B8-HWGUI 大目標を
+  完遂扱いにできるかを判定する。
+  B8-OSS0、general continuation execution、arbitrary Objective-C message send、
+  translation cache、fallback JIT/interpreter、`.app` bundle / resource 一般化はまだ行わない。
+- next_action: 次の小 step は B8-HWGUI Final expected/actual and manual visible review
+  boundary。B8-HWGUI 完遂時点で draft PR を開き、merge までは B8-OSS0 に進まない。
 - verification:
   `nix develop -c cargo check -p btbc-cli`、
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`、
-  `nix develop -c cargo run -q -p btbc-cli -- generate-b8-debug-bundle target/b8/b8_gui_hello_world_x86_64 /tmp/bara-b8-g6ae-inspect`、
-  `nix develop -c ./scripts/verify`
-  が B8-G6ae 実装後に通過した。
+  `nix develop -c cargo run -q -p btbc-cli -- generate-b8-debug-bundle target/b8/b8_gui_hello_world_x86_64 /tmp/bara-b8-g6af-inspect`
+  は通過。format 後に `nix develop -c ./scripts/verify` も通過した。
 
 直近で完了した作業:
 
+- 2026-06-13 19:32 JST: B8-G6af Self-authored continuation execution completion boundary を
+  実装した。final continuation は
+  `b8_return_to_continuation_modeled_execution_completion_v0` を保存し、
+  `role=self_authored_hello_world_gui_launch_path`、
+  `completion_model=modeled_real_entry_helper_continuation_chain`、
+  `launch_path_status=completed`、`remaining_b8_hwgui_blocker=null` になる。
+  `NSApp run` の no-argument selector では未使用 `rdx` argument blocker を残さず、
+  import helper request / return continuation / nested continuation decode boundary は
+  `status=executed`、`blocker=null`、`next_action=review_b8_hello_world_gui_completion`
+  に進む。automated expected/actual comparison と manual visible mode は final
+  B8-HWGUI review boundary の `pending_large_target_review` 差分として保存した。
 - 2026-06-13 19:14 JST: B8-G6ae Post-run epilogue return terminator completion boundary を
   実装した。`c3` / `ret` at `4294973082..4294973083` を
   `b8_return_to_continuation_epilogue_return_completion_v0` として executed report に保存し、

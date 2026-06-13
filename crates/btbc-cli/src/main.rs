@@ -2472,8 +2472,7 @@ mod tests {
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"helper_boundary_request\"")
         );
-        assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"reason\":\"return_to_continuation_execution_unimplemented\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"reason\":null"));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"kind\":\"import_helper_call\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
@@ -2582,8 +2581,7 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_source_pc\":4294972999"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register_state\""));
-        assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"blocker\":\"return_to_continuation_execution_unimplemented\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"blocker\":null"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"continuation_block\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"schema\":\"b8_return_to_continuation_decode_boundary_v0\""));
@@ -2599,7 +2597,7 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"entry\":4294972999"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"next_instruction\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"next_action\":\"inspect_return_to_continuation_blocker\""));
+            .contains("\"next_action\":\"review_b8_hello_world_gui_completion\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"start\":4294972999"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"end\":4294973006"));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
@@ -2839,8 +2837,7 @@ mod tests {
             .contains("\"return_value_handling\":\"no_x86_64_return_value_observed\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_source_pc\":4294973049"));
-        assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"blocker\":\"return_to_continuation_execution_unimplemented\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"blocker\":null"));
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"source_pc\":4294973049")
         );
@@ -2917,7 +2914,7 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"unsupported_instruction\":null"));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"return_to_continuation_execution_unimplemented\""));
+            .contains("\"next_action\":\"review_b8_hello_world_gui_completion\""));
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"source_pc\":4294973062")
         );
@@ -3040,6 +3037,21 @@ mod tests {
             .contains("\"classification\":\"ignored_after_return_terminator\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"effect\":\"does_not_extend_function_body\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_return_to_continuation_modeled_execution_completion_v0\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"role\":\"self_authored_hello_world_gui_launch_path\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"completion_model\":\"modeled_real_entry_helper_continuation_chain\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"launch_path_status\":\"completed\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"remaining_b8_hwgui_blocker\":null"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"automated_expected_actual_comparison\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"manual_visible_mode\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"remaining_difference\":\"pending_large_target_review\""));
         assert!(!read_file(&bundle_dir.join("loader.plan.json"))
             .contains("DecodeUnsupportedOpcode { opcode: 93"));
         assert!(!read_file(&bundle_dir.join("loader.plan.json"))
@@ -3048,9 +3060,12 @@ mod tests {
             .contains("DecodeUnsupportedOpcode { opcode: 91"));
         assert!(!read_file(&bundle_dir.join("loader.plan.json"))
             .contains("DecodeUnsupportedOpcode { opcode: 72"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"blocker\":null"));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"blocker\":\"return_to_continuation_execution_unimplemented\""));
-        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"next_action\":\"review_b8_hello_world_gui_completion\""));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"return_to_continuation_execution_unimplemented\""));
+        assert!(!read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_action\":\"implement_return_to_continuation_execution\""));
         assert!(!read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"return_to_continuation_call_rel32_helper_execution_unimplemented\""));
@@ -3129,9 +3144,7 @@ mod tests {
         assert!(launch_report.contains("\"processed_source_pc_range\":{\"start\":"));
         assert!(launch_report.contains("\"b8_g1_host_trap_path\":\"not_used\""));
         assert!(launch_report.contains("\"helper_boundary_request\""));
-        assert!(
-            launch_report.contains("\"reason\":\"return_to_continuation_execution_unimplemented\"")
-        );
+        assert!(launch_report.contains("\"reason\":null"));
         assert!(launch_report.contains("\"symbol_name\":\"_objc_msgSend\""));
         assert!(launch_report.contains("\"call_site\":4294972996"));
         assert!(launch_report.contains("\"return_to\":4294972999"));
@@ -3189,8 +3202,7 @@ mod tests {
         assert!(launch_report.contains("\"kind\":\"register_indirect_call_return\""));
         assert!(launch_report.contains("\"next_source_pc\":4294972999"));
         assert!(launch_report.contains("\"register_state\""));
-        assert!(launch_report
-            .contains("\"blocker\":\"return_to_continuation_execution_unimplemented\""));
+        assert!(launch_report.contains("\"blocker\":null"));
         assert!(launch_report.contains("\"continuation_block\""));
         assert!(
             launch_report.contains("\"schema\":\"b8_return_to_continuation_decode_boundary_v0\"")
@@ -3201,9 +3213,7 @@ mod tests {
         assert!(launch_report.contains("\"decode_report\""));
         assert!(launch_report.contains("\"entry\":4294972999"));
         assert!(launch_report.contains("\"next_instruction\""));
-        assert!(
-            launch_report.contains("\"next_action\":\"inspect_return_to_continuation_blocker\"")
-        );
+        assert!(launch_report.contains("\"next_action\":\"review_b8_hello_world_gui_completion\""));
         assert!(launch_report.contains("\"start\":4294972999"));
         assert!(launch_report.contains("\"end\":4294973006"));
         assert!(launch_report.contains("\"kind\":\"mov_r15_qword_ptr_rip_relative\""));
@@ -3364,8 +3374,7 @@ mod tests {
             launch_report.contains("\"return_value_handling\":\"no_x86_64_return_value_observed\"")
         );
         assert!(launch_report.contains("\"next_source_pc\":4294973049"));
-        assert!(launch_report
-            .contains("\"blocker\":\"return_to_continuation_execution_unimplemented\""));
+        assert!(launch_report.contains("\"blocker\":null"));
         assert!(launch_report.contains("\"source_pc\":4294973049"));
         assert!(launch_report.contains("\"input_register_state\":null"));
         assert!(launch_report.contains("\"start\":4294973049"));
@@ -3408,7 +3417,7 @@ mod tests {
         );
         assert!(!launch_report.contains("\"appkit_run_loop_lifecycle_unimplemented\""));
         assert!(launch_report.contains("\"unsupported_instruction\":null"));
-        assert!(launch_report.contains("\"return_to_continuation_execution_unimplemented\""));
+        assert!(launch_report.contains("\"next_action\":\"review_b8_hello_world_gui_completion\""));
         assert!(launch_report.contains("\"source_pc\":4294973062"));
         assert!(launch_report.contains("\"kind\":\"mov_rdi_rbx\""));
         assert!(launch_report.contains("\"blocked_register_materializations\":[]"));
@@ -3487,13 +3496,24 @@ mod tests {
         assert!(launch_report.contains("DecodeUnsupportedOpcode { opcode: 0"));
         assert!(launch_report.contains("\"classification\":\"ignored_after_return_terminator\""));
         assert!(launch_report.contains("\"effect\":\"does_not_extend_function_body\""));
+        assert!(launch_report
+            .contains("\"schema\":\"b8_return_to_continuation_modeled_execution_completion_v0\""));
+        assert!(launch_report.contains("\"role\":\"self_authored_hello_world_gui_launch_path\""));
+        assert!(launch_report
+            .contains("\"completion_model\":\"modeled_real_entry_helper_continuation_chain\""));
+        assert!(launch_report.contains("\"launch_path_status\":\"completed\""));
+        assert!(launch_report.contains("\"remaining_b8_hwgui_blocker\":null"));
+        assert!(launch_report.contains("\"automated_expected_actual_comparison\""));
+        assert!(launch_report.contains("\"manual_visible_mode\""));
+        assert!(launch_report.contains("\"remaining_difference\":\"pending_large_target_review\""));
         assert!(!launch_report.contains("DecodeUnsupportedOpcode { opcode: 93"));
         assert!(!launch_report.contains("DecodeUnsupportedOpcode { opcode: 65"));
         assert!(!launch_report.contains("DecodeUnsupportedOpcode { opcode: 91"));
         assert!(!launch_report.contains("DecodeUnsupportedOpcode { opcode: 72"));
-        assert!(launch_report
-            .contains("\"blocker\":\"return_to_continuation_execution_unimplemented\""));
-        assert!(launch_report
+        assert!(launch_report.contains("\"blocker\":null"));
+        assert!(launch_report.contains("\"next_action\":\"review_b8_hello_world_gui_completion\""));
+        assert!(!launch_report.contains("\"return_to_continuation_execution_unimplemented\""));
+        assert!(!launch_report
             .contains("\"next_action\":\"implement_return_to_continuation_execution\""));
         assert!(!launch_report
             .contains("\"return_to_continuation_call_rel32_helper_execution_unimplemented\""));

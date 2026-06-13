@@ -2185,14 +2185,14 @@ branch: `task/b8-hello-world-gui-complete`
 
 完了条件:
 
-- [ ] B8-G6ae の `return_to_continuation_execution_unimplemented` を受けて、
+- [x] B8-G6ae の `return_to_continuation_execution_unimplemented` を受けて、
   self-authored GUI fixture の modeled return-to-continuation execution completion を
   focused に stable report する。
-- [ ] `b8_return_to_continuation_epilogue_return_completion_v0` と
+- [x] `b8_return_to_continuation_epilogue_return_completion_v0` と
   AppKit run loop / autorelease pool / epilogue restore reports を維持したまま、
   Hello World GUI 完遂に必要な次 blocker が残るか、modeled real-entry launch path が
   completed と見なせるかを stable に分類する。
-- [ ] B8-HWGUI 大目標の完遂条件に対して、automated expected/actual comparison と
+- [x] B8-HWGUI 大目標の完遂条件に対して、automated expected/actual comparison と
   manual visible mode に残る差分を reviewable に報告できる。
 
 PR に含めない:
@@ -2211,6 +2211,41 @@ review gate:
 
 - B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
   slice として切れる限り継続する。
+
+#### PR Gate: B8-HWGUI Final expected/actual and manual visible review boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [ ] B8-G6af の `review_b8_hello_world_gui_completion` を受けて、self-authored
+  GUI fixture の real-entry modeled helper continuation chain が
+  `b8_return_to_continuation_modeled_execution_completion_v0` /
+  `launch_path_status=completed` で安定していることを確認する。
+- [ ] automated mode で Rosetta expected / Bara actual の stable JSON comparison が
+  Hello World GUI 完遂条件に対して一致するか、残る差分が B8-HWGUI 完遂 blocker か
+  post-completion 拡張対象かを stable report / review package に記録する。
+- [ ] manual visible mode で Bara 経由の実 entry path から `hello world` window / label を
+  表示できるか、実行環境上の制約があれば blocker として記録する。
+- [ ] B8-HWGUI 大目標の完遂条件を満たした場合は、TODO / progress を完了状態にし、
+  branch を push して draft PR を開き、review gate で停止する。
+
+PR に含めない:
+
+- B8-OSS0 source-built OSS GUI app automation。
+- general continuation execution、arbitrary Objective-C message send、
+  translation cache、fallback JIT/interpreter。
+- `.app` bundle / resource 一般化。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+- manual visible mode の実行手順と結果を review package に記録する。
+
+review gate:
+
+- B8-HWGUI 完遂時点で draft PR を開いて停止する。merge までは B8-OSS0 に進まない。
 
 - [ ] B8-G6: Objective-C runtime / AppKit helper bridge を B8-G1 専用 lifecycle
   event から一般化する。

@@ -617,6 +617,14 @@
   continuation boundary の `unsupported_instruction` は `null` に戻す。remaining blocker は
   `return_to_continuation_execution_unimplemented` に進むため、self-authored fixture の modeled
   completion 判定は次 gate へ分離する。
+- 2026-06-13 の B8-G6af として、G6ae の final continuation は
+  `b8_return_to_continuation_modeled_execution_completion_v0` を持つ executed boundary へ進める。
+  条件は `NSApp run` helper chain 後の autorelease pool pop、epilogue stack/register restore、
+  `ret` completion、post-ret zero padding classification がすべて揃うことに限定する。
+  `NSApp run` は no-argument selector として未使用 `rdx` blocker を残さず、
+  nested helper request / continuation boundary は `blocker=null`、
+  `next_action=review_b8_hello_world_gui_completion` になる。automated expected/actual と
+  manual visible mode は final B8-HWGUI review boundary の差分として report に残す。
 - B8-HWGUI 完遂後の OSS app cycle は、任意の downloaded binary ではなく、まず public
   source から x86_64 macOS binary を reproducible に build できる小さい OSS GUI app を
   source-built fixture として扱う。候補選定、license / redistribution、supply-chain、
