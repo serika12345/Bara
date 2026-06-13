@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 13:14 JST
+最終更新: 2026-06-13 13:16 JST
 
 状態:
 
@@ -103,8 +103,9 @@
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
 - active_branch: `task/b8-g6h-continuation-nsapp-global-load`。base branch は
   最新 `main` の `518430a` (`Merge pull request #44 from
-  serika12345:task/b8-g6g-continuation-r15-indirect-rdi-load`)。implementation commit と
-  draft PR は検証後に作成する。
+  serika12345:task/b8-g6g-continuation-r15-indirect-rdi-load`)。implementation commit は
+  `514bd3a` (`feat: materialize b8 g6h nsapp global load`)。draft PR は
+  <https://github.com/serika12345/Bara/pull/45>。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
@@ -245,8 +246,8 @@
   x86_64 `xor edx, edx` / 32-bit zeroing semantics として扱う。一般的な
   `xor r32, r32` 全体、`return_to` 以降の一般実行、arbitrary indirect call target
   execution、translation cache、fallback JIT/interpreter はまだ行わない。
-- next_action: B8-G6h を verify し、draft PR を作成して review gate で停止する。
-  merge 後の次 PR Gate は B8-G6i Return-To Continuation XOR EDX Zero Slice。
+- next_action: B8-G6h draft PR #45 を review / merge する。merge 後の次 PR Gate は
+  B8-G6i Return-To Continuation XOR EDX Zero Slice。
 - verification:
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
   `nix develop -c ./scripts/verify` が通過した。progress 更新後に
