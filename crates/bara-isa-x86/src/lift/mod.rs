@@ -230,6 +230,10 @@ fn lift_instruction(
             dst: Operand::Reg(X86Reg::Rax),
             src: Operand::ImmU64(0),
         })),
+        DecodedInstructionKind::XorEdxEdx => Ok(LiftedInstruction::Op(IrOp::Mov {
+            dst: Operand::Reg(X86Reg::Rdx),
+            src: Operand::ImmU64(0),
+        })),
         DecodedInstructionKind::BaraHostTrapSentinel => Ok(LiftedInstruction::Op(IrOp::HostTrap {
             kind: HostTrapKind::Stdout,
         })),
@@ -1572,6 +1576,34 @@ mod tests {
             block.ops(),
             &[IrOp::Mov {
                 dst: Operand::Reg(X86Reg::Rax),
+                src: Operand::ImmU64(0)
+            }]
+        );
+        assert_eq!(block.terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_xor_edx_edx_to_mov_rdx_zero() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(2),
+                    DecodedInstructionKind::XorEdxEdx,
+                ),
+                DecodedInstruction::new(X86Va::new(2), X86Va::new(3), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded xor function lifts");
+        let block = &program.blocks()[0];
+
+        assert_eq!(
+            block.ops(),
+            &[IrOp::Mov {
+                dst: Operand::Reg(X86Reg::Rdx),
                 src: Operand::ImmU64(0)
             }]
         );

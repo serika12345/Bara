@@ -798,6 +798,7 @@ enum B8DebugDecodedInstructionKindReport {
     PushR15,
     PopRax,
     XorEaxEax,
+    XorEdxEdx,
     JccRel8 {
         condition: String,
         taken: u64,
@@ -917,6 +918,7 @@ impl B8DebugDecodedInstructionKindReport {
             DecodedInstructionKind::PushR15 => Self::PushR15,
             DecodedInstructionKind::PopRax => Self::PopRax,
             DecodedInstructionKind::XorEaxEax => Self::XorEaxEax,
+            DecodedInstructionKind::XorEdxEdx => Self::XorEdxEdx,
             DecodedInstructionKind::JccRel8 {
                 condition,
                 taken,
@@ -1203,6 +1205,7 @@ enum B8DebugTargetPointerLoadKind {
 #[serde(rename_all = "snake_case")]
 enum B8DebugRegisterName {
     Rax,
+    Rdx,
     Rdi,
     Rsi,
     R14,
@@ -2744,6 +2747,23 @@ impl B8DebugReturnToContinuationMaterializedRegisterStateReport {
                         }
                     }
                 }
+                DecodedInstructionKind::XorEdxEdx => {
+                    states.push(Self {
+                        register: B8DebugRegisterName::Rdx,
+                        source:
+                            B8DebugReturnToContinuationMaterializedRegisterSource::XorEdxEdxZero,
+                        instruction_start: instruction.start().value(),
+                        instruction_end: instruction.end().value(),
+                        address: None,
+                        base_register: None,
+                        base_value: None,
+                        base_fixup_resolution: None,
+                        value: 0,
+                        value_source: None,
+                        fixup_resolution: None,
+                        width: B8DebugMemoryReadWidthReport::Bits64,
+                    });
+                }
                 _ => {}
             }
         }
@@ -2773,6 +2793,8 @@ enum B8DebugReturnToContinuationMaterializedRegisterSource {
     RegisterIndirectQword,
     #[serde(rename = "rip_relative_qword_load")]
     RipRelativeQword,
+    #[serde(rename = "xor_edx_edx_zero")]
+    XorEdxEdxZero,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]

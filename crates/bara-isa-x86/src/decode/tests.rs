@@ -1191,6 +1191,30 @@ fn decodes_xor_eax_eax_then_ret() {
 }
 
 #[test]
+fn decodes_xor_edx_edx_then_ret() {
+    let input = X86Bytes::new(X86Va::new(0x1000), vec![0x31, 0xd2, 0xc3])
+        .expect("test bytes are non-empty");
+
+    let decoded = decode_function(&input).expect("test bytes decode");
+
+    assert_eq!(
+        decoded.instructions(),
+        &[
+            DecodedInstruction::new(
+                X86Va::new(0x1000),
+                X86Va::new(0x1002),
+                DecodedInstructionKind::XorEdxEdx
+            ),
+            DecodedInstruction::new(
+                X86Va::new(0x1002),
+                X86Va::new(0x1003),
+                DecodedInstructionKind::Ret
+            )
+        ]
+    );
+}
+
+#[test]
 fn decodes_call_rel32_with_positive_target() {
     let input = X86Bytes::new(X86Va::new(0x1000), vec![0xe8, 0x10, 0, 0, 0])
         .expect("test bytes are non-empty");

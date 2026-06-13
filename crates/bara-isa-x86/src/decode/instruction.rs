@@ -119,6 +119,7 @@ pub enum DecodedInstructionKind {
     PushR15,
     PopRax,
     XorEaxEax,
+    XorEdxEdx,
     JccRel8 {
         condition: X86Cond,
         taken: X86Va,

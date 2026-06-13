@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 13:16 JST
+最終更新: 2026-06-13 13:39 JST
 
 状態:
 
@@ -88,29 +88,35 @@
   として materialize する。continuation report は input の x86_64 `rax` register state、
   `r15` import identity、`rdi` available state、`blocked_register_materializations=[]` を
   保持し、次の blocker は `31 d2` at `4294973016` の
-  `return_to_continuation_unsupported_instruction` に進む。arbitrary dynamic library data
+  `return_to_continuation_unsupported_instruction` に進む。B8-G6i では `31 d2` を
+  x86_64 `xor edx, edx` 専用 slice として decode / lift し、32-bit register zeroing
+  semantics により `rdx` が 64-bit zero へ materialize されることを
+  `source=xor_edx_edx_zero`、`value=0`、`width=bits64` として continuation report に
+  保存する。continuation decode は `call r14` at `4294973018` /
+  `return_to=4294973021` まで進み、次の blocker は
+  `return_to_continuation_execution_unimplemented` である。arbitrary dynamic library data
   symbol read、return-to continuation の一般実行、arbitrary indirect call target
   execution、translation cache、fallback JIT/interpreter はまだ行わない。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G6h Return-To Continuation
-  NSApp Global Load Boundary: G6g の
-  `return_to_continuation_import_global_load_unimplemented` を受けて、AppKit `_NSApp`
-  imported global pointee load を fixture-scoped helper value として扱い、次の
-  unsupported `31 d2` / `xor edx, edx` slice まで進める。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G6i Return-To Continuation
+  XOR EDX Zero Slice: G6h の `return_to_continuation_unsupported_instruction` を受けて、
+  `31 d2` / `xor edx, edx` を focused ISA slice として扱い、`rdx=0` materialization と
+  次の `call r14` / `return_to_continuation_execution_unimplemented` blocker を
+  stable report に保存する。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
   Objective-C runtime / dyld の private behavior は使わず、public metadata、
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
-- active_branch: `task/b8-g6h-continuation-nsapp-global-load`。base branch は
-  最新 `main` の `518430a` (`Merge pull request #44 from
-  serika12345:task/b8-g6g-continuation-r15-indirect-rdi-load`)。implementation commit は
-  `514bd3a` (`feat: materialize b8 g6h nsapp global load`)。draft PR は
-  <https://github.com/serika12345/Bara/pull/45>。
+- active_branch: `task/b8-g6i-continuation-xor-edx-zero`。base branch は
+  最新 `main` の `2ae960b` (`Merge pull request #45 from
+  serika12345:task/b8-g6h-continuation-nsapp-global-load`)。implementation commit は
+  `f163cb2` (`feat: add b8 g6i xor edx continuation slice`)。draft PR は
+  <https://github.com/serika12345/Bara/pull/46>。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
   B8-G5b-G5e / B8-G6a / B8-G6b / B8-G6c / B8-G6d / B8-G6e / B8-G6f /
-  B8-G6g / B8-G6h / B8-G6i。
+  B8-G6g / B8-G6h / B8-G6i / B8-G6j。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -240,21 +246,35 @@
   `base_register=r15`、`base_value=9227875636482146304`、
   `value_source=objc_shared_application_helper_return_value` を stable report に保存する。
   `blocked_register_materializations=[]` になり、次の blocker は `31 d2` at
-  `4294973016` の `return_to_continuation_unsupported_instruction` へ進む。
-- remaining_work: B8-G6i。G6h の continuation block が残す
-  `return_to_continuation_unsupported_instruction` を受けて、`31 d2` を
-  x86_64 `xor edx, edx` / 32-bit zeroing semantics として扱う。一般的な
-  `xor r32, r32` 全体、`return_to` 以降の一般実行、arbitrary indirect call target
-  execution、translation cache、fallback JIT/interpreter はまだ行わない。
-- next_action: B8-G6h draft PR #45 を review / merge する。merge 後の次 PR Gate は
-  B8-G6i Return-To Continuation XOR EDX Zero Slice。
+  `4294973016` の `return_to_continuation_unsupported_instruction` へ進む。B8-G6i として
+  `31 d2` を `xor_edx_edx` として decode / lift し、`rdx` の
+  `source=xor_edx_edx_zero`、`value=0`、`width=bits64` を stable report に保存する。
+  decode は次の `call_r14` at `4294973018` / `return_to=4294973021` まで進み、
+  blocker は `return_to_continuation_execution_unimplemented` になる。
+- remaining_work: B8-G6j。G6i の continuation block が残す
+  `return_to_continuation_execution_unimplemented` を受けて、decoded `call r14` at
+  `4294973018` / `return_to=4294973021` を focused stable boundary として扱う。
+  `return_to` 以降の一般実行、arbitrary indirect call target execution、translation cache、
+  fallback JIT/interpreter はまだ行わない。
+- next_action: B8-G6i draft PR #46 を review / merge する。merge 後の次 PR Gate は
+  B8-G6j Return-To Continuation Call R14 Boundary Planning。
 - verification:
+  `nix develop -c cargo test -p bara-isa-x86 xor_edx -- --nocapture`、
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
   `nix develop -c ./scripts/verify` が通過した。progress 更新後に
   `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-13 13:37 JST: B8-G6i Return-To Continuation XOR EDX Zero Slice
+  を実装した。`31 d2` を x86_64 `xor edx, edx` として decode / lift し、32-bit register
+  zeroing semantics により `rdx` を 64-bit zero として materialize する。continuation
+  report は `source=xor_edx_edx_zero`、`value=0`、`width=bits64` を保存し、次の decoded
+  instruction は `call_r14` at `4294973018` / `return_to=4294973021` まで進む。targeted
+  検証は `nix develop -c cargo test -p bara-isa-x86 xor_edx -- --nocapture` と
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
+  full verify は `nix develop -c ./scripts/verify` が通過した。progress 更新後に
+  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 - 2026-06-13 13:06 JST: B8-G6h Return-To Continuation NSApp Global Load Boundary
   を実装した。`r15` の public chained fixups 解決が AppKit `_NSApp` import である場合に限り、
   self-authored B8 GUI fixture の `_objc_msgSend(NSApplication, sharedApplication)` host
