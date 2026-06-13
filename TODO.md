@@ -1552,6 +1552,80 @@ review gate:
     identifier、resources、assets、nib/storyboard 相当を scope 化する。
   - [ ] bundle 化は B8-G2 から B8-G7 の実行経路が必要になるまで先送りする。
 
+#### Large Target: B8-HWGUI Self-Authored Hello World GUI Completion
+
+branch: `task/b8-hello-world-gui-complete`
+
+目的:
+
+- [ ] self-authored x86_64 Mach-O GUI Hello World fixture を、B8-G1 専用
+  sentinel / host trap ではなく、実 `LC_MAIN` entry から進めて GUI 起動完遂まで通す。
+- [ ] public Mach-O metadata、public Objective-C runtime / AppKit API、自前 fixture、
+  Rosetta black-box observable result だけを根拠にする。
+- [ ] debug bundle の next blocker を source of truth にし、必要な ISA / loader /
+  helper / process-state boundary を focused step として追加する。
+
+完遂条件:
+
+- [ ] automated mode で Rosetta expected / Bara actual の stable JSON comparison が通る。
+- [ ] manual visible mode で Bara 経由の実 entry path から `hello world` window / label を
+  表示できる。
+- [ ] launch report / debug bundle が、実 `LC_MAIN` entry から GUI lifecycle helper
+  boundary まで進んだ事実を保存し、B8-G1 専用 sentinel / host trap path と区別できる。
+- [ ] self-authored GUI Hello World fixture の expected launch path 上に残る blocker が
+  `unsupported_instruction` / `unsupported_import` / `unsupported_loader_feature` /
+  Objective-C / AppKit helper boundary として未処理ではない。
+- [ ] 完遂後に残る next blocker が、Hello World GUI 完遂後の拡張対象
+  （例: arbitrary ObjC message send、translation cache、OSS app 固有 boundary）として
+  stable report されている。
+
+自動進行方針:
+
+- `/advance-pr` は従来通り、次の unfinished `PR Gate` だけを進める。
+- `/advance-large` は、ユーザーが B8-HWGUI を明示した場合に限り、この大目標を対象に
+  してよい。その場合も各 coherent step は debug bundle blocker 由来の小さな
+  TODO-backed slice として commit し、想定外の広い boundary に当たったら TODO を更新して
+  停止する。
+- B8-HWGUI の途中で、arbitrary Objective-C message send、general continuation execution、
+  arbitrary indirect target execution、translation cache / JIT / fallback interpreter、
+  `.app` bundle / resource が必須 blocker になった場合は、先に focused PR Gate または
+  sub-target として TODO に追加する。
+- B8-HWGUI 完遂時点は review gate とする。draft PR を開いて停止し、merge までは次の
+  OSS GUI app target へ進まない。
+
+PR に含めない:
+
+- 任意 GUI app の一般対応。
+- 外部 OSS app の実行対応。
+- Wine / PE 接続。
+- Rosetta disassembly、private dyld behavior、private Objective-C / AppKit internals に
+  基づく実装。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+- manual visible mode の GUI 目視確認手順と結果を review package に記録する。
+
+review gate:
+
+- 完遂したら commit / push / draft PR 作成で停止する。review / merge 後に、
+  B8-OSS0 へ進むか、x86 32-bit / PE-Wine 前段へ戻るかを判断する。
+
+#### Future Target: B8-OSS0 Source-Built OSS GUI App Automation
+
+B8-HWGUI が review / merge 済みになるまで開始しない。
+
+- [ ] public source から reproducible に x86_64 macOS binary を build できる、小さい OSS
+  GUI app を候補にする。最初は任意の downloaded binary ではなく source-built fixture を
+  優先する。
+- [ ] license、再配布可否、build input、expected/actual/debug bundle 保存場所を scope
+  document に固定する。
+- [ ] OSS app 実行は B8-HWGUI の debug bundle / blocker-driven cycle を流用し、
+  unsupported boundary を 1 つずつ stable report へ落とす。
+- [ ] OSS app target の最初の作業は実装ではなく、候補選定、scope、success criteria、
+  clean-room / supply-chain checklist の TODO 追加にする。
+
 ### B9: 実 x86 32-bit アプリ対応
 
 - [ ] B9 は推奨ステップとする。blocker が大きい場合は記録したうえで B10 へ進んでよい。

@@ -472,6 +472,19 @@
   continuation block の一般実行、arbitrary indirect call target execution、
   translation cache / fallback JIT を追加するものではない。次の B8-G6l では
   `_objc_msgSend(NSApp, setActivationPolicy:, 0)` だけの focused host execution slice を扱う。
+- 2026-06-13 の planning update として、B8-HWGUI を self-authored Hello World GUI
+  completion の大目標として明文化した。大目標の対象は、実 `LC_MAIN` entry から
+  GUI lifecycle helper boundary までを通し、automated expected / actual と manual visible
+  mode の両方で Hello World GUI fixture を完遂することに限定する。`/advance-large` を
+  使う場合でも、debug bundle blocker 由来の focused slice を coherent commit として積み、
+  arbitrary Objective-C message send、general continuation execution、arbitrary indirect
+  target execution、translation cache / JIT、`.app` bundle / resource が必要になったら
+  先に TODO 上の focused gate または sub-target へ分割する。
+- B8-HWGUI 完遂後の OSS app cycle は、任意の downloaded binary ではなく、まず public
+  source から x86_64 macOS binary を reproducible に build できる小さい OSS GUI app を
+  source-built fixture として扱う。候補選定、license / redistribution、supply-chain、
+  clean-room checklist、expected/actual/debug bundle 保存場所を scope 化するまでは
+  実装へ進まない。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、
