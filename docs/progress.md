@@ -9,11 +9,11 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 12:50 JST
+最終更新: 2026-06-13 12:53 JST
 
 状態:
 
-- project_state: completed。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
+- project_state: paused。B8 は「一般アプリ対応」を 1 つの完了条件にせず、
   reviewable GUI 起動 slice の積み上げとして扱う。B8-G6c までで、self-authored
   x86_64 GUI fixture の実 `LC_MAIN` entry から
   `push rbp; mov rbp,rsp; push r15; push r14; push rbx; push rax; call rel32;
@@ -97,8 +97,9 @@
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
 - active_branch: `task/b8-g6g-continuation-r15-indirect-rdi-load`。base branch は
   最新 `main` の `f1ea4db` (`Merge pull request #43 from
-  serika12345:task/b8-g6f-continuation-r15-rip-relative-load`)。draft PR は verify / push 後に
-  作成する。
+  serika12345:task/b8-g6f-continuation-r15-rip-relative-load`)。implementation commit は
+  `43333ab` (`feat: add b8 g6g r15 indirect rdi load boundary`)。draft PR は
+  <https://github.com/serika12345/Bara/pull/44>。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
@@ -237,11 +238,13 @@
   一般的な dynamic library data symbol memory model、`return_to` 以降の一般実行、
   arbitrary indirect call target execution、translation cache、fallback JIT/interpreter は
   まだ行わない。
-- next_action: B8-G6g branch を push して draft PR を作成する。
+- next_action: B8-G6g draft PR #44 を review / merge する。merge 後の次 PR Gate は
+  B8-G6h Return-To Continuation NSApp Global Load Boundary。
 - verification:
   `nix develop -c cargo test -p bara-isa-x86 r15 -- --nocapture`、
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
-  `nix develop -c ./scripts/verify` が通過した。
+  `nix develop -c ./scripts/verify` が通過した。PR URL 記録後に
+  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 
 直近で完了した作業:
 
