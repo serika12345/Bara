@@ -1684,16 +1684,16 @@ branch: `task/b8-hello-world-gui-complete`
 
 完了条件:
 
-- [ ] B8-G6p の
+- [x] B8-G6p の
   `return_to_continuation_objc_alloc_init_fixture_delegate_bridge_unimplemented` を受けて、
   `_OBJC_CLASS_$_BaraGuiHelloWorldDelegate` に限る fixture delegate bridge contract として
   保存する。
-- [ ] `b8_return_to_continuation_objc_alloc_init_class_identity_v0` の
+- [x] `b8_return_to_continuation_objc_alloc_init_class_identity_v0` の
   `public_mach_o_symtab_nlist64` 解決結果を contract input に接続し、private Objective-C
   runtime metadata には依存しない。
-- [ ] `_objc_alloc_init` host-side substitute が返す値は x86_64 `rax` writeback の
+- [x] `_objc_alloc_init` host-side substitute が返す値は x86_64 `rax` writeback の
   producer として扱い、後続の `mov rdx, rax` / `setDelegate:` dataflow を維持する。
-- [ ] 次 blocker を fixture delegate host execution の未実装境界として分類する。
+- [x] 次 blocker を fixture delegate host execution の未実装境界として分類する。
 
 PR に含めない:
 
@@ -1701,6 +1701,41 @@ PR に含めない:
 - Objective-C object layout、isa pointer、private runtime metadata の解釈。
 - 一般的な `_objc_alloc_init` execution engine。
 - dynamic linker / dyld stub binding の一般実装。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6q は完了し、次の gate は B8-G6r。
+
+#### PR Gate: B8-G6r Return-To Continuation objc_alloc_init Fixture Delegate Host Execution
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [ ] B8-G6q の
+  `return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_unimplemented` を受けて、
+  self-authored fixture delegate substitute を public Objective-C / AppKit API helper で
+  実行する。
+- [ ] host execution result を
+  `b8_return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_v0` として保存し、
+  `host_pointer_u64` output を `_objc_alloc_init` return value として扱う。
+- [ ] `_objc_alloc_init` return value を x86_64 `rax` writeback に接続し、後続の
+  `mov rdx, rax` が `setDelegate:` argument として available になることを保存する。
+- [ ] 次 blocker を `setDelegate:` helper execution boundary へ進める。
+
+PR に含めない:
+
+- x86_64 binary 内の Objective-C object layout / method table / isa pointer 解釈。
+- 任意の Objective-C class / instance bridge。
+- 一般的な `_objc_alloc_init` execution engine。
+- delegate callback into translated code。
 - translation cache、fallback JIT/interpreter。
 
 検証:

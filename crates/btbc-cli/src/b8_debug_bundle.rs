@@ -2272,7 +2272,7 @@ enum B8DebugObjcHelperExecutionBlocker {
     ReturnToContinuationObjcAllocInitClassArgumentMaterializationUnimplemented,
     ReturnToContinuationObjcAllocInitClassBridgeUnimplemented,
     ReturnToContinuationObjcAllocInitClassIdentityUnresolved,
-    ReturnToContinuationObjcAllocInitFixtureDelegateBridgeUnimplemented,
+    ReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionUnimplemented,
     ReturnToContinuationObjcHelperExecutionUnimplemented,
     ReturnToContinuationUnsupportedInstruction,
     SelectorVmAddressUnavailable,
@@ -2451,8 +2451,8 @@ enum B8DebugObjcHelperReturnContinuationNextAction {
     AddReturnToContinuationInstructionSupport,
     DecodeReturnToContinuationBlock,
     DefineReturnToContinuationObjcAllocInitClassBridge,
-    DefineReturnToContinuationObjcAllocInitFixtureDelegateBridge,
     ImplementReturnToContinuationCallRel32HelperExecution,
+    ImplementReturnToContinuationObjcAllocInitFixtureDelegateHostExecution,
     ImplementReturnToContinuationObjcHelperExecution,
     ImplementReturnToContinuationExecution,
     MaterializeReturnToContinuationObjcAllocInitClassArgument,
@@ -2596,10 +2596,10 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
                     B8DebugReturnToContinuationDecodeNextAction::ResolveReturnToContinuationObjcAllocInitClassIdentity
                 } else if materialization_blocker
                     == Some(
-                        B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcAllocInitFixtureDelegateBridgeUnimplemented,
+                        B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionUnimplemented,
                     )
                 {
-                    B8DebugReturnToContinuationDecodeNextAction::DefineReturnToContinuationObjcAllocInitFixtureDelegateBridge
+                    B8DebugReturnToContinuationDecodeNextAction::ImplementReturnToContinuationObjcAllocInitFixtureDelegateHostExecution
                 } else if materialization_blocker
                     == Some(
                         B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented,
@@ -2673,11 +2673,11 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
             B8DebugReturnToContinuationDecodeNextAction::DefineReturnToContinuationObjcAllocInitClassBridge => {
                 B8DebugObjcHelperReturnContinuationNextAction::DefineReturnToContinuationObjcAllocInitClassBridge
             }
-            B8DebugReturnToContinuationDecodeNextAction::DefineReturnToContinuationObjcAllocInitFixtureDelegateBridge => {
-                B8DebugObjcHelperReturnContinuationNextAction::DefineReturnToContinuationObjcAllocInitFixtureDelegateBridge
-            }
             B8DebugReturnToContinuationDecodeNextAction::ImplementReturnToContinuationCallRel32HelperExecution => {
                 B8DebugObjcHelperReturnContinuationNextAction::ImplementReturnToContinuationCallRel32HelperExecution
+            }
+            B8DebugReturnToContinuationDecodeNextAction::ImplementReturnToContinuationObjcAllocInitFixtureDelegateHostExecution => {
+                B8DebugObjcHelperReturnContinuationNextAction::ImplementReturnToContinuationObjcAllocInitFixtureDelegateHostExecution
             }
             B8DebugReturnToContinuationDecodeNextAction::ImplementReturnToContinuationObjcHelperExecution => {
                 B8DebugObjcHelperReturnContinuationNextAction::ImplementReturnToContinuationObjcHelperExecution
@@ -2747,8 +2747,8 @@ enum B8DebugReturnToContinuationByteSource {
 enum B8DebugReturnToContinuationDecodeNextAction {
     AddReturnToContinuationInstructionSupport,
     DefineReturnToContinuationObjcAllocInitClassBridge,
-    DefineReturnToContinuationObjcAllocInitFixtureDelegateBridge,
     ImplementReturnToContinuationCallRel32HelperExecution,
+    ImplementReturnToContinuationObjcAllocInitFixtureDelegateHostExecution,
     ImplementReturnToContinuationObjcHelperExecution,
     ImplementReturnToContinuationExecution,
     InspectReturnToContinuationDecodeFailure,
@@ -3185,8 +3185,8 @@ enum B8DebugReturnToContinuationCallRel32HelperBoundarySource {
 #[serde(rename_all = "snake_case")]
 enum B8DebugReturnToContinuationCallRel32HelperBoundaryNextAction {
     DefineReturnToContinuationObjcAllocInitClassBridge,
-    DefineReturnToContinuationObjcAllocInitFixtureDelegateBridge,
     ImplementReturnToContinuationCallRel32HelperExecution,
+    ImplementReturnToContinuationObjcAllocInitFixtureDelegateHostExecution,
     MaterializeReturnToContinuationObjcAllocInitClassArgument,
     ResolveReturnToContinuationObjcAllocInitClassIdentity,
     ResolveReturnToContinuationCallRel32StubSymbol,
@@ -3330,6 +3330,8 @@ struct B8DebugReturnToContinuationObjcAllocInitClassBridgeReport {
     class_import: Option<MachOChainedImportIdentityReport>,
     class_rebase: Option<MachOChainedRebaseTargetIdentityReport>,
     class_identity: Option<B8DebugReturnToContinuationObjcAllocInitClassIdentityReport>,
+    fixture_delegate_bridge_contract:
+        Option<B8DebugReturnToContinuationObjcAllocInitFixtureDelegateBridgeContractReport>,
     blocker: B8DebugObjcHelperExecutionBlocker,
     next_action: B8DebugReturnToContinuationCallRel32HelperBoundaryNextAction,
 }
@@ -3347,19 +3349,22 @@ impl B8DebugReturnToContinuationObjcAllocInitClassBridgeReport {
                 class_rebase,
             )
         });
+        let fixture_delegate_bridge_contract = class_identity.as_ref().and_then(|identity| {
+            B8DebugReturnToContinuationObjcAllocInitFixtureDelegateBridgeContractReport::from_class_identity(
+                identity,
+            )
+        });
         let (bridge_state, blocker, next_action) = if !class_argument.is_available() {
             (
                 B8DebugReturnToContinuationObjcAllocInitClassBridgeState::Blocked,
                 B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcAllocInitClassArgumentMaterializationUnimplemented,
                 B8DebugReturnToContinuationCallRel32HelperBoundaryNextAction::MaterializeReturnToContinuationObjcAllocInitClassArgument,
             )
-        } else if class_identity.as_ref().is_some_and(
-            B8DebugReturnToContinuationObjcAllocInitClassIdentityReport::is_fixture_delegate,
-        ) {
+        } else if fixture_delegate_bridge_contract.is_some() {
             (
-                B8DebugReturnToContinuationObjcAllocInitClassBridgeState::FixtureDelegateBridgeUnimplemented,
-                B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcAllocInitFixtureDelegateBridgeUnimplemented,
-                B8DebugReturnToContinuationCallRel32HelperBoundaryNextAction::DefineReturnToContinuationObjcAllocInitFixtureDelegateBridge,
+                B8DebugReturnToContinuationObjcAllocInitClassBridgeState::FixtureDelegateHostExecutionUnimplemented,
+                B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionUnimplemented,
+                B8DebugReturnToContinuationCallRel32HelperBoundaryNextAction::ImplementReturnToContinuationObjcAllocInitFixtureDelegateHostExecution,
             )
         } else if class_identity.is_some() {
             (
@@ -3382,6 +3387,7 @@ impl B8DebugReturnToContinuationObjcAllocInitClassBridgeReport {
             class_import: class_argument.class_import.clone(),
             class_rebase: class_argument.class_rebase,
             class_identity,
+            fixture_delegate_bridge_contract,
             blocker,
             next_action,
         }
@@ -3393,8 +3399,186 @@ impl B8DebugReturnToContinuationObjcAllocInitClassBridgeReport {
 enum B8DebugReturnToContinuationObjcAllocInitClassBridgeState {
     Blocked,
     ClassIdentityUnresolved,
-    FixtureDelegateBridgeUnimplemented,
+    FixtureDelegateHostExecutionUnimplemented,
     Unimplemented,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationObjcAllocInitFixtureDelegateBridgeContractReport {
+    schema: &'static str,
+    status: B8DebugImportBoundaryStatus,
+    scope: B8DebugReturnToContinuationObjcAllocInitFixtureDelegateBridgeScope,
+    source: B8DebugReturnToContinuationObjcAllocInitFixtureDelegateBridgeSource,
+    helper_symbol_name: &'static str,
+    required_capability: B8DebugReturnToContinuationObjcAllocInitFixtureDelegateBridgeCapability,
+    class_identity: B8DebugReturnToContinuationObjcAllocInitClassIdentityReport,
+    input_contract: B8DebugReturnToContinuationObjcAllocInitFixtureDelegateInputContractReport,
+    output_contract: B8DebugReturnToContinuationObjcAllocInitFixtureDelegateOutputContractReport,
+    error_contract: B8DebugReturnToContinuationObjcAllocInitFixtureDelegateErrorContractReport,
+    host_execution_boundary:
+        B8DebugReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionBoundaryReport,
+    blocker: B8DebugObjcHelperExecutionBlocker,
+    next_action: B8DebugReturnToContinuationCallRel32HelperBoundaryNextAction,
+}
+
+impl B8DebugReturnToContinuationObjcAllocInitFixtureDelegateBridgeContractReport {
+    fn from_class_identity(
+        class_identity: &B8DebugReturnToContinuationObjcAllocInitClassIdentityReport,
+    ) -> Option<Self> {
+        if !class_identity.is_fixture_delegate() {
+            return None;
+        }
+
+        let host_execution_boundary =
+            B8DebugReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionBoundaryReport::blocked(
+            );
+        Some(Self {
+            schema: "b8_return_to_continuation_objc_alloc_init_fixture_delegate_bridge_contract_v0",
+            status: B8DebugImportBoundaryStatus::Blocked,
+            scope:
+                B8DebugReturnToContinuationObjcAllocInitFixtureDelegateBridgeScope::SelfAuthoredB8GuiHelloWorldDelegateFixture,
+            source:
+                B8DebugReturnToContinuationObjcAllocInitFixtureDelegateBridgeSource::PublicMachOSymtabNlist64AndSelfAuthoredFixture,
+            helper_symbol_name: "_objc_alloc_init",
+            required_capability:
+                B8DebugReturnToContinuationObjcAllocInitFixtureDelegateBridgeCapability::ObjcAllocInitFixtureDelegateHostSubstitute,
+            class_identity: class_identity.clone(),
+            input_contract: B8DebugReturnToContinuationObjcAllocInitFixtureDelegateInputContractReport::from_class_identity(
+                class_identity,
+            ),
+            output_contract:
+                B8DebugReturnToContinuationObjcAllocInitFixtureDelegateOutputContractReport::new(),
+            error_contract:
+                B8DebugReturnToContinuationObjcAllocInitFixtureDelegateErrorContractReport::new(),
+            blocker: host_execution_boundary.blocker,
+            next_action: host_execution_boundary.next_action,
+            host_execution_boundary,
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationObjcAllocInitFixtureDelegateBridgeScope {
+    SelfAuthoredB8GuiHelloWorldDelegateFixture,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationObjcAllocInitFixtureDelegateBridgeSource {
+    PublicMachOSymtabNlist64AndSelfAuthoredFixture,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationObjcAllocInitFixtureDelegateBridgeCapability {
+    ObjcAllocInitFixtureDelegateHostSubstitute,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationObjcAllocInitFixtureDelegateInputContractReport {
+    class_argument_register: B8DebugRegisterName,
+    class_argument_role: B8DebugReturnToContinuationObjcAllocInitArgumentRole,
+    class_symbol_name: Option<String>,
+    class_name: Option<String>,
+    class_identity_source: B8DebugReturnToContinuationMachOSymbolAddressResolutionSource,
+}
+
+impl B8DebugReturnToContinuationObjcAllocInitFixtureDelegateInputContractReport {
+    fn from_class_identity(
+        class_identity: &B8DebugReturnToContinuationObjcAllocInitClassIdentityReport,
+    ) -> Self {
+        Self {
+            class_argument_register: B8DebugRegisterName::Rdi,
+            class_argument_role: B8DebugReturnToContinuationObjcAllocInitArgumentRole::ObjcClass,
+            class_symbol_name: class_identity.class_symbol_name.clone(),
+            class_name: class_identity.class_name.clone(),
+            class_identity_source: class_identity.source,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationObjcAllocInitFixtureDelegateOutputContractReport {
+    output_representation:
+        B8DebugReturnToContinuationObjcAllocInitFixtureDelegateOutputRepresentation,
+    return_register: B8DebugRegisterName,
+    return_value_handling:
+        B8DebugReturnToContinuationObjcAllocInitFixtureDelegateReturnValueHandling,
+    consumer_register: B8DebugRegisterName,
+    consumer_source_register: B8DebugRegisterName,
+    consumer_selector_name: &'static str,
+}
+
+impl B8DebugReturnToContinuationObjcAllocInitFixtureDelegateOutputContractReport {
+    const fn new() -> Self {
+        Self {
+            output_representation:
+                B8DebugReturnToContinuationObjcAllocInitFixtureDelegateOutputRepresentation::HostPointerU64,
+            return_register: B8DebugRegisterName::Rax,
+            return_value_handling:
+                B8DebugReturnToContinuationObjcAllocInitFixtureDelegateReturnValueHandling::CapturedAsX8664RaxReturnValue,
+            consumer_register: B8DebugRegisterName::Rdx,
+            consumer_source_register: B8DebugRegisterName::Rax,
+            consumer_selector_name: B8_GUI_HELLO_WORLD_SET_DELEGATE_SELECTOR_NAME,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationObjcAllocInitFixtureDelegateOutputRepresentation {
+    HostPointerU64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationObjcAllocInitFixtureDelegateReturnValueHandling {
+    #[serde(rename = "captured_as_x86_64_rax_return_value")]
+    CapturedAsX8664RaxReturnValue,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationObjcAllocInitFixtureDelegateErrorContractReport {
+    blocked_error: B8DebugObjcHelperExecutionBlocker,
+}
+
+impl B8DebugReturnToContinuationObjcAllocInitFixtureDelegateErrorContractReport {
+    const fn new() -> Self {
+        Self {
+            blocked_error: B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionUnimplemented,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionBoundaryReport {
+    schema: &'static str,
+    status: B8DebugImportBoundaryStatus,
+    effect: B8DebugReturnToContinuationObjcAllocInitFixtureDelegateHostEffect,
+    blocker: B8DebugObjcHelperExecutionBlocker,
+    next_action: B8DebugReturnToContinuationCallRel32HelperBoundaryNextAction,
+}
+
+impl B8DebugReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionBoundaryReport {
+    const fn blocked() -> Self {
+        Self {
+            schema:
+                "b8_return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_boundary_v0",
+            status: B8DebugImportBoundaryStatus::Blocked,
+            effect:
+                B8DebugReturnToContinuationObjcAllocInitFixtureDelegateHostEffect::AllocInitFixtureDelegate,
+            blocker: B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionUnimplemented,
+            next_action:
+                B8DebugReturnToContinuationCallRel32HelperBoundaryNextAction::ImplementReturnToContinuationObjcAllocInitFixtureDelegateHostExecution,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationObjcAllocInitFixtureDelegateHostEffect {
+    AllocInitFixtureDelegate,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -3482,6 +3666,7 @@ const OBJC_CLASS_SYMBOL_PREFIX: &str = "_OBJC_CLASS_$_";
 const B8_GUI_HELLO_WORLD_DELEGATE_CLASS_SYMBOL_NAME: &str =
     "_OBJC_CLASS_$_BaraGuiHelloWorldDelegate";
 const B8_GUI_HELLO_WORLD_DELEGATE_CLASS_NAME: &str = "BaraGuiHelloWorldDelegate";
+const B8_GUI_HELLO_WORLD_SET_DELEGATE_SELECTOR_NAME: &str = "setDelegate:";
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 struct B8DebugReturnToContinuationMachOStubSymbolResolutionReport {
@@ -5409,7 +5594,7 @@ enum B8DebugHelperBoundaryBlockedReason {
     ReturnToContinuationObjcAllocInitClassArgumentMaterializationUnimplemented,
     ReturnToContinuationObjcAllocInitClassBridgeUnimplemented,
     ReturnToContinuationObjcAllocInitClassIdentityUnresolved,
-    ReturnToContinuationObjcAllocInitFixtureDelegateBridgeUnimplemented,
+    ReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionUnimplemented,
     ReturnToContinuationObjcHelperExecutionUnimplemented,
     ReturnToContinuationUnsupportedInstruction,
 }
@@ -5454,8 +5639,8 @@ impl B8DebugHelperBoundaryBlockedReason {
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcAllocInitClassIdentityUnresolved => {
                 Self::ReturnToContinuationObjcAllocInitClassIdentityUnresolved
             }
-            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcAllocInitFixtureDelegateBridgeUnimplemented => {
-                Self::ReturnToContinuationObjcAllocInitFixtureDelegateBridgeUnimplemented
+            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionUnimplemented => {
+                Self::ReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionUnimplemented
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcHelperExecutionUnimplemented => {
                 Self::ReturnToContinuationObjcHelperExecutionUnimplemented
@@ -5495,7 +5680,7 @@ enum B8DebugHelperBoundaryBlocker {
     ReturnToContinuationObjcAllocInitClassArgumentMaterializationUnimplemented,
     ReturnToContinuationObjcAllocInitClassBridgeUnimplemented,
     ReturnToContinuationObjcAllocInitClassIdentityUnresolved,
-    ReturnToContinuationObjcAllocInitFixtureDelegateBridgeUnimplemented,
+    ReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionUnimplemented,
     ReturnToContinuationObjcHelperExecutionUnimplemented,
     ReturnToContinuationUnsupportedInstruction,
 }
@@ -5546,8 +5731,8 @@ impl B8DebugHelperBoundaryBlocker {
             B8DebugHelperBoundaryBlockedReason::ReturnToContinuationObjcAllocInitClassIdentityUnresolved => {
                 vec![Self::ReturnToContinuationObjcAllocInitClassIdentityUnresolved]
             }
-            B8DebugHelperBoundaryBlockedReason::ReturnToContinuationObjcAllocInitFixtureDelegateBridgeUnimplemented => {
-                vec![Self::ReturnToContinuationObjcAllocInitFixtureDelegateBridgeUnimplemented]
+            B8DebugHelperBoundaryBlockedReason::ReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionUnimplemented => {
+                vec![Self::ReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionUnimplemented]
             }
             B8DebugHelperBoundaryBlockedReason::ReturnToContinuationObjcHelperExecutionUnimplemented => {
                 vec![Self::ReturnToContinuationObjcHelperExecutionUnimplemented]
@@ -5607,8 +5792,8 @@ impl B8DebugHelperBoundaryBlocker {
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcAllocInitClassIdentityUnresolved => {
                 Self::ReturnToContinuationObjcAllocInitClassIdentityUnresolved
             }
-            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcAllocInitFixtureDelegateBridgeUnimplemented => {
-                Self::ReturnToContinuationObjcAllocInitFixtureDelegateBridgeUnimplemented
+            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionUnimplemented => {
+                Self::ReturnToContinuationObjcAllocInitFixtureDelegateHostExecutionUnimplemented
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationObjcHelperExecutionUnimplemented => {
                 Self::ReturnToContinuationObjcHelperExecutionUnimplemented

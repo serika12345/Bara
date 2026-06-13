@@ -2473,7 +2473,7 @@ mod tests {
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"helper_boundary_request\"")
         );
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"reason\":\"return_to_continuation_objc_alloc_init_fixture_delegate_bridge_unimplemented\""
+            "\"reason\":\"return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_unimplemented\""
         ));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"kind\":\"import_helper_call\""));
@@ -2584,7 +2584,7 @@ mod tests {
             .contains("\"next_source_pc\":4294972999"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register_state\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"blocker\":\"return_to_continuation_objc_alloc_init_fixture_delegate_bridge_unimplemented\""
+            "\"blocker\":\"return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_unimplemented\""
         ));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"continuation_block\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
@@ -2761,7 +2761,34 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"symbol_vm_address\":4294988184"));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"bridge_state\":\"fixture_delegate_bridge_unimplemented\""));
+            .contains("\"bridge_state\":\"fixture_delegate_host_execution_unimplemented\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"schema\":\"b8_return_to_continuation_objc_alloc_init_fixture_delegate_bridge_contract_v0\""
+        ));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"scope\":\"self_authored_b8_gui_hello_world_delegate_fixture\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"public_mach_o_symtab_nlist64_and_self_authored_fixture\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"required_capability\":\"objc_alloc_init_fixture_delegate_host_substitute\""
+        ));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"helper_symbol_name\":\"_objc_alloc_init\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"class_argument_register\":\"rdi\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"class_argument_role\":\"objc_class\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"output_representation\":\"host_pointer_u64\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"return_value_handling\":\"captured_as_x86_64_rax_return_value\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"consumer_selector_name\":\"setDelegate:\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
+            "\"schema\":\"b8_return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_boundary_v0\""
+        ));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"effect\":\"alloc_init_fixture_delegate\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
             "\"schema\":\"b8_return_to_continuation_call_rel32_return_value_dataflow_v0\""
         ));
@@ -2780,14 +2807,14 @@ mod tests {
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"name\":\"setDelegate:\"")
         );
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"blocker\":\"return_to_continuation_objc_alloc_init_fixture_delegate_bridge_unimplemented\""
+            "\"blocker\":\"return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_unimplemented\""
         ));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"unsupported_instruction\":null"));
         assert!(!read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"return_to_continuation_unsupported_instruction\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains(
-            "\"next_action\":\"define_return_to_continuation_objc_alloc_init_fixture_delegate_bridge\""
+            "\"next_action\":\"implement_return_to_continuation_objc_alloc_init_fixture_delegate_host_execution\""
         ));
         assert!(!read_file(&bundle_dir.join("loader.plan.json")).contains(
             "\"return_to_continuation_call_rel32_return_value_materialization_unimplemented\""
@@ -2856,7 +2883,7 @@ mod tests {
         assert!(launch_report.contains("\"b8_g1_host_trap_path\":\"not_used\""));
         assert!(launch_report.contains("\"helper_boundary_request\""));
         assert!(launch_report.contains(
-            "\"reason\":\"return_to_continuation_objc_alloc_init_fixture_delegate_bridge_unimplemented\""
+            "\"reason\":\"return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_unimplemented\""
         ));
         assert!(launch_report.contains("\"symbol_name\":\"_objc_msgSend\""));
         assert!(launch_report.contains("\"call_site\":4294972996"));
@@ -2916,7 +2943,7 @@ mod tests {
         assert!(launch_report.contains("\"next_source_pc\":4294972999"));
         assert!(launch_report.contains("\"register_state\""));
         assert!(launch_report.contains(
-            "\"blocker\":\"return_to_continuation_objc_alloc_init_fixture_delegate_bridge_unimplemented\""
+            "\"blocker\":\"return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_unimplemented\""
         ));
         assert!(launch_report.contains("\"continuation_block\""));
         assert!(
@@ -3030,9 +3057,29 @@ mod tests {
             .contains("\"class_symbol_name\":\"_OBJC_CLASS_$_BaraGuiHelloWorldDelegate\""));
         assert!(launch_report.contains("\"class_name\":\"BaraGuiHelloWorldDelegate\""));
         assert!(launch_report.contains("\"symbol_vm_address\":4294988184"));
-        assert!(
-            launch_report.contains("\"bridge_state\":\"fixture_delegate_bridge_unimplemented\"")
-        );
+        assert!(launch_report
+            .contains("\"bridge_state\":\"fixture_delegate_host_execution_unimplemented\""));
+        assert!(launch_report.contains(
+            "\"schema\":\"b8_return_to_continuation_objc_alloc_init_fixture_delegate_bridge_contract_v0\""
+        ));
+        assert!(launch_report
+            .contains("\"scope\":\"self_authored_b8_gui_hello_world_delegate_fixture\""));
+        assert!(launch_report
+            .contains("\"source\":\"public_mach_o_symtab_nlist64_and_self_authored_fixture\""));
+        assert!(launch_report.contains(
+            "\"required_capability\":\"objc_alloc_init_fixture_delegate_host_substitute\""
+        ));
+        assert!(launch_report.contains("\"helper_symbol_name\":\"_objc_alloc_init\""));
+        assert!(launch_report.contains("\"class_argument_register\":\"rdi\""));
+        assert!(launch_report.contains("\"class_argument_role\":\"objc_class\""));
+        assert!(launch_report.contains("\"output_representation\":\"host_pointer_u64\""));
+        assert!(launch_report
+            .contains("\"return_value_handling\":\"captured_as_x86_64_rax_return_value\""));
+        assert!(launch_report.contains("\"consumer_selector_name\":\"setDelegate:\""));
+        assert!(launch_report.contains(
+            "\"schema\":\"b8_return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_boundary_v0\""
+        ));
+        assert!(launch_report.contains("\"effect\":\"alloc_init_fixture_delegate\""));
         assert!(launch_report.contains(
             "\"schema\":\"b8_return_to_continuation_call_rel32_return_value_dataflow_v0\""
         ));
@@ -3043,12 +3090,12 @@ mod tests {
         assert!(launch_report.contains("\"return_register\":\"rax\""));
         assert!(launch_report.contains("\"name\":\"setDelegate:\""));
         assert!(launch_report.contains(
-            "\"blocker\":\"return_to_continuation_objc_alloc_init_fixture_delegate_bridge_unimplemented\""
+            "\"blocker\":\"return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_unimplemented\""
         ));
         assert!(launch_report.contains("\"unsupported_instruction\":null"));
         assert!(!launch_report.contains("\"return_to_continuation_unsupported_instruction\""));
         assert!(launch_report.contains(
-            "\"next_action\":\"define_return_to_continuation_objc_alloc_init_fixture_delegate_bridge\""
+            "\"next_action\":\"implement_return_to_continuation_objc_alloc_init_fixture_delegate_host_execution\""
         ));
         assert!(!launch_report.contains(
             "\"return_to_continuation_call_rel32_return_value_materialization_unimplemented\""

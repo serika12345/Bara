@@ -532,6 +532,19 @@
   private runtime metadata、general `_objc_alloc_init` execution、translation cache /
   fallback JIT を追加するものではない。次の B8-G6q では
   `BaraGuiHelloWorldDelegate` に限る host-side substitute bridge contract を扱う。
+- 2026-06-13 の B8-G6q として、`_objc_alloc_init` の
+  `BaraGuiHelloWorldDelegate` fixture 専用 bridge contract を
+  `b8_return_to_continuation_objc_alloc_init_fixture_delegate_bridge_contract_v0` として
+  保存した。contract は `public_mach_o_symtab_nlist64` class identity、self-authored
+  fixture scope、`objc_alloc_init_fixture_delegate_host_substitute` capability、
+  `host_pointer_u64` output、x86_64 `rax` return writeback、後続 `mov rdx, rax` /
+  `setDelegate:` dataflow を明示し、next blocker を
+  `return_to_continuation_objc_alloc_init_fixture_delegate_host_execution_unimplemented` に
+  進める。これは x86_64 binary 内の Objective-C object layout / method table / isa
+  pointer 解釈、任意 class allocation、general `_objc_alloc_init` execution、
+  delegate callback into translated code、translation cache / fallback JIT を追加するもの
+  ではない。次の B8-G6r では public Objective-C / AppKit API helper による
+  self-authored fixture delegate substitute の host execution を扱う。
 - 2026-06-13 の planning update として、B8-HWGUI を self-authored Hello World GUI
   completion の大目標として明文化した。大目標の対象は、実 `LC_MAIN` entry から
   GUI lifecycle helper boundary までを通し、automated expected / actual と manual visible
