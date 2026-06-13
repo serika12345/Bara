@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 13:39 JST
+最終更新: 2026-06-13 13:59 JST
 
 状態:
 
@@ -94,29 +94,32 @@
   `source=xor_edx_edx_zero`、`value=0`、`width=bits64` として continuation report に
   保存する。continuation decode は `call r14` at `4294973018` /
   `return_to=4294973021` まで進み、次の blocker は
-  `return_to_continuation_execution_unimplemented` である。arbitrary dynamic library data
-  symbol read、return-to continuation の一般実行、arbitrary indirect call target
-  execution、translation cache、fallback JIT/interpreter はまだ行わない。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G6i Return-To Continuation
-  XOR EDX Zero Slice: G6h の `return_to_continuation_unsupported_instruction` を受けて、
-  `31 d2` / `xor edx, edx` を focused ISA slice として扱い、`rdx=0` materialization と
-  次の `call r14` / `return_to_continuation_execution_unimplemented` blocker を
-  stable report に保存する。
+  `return_to_continuation_execution_unimplemented` である。B8-G6j ではこの `call r14` を
+  `b8_return_to_continuation_call_boundary_v0` として保存し、target は `_objc_msgSend`
+  import identity を `preserved_import_helper_call_target` /
+  `x86_64_macos_system_v_callee_saved_register` として扱う。arguments は `rdi` の `_NSApp`
+  value、`rsi` の `setActivationPolicy:` selector rebase、`rdx=0` を available state として
+  report する。arbitrary dynamic library data symbol read、return-to continuation の一般実行、
+  arbitrary indirect call target execution、translation cache、fallback JIT/interpreter は
+  まだ行わない。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G6j Return-To Continuation
+  Call R14 Boundary Planning: G6i の `return_to_continuation_execution_unimplemented` を受けて、
+  decoded `call r14` at `4294973018` / `return_to=4294973021` を focused stable
+  boundary として扱い、target / arguments / blocked state を stable report に保存する。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
   Objective-C runtime / dyld の private behavior は使わず、public metadata、
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
-- active_branch: `task/b8-g6i-continuation-xor-edx-zero`。base branch は
-  最新 `main` の `2ae960b` (`Merge pull request #45 from
-  serika12345:task/b8-g6h-continuation-nsapp-global-load`)。implementation commit は
-  `f163cb2` (`feat: add b8 g6i xor edx continuation slice`)。draft PR は
-  <https://github.com/serika12345/Bara/pull/46>。
+- active_branch: `task/b8-g6j-continuation-call-r14-boundary`。base branch は
+  最新 `main` の `f67dffb` (`Merge pull request #46 from
+  serika12345:task/b8-g6i-continuation-xor-edx-zero`)。implementation commit と draft PR は
+  この snapshot の commit / push 後に作成する。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
   B8-G5b-G5e / B8-G6a / B8-G6b / B8-G6c / B8-G6d / B8-G6e / B8-G6f /
-  B8-G6g / B8-G6h / B8-G6i / B8-G6j。
+  B8-G6g / B8-G6h / B8-G6i / B8-G6j / B8-G6k。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -250,22 +253,33 @@
   `31 d2` を `xor_edx_edx` として decode / lift し、`rdx` の
   `source=xor_edx_edx_zero`、`value=0`、`width=bits64` を stable report に保存する。
   decode は次の `call_r14` at `4294973018` / `return_to=4294973021` まで進み、
-  blocker は `return_to_continuation_execution_unimplemented` になる。
-- remaining_work: B8-G6j。G6i の continuation block が残す
-  `return_to_continuation_execution_unimplemented` を受けて、decoded `call r14` at
-  `4294973018` / `return_to=4294973021` を focused stable boundary として扱う。
-  `return_to` 以降の一般実行、arbitrary indirect call target execution、translation cache、
-  fallback JIT/interpreter はまだ行わない。
-- next_action: B8-G6i draft PR #46 を review / merge する。merge 後の次 PR Gate は
-  B8-G6j Return-To Continuation Call R14 Boundary Planning。
+  blocker は `return_to_continuation_execution_unimplemented` になる。B8-G6j として
+  `continuation_call_boundary.schema=b8_return_to_continuation_call_boundary_v0` を追加し、
+  target `_objc_msgSend` は preserved `r14` call target、arguments は `rdi` `_NSApp`、
+  `rsi` `setActivationPolicy:`、`rdx=0` として available state を stable report に保存する。
+- remaining_work: B8-G6k。G6j の continuation call boundary が残す
+  `return_to_continuation_execution_unimplemented` を受けて、
+  `_objc_msgSend(NSApp, setActivationPolicy:, 0)` を focused Objective-C helper boundary
+  として扱う。`return_to` 以降の一般実行、arbitrary indirect call target execution、
+  translation cache、fallback JIT/interpreter はまだ行わない。
+- next_action: B8-G6j branch を commit / push し、draft PR を作成して review gate で停止する。
+  merge 後の次 PR Gate は B8-G6k Return-To Continuation setActivationPolicy Helper Boundary。
 - verification:
-  `nix develop -c cargo test -p bara-isa-x86 xor_edx -- --nocapture`、
-  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
   `nix develop -c ./scripts/verify` が通過した。progress 更新後に
   `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-13 13:59 JST: B8-G6j Return-To Continuation Call R14 Boundary Planning
+  を実装した。continuation block 内の `call_r14` at `4294973018` / `return_to=4294973021` を
+  `b8_return_to_continuation_call_boundary_v0` として保存し、target は `_objc_msgSend` import
+  identity を preserved `r14` call target として扱う。arguments は `rdi` の `_NSApp` value、
+  `rsi` の `setActivationPolicy:` selector identity、`rdx=0` を available state として
+  report する。targeted 検証は
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
+  full verify は `nix develop -c ./scripts/verify` が通過した。progress 更新後に
+  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 - 2026-06-13 13:37 JST: B8-G6i Return-To Continuation XOR EDX Zero Slice
   を実装した。`31 d2` を x86_64 `xor edx, edx` として decode / lift し、32-bit register
   zeroing semantics により `rdx` を 64-bit zero として materialize する。continuation

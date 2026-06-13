@@ -2315,10 +2315,14 @@ impl B8DebugObjcHelperReturnContinuationBoundaryReport {
             B8DebugReturnToContinuationImportedGlobalValue::nsapp_from_host_execution(
                 host_execution,
             );
+        let continuation_inputs = B8DebugReturnToContinuationDecodeInputs {
+            imported_global_value,
+            preserved_call_target_import: Some(host_execution.invocation.source_import.clone()),
+        };
         let continuation_block = B8DebugReturnToContinuationDecodeBoundaryReport::from_code_bytes(
             call_boundary.return_to,
             register_state,
-            imported_global_value,
+            continuation_inputs,
             code_bytes,
             input,
             input_probe,
@@ -2447,6 +2451,7 @@ struct B8DebugReturnToContinuationDecodeBoundaryReport {
     materialized_register_states: Vec<B8DebugReturnToContinuationMaterializedRegisterStateReport>,
     blocked_register_materializations:
         Vec<B8DebugReturnToContinuationBlockedRegisterMaterializationReport>,
+    continuation_call_boundary: Option<B8DebugReturnToContinuationCallBoundaryReport>,
     decode_report: B8DebugDecodeReport,
     processed_source_pc_range: Option<B8DebugProcessedPcRange>,
     next_instruction: Option<B8DebugDecodedInstructionReport>,
@@ -2455,11 +2460,17 @@ struct B8DebugReturnToContinuationDecodeBoundaryReport {
     next_action: B8DebugReturnToContinuationDecodeNextAction,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct B8DebugReturnToContinuationDecodeInputs {
+    imported_global_value: Option<B8DebugReturnToContinuationImportedGlobalValue>,
+    preserved_call_target_import: Option<MachOChainedImportIdentityReport>,
+}
+
 impl B8DebugReturnToContinuationDecodeBoundaryReport {
     fn from_code_bytes(
         source_pc: u64,
         input_register_state: B8DebugObjcHelperReturnContinuationRegisterStateReport,
-        imported_global_value: Option<B8DebugReturnToContinuationImportedGlobalValue>,
+        continuation_inputs: B8DebugReturnToContinuationDecodeInputs,
         code_bytes: &X86Bytes,
         input: &BinaryInput,
         input_probe: &BinaryFormatProbeReport,
@@ -2474,6 +2485,7 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
             unsupported_instruction,
             materialized_register_states,
             blocked_register_materializations,
+            continuation_call_boundary,
             blocker,
             next_action,
         ) = match decoded_result {
@@ -2486,7 +2498,14 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
                         image_metadata.mapped_bytes(),
                         input,
                         input_probe,
-                        imported_global_value,
+                        continuation_inputs.imported_global_value,
+                    );
+                let continuation_call_boundary =
+                    B8DebugReturnToContinuationCallBoundaryReport::from_decoded(
+                        &decoded,
+                        &materialized_register_states,
+                        continuation_inputs.preserved_call_target_import,
+                        image_metadata,
                     );
                 let materialization_blocker =
                     blocked_register_materializations.first().map(|blocked| blocked.blocker);
@@ -2518,6 +2537,7 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
                     unsupported_instruction,
                     materialized_register_states,
                     blocked_register_materializations,
+                    continuation_call_boundary,
                     blocker,
                     next_action,
                 )
@@ -2528,6 +2548,7 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
                 None,
                 Vec::new(),
                 Vec::new(),
+                None,
                 B8DebugObjcHelperExecutionBlocker::ReturnToContinuationDecodeFailed,
                 B8DebugReturnToContinuationDecodeNextAction::InspectReturnToContinuationDecodeFailure,
             ),
@@ -2544,6 +2565,7 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
             input_register_state,
             materialized_register_states,
             blocked_register_materializations,
+            continuation_call_boundary,
             decode_report,
             processed_source_pc_range,
             next_instruction,
@@ -2666,6 +2688,32 @@ impl B8DebugReturnToContinuationMaterializedRegisterStateReport {
                         r15_fixup_resolution = Some(fixup_resolution.clone());
                         states.push(Self {
                             register: B8DebugRegisterName::R15,
+                            source:
+                                B8DebugReturnToContinuationMaterializedRegisterSource::RipRelativeQword,
+                            instruction_start: instruction.start().value(),
+                            instruction_end: instruction.end().value(),
+                            address: Some(address.value()),
+                            base_register: None,
+                            base_value: None,
+                            base_fixup_resolution: None,
+                            value,
+                            value_source: None,
+                            fixup_resolution: Some(fixup_resolution),
+                            width: B8DebugMemoryReadWidthReport::Bits64,
+                        });
+                    }
+                }
+                DecodedInstructionKind::MovRsiQwordPtrRipRelative { address, .. } => {
+                    if let Some(value) = mapped_bytes.read_u64_le(*address) {
+                        let fixup_resolution =
+                            B8DebugObjcArgumentFixupResolutionReport::from_mapped_pointer(
+                                input,
+                                input_probe,
+                                address.value(),
+                                value,
+                            );
+                        states.push(Self {
+                            register: B8DebugRegisterName::Rsi,
                             source:
                                 B8DebugReturnToContinuationMaterializedRegisterSource::RipRelativeQword,
                             instruction_start: instruction.start().value(),
@@ -2862,6 +2910,194 @@ fn imported_global_value_for_resolution(
     imported_global_value
         .matches_import(import)
         .then_some(imported_global_value)
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationCallBoundaryReport {
+    schema: &'static str,
+    status: B8DebugImportBoundaryStatus,
+    call_site: u64,
+    return_to: u64,
+    target_register: B8DebugRegisterName,
+    target: B8DebugReturnToContinuationCallTargetReport,
+    arguments: Vec<B8DebugReturnToContinuationCallArgumentReport>,
+    blocker: B8DebugObjcHelperExecutionBlocker,
+    next_action: B8DebugReturnToContinuationDecodeNextAction,
+}
+
+impl B8DebugReturnToContinuationCallBoundaryReport {
+    fn from_decoded(
+        decoded: &DecodedFunction,
+        materialized_register_states: &[B8DebugReturnToContinuationMaterializedRegisterStateReport],
+        preserved_call_target_import: Option<MachOChainedImportIdentityReport>,
+        image_metadata: &ProgramImageMetadata,
+    ) -> Option<Self> {
+        let (call_site, return_to) =
+            decoded
+                .instructions()
+                .iter()
+                .find_map(|instruction| match instruction.kind() {
+                    DecodedInstructionKind::CallR14 { return_to } => {
+                        Some((instruction.start().value(), return_to.value()))
+                    }
+                    _ => None,
+                })?;
+
+        Some(Self {
+            schema: "b8_return_to_continuation_call_boundary_v0",
+            status: B8DebugImportBoundaryStatus::Blocked,
+            call_site,
+            return_to,
+            target_register: B8DebugRegisterName::R14,
+            target: B8DebugReturnToContinuationCallTargetReport::preserved_r14(
+                preserved_call_target_import,
+            ),
+            arguments: vec![
+                B8DebugReturnToContinuationCallArgumentReport::from_materialized_register(
+                    0,
+                    B8DebugReturnToContinuationCallArgumentRole::Receiver,
+                    B8DebugRegisterName::Rdi,
+                    materialized_register_states,
+                    image_metadata,
+                ),
+                B8DebugReturnToContinuationCallArgumentReport::from_materialized_register(
+                    1,
+                    B8DebugReturnToContinuationCallArgumentRole::Selector,
+                    B8DebugRegisterName::Rsi,
+                    materialized_register_states,
+                    image_metadata,
+                ),
+                B8DebugReturnToContinuationCallArgumentReport::from_materialized_register(
+                    2,
+                    B8DebugReturnToContinuationCallArgumentRole::Argument,
+                    B8DebugRegisterName::Rdx,
+                    materialized_register_states,
+                    image_metadata,
+                ),
+            ],
+            blocker: B8DebugObjcHelperExecutionBlocker::ReturnToContinuationExecutionUnimplemented,
+            next_action:
+                B8DebugReturnToContinuationDecodeNextAction::ImplementReturnToContinuationExecution,
+        })
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationCallTargetReport {
+    state: B8DebugValueMaterializationStatus,
+    source: B8DebugReturnToContinuationCallTargetSource,
+    preservation_model: B8DebugReturnToContinuationCallTargetPreservationModel,
+    import: Option<MachOChainedImportIdentityReport>,
+    blocker: Option<B8DebugObjcHelperExecutionBlocker>,
+}
+
+impl B8DebugReturnToContinuationCallTargetReport {
+    fn preserved_r14(import: Option<MachOChainedImportIdentityReport>) -> Self {
+        let state = if import.is_some() {
+            B8DebugValueMaterializationStatus::Available
+        } else {
+            B8DebugValueMaterializationStatus::Blocked
+        };
+        let blocker = if import.is_some() {
+            None
+        } else {
+            Some(B8DebugObjcHelperExecutionBlocker::ReturnToContinuationExecutionUnimplemented)
+        };
+
+        Self {
+            state,
+            source: B8DebugReturnToContinuationCallTargetSource::PreservedImportHelperCallTarget,
+            preservation_model:
+                B8DebugReturnToContinuationCallTargetPreservationModel::X8664MacosSystemVCalleeSavedRegister,
+            import,
+            blocker,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationCallTargetSource {
+    PreservedImportHelperCallTarget,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationCallTargetPreservationModel {
+    #[serde(rename = "x86_64_macos_system_v_callee_saved_register")]
+    X8664MacosSystemVCalleeSavedRegister,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationCallArgumentReport {
+    position: u8,
+    role: B8DebugReturnToContinuationCallArgumentRole,
+    register: B8DebugRegisterName,
+    state: B8DebugValueMaterializationStatus,
+    materialized_state: Option<B8DebugReturnToContinuationMaterializedRegisterStateReport>,
+    selector_identity: Option<B8DebugObjcSelectorIdentityReport>,
+    blocker: Option<B8DebugObjcHelperExecutionBlocker>,
+}
+
+impl B8DebugReturnToContinuationCallArgumentReport {
+    fn from_materialized_register(
+        position: u8,
+        role: B8DebugReturnToContinuationCallArgumentRole,
+        register: B8DebugRegisterName,
+        materialized_register_states: &[B8DebugReturnToContinuationMaterializedRegisterStateReport],
+        image_metadata: &ProgramImageMetadata,
+    ) -> Self {
+        let materialized_state = materialized_register_states
+            .iter()
+            .rev()
+            .find(|state| state.register == register)
+            .cloned();
+        let state = if materialized_state.is_some() {
+            B8DebugValueMaterializationStatus::Available
+        } else {
+            B8DebugValueMaterializationStatus::Blocked
+        };
+        let selector_identity = if role == B8DebugReturnToContinuationCallArgumentRole::Selector {
+            materialized_state
+                .as_ref()
+                .and_then(|state| state.fixup_resolution.as_ref())
+                .and_then(|resolution| resolution.rebase)
+                .and_then(|rebase| {
+                    B8DebugObjcSelectorIdentityReport::from_rebase_target(
+                        Some(rebase),
+                        image_metadata,
+                    )
+                })
+        } else {
+            None
+        };
+        let blocker = if materialized_state.is_some() {
+            None
+        } else {
+            Some(B8DebugObjcHelperExecutionBlocker::ReturnToContinuationExecutionUnimplemented)
+        };
+
+        Self {
+            position,
+            role,
+            register,
+            state,
+            materialized_state,
+            selector_identity,
+            blocker,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationCallArgumentRole {
+    #[serde(rename = "objc_argument")]
+    Argument,
+    #[serde(rename = "objc_receiver")]
+    Receiver,
+    #[serde(rename = "objc_selector")]
+    Selector,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]

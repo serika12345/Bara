@@ -454,6 +454,14 @@
   continuation report に保存する。これは `xor r32, r32` 全体の一般化、continuation block
   の一般実行、translation cache / fallback JIT を追加するものではない。次の B8-G6j では
   到達済みの `call r14` at `4294973018` / `return_to=4294973021` を focused boundary として扱う。
+- 2026-06-13 の B8-G6j として、continuation block 内の `call r14` を
+  `b8_return_to_continuation_call_boundary_v0` として保存する。target は初回 helper call の
+  `_objc_msgSend` import identity を `preserved_import_helper_call_target` /
+  `x86_64_macos_system_v_callee_saved_register` として扱い、arguments は `rdi` の `_NSApp`
+  value、`rsi` の `setActivationPolicy:` selector rebase、`rdx=0` を available state として
+  report する。これは continuation block の一般実行、arbitrary indirect call target
+  execution、translation cache / fallback JIT を追加するものではない。次の B8-G6k では
+  `_objc_msgSend(NSApp, setActivationPolicy:, 0)` を focused helper boundary として扱う。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、

@@ -2640,10 +2640,38 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"source\":\"xor_edx_edx_zero\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"value\":0"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"register\":\"rsi\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"address\":4294988008"));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"kind\":\"call_r14\""));
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"return_to\":4294973021")
         );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"continuation_call_boundary\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"schema\":\"b8_return_to_continuation_call_boundary_v0\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"call_site\":4294973018")
+        );
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"target_register\":\"r14\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"source\":\"preserved_import_helper_call_target\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"preservation_model\":\"x86_64_macos_system_v_callee_saved_register\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"arguments\""));
+        assert!(
+            read_file(&bundle_dir.join("loader.plan.json")).contains("\"role\":\"objc_argument\"")
+        );
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"state\":\"available\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"selector_identity\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"name\":\"setActivationPolicy:\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"resolved_vm_address\":4294975544"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"blocker\":\"return_to_continuation_execution_unimplemented\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"unsupported_instruction\":null"));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
@@ -2810,8 +2838,25 @@ mod tests {
         assert!(launch_report.contains("\"register\":\"rdx\""));
         assert!(launch_report.contains("\"source\":\"xor_edx_edx_zero\""));
         assert!(launch_report.contains("\"value\":0"));
+        assert!(launch_report.contains("\"register\":\"rsi\""));
+        assert!(launch_report.contains("\"address\":4294988008"));
         assert!(launch_report.contains("\"kind\":\"call_r14\""));
         assert!(launch_report.contains("\"return_to\":4294973021"));
+        assert!(launch_report.contains("\"continuation_call_boundary\""));
+        assert!(launch_report.contains("\"schema\":\"b8_return_to_continuation_call_boundary_v0\""));
+        assert!(launch_report.contains("\"call_site\":4294973018"));
+        assert!(launch_report.contains("\"target_register\":\"r14\""));
+        assert!(launch_report.contains("\"source\":\"preserved_import_helper_call_target\""));
+        assert!(launch_report
+            .contains("\"preservation_model\":\"x86_64_macos_system_v_callee_saved_register\""));
+        assert!(launch_report.contains("\"arguments\""));
+        assert!(launch_report.contains("\"role\":\"objc_argument\""));
+        assert!(launch_report.contains("\"state\":\"available\""));
+        assert!(launch_report.contains("\"selector_identity\""));
+        assert!(launch_report.contains("\"name\":\"setActivationPolicy:\""));
+        assert!(launch_report.contains("\"resolved_vm_address\":4294975544"));
+        assert!(launch_report
+            .contains("\"blocker\":\"return_to_continuation_execution_unimplemented\""));
         assert!(launch_report.contains("\"unsupported_instruction\":null"));
         assert!(launch_report
             .contains("\"next_action\":\"implement_return_to_continuation_execution\""));
