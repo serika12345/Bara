@@ -23,6 +23,9 @@ crates/bara-isa-x86/src/decode/instruction.rs:    pub fn new(entry: X86Va, instr
 crates/bara-mach-o/src/arm64_executable/serialization.rs:    pub const fn value(self) -> u64 {
 crates/bara-oracle/src/binary_format/input/mach_o_chained_fixups.rs:    pub const fn from_mach_o_virtual_address(value: u64) -> Self {
 crates/bara-oracle/src/binary_format/input/mach_o_linkedit_command.rs:    pub const fn as_u32(self) -> u32 {
+crates/bara-oracle/src/binary_format/input/mach_o_symbol_stub.rs:    pub const fn as_u32(self) -> u32 {
+crates/bara-oracle/src/binary_format/input/mach_o_symbol_stub.rs:    pub const fn as_u64(self) -> u64 {
+crates/bara-oracle/src/binary_format/input/mach_o_symbol_stub.rs:    pub const fn new(value: u64) -> Self {
 crates/bara-oracle/src/compare/mod.rs:    pub fn new(issues: Vec<ComparisonIssue>) -> Self {
 crates/bara-oracle/src/json/mod.rs:pub fn corpus_report_to_json(report: &CorpusReport) -> Result<String, JsonError> {
 crates/bara-oracle/src/json/mod.rs:pub fn observed_result_to_json(result: &ObservedResult) -> Result<String, JsonError> {

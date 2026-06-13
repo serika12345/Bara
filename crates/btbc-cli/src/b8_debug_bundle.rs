@@ -16,12 +16,14 @@ use bara_isa_x86::{
 };
 use bara_oracle::{
     binary_format_probe_report_to_json, decode_mach_o_chained_fixups_for_target,
-    mach_o_entry_function_input, probe_public_binary_format, BinaryFileBytes,
-    BinaryFormatProbeError, BinaryFormatProbeReport, BinaryInput, FailureKind, JsonError,
-    MachOChainedFixupTargetAddress, MachOChainedFixupsBlocker, MachOChainedFixupsTargetReport,
-    MachOChainedImportIdentityReport, MachOChainedRebaseTargetIdentityReport,
-    MachODyldInfoCommandKind, MachODylibImportCommandKind, MachOEntryFunctionInput,
-    MachOEntryFunctionTestCaseError, MachOLinkeditDataCommandKind, TestCase,
+    mach_o_entry_function_input, probe_public_binary_format, resolve_mach_o_symbol_stub_for_target,
+    BinaryFileBytes, BinaryFormatProbeError, BinaryFormatProbeReport, BinaryInput, FailureKind,
+    JsonError, MachOChainedFixupTargetAddress, MachOChainedFixupsBlocker,
+    MachOChainedFixupsTargetReport, MachOChainedImportIdentityReport,
+    MachOChainedRebaseTargetIdentityReport, MachODyldInfoCommandKind, MachODylibImportCommandKind,
+    MachOEntryFunctionInput, MachOEntryFunctionTestCaseError, MachOLinkeditDataCommandKind,
+    MachOStubSymbolResolution, MachOStubSymbolResolutionBlocker, MachOStubSymbolResolutionStatus,
+    MachOStubVirtualAddress, TestCase,
 };
 use serde::{Deserialize, Serialize};
 
@@ -2261,6 +2263,8 @@ enum B8DebugObjcHelperExecutionBlocker {
     ObjcRuntimeHelperHostExecutionUnsupported,
     ReceiverIdentityUnavailable,
     ReturnToContinuationDecodeFailed,
+    ReturnToContinuationCallRel32HelperExecutionUnimplemented,
+    ReturnToContinuationCallRel32StubSymbolResolutionUnresolved,
     ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented,
     ReturnToContinuationExecutionUnimplemented,
     ReturnToContinuationImportGlobalLoadUnimplemented,
@@ -2441,8 +2445,10 @@ enum B8DebugObjcHelperReturnContinuationRegisterSource {
 enum B8DebugObjcHelperReturnContinuationNextAction {
     AddReturnToContinuationInstructionSupport,
     DecodeReturnToContinuationBlock,
+    ImplementReturnToContinuationCallRel32HelperExecution,
     ImplementReturnToContinuationObjcHelperExecution,
     ImplementReturnToContinuationExecution,
+    ResolveReturnToContinuationCallRel32StubSymbol,
     MaterializeReturnToContinuationCallRel32ReturnValue,
     MaterializeReturnToContinuationImportGlobalLoad,
     InspectReturnToContinuationObjcHelperExecutionFailure,
@@ -2551,6 +2557,18 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
                     B8DebugReturnToContinuationDecodeNextAction::MaterializeReturnToContinuationImportGlobalLoad
                 } else if materialization_blocker
                     == Some(
+                        B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32HelperExecutionUnimplemented,
+                    )
+                {
+                    B8DebugReturnToContinuationDecodeNextAction::ImplementReturnToContinuationCallRel32HelperExecution
+                } else if materialization_blocker
+                    == Some(
+                        B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32StubSymbolResolutionUnresolved,
+                    )
+                {
+                    B8DebugReturnToContinuationDecodeNextAction::ResolveReturnToContinuationCallRel32StubSymbol
+                } else if materialization_blocker
+                    == Some(
                         B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented,
                     )
                 {
@@ -2619,6 +2637,9 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
             B8DebugReturnToContinuationDecodeNextAction::AddReturnToContinuationInstructionSupport => {
                 B8DebugObjcHelperReturnContinuationNextAction::AddReturnToContinuationInstructionSupport
             }
+            B8DebugReturnToContinuationDecodeNextAction::ImplementReturnToContinuationCallRel32HelperExecution => {
+                B8DebugObjcHelperReturnContinuationNextAction::ImplementReturnToContinuationCallRel32HelperExecution
+            }
             B8DebugReturnToContinuationDecodeNextAction::ImplementReturnToContinuationObjcHelperExecution => {
                 B8DebugObjcHelperReturnContinuationNextAction::ImplementReturnToContinuationObjcHelperExecution
             }
@@ -2636,6 +2657,9 @@ impl B8DebugReturnToContinuationDecodeBoundaryReport {
             }
             B8DebugReturnToContinuationDecodeNextAction::MaterializeReturnToContinuationImportGlobalLoad => {
                 B8DebugObjcHelperReturnContinuationNextAction::MaterializeReturnToContinuationImportGlobalLoad
+            }
+            B8DebugReturnToContinuationDecodeNextAction::ResolveReturnToContinuationCallRel32StubSymbol => {
+                B8DebugObjcHelperReturnContinuationNextAction::ResolveReturnToContinuationCallRel32StubSymbol
             }
             B8DebugReturnToContinuationDecodeNextAction::RunReturnToContinuationObjcHelperOnSupportedMacosHost => {
                 B8DebugObjcHelperReturnContinuationNextAction::RunReturnToContinuationObjcHelperOnSupportedMacosHost
@@ -2677,12 +2701,14 @@ enum B8DebugReturnToContinuationByteSource {
 #[serde(rename_all = "snake_case")]
 enum B8DebugReturnToContinuationDecodeNextAction {
     AddReturnToContinuationInstructionSupport,
+    ImplementReturnToContinuationCallRel32HelperExecution,
     ImplementReturnToContinuationObjcHelperExecution,
     ImplementReturnToContinuationExecution,
     InspectReturnToContinuationDecodeFailure,
     InspectReturnToContinuationObjcHelperExecutionFailure,
     MaterializeReturnToContinuationCallRel32ReturnValue,
     MaterializeReturnToContinuationImportGlobalLoad,
+    ResolveReturnToContinuationCallRel32StubSymbol,
     RunReturnToContinuationObjcHelperOnSupportedMacosHost,
 }
 
@@ -2723,12 +2749,15 @@ impl B8DebugReturnToContinuationMaterializedRegisterStateReport {
         for instruction in decoded.instructions() {
             match instruction.kind() {
                 DecodedInstructionKind::CallRel32 { target, return_to } => {
-                    rax_call_return = Some(B8DebugReturnToContinuationCallRel32ReturnValueReport {
-                        call_site: instruction.start().value(),
-                        return_to: return_to.value(),
-                        target: target.value(),
-                        return_register: B8DebugRegisterName::Rax,
-                    });
+                    rax_call_return = Some(
+                        B8DebugReturnToContinuationCallRel32ReturnValueReport::from_call_rel32(
+                            instruction.start().value(),
+                            return_to.value(),
+                            target.value(),
+                            input,
+                            input_probe,
+                        ),
+                    );
                 }
                 DecodedInstructionKind::MovR15QwordPtrRipRelative { address, .. } => {
                     if let Some(value) = mapped_bytes.read_u64_le(*address) {
@@ -2826,6 +2855,7 @@ impl B8DebugReturnToContinuationMaterializedRegisterStateReport {
                                     base_fixup_resolution: r15_fixup_resolution.clone(),
                                     source_register: None,
                                     source_call_return: None,
+                                    source_call_return_dataflow: None,
                                     blocker: B8DebugObjcHelperExecutionBlocker::ReturnToContinuationImportGlobalLoadUnimplemented,
                                 },
                             );
@@ -2875,6 +2905,22 @@ impl B8DebugReturnToContinuationMaterializedRegisterStateReport {
                     });
                 }
                 DecodedInstructionKind::MovRdxRax => {
+                    let source_call_return = rax_call_return.clone();
+                    let source_call_return_dataflow = source_call_return.as_ref().map(
+                        |call_return| {
+                            B8DebugReturnToContinuationCallRel32ReturnValueDataflowReport::from_consumer(
+                                call_return,
+                                instruction.start().value(),
+                                instruction.end().value(),
+                                B8DebugRegisterName::Rdx,
+                                B8DebugRegisterName::Rax,
+                            )
+                        },
+                    );
+                    let blocker = source_call_return.as_ref().map_or(
+                        B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented,
+                        |call_return| call_return.helper_boundary.blocker,
+                    );
                     blocked.push(
                         B8DebugReturnToContinuationBlockedRegisterMaterializationReport {
                             register: B8DebugRegisterName::Rdx,
@@ -2886,8 +2932,9 @@ impl B8DebugReturnToContinuationMaterializedRegisterStateReport {
                             base_value: None,
                             base_fixup_resolution: None,
                             source_register: Some(B8DebugRegisterName::Rax),
-                            source_call_return: rax_call_return,
-                            blocker: B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented,
+                            source_call_return,
+                            source_call_return_dataflow,
+                            blocker,
                         },
                     );
                 }
@@ -2910,15 +2957,210 @@ struct B8DebugReturnToContinuationBlockedRegisterMaterializationReport {
     base_fixup_resolution: Option<B8DebugObjcArgumentFixupResolutionReport>,
     source_register: Option<B8DebugRegisterName>,
     source_call_return: Option<B8DebugReturnToContinuationCallRel32ReturnValueReport>,
+    source_call_return_dataflow:
+        Option<B8DebugReturnToContinuationCallRel32ReturnValueDataflowReport>,
     blocker: B8DebugObjcHelperExecutionBlocker,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 struct B8DebugReturnToContinuationCallRel32ReturnValueReport {
+    schema: &'static str,
     call_site: u64,
     return_to: u64,
     target: u64,
     return_register: B8DebugRegisterName,
+    helper_boundary: B8DebugReturnToContinuationCallRel32HelperBoundaryReport,
+}
+
+impl B8DebugReturnToContinuationCallRel32ReturnValueReport {
+    fn from_call_rel32(
+        call_site: u64,
+        return_to: u64,
+        target: u64,
+        input: &BinaryInput,
+        input_probe: &BinaryFormatProbeReport,
+    ) -> Self {
+        Self {
+            schema: "b8_return_to_continuation_call_rel32_return_value_v0",
+            call_site,
+            return_to,
+            target,
+            return_register: B8DebugRegisterName::Rax,
+            helper_boundary:
+                B8DebugReturnToContinuationCallRel32HelperBoundaryReport::from_call_rel32(
+                    call_site,
+                    return_to,
+                    target,
+                    input,
+                    input_probe,
+                ),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationCallRel32HelperBoundaryReport {
+    schema: &'static str,
+    status: B8DebugImportBoundaryStatus,
+    kind: B8DebugReturnToContinuationCallRel32HelperBoundaryKind,
+    source: B8DebugReturnToContinuationCallRel32HelperBoundarySource,
+    call_site: u64,
+    return_to: u64,
+    target: u64,
+    return_register: B8DebugRegisterName,
+    target_resolution: B8DebugReturnToContinuationMachOStubSymbolResolutionReport,
+    blocker: B8DebugObjcHelperExecutionBlocker,
+    next_action: B8DebugReturnToContinuationCallRel32HelperBoundaryNextAction,
+}
+
+impl B8DebugReturnToContinuationCallRel32HelperBoundaryReport {
+    fn from_call_rel32(
+        call_site: u64,
+        return_to: u64,
+        target: u64,
+        input: &BinaryInput,
+        input_probe: &BinaryFormatProbeReport,
+    ) -> Self {
+        let resolution =
+            B8DebugReturnToContinuationMachOStubSymbolResolutionReport::from_resolution(
+                resolve_mach_o_symbol_stub_for_target(
+                    input,
+                    input_probe,
+                    MachOStubVirtualAddress::new(target),
+                ),
+            );
+        let (blocker, next_action) = if resolution.is_resolved() {
+            (
+                B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32HelperExecutionUnimplemented,
+                B8DebugReturnToContinuationCallRel32HelperBoundaryNextAction::ImplementReturnToContinuationCallRel32HelperExecution,
+            )
+        } else {
+            (
+                B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32StubSymbolResolutionUnresolved,
+                B8DebugReturnToContinuationCallRel32HelperBoundaryNextAction::ResolveReturnToContinuationCallRel32StubSymbol,
+            )
+        };
+
+        Self {
+            schema: "b8_return_to_continuation_call_rel32_helper_boundary_v0",
+            status: B8DebugImportBoundaryStatus::Blocked,
+            kind: B8DebugReturnToContinuationCallRel32HelperBoundaryKind::MachOSymbolStubCall,
+            source:
+                B8DebugReturnToContinuationCallRel32HelperBoundarySource::PublicMachOSection64DysymtabSymtab,
+            call_site,
+            return_to,
+            target,
+            return_register: B8DebugRegisterName::Rax,
+            target_resolution: resolution,
+            blocker,
+            next_action,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationCallRel32HelperBoundaryKind {
+    MachOSymbolStubCall,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationCallRel32HelperBoundarySource {
+    PublicMachOSection64DysymtabSymtab,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum B8DebugReturnToContinuationCallRel32HelperBoundaryNextAction {
+    ImplementReturnToContinuationCallRel32HelperExecution,
+    ResolveReturnToContinuationCallRel32StubSymbol,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationMachOStubSymbolResolutionReport {
+    schema: &'static str,
+    status: MachOStubSymbolResolutionStatus,
+    source: B8DebugReturnToContinuationCallRel32HelperBoundarySource,
+    section_segment_name: Option<String>,
+    section_name: Option<String>,
+    stub_address: Option<u64>,
+    stub_byte_size: Option<u32>,
+    stub_index: Option<u32>,
+    indirect_symbol_table_slot: Option<u32>,
+    indirect_symbol_table_file_offset: Option<u32>,
+    symbol_table_index: Option<u32>,
+    symbol_name: Option<String>,
+    blocker: Option<MachOStubSymbolResolutionBlocker>,
+}
+
+impl B8DebugReturnToContinuationMachOStubSymbolResolutionReport {
+    fn from_resolution(resolution: MachOStubSymbolResolution) -> Self {
+        let resolved = resolution.resolved_symbol();
+        Self {
+            schema: "b8_return_to_continuation_mach_o_stub_symbol_resolution_v0",
+            status: resolution.status(),
+            source:
+                B8DebugReturnToContinuationCallRel32HelperBoundarySource::PublicMachOSection64DysymtabSymtab,
+            section_segment_name: resolved.map(|symbol| symbol.section_segment_name().to_owned()),
+            section_name: resolved.map(|symbol| symbol.section_name().to_owned()),
+            stub_address: resolved.map(|symbol| symbol.stub_address().as_u64()),
+            stub_byte_size: resolved.map(|symbol| symbol.stub_byte_size().as_u32()),
+            stub_index: resolved.map(|symbol| symbol.stub_index().as_u32()),
+            indirect_symbol_table_slot: resolved
+                .map(|symbol| symbol.indirect_symbol_table_slot().as_u32()),
+            indirect_symbol_table_file_offset: resolved
+                .map(|symbol| symbol.indirect_symbol_table_file_offset().as_u32()),
+            symbol_table_index: resolved.map(|symbol| symbol.symbol_table_index().as_u32()),
+            symbol_name: resolved.map(|symbol| symbol.symbol_name().as_str().to_owned()),
+            blocker: resolution.blocker(),
+        }
+    }
+
+    const fn is_resolved(&self) -> bool {
+        matches!(self.status, MachOStubSymbolResolutionStatus::Resolved)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+struct B8DebugReturnToContinuationCallRel32ReturnValueDataflowReport {
+    schema: &'static str,
+    producer_call_site: u64,
+    producer_return_to: u64,
+    producer_target: u64,
+    producer_symbol_name: Option<String>,
+    return_register: B8DebugRegisterName,
+    consumer_instruction_start: u64,
+    consumer_instruction_end: u64,
+    consumer_register: B8DebugRegisterName,
+    consumer_source_register: B8DebugRegisterName,
+}
+
+impl B8DebugReturnToContinuationCallRel32ReturnValueDataflowReport {
+    fn from_consumer(
+        call_return: &B8DebugReturnToContinuationCallRel32ReturnValueReport,
+        consumer_instruction_start: u64,
+        consumer_instruction_end: u64,
+        consumer_register: B8DebugRegisterName,
+        consumer_source_register: B8DebugRegisterName,
+    ) -> Self {
+        Self {
+            schema: "b8_return_to_continuation_call_rel32_return_value_dataflow_v0",
+            producer_call_site: call_return.call_site,
+            producer_return_to: call_return.return_to,
+            producer_target: call_return.target,
+            producer_symbol_name: call_return
+                .helper_boundary
+                .target_resolution
+                .symbol_name
+                .clone(),
+            return_register: call_return.return_register,
+            consumer_instruction_start,
+            consumer_instruction_end,
+            consumer_register,
+            consumer_source_register,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -4753,6 +4995,8 @@ enum B8DebugHelperBoundaryBlockedReason {
     ObjcRuntimeHelperExecutionFailed,
     ObjcRuntimeHelperExecutionUnsupported,
     ReturnToContinuationDecodeFailed,
+    ReturnToContinuationCallRel32HelperExecutionUnimplemented,
+    ReturnToContinuationCallRel32StubSymbolResolutionUnresolved,
     ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented,
     ReturnToContinuationExecutionUnimplemented,
     ReturnToContinuationImportGlobalLoadUnimplemented,
@@ -4778,6 +5022,12 @@ impl B8DebugHelperBoundaryBlockedReason {
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationDecodeFailed => {
                 Self::ReturnToContinuationDecodeFailed
+            }
+            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32HelperExecutionUnimplemented => {
+                Self::ReturnToContinuationCallRel32HelperExecutionUnimplemented
+            }
+            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32StubSymbolResolutionUnresolved => {
+                Self::ReturnToContinuationCallRel32StubSymbolResolutionUnresolved
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented => {
                 Self::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented
@@ -4815,6 +5065,8 @@ enum B8DebugHelperBoundaryBlocker {
     ObjcRuntimeHelperExecutionFailed,
     ObjcRuntimeHelperExecutionUnsupported,
     ReturnToContinuationDecodeFailed,
+    ReturnToContinuationCallRel32HelperExecutionUnimplemented,
+    ReturnToContinuationCallRel32StubSymbolResolutionUnresolved,
     ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented,
     ReturnToContinuationExecutionUnimplemented,
     ReturnToContinuationImportGlobalLoadUnimplemented,
@@ -4846,6 +5098,12 @@ impl B8DebugHelperBoundaryBlocker {
             }
             B8DebugHelperBoundaryBlockedReason::ReturnToContinuationDecodeFailed => {
                 vec![Self::ReturnToContinuationDecodeFailed]
+            }
+            B8DebugHelperBoundaryBlockedReason::ReturnToContinuationCallRel32HelperExecutionUnimplemented => {
+                vec![Self::ReturnToContinuationCallRel32HelperExecutionUnimplemented]
+            }
+            B8DebugHelperBoundaryBlockedReason::ReturnToContinuationCallRel32StubSymbolResolutionUnresolved => {
+                vec![Self::ReturnToContinuationCallRel32StubSymbolResolutionUnresolved]
             }
             B8DebugHelperBoundaryBlockedReason::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented => {
                 vec![Self::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented]
@@ -4889,6 +5147,12 @@ impl B8DebugHelperBoundaryBlocker {
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationDecodeFailed => {
                 Self::ReturnToContinuationDecodeFailed
+            }
+            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32HelperExecutionUnimplemented => {
+                Self::ReturnToContinuationCallRel32HelperExecutionUnimplemented
+            }
+            B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32StubSymbolResolutionUnresolved => {
+                Self::ReturnToContinuationCallRel32StubSymbolResolutionUnresolved
             }
             B8DebugObjcHelperExecutionBlocker::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented => {
                 Self::ReturnToContinuationCallRel32ReturnValueMaterializationUnimplemented

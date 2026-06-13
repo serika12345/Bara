@@ -1576,19 +1576,54 @@ branch: `task/b8-hello-world-gui-complete`
 
 完了条件:
 
-- [ ] B8-G6m の
+- [x] B8-G6m の
   `return_to_continuation_call_rel32_return_value_materialization_unimplemented` を受けて、
   `call_rel32` at `4294973028` / target `4294973108` / return_to `4294973033` を
   focused helper boundary として保存する。
-- [ ] public Mach-O stub / symbol / import metadata から `_objc_alloc_init` identity を
+- [x] public Mach-O stub / symbol / import metadata から `_objc_alloc_init` identity を
   解決できる場合は保存し、まだ解決できない場合は stable unresolved-stub blocker として
   分類する。
-- [ ] `objc_alloc_init` return value が `rax` に入り、`mov rdx, rax` によって
+- [x] `objc_alloc_init` return value が `rax` に入り、`mov rdx, rax` によって
   `setDelegate:` argument へ渡る dataflow を helper return materialization boundary として
   保存する。
-- [ ] arbitrary call-rel32 helper execution、arbitrary Objective-C allocation /
+- [x] arbitrary call-rel32 helper execution、arbitrary Objective-C allocation /
   initialization、general dynamic symbol resolver、translation cache、fallback
   JIT/interpreter は行わない。
+
+PR に含めない:
+
+- 一般的な call-rel32 execution engine。
+- arbitrary Objective-C allocation / initialization bridge。
+- dynamic linker / dyld stub binding の一般実装。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6n は完了し、次の gate は B8-G6o。
+
+#### PR Gate: B8-G6o Return-To Continuation objc_alloc_init Helper Execution Boundary
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [ ] B8-G6n の
+  `return_to_continuation_call_rel32_helper_execution_unimplemented` を受けて、
+  `_objc_alloc_init` helper execution request を focused boundary として保存する。
+- [ ] `call_rel32` at `4294973028` の x86_64 argument `rdi` を public Mach-O mapped
+  image / chained fixup metadata から materialize し、class identity を解決できる場合は
+  保存する。解決できない場合は stable class-argument blocker として分類する。
+- [ ] `_objc_alloc_init` の return value が `rax` に入り、後続の `mov rdx, rax` で
+  `setDelegate:` argument へ渡る execution/dataflow 境界を更新する。
+- [ ] arbitrary Objective-C class allocation / initialization bridge、arbitrary call-rel32
+  execution、general dynamic symbol resolver、translation cache、fallback JIT/interpreter は
+  行わない。
 
 PR に含めない:
 

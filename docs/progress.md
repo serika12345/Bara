@@ -117,13 +117,18 @@
   `source_call_return.target=4294973108`、`source_call_return.return_register=rax` を
   stable report に保存する。next blocker は
   `return_to_continuation_call_rel32_return_value_materialization_unimplemented` である。
+  B8-G6n では public Mach-O `section_64.reserved1/reserved2`、`LC_DYSYMTAB` indirect
+  symbol table、`LC_SYMTAB` / string table から `call_rel32` target `4294973108` を
+  `_objc_alloc_init` に解決し、`b8_return_to_continuation_call_rel32_helper_boundary_v0` と
+  `b8_return_to_continuation_call_rel32_return_value_dataflow_v0` を保存する。`objc_alloc_init`
+  return value は `rax` から `mov rdx, rax` で `setDelegate:` argument に渡る。next
+  blocker は `return_to_continuation_call_rel32_helper_execution_unimplemented` である。
   arbitrary dynamic library data symbol read、return-to continuation の一般実行、
-  arbitrary indirect call target execution、translation cache、fallback JIT/interpreter は
-  まだ行わない。
+  arbitrary call-rel32 execution、translation cache、fallback JIT/interpreter はまだ行わない。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8-HWGUI Self-Authored Hello
   World GUI Completion を大目標として、`task/b8-hello-world-gui-complete` 上で
-  blocker-driven slice を継続中。B8-G6m は完了し、次は B8-G6n Return-To Continuation
-  `call_rel32` `objc_alloc_init` Helper Boundary。
+  blocker-driven slice を継続中。B8-G6n は完了し、次は B8-G6o Return-To Continuation
+  `objc_alloc_init` Helper Execution Boundary。
 - active_design_focus: B8-HWGUI Self-Authored Hello World GUI Completion を大目標として
   明文化した。B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から GUI lifecycle helper boundary までを通す。`/advance-large` を
@@ -134,15 +139,15 @@
   dyld の private behavior は使わず、public metadata、public API、自前 fixture、
   Rosetta black-box observable result を根拠にする。
 - active_branch: `task/b8-hello-world-gui-complete`。branch base は `2258806`
-  (`docs: define b8 hello world gui completion target`)。この snapshot は B8-G6l
-  coherent step commit で更新されており、B8-HWGUI 完遂まではこの branch で
-  coherent step ごとに commit / push する。
+  (`docs: define b8 hello world gui completion target`)。この snapshot は B8-G6n
+  coherent step で更新されており、B8-HWGUI 完遂まではこの branch で coherent step
+  ごとに commit / push する。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
   B8-G5b-G5e / B8-G6a / B8-G6b / B8-G6c / B8-G6d / B8-G6e / B8-G6f /
   B8-G6g / B8-G6h / B8-G6i / B8-G6j / B8-G6k / B8-G6l / B8-G6m /
-  B8-G6n / B8-HWGUI / B8-OSS0。
+  B8-G6n / B8-G6o / B8-HWGUI / B8-OSS0。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -299,29 +304,51 @@
   `source_call_return` として保存する。`call r14` at `4294973046` /
   return_to `4294973049` と selector `setDelegate:` まで report し、next blocker は
   `return_to_continuation_call_rel32_return_value_materialization_unimplemented` に進む。
+- B8-G6n として public Mach-O `section_64.reserved1/reserved2`、`LC_DYSYMTAB` indirect
+  symbol table、`LC_SYMTAB` / string table から `__stubs` target `4294973108` を
+  `_objc_alloc_init` に解決する focused resolver を追加した。debug bundle は
+  `b8_return_to_continuation_call_rel32_helper_boundary_v0` に `call_site=4294973028`、
+  `target=4294973108`、`symbol_table_index=46`、`symbol_name=_objc_alloc_init` を保存し、
+  `b8_return_to_continuation_call_rel32_return_value_dataflow_v0` に `rax` return value が
+  `mov rdx, rax` で `setDelegate:` argument へ渡ることを保存する。next blocker は
+  `return_to_continuation_call_rel32_helper_execution_unimplemented` に進む。
 - B8-HWGUI として、self-authored x86_64 Mach-O GUI Hello World fixture を実 `LC_MAIN`
   entry から GUI 起動完遂まで通す大目標、`/advance-large` 利用時の stop 条件、
   および B8-HWGUI merge 後に開始する B8-OSS0 source-built OSS GUI app automation target を
   TODO / design TODO に追加した。
-- remaining_work: B8-G6n。G6m が残す
-  `return_to_continuation_call_rel32_return_value_materialization_unimplemented` を受けて、
-  `call_rel32` at `4294973028` / target `4294973108` / return_to `4294973033` を
-  focused helper boundary として扱う。public Mach-O stub / symbol / import metadata で
-  `_objc_alloc_init` identity を解決できる場合は保存し、まだ解決できない場合は stable
-  unresolved-stub blocker に進める。arbitrary call-rel32 execution、general dynamic
-  symbol resolver、arbitrary Objective-C allocation / initialization bridge、translation
-  cache、fallback JIT/interpreter はまだ行わない。
-- next_action: 次の小 step は B8-G6n Return-To Continuation `call_rel32`
-  `objc_alloc_init` Helper Boundary。B8-HWGUI 大目標の途中なので、coherent step ごとに
-  verify / commit / push し、Hello World GUI 完遂 review gate で draft PR を開いて停止する。
+- remaining_work: B8-G6o。G6n が残す
+  `return_to_continuation_call_rel32_helper_execution_unimplemented` を受けて、
+  `_objc_alloc_init` helper execution request、`rdi` class argument materialization、
+  class identity / bridge blocker を focused helper boundary として扱う。arbitrary
+  call-rel32 execution、general dynamic symbol resolver、arbitrary Objective-C allocation /
+  initialization bridge、translation cache、fallback JIT/interpreter はまだ行わない。
+- next_action: 次の小 step は B8-G6o Return-To Continuation `objc_alloc_init`
+  Helper Execution Boundary。B8-HWGUI 大目標の途中なので、coherent step ごとに verify /
+  commit / push し、Hello World GUI 完遂 review gate で draft PR を開いて停止する。
 - verification:
-  `nix develop -c cargo test -p bara-isa-x86 mov_rdx_rax -- --nocapture` が通過した。
-  `nix develop -c cargo test -p bara-arm64 emits_mov_rdx_rax -- --nocapture` が通過した。
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
-  B8-G6m 実装後の full `nix develop -c ./scripts/verify` が通過した。
+  `nix develop -c cargo test -p bara-oracle` が通過した。
+  `nix develop -c cargo test -p btbc-cli mach_o_stdout_input_reaches_pure_writer_serialization_plan -- --nocapture`
+  が通過した。`nix develop -c ./scripts/check-domain-types` が通過した。B8-G6n 実装後の
+  full `nix develop -c ./scripts/verify` が通過した。
 
 直近で完了した作業:
 
+- 2026-06-13 15:27 JST: B8-G6n Return-To Continuation call_rel32
+  objc_alloc_init Helper Boundary を実装した。public Mach-O `section_64.reserved1/reserved2`、
+  `LC_DYSYMTAB` indirect symbol table、`LC_SYMTAB` / string table から `__stubs` target
+  `4294973108` を `_objc_alloc_init` に解決し、`call_rel32` at `4294973028` /
+  return_to `4294973033` を helper boundary として保存する。`rax` return value が
+  `mov rdx, rax` で `setDelegate:` argument へ渡る dataflow も保存し、next blocker は
+  `return_to_continuation_call_rel32_helper_execution_unimplemented` になった。domain primitive
+  baseline は `MachOStub*` newtype の constructor/accessor だけを追加した。これは B8 debug
+  report が public Mach-O stub virtual address、stub index、indirect symbol table slot、
+  symbol table index を JSON 境界で安定表示するための accessor 例外であり、raw byte reader
+  や general dynamic symbol resolver を公開するものではない。targeted 検証は
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
+  `nix develop -c cargo test -p bara-oracle`、
+  `nix develop -c cargo test -p btbc-cli mach_o_stdout_input_reaches_pure_writer_serialization_plan -- --nocapture`
+  が通過した。full verify は `nix develop -c ./scripts/verify` が通過した。
 - 2026-06-13 14:03 JST: B8-G6j Return-To Continuation Call R14 Boundary Planning
   を実装した。continuation block 内の `call_r14` at `4294973018` / `return_to=4294973021` を
   `b8_return_to_continuation_call_boundary_v0` として保存し、target は `_objc_msgSend` import

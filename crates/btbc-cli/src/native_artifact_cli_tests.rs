@@ -228,7 +228,10 @@ fn mach_o_stdout_input_reaches_pure_writer_serialization_plan() {
                                         "align": 2,
                                         "reloff": 0,
                                         "nreloc": 0,
-                                        "flags": 2_147_484_672_u32
+                                        "flags": 2_147_484_672_u32,
+                                        "reserved1": 0,
+                                        "reserved2": 0,
+                                        "reserved3": 0
                                     },
                                     {
                                         "name": "__const",
@@ -239,7 +242,10 @@ fn mach_o_stdout_input_reaches_pure_writer_serialization_plan() {
                                         "align": 0,
                                         "reloff": 0,
                                         "nreloc": 0,
-                                        "flags": 0
+                                        "flags": 0,
+                                        "reserved1": 0,
+                                        "reserved2": 0,
+                                        "reserved3": 0
                                     }
                                 ]
                             }
@@ -270,7 +276,10 @@ fn mach_o_stdout_input_reaches_pure_writer_serialization_plan() {
                                     "align": 2,
                                     "reloff": 0,
                                     "nreloc": 0,
-                                    "flags": 2_147_484_672_u32
+                                    "flags": 2_147_484_672_u32,
+                                    "reserved1": 0,
+                                    "reserved2": 0,
+                                    "reserved3": 0
                                 },
                                 {
                                     "name": "__const",
@@ -281,7 +290,10 @@ fn mach_o_stdout_input_reaches_pure_writer_serialization_plan() {
                                     "align": 0,
                                     "reloff": 0,
                                     "nreloc": 0,
-                                    "flags": 0
+                                    "flags": 0,
+                                    "reserved1": 0,
+                                    "reserved2": 0,
+                                    "reserved3": 0
                                 }
                             ]
                         }

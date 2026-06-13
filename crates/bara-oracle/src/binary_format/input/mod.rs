@@ -7,6 +7,7 @@ mod mach_o_linkedit_command;
 mod mach_o_load_command;
 mod mach_o_section;
 mod mach_o_segment_command;
+mod mach_o_symbol_stub;
 mod probe;
 
 pub use mach_o::{MachOFileType, MachOLoadCommands, MachOMetadata};
@@ -39,11 +40,18 @@ pub use mach_o_load_command::{
 pub use mach_o_section::{
     MachOSectionAddress, MachOSectionAlignment, MachOSectionByteSize, MachOSectionFileOffset,
     MachOSectionFlags, MachOSectionMetadata, MachOSectionName, MachOSectionRelocationCount,
-    MachOSectionRelocationFileOffset,
+    MachOSectionRelocationFileOffset, MachOSectionReserved1, MachOSectionReserved2,
+    MachOSectionReserved3,
 };
 pub use mach_o_segment_command::{
     MachOSegmentCommandHeaderMetadata, MachOSegmentFileOffset, MachOSegmentFileSize,
     MachOSegmentName, MachOSegmentVmAddr,
+};
+pub use mach_o_symbol_stub::{
+    resolve_mach_o_symbol_stub_for_target, MachOIndirectSymbolTableFileOffset,
+    MachOIndirectSymbolTableSlot, MachOResolvedStubSymbol, MachOStubByteSize, MachOStubIndex,
+    MachOStubSymbolName, MachOStubSymbolResolution, MachOStubSymbolResolutionBlocker,
+    MachOStubSymbolResolutionStatus, MachOStubVirtualAddress,
 };
 pub use probe::{
     probe_public_binary_format, BinaryFormat, BinaryFormatProbeError, BinaryFormatProbeMetadata,

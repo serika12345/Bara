@@ -61,6 +61,14 @@ impl RecognizedMachODynamicSymbolTableCommand {
         self.byte_size
     }
 
+    pub const fn indirectsymoff(&self) -> MachOLinkeditFileOffset {
+        self.indirectsymoff
+    }
+
+    pub const fn nindirectsyms(&self) -> MachOLinkeditEntryCount {
+        self.nindirectsyms
+    }
+
     pub const fn extreloff(&self) -> MachOLinkeditFileOffset {
         self.extreloff
     }
@@ -233,7 +241,7 @@ pub struct MachOSymbolIndex {
 }
 
 impl MachOSymbolIndex {
-    const fn from_public_linkedit_value(value: u32) -> Self {
+    pub(crate) const fn from_public_linkedit_value(value: u32) -> Self {
         Self { value }
     }
 

@@ -495,6 +495,19 @@
   Objective-C message send、translation cache / fallback JIT は追加しない。次の B8-G6n
   では public Mach-O stub / symbol / import metadata を使って、この `call_rel32`
   return value の helper boundary または stable unresolved-stub blocker を扱う。
+- 2026-06-13 の B8-G6n として、public Mach-O `section_64.reserved1/reserved2`、
+  `LC_DYSYMTAB` indirect symbol table、`LC_SYMTAB` / string table から `__stubs`
+  target `4294973108` を `_objc_alloc_init` に解決する focused resolver を
+  `bara-oracle` に追加した。B8 debug bundle は `call_rel32` at `4294973028` /
+  return_to `4294973033` を
+  `b8_return_to_continuation_call_rel32_helper_boundary_v0` として保存し、`rax` return
+  value が `mov rdx, rax` により `setDelegate:` argument へ渡る dataflow を
+  `b8_return_to_continuation_call_rel32_return_value_dataflow_v0` として記録する。次
+  blocker は `return_to_continuation_call_rel32_helper_execution_unimplemented` である。
+  これは arbitrary call-rel32 execution、general dyld stub binding、arbitrary Objective-C
+  allocation / initialization、translation cache / fallback JIT を追加するものではない。
+  次の B8-G6o では `_objc_alloc_init` helper execution request と class argument
+  materialization / bridge blocker を focused slice として扱う。
 - 2026-06-13 の planning update として、B8-HWGUI を self-authored Hello World GUI
   completion の大目標として明文化した。大目標の対象は、実 `LC_MAIN` entry から
   GUI lifecycle helper boundary までを通し、automated expected / actual と manual visible
