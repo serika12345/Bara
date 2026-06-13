@@ -1648,23 +1648,58 @@ branch: `task/b8-hello-world-gui-complete`
 
 完了条件:
 
-- [ ] B8-G6o の
+- [x] B8-G6o の
   `return_to_continuation_objc_alloc_init_class_bridge_unimplemented` を受けて、
   `class_rebase.resolved_vm_address=4294988184` を self-authored fixture の delegate class
   bridge boundary として扱う。
-- [ ] public Mach-O / Objective-C metadata から `BaraGuiHelloWorldDelegate` identity を
+- [x] public Mach-O / Objective-C metadata から `BaraGuiHelloWorldDelegate` identity を
   解決できる場合は保存し、まだ解決できない場合は stable class-identity blocker として
   分類する。
-- [ ] `_objc_alloc_init` の host-side substitute が必要な場合は、self-authored B8 GUI
+- [x] `_objc_alloc_init` の host-side substitute が必要な場合は、self-authored B8 GUI
   fixture の delegate class に限る bridge contract として保存する。arbitrary Objective-C
   class allocation / initialization bridge にはしない。
-- [ ] `_objc_alloc_init` return value が `rax` に入り、後続の `mov rdx, rax` で
+- [x] `_objc_alloc_init` return value が `rax` に入り、後続の `mov rdx, rax` で
   `setDelegate:` argument へ渡る dataflow を維持する。
 
 PR に含めない:
 
 - 任意の Objective-C class / instance bridge。
 - 一般的な call-rel32 execution engine。
+- dynamic linker / dyld stub binding の一般実装。
+- translation cache、fallback JIT/interpreter。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- B8-HWGUI 大目標の途中 slice として commit / push 後も、次 blocker が focused
+  slice として切れる限り継続する。B8-G6p は完了し、次の gate は B8-G6q。
+
+#### PR Gate: B8-G6q Return-To Continuation objc_alloc_init Fixture Delegate Bridge Contract
+
+branch: `task/b8-hello-world-gui-complete`
+
+完了条件:
+
+- [ ] B8-G6p の
+  `return_to_continuation_objc_alloc_init_fixture_delegate_bridge_unimplemented` を受けて、
+  `_OBJC_CLASS_$_BaraGuiHelloWorldDelegate` に限る fixture delegate bridge contract として
+  保存する。
+- [ ] `b8_return_to_continuation_objc_alloc_init_class_identity_v0` の
+  `public_mach_o_symtab_nlist64` 解決結果を contract input に接続し、private Objective-C
+  runtime metadata には依存しない。
+- [ ] `_objc_alloc_init` host-side substitute が返す値は x86_64 `rax` writeback の
+  producer として扱い、後続の `mov rdx, rax` / `setDelegate:` dataflow を維持する。
+- [ ] 次 blocker を fixture delegate host execution の未実装境界として分類する。
+
+PR に含めない:
+
+- 任意の Objective-C class / instance bridge。
+- Objective-C object layout、isa pointer、private runtime metadata の解釈。
+- 一般的な `_objc_alloc_init` execution engine。
 - dynamic linker / dyld stub binding の一般実装。
 - translation cache、fallback JIT/interpreter。
 

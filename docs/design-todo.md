@@ -520,6 +520,18 @@
   execution、general dynamic symbol resolver、translation cache / fallback JIT を追加する
   ものではない。次の B8-G6p では `BaraGuiHelloWorldDelegate` に限る self-authored fixture
   class bridge / identity blocker を扱う。
+- 2026-06-13 の B8-G6p として、`class_rebase.resolved_vm_address=4294988184` を
+  public `LC_SYMTAB` / `nlist_64.n_value` で
+  `_OBJC_CLASS_$_BaraGuiHelloWorldDelegate` に解決する focused resolver を追加した。
+  B8 debug bundle は
+  `b8_return_to_continuation_objc_alloc_init_class_identity_v0` と
+  `b8_return_to_continuation_mach_o_symbol_address_resolution_v0` を保存し、
+  `bridge_state=fixture_delegate_bridge_unimplemented`、next blocker
+  `return_to_continuation_objc_alloc_init_fixture_delegate_bridge_unimplemented` に進める。
+  これは arbitrary Objective-C class / instance bridge、Objective-C object layout、
+  private runtime metadata、general `_objc_alloc_init` execution、translation cache /
+  fallback JIT を追加するものではない。次の B8-G6q では
+  `BaraGuiHelloWorldDelegate` に限る host-side substitute bridge contract を扱う。
 - 2026-06-13 の planning update として、B8-HWGUI を self-authored Hello World GUI
   completion の大目標として明文化した。大目標の対象は、実 `LC_MAIN` entry から
   GUI lifecycle helper boundary までを通し、automated expected / actual と manual visible

@@ -8,6 +8,7 @@ mod mach_o_load_command;
 mod mach_o_section;
 mod mach_o_segment_command;
 mod mach_o_symbol_stub;
+mod mach_o_symbol_table;
 mod probe;
 
 pub use mach_o::{MachOFileType, MachOLoadCommands, MachOMetadata};
@@ -52,6 +53,10 @@ pub use mach_o_symbol_stub::{
     MachOIndirectSymbolTableSlot, MachOResolvedStubSymbol, MachOStubByteSize, MachOStubIndex,
     MachOStubSymbolName, MachOStubSymbolResolution, MachOStubSymbolResolutionBlocker,
     MachOStubSymbolResolutionStatus, MachOStubVirtualAddress,
+};
+pub use mach_o_symbol_table::{
+    resolve_mach_o_symbol_for_x86_va, MachOResolvedAddressSymbol, MachOSymbolAddressResolution,
+    MachOSymbolAddressResolutionBlocker, MachOSymbolAddressResolutionStatus, MachOSymbolName,
 };
 pub use probe::{
     probe_public_binary_format, BinaryFormat, BinaryFormatProbeError, BinaryFormatProbeMetadata,
