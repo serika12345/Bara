@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 14:03 JST
+最終更新: 2026-06-13 14:21 JST
 
 状態:
 
@@ -99,28 +99,35 @@
   import identity を `preserved_import_helper_call_target` /
   `x86_64_macos_system_v_callee_saved_register` として扱う。arguments は `rdi` の `_NSApp`
   value、`rsi` の `setActivationPolicy:` selector rebase、`rdx=0` を available state として
-  report する。arbitrary dynamic library data symbol read、return-to continuation の一般実行、
+  report する。B8-G6k ではこの boundary から
+  `b8_return_to_continuation_objc_helper_boundary_v0` を派生し、target `_objc_msgSend`、
+  receiver `_NSApp` value、selector `setActivationPolicy:`、argument `rdx=0` の
+  helper request / bridge contract / available-or-blocked state を stable report に保存する。
+  next blocker は `return_to_continuation_objc_helper_execution_unimplemented` である。
+  arbitrary dynamic library data symbol read、return-to continuation の一般実行、
   arbitrary indirect call target execution、translation cache、fallback JIT/interpreter は
   まだ行わない。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-G6j Return-To Continuation
-  Call R14 Boundary Planning: G6i の `return_to_continuation_execution_unimplemented` を受けて、
-  decoded `call r14` at `4294973018` / `return_to=4294973021` を focused stable
-  boundary として扱い、target / arguments / blocked state を stable report に保存する。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-G6k Return-To Continuation
+  setActivationPolicy Helper Boundary: G6j の
+  `return_to_continuation_execution_unimplemented` を受けて、
+  `_objc_msgSend(NSApp, setActivationPolicy:, 0)` を focused Objective-C helper boundary
+  として扱い、helper request / bridge contract / available-or-blocked state と
+  `return_to_continuation_objc_helper_execution_unimplemented` blocker を stable report に保存する。
 - active_design_focus: B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から進んだ結果として必要になる loader / ISA / import /
   Objective-C / AppKit / process-state boundary を順に model 化する。AppKit /
   Objective-C runtime / dyld の private behavior は使わず、public metadata、
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
-- active_branch: `task/b8-g6j-continuation-call-r14-boundary`。base branch は
-  最新 `main` の `f67dffb` (`Merge pull request #46 from
-  serika12345:task/b8-g6i-continuation-xor-edx-zero`)。implementation commit は
-  `31b3e7c` (`feat: add b8 g6j continuation call boundary`)。draft PR は
-  <https://github.com/serika12345/Bara/pull/47>。
+- active_branch: `task/b8-g6k-continuation-set-activation-policy-helper`。base branch は
+  最新 `main` の `5cbf712` (`Merge pull request #47 from
+  serika12345:task/b8-g6j-continuation-call-r14-boundary`)。implementation commit は
+  `d717dc9` (`feat: add b8 g6k set activation policy helper boundary`)。draft PR は
+  <https://github.com/serika12345/Bara/pull/48>。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
   B8-G5b-G5e / B8-G6a / B8-G6b / B8-G6c / B8-G6d / B8-G6e / B8-G6f /
-  B8-G6g / B8-G6h / B8-G6i / B8-G6j / B8-G6k。
+  B8-G6g / B8-G6h / B8-G6i / B8-G6j / B8-G6k / B8-G6l。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -258,13 +265,21 @@
   `continuation_call_boundary.schema=b8_return_to_continuation_call_boundary_v0` を追加し、
   target `_objc_msgSend` は preserved `r14` call target、arguments は `rdi` `_NSApp`、
   `rsi` `setActivationPolicy:`、`rdx=0` として available state を stable report に保存する。
-- remaining_work: B8-G6k。G6j の continuation call boundary が残す
-  `return_to_continuation_execution_unimplemented` を受けて、
-  `_objc_msgSend(NSApp, setActivationPolicy:, 0)` を focused Objective-C helper boundary
-  として扱う。`return_to` 以降の一般実行、arbitrary indirect call target execution、
+- B8-G6k として
+  `continuation_call_boundary.objc_helper_boundary.schema=b8_return_to_continuation_objc_helper_boundary_v0`
+  を追加し、target `_objc_msgSend`、receiver `_NSApp` value、selector
+  `setActivationPolicy:`、argument `rdx=0` の helper request / bridge contract /
+  available-or-blocked state を stable report に保存する。continuation block と
+  helper boundary request の blocker は
+  `return_to_continuation_objc_helper_execution_unimplemented` に進む。
+- remaining_work: B8-G6l。G6k が残す
+  `return_to_continuation_objc_helper_execution_unimplemented` を受けて、
+  `_objc_msgSend(NSApp, setActivationPolicy:, 0)` だけの focused host execution slice を
+  扱う。`setActivationPolicy:` 以外の arbitrary Objective-C message send、
+  return-to continuation の一般実行、arbitrary indirect call target execution、
   translation cache、fallback JIT/interpreter はまだ行わない。
-- next_action: B8-G6j draft PR #47 を review / merge する。
-  merge 後の次 PR Gate は B8-G6k Return-To Continuation setActivationPolicy Helper Boundary。
+- next_action: B8-G6k draft PR #48 を review / merge する。
+  merge 後の次 PR Gate は B8-G6l Return-To Continuation setActivationPolicy Host Execution Slice。
 - verification:
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
   `nix develop -c ./scripts/verify` が通過した。progress 更新後に
