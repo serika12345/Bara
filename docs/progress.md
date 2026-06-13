@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 13:59 JST
+最終更新: 2026-06-13 14:03 JST
 
 状態:
 
@@ -113,8 +113,9 @@
   public API、自前 fixture、Rosetta black-box observable result を根拠にする。
 - active_branch: `task/b8-g6j-continuation-call-r14-boundary`。base branch は
   最新 `main` の `f67dffb` (`Merge pull request #46 from
-  serika12345:task/b8-g6i-continuation-xor-edx-zero`)。implementation commit と draft PR は
-  この snapshot の commit / push 後に作成する。
+  serika12345:task/b8-g6i-continuation-xor-edx-zero`)。implementation commit は
+  `31b3e7c` (`feat: add b8 g6j continuation call boundary`)。draft PR は
+  <https://github.com/serika12345/Bara/pull/47>。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
@@ -262,7 +263,7 @@
   `_objc_msgSend(NSApp, setActivationPolicy:, 0)` を focused Objective-C helper boundary
   として扱う。`return_to` 以降の一般実行、arbitrary indirect call target execution、
   translation cache、fallback JIT/interpreter はまだ行わない。
-- next_action: B8-G6j branch を commit / push し、draft PR を作成して review gate で停止する。
+- next_action: B8-G6j draft PR #47 を review / merge する。
   merge 後の次 PR Gate は B8-G6k Return-To Continuation setActivationPolicy Helper Boundary。
 - verification:
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
@@ -271,7 +272,7 @@
 
 直近で完了した作業:
 
-- 2026-06-13 13:59 JST: B8-G6j Return-To Continuation Call R14 Boundary Planning
+- 2026-06-13 14:03 JST: B8-G6j Return-To Continuation Call R14 Boundary Planning
   を実装した。continuation block 内の `call_r14` at `4294973018` / `return_to=4294973021` を
   `b8_return_to_continuation_call_boundary_v0` として保存し、target は `_objc_msgSend` import
   identity を preserved `r14` call target として扱う。arguments は `rdi` の `_NSApp` value、
@@ -279,7 +280,8 @@
   report する。targeted 検証は
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
   full verify は `nix develop -c ./scripts/verify` が通過した。progress 更新後に
-  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
+  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。draft PR
+  <https://github.com/serika12345/Bara/pull/47> を開いた。
 - 2026-06-13 13:37 JST: B8-G6i Return-To Continuation XOR EDX Zero Slice
   を実装した。`31 d2` を x86_64 `xor edx, edx` として decode / lift し、32-bit register
   zeroing semantics により `rdx` を 64-bit zero として materialize する。continuation
