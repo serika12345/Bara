@@ -2390,6 +2390,10 @@ review gate:
 
 B8-HWGUI / B8-ARCH0 が review / merge 済みになるまで開始しない。
 
+- [ ] merge 後の最初の作業として、この Future Target を concrete `PR Gate` に落とす。
+  branch は `task/b8-arch1-responsibility-split-audit` を基本候補にする。
+- [ ] 最初の PR は audit / classification / extraction order 決定を主対象にし、
+  behavior-changing refactor や大きな file move から始めない。
 - [ ] `crates/btbc-cli/src/b8_debug_bundle.rs`、`crates/btbc-cli/src/main.rs`、
   `crates/bara-oracle/src/binary_format/` に残る B8-specific logic を棚卸しする。
 - [ ] logic を loader image model、runtime modeling、helper bridge、report DTO、

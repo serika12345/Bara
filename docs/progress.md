@@ -7,9 +7,52 @@
 [docs/design-todo.md](design-todo.md)、`hello world` までの詳細な段階履歴は
 [docs/hello-world-roadmap.md](hello-world-roadmap.md) に置く。
 
+## 新コンテキスト引き継ぎメモ
+
+このメモは、B8-HWGUI / B8-ARCH0 merge 後に新しい agent context で作業を再開するための
+最短 handoff である。
+
+開始時に読むもの:
+
+1. [TODO.md](../TODO.md) の `B8-ARCH1 Post-HWGUI Responsibility Split Audit` と
+   `B8-ARCH1a ISA Semantic Coverage Plan`
+2. [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) の `R1` / `R1a` と
+   `Instruction Coverage Strategy`
+3. [design-todo.md](design-todo.md) の `D4a: x86_64 ISA semantic coverage strategy`
+4. この `docs/progress.md` の現在の作業スナップショット
+
+merge 後の最初の作業:
+
+- `main` を最新化したうえで、`task/b8-arch1-responsibility-split-audit` のような
+  dedicated branch を作る。
+- まず B8-ARCH1 を具体的な `PR Gate` に落とす。実装や大きな file move から始めない。
+- `crates/btbc-cli/src/b8_debug_bundle.rs`、`crates/btbc-cli/src/main.rs`、
+  `crates/bara-oracle/src/binary_format/` に残る B8-specific logic を棚卸しし、
+  loader image model、runtime modeling、helper bridge、report DTO、
+  fixture / oracle I/O、CLI boundary に分類する。
+- B8-ARCH1a は同じ design/audit phase で進めてよいが、依存追加はしない。
+  Intel XED / iced-x86 / Zydis などは候補分類までに留め、採用する場合は別 PR で
+  supply-chain gate を通す。
+
+merge 後にすぐ始めないもの:
+
+- B8-OSS0 source-built OSS GUI app automation
+- B8-ARCH2 `GuestImage` extraction の実装
+- arbitrary Objective-C message send、general continuation execution、
+  translation cache、fallback JIT/interpreter、Wine bridge
+- B8-HWGUI fixture 専用 path のさらなる機能追加
+
+最初の review package で示すべきもの:
+
+- B8-specific logic の分類表
+- 抽出順の smallest coherent PR Gate
+- behavior を変えていないこと
+- docs-only なら `git diff --check` と `nix develop -c ./scripts/check-no-invisible-chars`
+- code / script / config を触った場合は `nix develop -c ./scripts/verify`
+
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 21:50 JST
+最終更新: 2026-06-13 21:55 JST
 
 状態:
 
@@ -229,9 +272,9 @@
   Box64、DynamoRIO などの permissive candidate / prior art は dependency candidate と
   research reference に分けて扱う。
 - active_branch: `task/b8-hello-world-gui-complete`。branch base は `2258806`
-  (`docs: define b8 hello world gui completion target`)。latest pushed implementation commit is
-  `32c8afb` (`feat: complete b8 modeled gui continuation`)。latest pushed documentation commit
-  before this architecture record is `7248baf` (`docs: record b8 hwgui draft pr`)。
+  (`docs: define b8 hello world gui completion target`)。latest completed implementation commit is
+  `32c8afb` (`feat: complete b8 modeled gui continuation`)。latest completed documentation commit
+  before this handoff update is `7bde631` (`docs: record isa coverage references`)。
   この snapshot は B8-HWGUI / B8-ARCH0 completed state として更新されており、draft
   PR #49 の merge review までは B8-OSS0 や B8-ARCH1 implementation に進まない。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
@@ -500,17 +543,22 @@
   ISA coverage 方針を追記した。x86_64 opcode を個別 checklist として潰すのではなく、
   semantic bucket catalog、canonical instruction、operand semantics、guest semantic IR、
   direct ARM64 lowering、helper/fallback、stable blocker report の責務分担として扱う。
-  TODO には B8-ARCH1a ISA Semantic Coverage Plan を追加した。この変更は docs-only で、
-  ユーザー指示によりコミットせず review 用の未コミット diff として残す。検証は
-  `git diff --check` と `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
+  TODO には B8-ARCH1a ISA Semantic Coverage Plan を追加した。検証は
+  `git diff --check` と `nix develop -c ./scripts/check-no-invisible-chars` が通過し、
+  後続の reference inventory と合わせて `7bde631` にコミット済みである。
 - 2026-06-13 21:50 JST: B8-ARCH1a の reference inventory として、Intel SDM、
   Arm A64 docs、ABI specs、Mach-O public docs を primary source にし、Intel XED、
   iced-x86、Zydis、Capstone、object、goblin、LIEF、AsmJit、Cranelift、Remill / McSema、
   FEX、Box64、DynamoRIO を permissive dependency candidate または prior-art reference
   として [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) に追記した。
   GPL / LGPL / proprietary tool は permissive dependency candidate にしない方針も記録した。
-  この変更も docs-only で、ユーザー指示によりコミットしない。検証は
-  `git diff --check` と `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
+  検証は `git diff --check` と `nix develop -c ./scripts/check-no-invisible-chars` が通過し、
+  `7bde631` にコミット済みである。
+- 2026-06-13 21:55 JST: merge 後に新しい agent context で再開しても迷わないよう、
+  `新コンテキスト引き継ぎメモ` を追加した。merge 後の最初の作業は B8-ARCH1 を
+  concrete PR Gate に落とす responsibility split audit であり、B8-OSS0、B8-ARCH2 実装、
+  translation cache、fallback JIT/interpreter、Wine bridge には進まないことを明記した。
+  検証は `git diff --check` と `nix develop -c ./scripts/check-no-invisible-chars` を使う。
 - 2026-06-13 19:53 JST: B8-HWGUI Final expected/actual and manual visible review boundary を
   開始した。automated expected / actual は
   `target/b8-hwgui-review/expected.json` と `target/b8-hwgui-review/actual.json` の
