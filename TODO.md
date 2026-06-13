@@ -2218,11 +2218,11 @@ branch: `task/b8-hello-world-gui-complete`
 
 完了条件:
 
-- [ ] B8-G6af の `review_b8_hello_world_gui_completion` を受けて、self-authored
+- [x] B8-G6af の `review_b8_hello_world_gui_completion` を受けて、self-authored
   GUI fixture の real-entry modeled helper continuation chain が
   `b8_return_to_continuation_modeled_execution_completion_v0` /
   `launch_path_status=completed` で安定していることを確認する。
-- [ ] automated mode で Rosetta expected / Bara actual の stable JSON comparison が
+- [x] automated mode で Rosetta expected / Bara actual の stable JSON comparison が
   Hello World GUI 完遂条件に対して一致するか、残る差分が B8-HWGUI 完遂 blocker か
   post-completion 拡張対象かを stable report / review package に記録する。
 - [ ] manual visible mode で Bara 経由の実 entry path から `hello world` window / label を
@@ -2246,6 +2246,20 @@ PR に含めない:
 review gate:
 
 - B8-HWGUI 完遂時点で draft PR を開いて停止する。merge までは B8-OSS0 に進まない。
+
+current blocker:
+
+- 2026-06-13 19:53 JST: automated expected / actual は
+  `target/b8-hwgui-review/expected.json` と `target/b8-hwgui-review/actual.json` の
+  `compare-expected-actual` が `{"issues":[]}` で一致した。debug bundle の real-entry
+  modeled helper continuation chain も
+  `b8_return_to_continuation_modeled_execution_completion_v0` /
+  `launch_path_status=completed` を確認した。
+- manual visible は `run-arm64-gui-hello-world-translated-visible` で helper process が
+  visible process として起動するところまで確認したが、Computer Use の Accessibility /
+  Screen Recording 権限が未完了で、`screencapture` も黒画面になったため、window / label の
+  目視確認は未完了。process は残さないため終了済み。次は権限付与後に同 command を再実行し、
+  window close まで通して `manual-visible.launch-report.json` を保存する。
 
 - [ ] B8-G6: Objective-C runtime / AppKit helper bridge を B8-G1 専用 lifecycle
   event から一般化する。
