@@ -462,6 +462,16 @@
   report する。これは continuation block の一般実行、arbitrary indirect call target
   execution、translation cache / fallback JIT を追加するものではない。次の B8-G6k では
   `_objc_msgSend(NSApp, setActivationPolicy:, 0)` を focused helper boundary として扱う。
+- 2026-06-13 の B8-G6k として、上記 continuation call boundary から
+  `b8_return_to_continuation_objc_helper_boundary_v0` を派生し、helper request、
+  bridge contract、available-or-blocked state を stable report に保存する。target
+  `_objc_msgSend`、receiver `_NSApp` value、selector `setActivationPolicy:`、
+  argument `rdx=0` は available だが、host execution はまだ行わず
+  `return_to_continuation_objc_helper_execution_unimplemented` を次 blocker とする。
+  これは `setActivationPolicy:` 以外の arbitrary Objective-C message send、
+  continuation block の一般実行、arbitrary indirect call target execution、
+  translation cache / fallback JIT を追加するものではない。次の B8-G6l では
+  `_objc_msgSend(NSApp, setActivationPolicy:, 0)` だけの focused host execution slice を扱う。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、
