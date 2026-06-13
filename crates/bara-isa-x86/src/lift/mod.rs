@@ -244,6 +244,9 @@ fn lift_instruction(
         DecodedInstructionKind::PopR14 => Ok(LiftedInstruction::Op(IrOp::Pop {
             dst: Operand::Reg(X86Reg::R14),
         })),
+        DecodedInstructionKind::PopR15 => Ok(LiftedInstruction::Op(IrOp::Pop {
+            dst: Operand::Reg(X86Reg::R15),
+        })),
         DecodedInstructionKind::XorEaxEax => Ok(LiftedInstruction::Op(IrOp::Mov {
             dst: Operand::Reg(X86Reg::Rax),
             src: Operand::ImmU64(0),
@@ -1038,6 +1041,32 @@ mod tests {
             program.blocks()[0].ops(),
             &[IrOp::Pop {
                 dst: Operand::Reg(X86Reg::R14)
+            }]
+        );
+        assert_eq!(program.blocks()[0].terminator(), &Terminator::Return);
+    }
+
+    #[test]
+    fn lifts_pop_r15_to_preserved_register_restore() {
+        let decoded = DecodedFunction::new(
+            X86Va::new(0),
+            vec![
+                DecodedInstruction::new(
+                    X86Va::new(0),
+                    X86Va::new(2),
+                    DecodedInstructionKind::PopR15,
+                ),
+                DecodedInstruction::new(X86Va::new(2), X86Va::new(3), DecodedInstructionKind::Ret),
+            ],
+        )
+        .expect("decoded function has instructions");
+
+        let program = lift_decoded_function(&decoded).expect("decoded pop r15 function lifts");
+
+        assert_eq!(
+            program.blocks()[0].ops(),
+            &[IrOp::Pop {
+                dst: Operand::Reg(X86Reg::R15)
             }]
         );
         assert_eq!(program.blocks()[0].terminator(), &Terminator::Return);

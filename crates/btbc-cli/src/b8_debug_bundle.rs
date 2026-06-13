@@ -807,6 +807,7 @@ enum B8DebugDecodedInstructionKindReport {
     PopRax,
     PopRbx,
     PopR14,
+    PopR15,
     XorEaxEax,
     XorEdxEdx,
     JccRel8 {
@@ -934,6 +935,7 @@ impl B8DebugDecodedInstructionKindReport {
             DecodedInstructionKind::PopRax => Self::PopRax,
             DecodedInstructionKind::PopRbx => Self::PopRbx,
             DecodedInstructionKind::PopR14 => Self::PopR14,
+            DecodedInstructionKind::PopR15 => Self::PopR15,
             DecodedInstructionKind::XorEaxEax => Self::XorEaxEax,
             DecodedInstructionKind::XorEdxEdx => Self::XorEdxEdx,
             DecodedInstructionKind::JccRel8 {
@@ -2695,6 +2697,7 @@ impl B8DebugReturnToContinuationEpilogueRegisterRestoreReport {
         match kind {
             DecodedInstructionKind::PopRbx => Some(B8DebugRegisterName::Rbx),
             DecodedInstructionKind::PopR14 => Some(B8DebugRegisterName::R14),
+            DecodedInstructionKind::PopR15 => Some(B8DebugRegisterName::R15),
             _ => None,
         }
     }

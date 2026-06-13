@@ -598,6 +598,11 @@
   `stack_slot_source=sequential_epilogue_stack_top` として `pop_rbx` からの連続性を残し、
   next blocker は `DecodeUnsupportedOpcode { opcode: 65 }` at `4294973079` /
   `41 5f` `pop r15` prefix に進める。
+- 2026-06-13 の B8-G6ac として、post-run `41 5f` / `pop r15` も同じ
+  epilogue register restore 配列に追加する。`pop_rbx` / `pop_r14` / `pop_r15` は
+  sequential restore として保存され、next blocker は
+  `DecodeUnsupportedOpcode { opcode: 93 }` at `4294973081` / `5d` `pop rbp` に進む。
+  frame-pointer restore と function return completion は次 gate へ分離する。
 - B8-HWGUI 完遂後の OSS app cycle は、任意の downloaded binary ではなく、まず public
   source から x86_64 macOS binary を reproducible に build できる小さい OSS GUI app を
   source-built fixture として扱う。候補選定、license / redistribution、supply-chain、

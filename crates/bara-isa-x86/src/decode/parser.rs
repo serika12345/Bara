@@ -191,6 +191,16 @@ pub(super) fn parse_function(input: &X86Bytes) -> Result<DecodedFunction, Decode
                         ));
                         offset = end_offset;
                     }
+                    0x5f => {
+                        let end_offset = offset + 2;
+                        let end = instruction_end(input, at, end_offset, 2)?;
+                        instructions.push(DecodedInstruction::new(
+                            at,
+                            end,
+                            DecodedInstructionKind::PopR15,
+                        ));
+                        offset = end_offset;
+                    }
                     0xff => {
                         let operand = read_u8(input, offset + 2, at, opcode)?;
                         let end_offset = offset + 3;

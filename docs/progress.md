@@ -9,7 +9,7 @@
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 18:40 JST
+最終更新: 2026-06-13 18:55 JST
 
 状態:
 
@@ -191,12 +191,14 @@
   `41 5e` / `pop r14` prefix at `source_pc=4294973077` に進む。
   B8-G6ab では `41 5e` / `pop r14` も epilogue preserved-register restore 配列に
   保存し、next blocker は `41 5f` / `pop r15` prefix at `source_pc=4294973079` に進む。
+  B8-G6ac では `41 5f` / `pop r15` も epilogue preserved-register restore 配列に
+  保存し、next blocker は `5d` / `pop rbp` at `source_pc=4294973081` に進む。
   arbitrary dynamic library data symbol read、return-to continuation の一般実行、
   arbitrary call-rel32 execution、translation cache、fallback JIT/interpreter はまだ行わない。
 - active_milestone: in_progress。[TODO.md](../TODO.md) の B8-HWGUI Self-Authored Hello
   World GUI Completion を大目標として、`task/b8-hello-world-gui-complete` 上で
-  blocker-driven slice を継続中。B8-G6ab は完了し、次は B8-G6ac Post-run epilogue
-  preserved r15 restore boundary。
+  blocker-driven slice を継続中。B8-G6ac は完了し、次は B8-G6ad Post-run epilogue
+  frame-pointer restore boundary。
 - active_design_focus: B8-HWGUI Self-Authored Hello World GUI Completion を大目標として
   明文化した。B8-G1 専用 `appkit_gui_hello_world` host trap を肥大化させず、
   実 Mach-O entry から GUI lifecycle helper boundary までを通す。`/advance-large` を
@@ -207,7 +209,7 @@
   dyld の private behavior は使わず、public metadata、public API、自前 fixture、
   Rosetta black-box observable result を根拠にする。
 - active_branch: `task/b8-hello-world-gui-complete`。branch base は `2258806`
-  (`docs: define b8 hello world gui completion target`)。この snapshot は B8-G6ab
+  (`docs: define b8 hello world gui completion target`)。この snapshot は B8-G6ac
   coherent step で更新されており、B8-HWGUI 完遂まではこの branch で coherent step
   ごとに commit / push する。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
@@ -217,7 +219,7 @@
   B8-G6g / B8-G6h / B8-G6i / B8-G6j / B8-G6k / B8-G6l / B8-G6m /
   B8-G6n / B8-G6o / B8-G6p / B8-G6q / B8-G6r / B8-G6s / B8-G6t / B8-G6u /
   B8-G6v / B8-G6w / B8-G6x / B8-G6y / B8-G6z / B8-G6aa / B8-G6ab /
-  B8-G6ac / B8-HWGUI / B8-OSS0。
+  B8-G6ac / B8-G6ad / B8-HWGUI / B8-OSS0。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -428,29 +430,35 @@
   entry から GUI 起動完遂まで通す大目標、`/advance-large` 利用時の stop 条件、
   および B8-HWGUI merge 後に開始する B8-OSS0 source-built OSS GUI app automation target を
   TODO / design TODO に追加した。
-- remaining_work: B8-G6ac。G6ab が残す
+- remaining_work: B8-G6ad。G6ac が残す
   `return_to_continuation_unsupported_instruction` を受けて、post-run epilogue の
-  `41 5f` / `pop r15` at `4294973079` を focused に decode / report する。
-  B8-G6z-G6ab の epilogue stack adjustment / register restore report と
-  `_objc_autoreleasePoolPop` executed boundary は維持し、次 blocker を `pop r15` at
-  `4294973079` から `pop rbp` at `4294973081`、`ret`、または narrower epilogue
+  `5d` / `pop rbp` at `4294973081` を focused に decode / report する。
+  B8-G6z-G6ac の epilogue stack adjustment / register restore report と
+  `_objc_autoreleasePoolPop` executed boundary は維持し、次 blocker を `pop rbp` at
+  `4294973081` から `ret` at `4294973082`、function completion、または narrower epilogue
   blocker へ進める。
-  arbitrary REX-prefixed pop semantics、full callee-saved register restoration、
-  full epilogue completion、translation cache、fallback JIT/interpreter はまだ行わない。
-- next_action: 次の小 step は B8-G6ac Post-run epilogue preserved r15 restore boundary。
+  arbitrary pop / stack-memory semantics、full frame unwinding、full epilogue completion、
+  translation cache、fallback JIT/interpreter はまだ行わない。
+- next_action: 次の小 step は B8-G6ad Post-run epilogue frame-pointer restore boundary。
   B8-HWGUI 大目標の途中なので、coherent step ごとに verify /
   commit / push し、Hello World GUI 完遂 review gate で draft PR を開いて停止する。
 - verification:
   `nix develop -c cargo check -p btbc-cli`、
-  `nix develop -c cargo test -p bara-isa-x86 decodes_pop_r14_before_next_unsupported_rex_opcode -- --nocapture`、
-  `nix develop -c cargo test -p bara-isa-x86 lifts_pop_r14_to_preserved_register_restore -- --nocapture`、
+  `nix develop -c cargo test -p bara-isa-x86 decodes_pop_r15_before_next_unsupported_opcode -- --nocapture`、
+  `nix develop -c cargo test -p bara-isa-x86 lifts_pop_r15_to_preserved_register_restore -- --nocapture`、
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`、
-  `nix develop -c cargo run -q -p btbc-cli -- generate-b8-debug-bundle target/b8/b8_gui_hello_world_x86_64 /tmp/bara-b8-g6ab-inspect`、
+  `nix develop -c cargo run -q -p btbc-cli -- generate-b8-debug-bundle target/b8/b8_gui_hello_world_x86_64 /tmp/bara-b8-g6ac-inspect`、
   `nix develop -c ./scripts/verify`
-  が B8-G6ab 実装後に通過した。
+  が B8-G6ac 実装後に通過した。
 
 直近で完了した作業:
 
+- 2026-06-13 18:51 JST: B8-G6ac Post-run epilogue preserved r15 restore boundary を実装した。
+  `41 5f` / `pop r15` at `4294973079..4294973081` を `pop_r15` として decode / lift
+  し、`b8_return_to_continuation_epilogue_register_restore_v0` 配列に
+  `source=after_previous_epilogue_register_restore`、`register=r15`、
+  `stack_slot_source=sequential_epilogue_stack_top` として保存する。next blocker は
+  `DecodeUnsupportedOpcode { opcode: 93 }` / `5d` `pop rbp` at `4294973081`。
 - 2026-06-13 18:40 JST: B8-G6ab Post-run epilogue preserved r14 restore boundary を実装した。
   `41 5e` / `pop r14` at `4294973077..4294973079` を `pop_r14` として decode / lift
   し、`b8_return_to_continuation_epilogue_register_restore_v0` 配列に
