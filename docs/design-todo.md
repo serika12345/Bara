@@ -419,6 +419,15 @@
   先頭 instruction は `4c 8b 3d ...` の unsupported REX/MOV である。これは
   `return_to` block の実行、arbitrary indirect call target execution、translation cache、
   fallback JIT/interpreter を追加するものではない。
+- 2026-06-13 の B8-G6f として、G6e の
+  `return_to_continuation_unsupported_instruction` のうち continuation block 先頭の
+  `4c 8b 3d ...` を x86_64 `mov r15, qword ptr [rip+disp32]` として既存
+  decode / lift / emit / debug report 境界に追加した。`b8_return_to_continuation_decode_boundary_v0`
+  は input の x86_64 `rax` register state を保持したまま、先頭 instruction を
+  `mov_r15_qword_ptr_rip_relative` として report し、次の unsupported opcode は
+  `0x49` at `4294973006` へ進む。これは continuation block の一般実行や
+  translation cache / fallback JIT を追加するものではなく、次の B8-G6g では
+  `49 8b 3f` を `mov rdi, qword ptr [r15]` slice として扱う。
 - B8 の一般アプリ化でぶつかりそうな壁の初期順序は、debug bundle、実 Mach-O entry、
   x86_64 ISA coverage、Mach-O loader execution、dynamic library / import boundary、
   ABI / helper marshaling、Objective-C runtime / AppKit lifecycle、process state、

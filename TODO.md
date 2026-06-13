@@ -1306,12 +1306,44 @@ branch: `task/b8-g6f-continuation-r15-rip-relative-load`
 
 完了条件:
 
-- [ ] B8-G6e の `return_to_continuation_unsupported_instruction` を受けて、
+- [x] B8-G6e の `return_to_continuation_unsupported_instruction` を受けて、
   `return_to` continuation block 先頭の `4c 8b 3d ...` を x86_64
   `mov r15, qword ptr [rip+disp32]` として decode / lift / emit または stable boundary
   に進める。
-- [ ] continuation input の x86_64 `rax` register state を保持したまま、次の decoded
+- [x] continuation input の x86_64 `rax` register state を保持したまま、次の decoded
   instruction / boundary / blocker を stable report に保存する。
+- [x] `return_to` 以降の一般実行、arbitrary indirect call target execution、
+  translation cache、fallback JIT/interpreter は行わない。
+
+PR に含めない:
+
+- `return_to` 以降の一般実行。
+- arbitrary indirect call target execution、translation cache、fallback JIT/interpreter。
+- Objective-C runtime / AppKit lifecycle 全体の一般化。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 完了したら commit / push / draft PR 作成で停止する。次の gate は continuation block
+  の next blocker を見て focused ISA / process-state / AppKit lifecycle slice として
+  更新する。
+
+#### PR Gate: B8-G6g Return-To Continuation R15-Indirect RDI Load Slice
+
+branch: `task/b8-g6g-continuation-r15-indirect-rdi-load`
+
+完了条件:
+
+- [ ] B8-G6f の `return_to_continuation_unsupported_instruction` を受けて、`return_to`
+  continuation block の次 bytes `49 8b 3f` を x86_64
+  `mov rdi, qword ptr [r15]` として decode / lift / emit または stable boundary に進める。
+- [ ] continuation input の x86_64 `rax` register state と、直前の
+  `mov r15, qword ptr [rip+disp32]` で materialize した `r15` state を保持したまま、
+  次の decoded instruction / boundary / blocker を stable report に保存する。
 - [ ] `return_to` 以降の一般実行、arbitrary indirect call target execution、
   translation cache、fallback JIT/interpreter は行わない。
 
@@ -1331,6 +1363,7 @@ review gate:
 - 完了したら commit / push / draft PR 作成で停止する。次の gate は continuation block
   の next blocker を見て focused ISA / process-state / AppKit lifecycle slice として
   更新する。
+
 - [ ] B8-G6: Objective-C runtime / AppKit helper bridge を B8-G1 専用 lifecycle
   event から一般化する。
   - [ ] class lookup、selector lookup、message send、autorelease pool、main run loop

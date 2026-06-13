@@ -2601,12 +2601,18 @@ mod tests {
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_action\":\"inspect_return_to_continuation_blocker\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"start\":4294972999"));
-        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"end\":4294973002"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"end\":4294973006"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"kind\":\"mov_r15_qword_ptr_rip_relative\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json"))
+            .contains("\"displacement\":\"X86Imm32 { value: 6578 }\""));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"address\":4294979584"));
+        assert!(read_file(&bundle_dir.join("loader.plan.json")).contains("\"end\":4294973007"));
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"kind\":\"unsupported\"")
         );
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
-            .contains("\"reason\":\"DecodeUnsupportedOpcode { opcode: 76"));
+            .contains("\"reason\":\"DecodeUnsupportedOpcode { opcode: 73"));
         assert!(
             read_file(&bundle_dir.join("loader.plan.json")).contains("\"unsupported_instruction\"")
         );
@@ -2747,9 +2753,13 @@ mod tests {
             launch_report.contains("\"next_action\":\"inspect_return_to_continuation_blocker\"")
         );
         assert!(launch_report.contains("\"start\":4294972999"));
-        assert!(launch_report.contains("\"end\":4294973002"));
+        assert!(launch_report.contains("\"end\":4294973006"));
+        assert!(launch_report.contains("\"kind\":\"mov_r15_qword_ptr_rip_relative\""));
+        assert!(launch_report.contains("\"displacement\":\"X86Imm32 { value: 6578 }\""));
+        assert!(launch_report.contains("\"address\":4294979584"));
+        assert!(launch_report.contains("\"end\":4294973007"));
         assert!(launch_report.contains("\"kind\":\"unsupported\""));
-        assert!(launch_report.contains("\"reason\":\"DecodeUnsupportedOpcode { opcode: 76"));
+        assert!(launch_report.contains("\"reason\":\"DecodeUnsupportedOpcode { opcode: 73"));
         assert!(launch_report.contains("\"unsupported_instruction\""));
         assert!(launch_report
             .contains("\"next_action\":\"add_return_to_continuation_instruction_support\""));
