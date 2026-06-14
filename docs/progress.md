@@ -22,36 +22,36 @@
    B8-ARCH1 responsibility split audit と、`D4a: x86_64 ISA semantic coverage strategy`
 4. この `docs/progress.md` の現在の作業スナップショット
 
-B8-ARCH1 review / merge 後の最初の作業:
+B8-ARCH1a review / merge 後の最初の作業:
 
-- `main` を最新化したうえで、`task/b8-arch1a-isa-semantic-coverage-plan` の dedicated
+- `main` を最新化したうえで、`task/b8-arch2a-debug-report-dto-module-split` の dedicated
   branch を作る。
-- B8-ARCH1a は docs-only plan とし、依存追加はしない。
-  Intel XED / iced-x86 / Zydis などは候補分類までに留め、採用する場合は別 PR で
-  supply-chain gate を通す。
-- B8-ARCH1a merge 後、最初の behavior-preserving code split は
-  `task/b8-arch2a-debug-report-dto-module-split` で B8 debug bundle report DTO module split
-  から始める。
+- 最初の behavior-preserving code split として、B8 debug bundle report DTO module split
+  だけを行う。JSON schema 名、field 名、既存 B8-HWGUI debug bundle output は維持する。
+- helper process execution、bundle file I/O、loader image model、runtime dispatcher、
+  decoder dependency 採用には進まない。
 
-B8-ARCH1 review / merge 後にすぐ始めないもの:
+B8-ARCH1a review / merge 後にすぐ始めないもの:
 
 - B8-OSS0 source-built OSS GUI app automation
 - B8-ARCH2 `GuestImage` extraction の実装
 - arbitrary Objective-C message send、general continuation execution、
   translation cache、fallback JIT/interpreter、Wine bridge
 - B8-HWGUI fixture 専用 path のさらなる機能追加
+- decoder dependency 採用、ISA implementation / lowering 追加、supply-chain lockfile 変更
 
 最初の review package で示すべきもの:
 
-- B8-specific logic の分類表
-- 抽出順の smallest coherent PR Gate
-- behavior を変えていないこと
+- ISA semantic bucket catalog
+- B8-HWGUI focused slice の再分類
+- status vocabulary と direct/helper/fallback 判断基準
+- decoder dependency adoption checklist
 - docs-only なら `git diff --check` と `nix develop -c ./scripts/check-no-invisible-chars`
 - code / script / config を触った場合は `nix develop -c ./scripts/verify`
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-14 10:15 JST
+最終更新: 2026-06-14 10:26 JST
 
 状態:
 
@@ -247,15 +247,15 @@ B8-ARCH1 review / merge 後にすぐ始めないもの:
   `next_action=review_b8_hello_world_gui_completion` に進む。
   arbitrary dynamic library data symbol read、return-to continuation の一般実行、
   arbitrary call-rel32 execution、translation cache、fallback JIT/interpreter はまだ行わない。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-ARCH1 Post-HWGUI
-  Responsibility Split Audit を `task/b8-arch1-responsibility-split-audit` 上で
-  docs-only gate として進めた。B8-HWGUI / B8-ARCH0 は PR #49 で merge 済みであり、
-  B8-ARCH1 では code refactor に入らず、`crates/btbc-cli/src/b8_debug_bundle.rs`、
-  `crates/btbc-cli/src/main.rs`、`crates/bara-oracle/src/binary_format/` に残る
-  B8-specific logic を report DTO、bundle I/O、real-entry attempt、loader/import
-  projection、modeled continuation state、Objective-C/AppKit helper process、
-  fixture/oracle I/O、CLI boundary へ分類した。次の unfinished PR Gate は
-  B8-ARCH1a ISA Semantic Coverage Plan である。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-ARCH1a ISA Semantic
+  Coverage Plan を `task/b8-arch1a-isa-semantic-coverage-plan` 上で docs-only gate として
+  進めた。B8-ARCH1 は PR #50 で merge 済みであり、B8-ARCH1a では依存採用や
+  ISA implementation に入らず、B8-HWGUI の focused instruction slices を semantic
+  bucket catalog に再分類した。status vocabulary は `decode_only`、`lift_ready`、
+  `direct_lowering_ready`、`helper_required`、`fallback_required`、`stable_blocker` とし、
+  direct lowering / helper / fallback の判断基準、unsupported report schema 方針、
+  decoder dependency adoption checklist を固定した。次の unfinished PR Gate は
+  B8-ARCH2a B8 Debug Bundle Report DTO Module Split である。
 - active_design_focus: Bara の主対象は同 OS / 異アーキテクチャ実行である。
   `macOS x86_64 -> macOS arm64` を最初の concrete target とし、将来
   `Linux x86_64 -> Linux arm64` と `Windows x64 -> Wine on arm64` を OS personality として
@@ -271,10 +271,11 @@ B8-ARCH1 review / merge 後にすぐ始めないもの:
   public docs とし、Intel XED、iced-x86、Zydis、Capstone、Remill / McSema、FEX、
   Box64、DynamoRIO などの permissive candidate / prior art は dependency candidate と
   research reference に分けて扱う。
-- active_branch: `task/b8-arch1-responsibility-split-audit`。branch base は `a996827`
-  (`Merge pull request #49 from serika12345:task/b8-hello-world-gui-complete`)。
-  この branch は B8-ARCH1 docs-only audit 用であり、code refactor、large file move、
-  B8-OSS0、B8-ARCH2 implementation には進まない。
+- active_branch: `task/b8-arch1a-isa-semantic-coverage-plan`。branch base は `300060b`
+  (`Merge pull request #50 from serika12345:task/b8-arch1-responsibility-split-audit`)。
+  この branch は B8-ARCH1a docs-only audit 用であり、decoder dependency 採用、
+  ISA implementation / lowering 追加、supply-chain lockfile 変更、B8-ARCH2a code split には
+  進まない。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
@@ -510,12 +511,17 @@ B8-ARCH1 review / merge 後にすぐ始めないもの:
   B8-specific logic を分類し、最初の code split は B8 debug bundle report DTO module split
   として B8-ARCH2a に固定した。B8-ARCH1a は ISA semantic coverage plan の docs-only
   gate として次に進める。
-- remaining_work: B8-ARCH1 review gate。commit / push / draft PR 作成後に停止する。
-  B8-ARCH1a、B8-ARCH2a、B8-OSS0、translation cache、fallback JIT/interpreter、
+- B8-ARCH1a として、x86_64 instruction coverage を opcode list ではなく
+  semantic bucket catalog として扱う方針を docs-only gate で固定した。B8-HWGUI の
+  focused slices は prefix/width/register alias、register transfer、RIP-relative
+  data/address access、register-indirect data access、stack/control-flow、
+  integer ALU/flags、helper service、fallback/runtime state などへ再分類した。
+- remaining_work: B8-ARCH1a review gate。commit / push / draft PR 作成後に停止する。
+  B8-ARCH2a code split、B8-OSS0、translation cache、fallback JIT/interpreter、
   Wine bridge 実装へはこの branch では進まない。
-- next_action: B8-ARCH1 docs-only audit を review する。merge 後は
-  `task/b8-arch1a-isa-semantic-coverage-plan` で B8-ARCH1a に進み、依存採用や
-  ISA implementation は別 gate に分ける。
+- next_action: B8-ARCH1a docs-only semantic coverage plan を review する。merge 後は
+  `task/b8-arch2a-debug-report-dto-module-split` で B8 debug bundle report DTO module split
+  に進む。
 - verification:
   docs-only change として `git diff --check` と
   `nix develop -c ./scripts/check-no-invisible-chars` が通過した。code / script /
@@ -523,6 +529,14 @@ B8-ARCH1 review / merge 後にすぐ始めないもの:
 
 直近で完了した作業:
 
+- 2026-06-14 10:26 JST: B8-ARCH1a ISA Semantic Coverage Plan を開始し、
+  docs-only PR Gate として完了状態にした。D4a に
+  `b8_arch1a_isa_semantic_bucket_catalog_v0` を追加し、B8-HWGUI focused instruction
+  slices を semantic bucket へ再分類した。coverage status vocabulary、
+  direct/helper/fallback 判断基準、unsupported report schema 方針、decoder dependency
+  adoption checklist を固定した。依存採用、ISA implementation、schema/code change は
+  行わない。検証は `git diff --check` と
+  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 - 2026-06-14 10:15 JST: B8-ARCH1 Post-HWGUI Responsibility Split Audit を開始し、
   concrete PR Gate として完了状態にした。`crates/btbc-cli/src/b8_debug_bundle.rs` は
   debug bundle file I/O、real-entry attempt、stable report DTO、loader/import projection、
