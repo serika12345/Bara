@@ -117,6 +117,18 @@ B8-ARCH2e result:
   continuation state、runtime dispatcher、`GuestImage` / `MachOImage` 本体抽出は同じ PR では
   動かさない。
 
+B8-ARCH2f result:
+
+- 2026-06-14 に `crates/btbc-cli/src/b8_debug_bundle/helper_boundary.rs` を追加し、
+  `B8DebugHelperBoundaryRequestReport`、`B8DebugImportHelperRequestReport`、
+  `B8DebugHelperMarshalingReport`、import helper marshaling contract DTO、helper boundary
+  blocker / blocked reason を `b8_debug_bundle.rs` から分けた。
+- `loader.rs`、`import_boundary.rs`、`report.rs` は helper boundary request type を
+  `helper_boundary` module から使う形にした。`loader.plan.json` と launch report の
+  helper boundary request field 名、schema 名、JSON output は変えない。
+- Objective-C/AppKit helper process execution、modeled continuation state、runtime
+  dispatcher、`GuestImage` / `MachOImage` 本体抽出は同じ PR では動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。

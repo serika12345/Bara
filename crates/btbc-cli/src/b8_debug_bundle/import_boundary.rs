@@ -7,9 +7,11 @@ use bara_oracle::{
 };
 use serde::Serialize;
 
+use super::helper_boundary::{
+    B8DebugHelperBoundaryBlockedReason, B8DebugHelperBoundaryRequestReport,
+};
 use super::report::B8DebugDecodeReport;
 use super::{
-    B8DebugHelperBoundaryBlockedReason, B8DebugHelperBoundaryRequestReport,
     B8DebugImportBoundaryStatus, B8DebugRegisterIndirectCallBoundaryReport,
     B8DebugTargetPointerLoadReport,
 };
@@ -51,11 +53,10 @@ impl B8DebugImportBoundaryReport {
             let resolved_import_identity = chained_fixups
                 .as_ref()
                 .and_then(MachOChainedFixupsTargetReport::resolved_import_identity);
-            let (resolution, next_action, helper_boundary_request) = if public_metadata
-                .has_chained_fixups()
-            {
-                if let Some(import_identity) = resolved_import_identity {
-                    (
+            let (resolution, next_action, helper_boundary_request) =
+                if public_metadata.has_chained_fixups() {
+                    if let Some(import_identity) = resolved_import_identity {
+                        (
                         B8DebugImportBoundaryResolution::ResolvedPublicDyldChainedFixupsImport,
                         B8DebugImportBoundaryNextAction::DefineObjcReceiverSelectorMaterialization,
                         B8DebugHelperBoundaryRequestReport::blocked_import_helper_call(
@@ -68,38 +69,38 @@ impl B8DebugImportBoundaryReport {
                             image_metadata,
                         ),
                     )
-                } else {
+                    } else {
+                        (
+                            B8DebugImportBoundaryResolution::RequiresPublicDyldChainedFixupsDecoder,
+                            B8DebugImportBoundaryNextAction::DecodePublicDyldChainedFixupsImports,
+                            B8DebugHelperBoundaryRequestReport::blocked(
+                                B8DebugHelperBoundaryBlockedReason::ImportSymbolIdentityUnresolved,
+                            ),
+                        )
+                    }
+                } else if public_metadata.has_dyld_info_bind_ranges() {
                     (
-                        B8DebugImportBoundaryResolution::RequiresPublicDyldChainedFixupsDecoder,
-                        B8DebugImportBoundaryNextAction::DecodePublicDyldChainedFixupsImports,
+                        B8DebugImportBoundaryResolution::RequiresPublicDyldBindOpcodeDecoder,
+                        B8DebugImportBoundaryNextAction::DecodePublicDyldBindOpcodes,
                         B8DebugHelperBoundaryRequestReport::blocked(
                             B8DebugHelperBoundaryBlockedReason::ImportSymbolIdentityUnresolved,
                         ),
                     )
-                }
-            } else if public_metadata.has_dyld_info_bind_ranges() {
-                (
-                    B8DebugImportBoundaryResolution::RequiresPublicDyldBindOpcodeDecoder,
-                    B8DebugImportBoundaryNextAction::DecodePublicDyldBindOpcodes,
-                    B8DebugHelperBoundaryRequestReport::blocked(
-                        B8DebugHelperBoundaryBlockedReason::ImportSymbolIdentityUnresolved,
-                    ),
-                )
-            } else {
-                (
-                    B8DebugImportBoundaryResolution::MissingPublicBindMetadata,
-                    B8DebugImportBoundaryNextAction::InspectUnsupportedLoaderMetadata,
-                    B8DebugHelperBoundaryRequestReport::blocked(
-                        B8DebugHelperBoundaryBlockedReason::ImportSymbolIdentityUnresolved,
-                    ),
-                )
-            };
-            let status = if helper_boundary_request.status == B8DebugImportBoundaryStatus::Executed
-            {
-                B8DebugImportBoundaryStatus::Executed
-            } else {
-                B8DebugImportBoundaryStatus::Blocked
-            };
+                } else {
+                    (
+                        B8DebugImportBoundaryResolution::MissingPublicBindMetadata,
+                        B8DebugImportBoundaryNextAction::InspectUnsupportedLoaderMetadata,
+                        B8DebugHelperBoundaryRequestReport::blocked(
+                            B8DebugHelperBoundaryBlockedReason::ImportSymbolIdentityUnresolved,
+                        ),
+                    )
+                };
+            let status =
+                if helper_boundary_request.status() == B8DebugImportBoundaryStatus::Executed {
+                    B8DebugImportBoundaryStatus::Executed
+                } else {
+                    B8DebugImportBoundaryStatus::Blocked
+                };
             let next_action = if status == B8DebugImportBoundaryStatus::Executed {
                 B8DebugImportBoundaryNextAction::InspectNextDebugBundleBlocker
             } else {
