@@ -2748,6 +2748,56 @@ review gate:
 
 - helper boundary marshaling split を commit / push / draft PR 作成で停止する。
 
+#### PR Gate: B8-ARCH2g B8 Debug Bundle Guest Image Mapping Shell Split
+
+branch: `task/b8-arch2g-debug-guest-image-mapping-shell`
+
+B8-ARCH2f が review / merge 済みになるまで開始しない。B8-ARCH2 Guest Image Model
+Extraction の preparatory slice として、loader plan shell に残っている guest image
+mapping summary を分ける。これは `GuestImage` / `MachOImage` domain model 本体抽出の
+前段であり、既存 debug bundle JSON を維持する。
+
+完了条件:
+
+- [x] `crates/btbc-cli/src/b8_debug_bundle/loader.rs` 内の image mapping summary DTO
+  （entry PC、code segment VM address / byte length、segment source、address space、
+  mapped bytes source）を `crates/btbc-cli/src/b8_debug_bundle/guest_image.rs` へ分ける。
+- [x] `loader.plan.json` の `image_mapping` field 名、nested field 名、serde 値、JSON output を
+  維持する。
+- [x] import/fixup projection、helper boundary、Objective-C / AppKit helper process execution、
+  modeled continuation state、runtime dispatcher、`GuestImage` / `MachOImage` domain model
+  本体抽出は移動しない。
+- [x] module split 後も behavior-changing refactor を混ぜず、既存 verification を維持する。
+
+completion evidence:
+
+- `crates/btbc-cli/src/b8_debug_bundle/guest_image.rs` を追加し、
+  `B8DebugGuestImageMappingReport` と直接の segment source / address space /
+  mapped bytes source enum を `loader.rs` から分けた。
+- `loader.rs` は `B8DebugGuestImageMappingReport::from_entry_input` を呼び、
+  `loader.plan.json` の `image_mapping` field 名、nested field 名、serde 値、JSON output は
+  変えない。
+- import/fixup projection、helper boundary、Objective-C / AppKit helper process execution、
+  modeled continuation state、runtime dispatcher、`GuestImage` / `MachOImage` 本体抽出は
+  移動していない。
+
+PR に含めない:
+
+- `GuestImage` / `MachOImage` domain model 本体抽出。
+- import/fixup projection の意味変更または schema 変更。
+- helper boundary / Objective-C / AppKit helper bridge 一般化。
+- return-to continuation dispatcher 抽出。
+- translation artifact/cache/dispatcher 実装。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- guest image mapping shell split を commit / push / draft PR 作成で停止する。
+
 #### Future Target: B8-ARCH2 Guest Image Model Extraction
 
 - [ ] public Mach-O metadata から runtime が使う `GuestImage` / `MachOImage` domain model を
