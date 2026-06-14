@@ -400,6 +400,28 @@ helper-required、fallback-required、stable blocker の状態を分ける。
 - OSS app cycle で次に潰す対象を opcode ではなく semantic bucket として選べる
 - clean-room source と permissive dependency 候補の扱いが明記されている
 
+2026-06-14 の B8-ARCH1a audit result:
+
+- B8-HWGUI で追加した focused instruction slices は
+  `prefix / width / register alias decode`、`register transfer`、
+  `RIP-relative data access`、`RIP-relative address materialization`、
+  `register-indirect data access`、`stack frame and epilogue`、
+  `direct control flow`、`indirect / imported control flow`、`integer ALU and flags`、
+  `byte load / zero extension`、`syscall / host service request`、
+  `Objective-C / AppKit helper service`、`fallback / runtime state` に再分類した。
+- coverage status vocabulary は `decode_only`、`lift_ready`、`direct_lowering_ready`、
+  `helper_required`、`fallback_required`、`stable_blocker` とする。
+- direct lowering は pure IR と target backend metadata だけで表せる bucket に限定する。
+  loader/import/ABI/OS personality が必要な bucket は helper、dispatcher state が必要な
+  bucket は fallback-required または stable blocker として扱う。
+- unsupported report は、opcode だけでなく semantic bucket、operand shape、
+  source PC range、raw bytes、required runtime service、fallback possibility、
+  clean-room source、next action を持てる方向へ進める。
+- dependency candidate は decoder / disassembler の canonical instruction construction
+  までに留める。lift / IR semantics / runtime helper / metadata schema / fallback policy は
+  Bara の clean-room domain model として保持する。採用は別 PR Gate とし、
+  license / NOTICE / transitive dependency / Nix packaging / supply-chain verification を必須にする。
+
 ### R2: Guest Image Model
 
 Mach-O parsing / probing から runtime が使える `GuestImage` / `MachOImage` model を

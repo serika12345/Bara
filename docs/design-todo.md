@@ -119,20 +119,20 @@ B8-ARCH1 responsibility split audit:
 
 ## D4a: x86_64 ISA semantic coverage strategy
 
-- [ ] x86_64 coverage を opcode checklist ではなく semantic bucket catalog として管理する。
-- [ ] decode、canonical instruction、operand semantics、guest semantic IR、backend lowering、
+- [x] x86_64 coverage を opcode checklist ではなく semantic bucket catalog として管理する。
+- [x] decode、canonical instruction、operand semantics、guest semantic IR、backend lowering、
   helper/fallback の責務を分ける。
-- [ ] unsupported instruction report は opcode だけでなく、operand shape、semantic bucket、
+- [x] unsupported instruction report は opcode だけでなく、operand shape、semantic bucket、
   required runtime service、fallback possibility を含める。
-- [ ] direct ARM64 lowering へ進める bucket と、helper / interpreter fallback へ逃がす
+- [x] direct ARM64 lowering へ進める bucket と、helper / interpreter fallback へ逃がす
   bucket の判断基準を固定する。
-- [ ] permissive license decoder を採用する場合でも、lift / IR / runtime semantics は
+- [x] permissive license decoder を採用する場合でも、lift / IR / runtime semantics は
   Bara の clean-room domain model として保持する。
-- [ ] Intel SDM、Arm A64 docs、ABI specs、Mach-O public docs を primary source として
+- [x] Intel SDM、Arm A64 docs、ABI specs、Mach-O public docs を primary source として
   coverage catalog に紐づける。
-- [ ] Intel XED、iced-x86、Zydis、Capstone、Remill / McSema、FEX、Box64、DynamoRIO を
+- [x] Intel XED、iced-x86、Zydis、Capstone、Remill / McSema、FEX、Box64、DynamoRIO を
   dependency candidate / research reference / non-candidate に分類する。
-- [ ] dependency candidate を採用する前に、license、NOTICE、transitive dependency、
+- [x] dependency candidate を採用する前に、license、NOTICE、transitive dependency、
   Nix packaging、`verify-supply-chain` 対象を audit する。
 
 メモ:
@@ -169,6 +169,68 @@ B8-ARCH1 responsibility split audit:
 - QEMU user-mode、Valgrind、Ghidra、Binary Ninja、Rosetta は有用な比較対象になり得るが、
   GPL / LGPL / proprietary license または clean-room 境界の理由により、Bara core の
   permissive dependency candidate にはしない。
+
+B8-ARCH1a semantic bucket catalog (`b8_arch1a_isa_semantic_bucket_catalog_v0`):
+
+| bucket | B8-HWGUI で確認済みの focused slice | 現状態 | 次の抽象化境界 |
+| --- | --- | --- | --- |
+| prefix / width / register alias decode | `48 89 e5`、`41 57`、`41 56`、`41 5e`、`41 5f`、32-bit `xor edx,edx` | lift-ready / direct-lowering-ready の混在 | REX、operand width、32-bit write zero-extension、partial register aliasing を canonical operand semantics に分ける |
+| register transfer | `mov rbx,rax`、`mov rdx,rax`、`mov rdi,rbx`、`mov rbp,rsp` | direct-lowering-ready | arbitrary register-copy engine ではなく、register family / width / writeback rule を先に domain type 化する |
+| RIP-relative data access | `mov rax/rdi/rsi/r14/r15, qword ptr [rip+disp32]` | lift-ready、mapped image / fixup resolution required | `MemRipRelative` operand を loader/image model と接続し、raw qword、rebase、bind、import identity を区別する |
+| RIP-relative address materialization | `lea rdi,[rip+disp32]`、`lea rsi,[rip+disp32]` | lift-ready | address calculation を memory load と分け、source VA / target VA を混ぜない API にする |
+| register-indirect data access | `mov rdx,qword ptr [rax]`、`mov rdi,qword ptr [r15]` | helper-required / stable-blocker 併用 | mapped-image read、imported global pointee load、runtime memory read を別 bucket に分ける |
+| stack frame and epilogue | `push rax/rbx/rbp/r14/r15`、`pop rbx/rbp/r14/r15`、`add rsp,8` | direct-lowering-ready for focused shapes | stack state model と callee-saved restore report を runtime dispatcher 境界へ移す |
+| direct control flow | `call rel32`、`ret`、`jmp rel8`、`jcc rel8/rel32` | direct-lowering-ready for simple internal targets | external stub call、post-ret padding、function completion を terminator semantics として分ける |
+| indirect / imported control flow | `call r14` -> `_objc_msgSend` | helper-required / stable-blocker | indirect target identity、import helper request、dispatcher/cache requirement を分ける |
+| integer ALU and flags | `add/sub/cmp/test eax,*`、`xor eax,eax`、`xor edx,edx` | direct-lowering-ready for narrow set | common flags builder、condition-code evaluation、parity/auxiliary flags policy を分ける |
+| byte load / zero extension | `movzx eax, byte ptr [rdi]` | lift-ready / direct-lowering-ready for fixture shape | memory width、zero extension、addressing mode を generic operand semantics へ移す |
+| syscall / host service request | `syscall`、Bara host trap sentinel | helper-required / stable-blocker | syscall、libc/import helper、runtime helper、fixture host trap を separate capability にする |
+| Objective-C / AppKit helper service | `sharedApplication`、`setActivationPolicy:`、`_objc_alloc_init`、`setDelegate:`、`run`、autorelease pool | fixture-scoped host service | generic `GuestCall -> HostService -> GuestReturn` contract へ移す |
+| fallback / runtime state | unknown indirect target、callback、TLS、signal、thread、SIMD/FP/string/atomic | stable-blocker / future fallback-required | fallback interpreter or JIT は dispatcher interface 上の explicit capability として追加する |
+
+status vocabulary:
+
+- `decode_only`: public bytes から canonical instruction / operand shape までは分かるが、
+  guest semantic IR へまだ載らない。
+- `lift_ready`: guest semantic IR が source-level observable semantics を表せる。
+- `direct_lowering_ready`: ARM64 backend が helper なしで deterministic に lowering できる。
+- `helper_required`: OS personality、loader/import、ABI、host service が必要で、core translator
+  だけで完結しない。
+- `fallback_required`: interpreter / JIT / dispatcher fallback が必要な可能性が高い。
+- `stable_blocker`: silent fallback せず、source PC、operand shape、required service、
+  next action を report して停止する。
+
+direct lowering / helper / fallback 判断基準:
+
+- direct lowering は、guest-visible semantics が pure IR と target backend metadata だけで
+  表現でき、hidden OS state、loader state、time、host object identity、callback を要求しない
+  bucket に限定する。
+- helper は、ABI marshaling、import symbol、syscall/libc/Objective-C/AppKit、loader fixup、
+  process state など OS personality が責務を持つ bucket に使う。
+- fallback は、unknown indirect target、self-modifying code、runtime-generated target、
+  complex SIMD/FP/string/atomic、exception/signal/thread/TLS のように dispatcher state が
+  ないと進めない bucket にだけ使う。fallback 可能性は report するが、実装は別 gate にする。
+
+unsupported report schema 方針:
+
+- 既存の opcode / `DecodeUnsupportedOpcode` だけでなく、`semantic_bucket`、
+  `operand_shape`、`source_pc_range`、`raw_bytes_hex`、`required_runtime_service`、
+  `fallback_possibility`、`clean_room_source`、`next_action` を持てる形に進める。
+- B8 debug bundle の report DTO split 後に schema を広げる。B8-ARCH1a では schema 変更や
+  Rust code change は行わない。
+
+decoder / reference adoption checklist:
+
+- dependency 採用は別 PR Gate とし、B8-ARCH1a では採用しない。
+- 採用前に license / NOTICE / transitive dependency / Nix packaging / `deny.toml` /
+  `nix develop -c ./scripts/verify-supply-chain` を確認する。
+- decoder / disassembler dependency は canonical instruction construction までに留める。
+  lift、IR semantics、runtime helper、metadata schema、fallback policy は Bara の
+  clean-room domain model として保持する。
+- Intel SDM、Arm A64 docs、ABI specs、Mach-O public docs を primary source とし、
+  dependency candidate / research reference の分類は
+  [Runtime Architecture Roadmap](runtime-architecture-roadmap.md) の
+  `Reference Materials And Permissive Candidates` を source of truth とする。
 
 ## D5: Host helper / OS boundary
 
