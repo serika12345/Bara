@@ -6,14 +6,8 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use bara_arm64::{emit_program, EmitError};
-use bara_ir::{
-    Program, ProgramImageMappedBytes, ProgramImageMetadata, Terminator, UnsupportedReason, X86Va,
-};
-use bara_isa_x86::{
-    decode_function, lift_decoded_function_with_image_metadata, DecodedFunction,
-    DecodedInstructionKind, X86Bytes,
-};
+use bara_ir::{ProgramImageMappedBytes, ProgramImageMetadata, UnsupportedReason, X86Va};
+use bara_isa_x86::{decode_function, DecodedFunction, DecodedInstructionKind, X86Bytes};
 use bara_oracle::{
     binary_format_probe_report_to_json, decode_mach_o_chained_fixups_for_target,
     mach_o_entry_function_input, probe_public_binary_format, resolve_mach_o_symbol_for_x86_va,
@@ -24,33 +18,27 @@ use bara_oracle::{
     MachOEntryFunctionInput, MachOEntryFunctionTestCaseError, MachOLinkeditDataCommandKind,
     MachOStubSymbolResolution, MachOStubSymbolResolutionBlocker, MachOStubSymbolResolutionStatus,
     MachOStubVirtualAddress, MachOSymbolAddressResolution, MachOSymbolAddressResolutionBlocker,
-    MachOSymbolAddressResolutionStatus, TestCase,
+    MachOSymbolAddressResolutionStatus,
 };
 use serde::{Deserialize, Serialize};
 
+mod attempt;
 mod io;
 mod report;
 
+use self::attempt::B8RealEntryAttempt;
 use self::io::{
     create_dir, read_binary_file, write_binary_file, write_json_file, write_text_file,
     B8DebugBundleOutputPaths, B8DebugReproScript,
 };
 use self::report::{
-    B8DebugArtifactReport, B8DebugBlockerReport, B8DebugDecodeReport,
-    B8DebugDecodedInstructionKindReport, B8DebugDecodedInstructionReport, B8DebugEntryBytesReport,
-    B8DebugEntrySource, B8DebugLaunchReport, B8DebugMemoryReadWidthReport, B8DebugProcessedPcRange,
-    B8DebugRuntimeAttemptReport, B8DebugRuntimeRunScope, B8DebugSourceIsa, B8DebugStageStatus,
+    B8DebugDecodeReport, B8DebugDecodedInstructionKindReport, B8DebugDecodedInstructionReport,
+    B8DebugEntryBytesReport, B8DebugEntrySource, B8DebugMemoryReadWidthReport,
+    B8DebugProcessedPcRange, B8DebugSourceIsa, B8DebugStageStatus,
     B8DebugUnsupportedInstructionReport,
 };
 
-use crate::{
-    function_run::{
-        run_compiled_test_case_function_with_bundle, FunctionArtifactReport, FunctionCompileResult,
-        FunctionCompiledIrArtifact, FunctionFixupsArtifact, FunctionHelpersArtifact,
-        FunctionPcMapArtifact, FunctionRunError,
-    },
-    x86_64_mach_o_fixture::{b8_gui_hello_world_case_id, X8664MachOFixtureError},
-};
+use crate::x86_64_mach_o_fixture::{b8_gui_hello_world_case_id, X8664MachOFixtureError};
 
 pub(crate) fn generate_b8_debug_bundle(
     binary_path: &Path,
@@ -110,216 +98,6 @@ pub(crate) fn generate_b8_debug_bundle(
     serde_json::to_string(&paths)
         .map_err(JsonError::new)
         .map_err(B8DebugBundleError::Json)
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct B8RealEntryAttempt {
-    decode_report: B8DebugDecodeReport,
-    lift_ir: B8DebugArtifactReport<FunctionCompiledIrArtifact>,
-    emit_report: B8DebugArtifactReport<FunctionArtifactReport>,
-    pcmap: B8DebugArtifactReport<FunctionPcMapArtifact>,
-    fixups: B8DebugArtifactReport<FunctionFixupsArtifact>,
-    helpers: B8DebugArtifactReport<FunctionHelpersArtifact>,
-    runtime_report: B8DebugRuntimeAttemptReport,
-    launch_report: B8DebugLaunchReport,
-    blocker_report: B8DebugBlockerReport,
-}
-
-impl B8RealEntryAttempt {
-    fn run(test_case: &TestCase, image_metadata: &ProgramImageMetadata) -> Self {
-        let decoded_result = decode_function(test_case.x86_bytes());
-        let decode_report = B8DebugDecodeReport::from_result(decoded_result.as_ref());
-        let decoded = match decoded_result {
-            Ok(decoded) => decoded,
-            Err(error) => {
-                let blocker_report = B8DebugBlockerReport::from_decode_error(&error);
-                return Self::blocked_without_ir(
-                    test_case,
-                    decode_report,
-                    None,
-                    "decode failed",
-                    blocker_report,
-                );
-            }
-        };
-
-        let processed_pc_range = Some(B8DebugProcessedPcRange::from_decoded(&decoded));
-        let first_unsupported_instruction =
-            B8DebugUnsupportedInstructionReport::from_decoded(&decoded);
-        let program =
-            match lift_decoded_function_with_image_metadata(&decoded, image_metadata.clone()) {
-                Ok(program) => program,
-                Err(error) => {
-                    let blocker_report = first_unsupported_instruction
-                        .as_ref()
-                        .map(B8DebugBlockerReport::from_unsupported_instruction)
-                        .unwrap_or_else(|| B8DebugBlockerReport::from_lift_error(&error));
-                    return Self::blocked_without_ir(
-                        test_case,
-                        decode_report,
-                        processed_pc_range,
-                        format!("lift failed: {error:?}"),
-                        blocker_report,
-                    );
-                }
-            };
-
-        let lift_ir =
-            B8DebugArtifactReport::available(FunctionCompiledIrArtifact::from_program(&program));
-        if let Some(reason) = frontier_unsupported_terminator_reason(&program) {
-            let run_error = FunctionRunError::Emit(EmitError::UnsupportedIr {
-                reason: reason.clone(),
-            });
-            let blocker_report = B8DebugBlockerReport::from_function_error(&run_error);
-            return Self {
-                decode_report,
-                lift_ir,
-                emit_report: B8DebugArtifactReport::failed(run_error.to_string()),
-                pcmap: B8DebugArtifactReport::skipped("unsupported IR terminator"),
-                fixups: B8DebugArtifactReport::skipped("unsupported IR terminator"),
-                helpers: B8DebugArtifactReport::skipped("unsupported IR terminator"),
-                runtime_report: B8DebugRuntimeAttemptReport::skipped(
-                    "unsupported IR terminator",
-                    B8DebugRuntimeRunScope::RealLcMainEntryFirstBlock,
-                ),
-                launch_report: B8DebugLaunchReport::from_attempt(
-                    test_case,
-                    processed_pc_range,
-                    &blocker_report,
-                ),
-                blocker_report,
-            };
-        }
-        let emitted = match emit_program(&program) {
-            Ok(emitted) => emitted,
-            Err(error) => {
-                let run_error = FunctionRunError::Emit(error);
-                let blocker_report = first_unsupported_instruction
-                    .as_ref()
-                    .map(B8DebugBlockerReport::from_unsupported_instruction)
-                    .unwrap_or_else(|| B8DebugBlockerReport::from_function_error(&run_error));
-                return Self {
-                    decode_report,
-                    lift_ir,
-                    emit_report: B8DebugArtifactReport::failed(run_error.to_string()),
-                    pcmap: B8DebugArtifactReport::skipped("emit failed"),
-                    fixups: B8DebugArtifactReport::skipped("emit failed"),
-                    helpers: B8DebugArtifactReport::skipped("emit failed"),
-                    runtime_report: B8DebugRuntimeAttemptReport::skipped(
-                        "emit failed",
-                        B8DebugRuntimeRunScope::RealLcMainEntryFirstBlock,
-                    ),
-                    launch_report: B8DebugLaunchReport::from_attempt(
-                        test_case,
-                        processed_pc_range,
-                        &blocker_report,
-                    ),
-                    blocker_report,
-                };
-            }
-        };
-
-        let emit_report = B8DebugArtifactReport::available(
-            FunctionArtifactReport::from_source_and_emitted(test_case, &emitted),
-        );
-        let pcmap =
-            B8DebugArtifactReport::available(FunctionPcMapArtifact::from_entries(emitted.pc_map()));
-        let fixups = B8DebugArtifactReport::available(FunctionFixupsArtifact::from_fixups(
-            emitted.branch_fixups(),
-        ));
-        let helpers = B8DebugArtifactReport::available(FunctionHelpersArtifact::from_requests(
-            emitted.host_trap_requests(),
-        ));
-        let compiled = FunctionCompileResult::new(program, emitted);
-        match run_compiled_test_case_function_with_bundle(test_case, compiled) {
-            Ok(bundle) => {
-                let blocker_report = B8DebugBlockerReport::none();
-                Self {
-                    decode_report,
-                    lift_ir,
-                    emit_report,
-                    pcmap,
-                    fixups,
-                    helpers,
-                    runtime_report: B8DebugRuntimeAttemptReport::from_result(
-                        bundle.result(),
-                        B8DebugRuntimeRunScope::RealLcMainEntryFirstBlock,
-                    ),
-                    launch_report: B8DebugLaunchReport::from_attempt(
-                        test_case,
-                        processed_pc_range,
-                        &blocker_report,
-                    ),
-                    blocker_report,
-                }
-            }
-            Err(error) => {
-                let blocker_report = B8DebugBlockerReport::from_function_error(&error);
-                Self {
-                    decode_report,
-                    lift_ir,
-                    emit_report,
-                    pcmap,
-                    fixups,
-                    helpers,
-                    runtime_report: B8DebugRuntimeAttemptReport::failed(
-                        &error,
-                        B8DebugRuntimeRunScope::RealLcMainEntryFirstBlock,
-                    ),
-                    launch_report: B8DebugLaunchReport::from_attempt(
-                        test_case,
-                        processed_pc_range,
-                        &blocker_report,
-                    ),
-                    blocker_report,
-                }
-            }
-        }
-    }
-
-    fn blocked_without_ir(
-        test_case: &TestCase,
-        decode_report: B8DebugDecodeReport,
-        processed_pc_range: Option<B8DebugProcessedPcRange>,
-        reason: impl Into<String>,
-        blocker_report: B8DebugBlockerReport,
-    ) -> Self {
-        let reason = reason.into();
-        Self {
-            decode_report,
-            lift_ir: B8DebugArtifactReport::failed(reason.clone()),
-            emit_report: B8DebugArtifactReport::skipped(reason.clone()),
-            pcmap: B8DebugArtifactReport::skipped(reason.clone()),
-            fixups: B8DebugArtifactReport::skipped(reason.clone()),
-            helpers: B8DebugArtifactReport::skipped(reason.clone()),
-            runtime_report: B8DebugRuntimeAttemptReport::skipped(
-                reason,
-                B8DebugRuntimeRunScope::RealLcMainEntryFirstBlock,
-            ),
-            launch_report: B8DebugLaunchReport::from_attempt(
-                test_case,
-                processed_pc_range,
-                &blocker_report,
-            ),
-            blocker_report,
-        }
-    }
-}
-
-fn frontier_unsupported_terminator_reason(program: &Program) -> Option<&UnsupportedReason> {
-    program
-        .blocks()
-        .iter()
-        .rev()
-        .find_map(|block| match block.terminator() {
-            Terminator::Unsupported { reason } => Some(reason),
-            Terminator::Return
-            | Terminator::BoundaryRequest { .. }
-            | Terminator::Fallthrough { .. }
-            | Terminator::DirectJump { .. }
-            | Terminator::DirectCall { .. }
-            | Terminator::CondJump { .. } => None,
-        })
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]

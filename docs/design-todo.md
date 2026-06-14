@@ -82,6 +82,16 @@ B8-ARCH2b result:
   loader/import projection、Objective-C/AppKit helper process execution、runtime
   dispatcher は同じ PR では動かさない。
 
+B8-ARCH2c result:
+
+- 2026-06-14 に `crates/btbc-cli/src/b8_debug_bundle/attempt.rs` を追加し、
+  `B8RealEntryAttempt`、decode/lift/emit/runtime attempt orchestration、
+  unsupported terminator frontier helper を `b8_debug_bundle.rs` から分けた。
+- `generate_b8_debug_bundle` は existing attempt result fields を読むだけにし、JSON
+  output、blocker classification、runtime attempt behavior は変えない。
+- bundle file I/O、report DTO、loader/import projection、Objective-C/AppKit helper
+  process execution、runtime dispatcher は同じ PR では動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。
