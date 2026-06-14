@@ -1,6 +1,6 @@
 use std::{
     error::Error,
-    fmt, fs, io,
+    fmt, fs, io as std_io,
     path::{Path, PathBuf},
     process::{Command, Output},
     time::{SystemTime, UNIX_EPOCH},
@@ -28,8 +28,13 @@ use bara_oracle::{
 };
 use serde::{Deserialize, Serialize};
 
+mod io;
 mod report;
 
+use self::io::{
+    create_dir, read_binary_file, write_binary_file, write_json_file, write_text_file,
+    B8DebugBundleOutputPaths, B8DebugReproScript,
+};
 use self::report::{
     B8DebugArtifactReport, B8DebugBlockerReport, B8DebugDecodeReport,
     B8DebugDecodedInstructionKindReport, B8DebugDecodedInstructionReport, B8DebugEntryBytesReport,
@@ -105,103 +110,6 @@ pub(crate) fn generate_b8_debug_bundle(
     serde_json::to_string(&paths)
         .map_err(JsonError::new)
         .map_err(B8DebugBundleError::Json)
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-struct B8DebugBundleOutputPaths {
-    bundle_dir: String,
-    input_probe: String,
-    entry_bytes_bin: String,
-    entry_bytes_json: String,
-    decode_report: String,
-    lift_ir: String,
-    emit_report: String,
-    pcmap: String,
-    fixups: String,
-    helpers: String,
-    loader_plan: String,
-    runtime_attempt: String,
-    launch_report: String,
-    blocker: String,
-    repro: String,
-}
-
-impl B8DebugBundleOutputPaths {
-    fn from_dir(bundle_dir: &Path) -> Self {
-        Self {
-            bundle_dir: path_string(bundle_dir),
-            input_probe: path_string(&bundle_dir.join("input.probe.json")),
-            entry_bytes_bin: path_string(&bundle_dir.join("entry.bytes.bin")),
-            entry_bytes_json: path_string(&bundle_dir.join("entry.bytes.json")),
-            decode_report: path_string(&bundle_dir.join("decode.report.json")),
-            lift_ir: path_string(&bundle_dir.join("lift.ir.json")),
-            emit_report: path_string(&bundle_dir.join("emit.report.json")),
-            pcmap: path_string(&bundle_dir.join("pcmap.json")),
-            fixups: path_string(&bundle_dir.join("fixups.json")),
-            helpers: path_string(&bundle_dir.join("helpers.json")),
-            loader_plan: path_string(&bundle_dir.join("loader.plan.json")),
-            runtime_attempt: path_string(&bundle_dir.join("runtime-attempt.json")),
-            launch_report: path_string(&bundle_dir.join("launch.report.json")),
-            blocker: path_string(&bundle_dir.join("blocker.json")),
-            repro: path_string(&bundle_dir.join("repro.sh")),
-        }
-    }
-
-    fn input_probe_path(&self) -> PathBuf {
-        PathBuf::from(&self.input_probe)
-    }
-
-    fn entry_bytes_bin_path(&self) -> PathBuf {
-        PathBuf::from(&self.entry_bytes_bin)
-    }
-
-    fn entry_bytes_json_path(&self) -> PathBuf {
-        PathBuf::from(&self.entry_bytes_json)
-    }
-
-    fn decode_report_path(&self) -> PathBuf {
-        PathBuf::from(&self.decode_report)
-    }
-
-    fn lift_ir_path(&self) -> PathBuf {
-        PathBuf::from(&self.lift_ir)
-    }
-
-    fn emit_report_path(&self) -> PathBuf {
-        PathBuf::from(&self.emit_report)
-    }
-
-    fn pcmap_path(&self) -> PathBuf {
-        PathBuf::from(&self.pcmap)
-    }
-
-    fn fixups_path(&self) -> PathBuf {
-        PathBuf::from(&self.fixups)
-    }
-
-    fn helpers_path(&self) -> PathBuf {
-        PathBuf::from(&self.helpers)
-    }
-
-    fn loader_plan_path(&self) -> PathBuf {
-        PathBuf::from(&self.loader_plan)
-    }
-
-    fn runtime_attempt_path(&self) -> PathBuf {
-        PathBuf::from(&self.runtime_attempt)
-    }
-
-    fn launch_report_path(&self) -> PathBuf {
-        PathBuf::from(&self.launch_report)
-    }
-
-    fn blocker_path(&self) -> PathBuf {
-        PathBuf::from(&self.blocker)
-    }
-
-    fn repro_path(&self) -> PathBuf {
-        PathBuf::from(&self.repro)
-    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -7594,33 +7502,20 @@ enum B8DebugLoaderNextEntrySource {
     FirstUnsupportedBoundary,
 }
 
-struct B8DebugReproScript<'a> {
-    binary_path: &'a Path,
-    output_root: &'a Path,
-}
-
-impl<'a> B8DebugReproScript<'a> {
-    const fn new(binary_path: &'a Path, output_root: &'a Path) -> Self {
-        Self {
-            binary_path,
-            output_root,
-        }
-    }
-
-    fn into_script(self) -> String {
-        format!(
-            "#!/usr/bin/env sh\nset -eu\nnix develop -c cargo run -p btbc-cli -- generate-b8-debug-bundle {} {}\n",
-            shell_single_quote(&path_string(self.binary_path)),
-            shell_single_quote(&path_string(self.output_root))
-        )
-    }
-}
-
 #[derive(Debug)]
 pub(crate) enum B8DebugBundleError {
-    ReadFile { path: PathBuf, source: io::Error },
-    WriteFile { path: PathBuf, source: io::Error },
-    CreateDir { path: PathBuf, source: io::Error },
+    ReadFile {
+        path: PathBuf,
+        source: std_io::Error,
+    },
+    WriteFile {
+        path: PathBuf,
+        source: std_io::Error,
+    },
+    CreateDir {
+        path: PathBuf,
+        source: std_io::Error,
+    },
     Probe(BinaryFormatProbeError),
     Entry(MachOEntryFunctionTestCaseError),
     B8CaseId(X8664MachOFixtureError),
@@ -7663,45 +7558,6 @@ impl fmt::Display for B8DebugBundleError {
 
 impl Error for B8DebugBundleError {}
 
-fn read_binary_file(path: &Path) -> Result<Vec<u8>, B8DebugBundleError> {
-    fs::read(path).map_err(|source| B8DebugBundleError::ReadFile {
-        path: path.to_path_buf(),
-        source,
-    })
-}
-
-fn create_dir(path: &Path) -> Result<(), B8DebugBundleError> {
-    fs::create_dir_all(path).map_err(|source| B8DebugBundleError::CreateDir {
-        path: path.to_path_buf(),
-        source,
-    })
-}
-
-fn write_json_file<T: Serialize>(path: &Path, value: &T) -> Result<(), B8DebugBundleError> {
-    let json = serde_json::to_string(value)
-        .map_err(JsonError::new)
-        .map_err(B8DebugBundleError::Json)?;
-    write_text_file(path, &json)
-}
-
-fn write_text_file(path: &Path, contents: &str) -> Result<(), B8DebugBundleError> {
-    fs::write(path, contents).map_err(|source| B8DebugBundleError::WriteFile {
-        path: path.to_path_buf(),
-        source,
-    })
-}
-
-fn write_binary_file(path: &Path, contents: &[u8]) -> Result<(), B8DebugBundleError> {
-    fs::write(path, contents).map_err(|source| B8DebugBundleError::WriteFile {
-        path: path.to_path_buf(),
-        source,
-    })
-}
-
-fn path_string(path: &Path) -> String {
-    path.to_string_lossy().into_owned()
-}
-
 fn encode_lower_hex(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
 
@@ -7711,8 +7567,4 @@ fn encode_lower_hex(bytes: &[u8]) -> String {
         output.push(char::from(HEX[usize::from(byte & 0x0f)]));
     }
     output
-}
-
-fn shell_single_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "'\"'\"'"))
 }

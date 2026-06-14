@@ -2514,6 +2514,51 @@ review gate:
 
 - report DTO split を commit / push / draft PR 作成で停止する。
 
+#### PR Gate: B8-ARCH2b B8 Debug Bundle I/O Boundary Split
+
+branch: `task/b8-arch2b-debug-bundle-io-boundary`
+
+B8-ARCH2a が review / merge 済みになるまで開始しない。B8-ARCH1 audit の抽出順に従い、
+report DTO split の次に bundle file I/O と repro script generation だけを分ける。
+
+完了条件:
+
+- [x] `crates/btbc-cli/src/b8_debug_bundle.rs` 内の bundle directory layout、
+  JSON/bin/text file read/write helper、repro script generation を
+  `crates/btbc-cli/src/b8_debug_bundle/io.rs` へ分ける。
+- [x] `generate_b8_debug_bundle` の output path JSON、file 名、repro script content、
+  B8-HWGUI debug bundle output を維持する。
+- [x] decode/lift/emit/runtime attempt orchestration、report DTO、loader/import projection、
+  helper process execution、runtime dispatcher は移動しない。
+- [x] module split 後も behavior-changing refactor を混ぜず、既存 verification を維持する。
+
+completion evidence:
+
+- `crates/btbc-cli/src/b8_debug_bundle/io.rs` を追加し、`B8DebugBundleOutputPaths`、
+  `B8DebugReproScript`、bundle directory creation、binary/text/JSON file read/write helper を
+  移した。
+- output path JSON の field 名、bundle file 名、repro script command string は維持し、
+  `generate_b8_debug_bundle` は既存 orchestration から `io` module の boundary helper を
+  呼ぶだけにした。
+- decode/lift/emit/runtime attempt orchestration、report DTO、loader/import projection、
+  helper process execution、runtime dispatcher 相当の処理は移動していない。
+
+PR に含めない:
+
+- `B8RealEntryAttempt` / attempt orchestration 抽出。
+- `GuestImage` / loader image model 抽出。
+- Objective-C / AppKit helper bridge 一般化。
+- translation artifact/cache/dispatcher 実装。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- bundle I/O boundary split を commit / push / draft PR 作成で停止する。
+
 #### Future Target: B8-ARCH2 Guest Image Model Extraction
 
 - [ ] public Mach-O metadata から runtime が使う `GuestImage` / `MachOImage` domain model を

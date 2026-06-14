@@ -70,6 +70,18 @@ B8-ARCH2a result:
   bridge、return-to continuation report 群は、それぞれ B8-ARCH2 / B8-ARCH4 /
   B8-ARCH5 の責務境界が決まるまで同じ PR では動かさない。
 
+B8-ARCH2b result:
+
+- 2026-06-14 に `crates/btbc-cli/src/b8_debug_bundle/io.rs` を追加し、bundle
+  directory layout、`B8DebugBundleOutputPaths`、JSON/bin/text file read/write helper、
+  repro script generation を `b8_debug_bundle.rs` から分けた。
+- output path JSON の field 名、bundle file 名、repro script command string は変えない。
+  親 module は existing orchestration を保持し、bundle I/O boundary helper だけを
+  `io` module から使う。
+- `B8RealEntryAttempt` / decode-lift-emit-runtime attempt orchestration、report DTO、
+  loader/import projection、Objective-C/AppKit helper process execution、runtime
+  dispatcher は同じ PR では動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。
