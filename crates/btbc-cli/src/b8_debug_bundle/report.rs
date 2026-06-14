@@ -6,10 +6,11 @@ use bara_isa_x86::{
 use bara_oracle::{FailureKind, TestCase};
 use serde::Serialize;
 
+use super::helper_boundary::B8DebugHelperBoundaryRequestReport;
 use super::{
-    encode_lower_hex, B8DebugHelperBoundaryRequestReport,
-    B8DebugRegisterIndirectCallBoundaryReport, B8DebugRegisterMaterializationSourceReport,
-    B8DebugRegisterName, B8DebugTargetPointerLoadKind, B8DebugTargetPointerLoadReport,
+    encode_lower_hex, B8DebugRegisterIndirectCallBoundaryReport,
+    B8DebugRegisterMaterializationSourceReport, B8DebugRegisterName, B8DebugTargetPointerLoadKind,
+    B8DebugTargetPointerLoadReport,
 };
 
 use crate::function_run::{FunctionRunError, FunctionRunResult};

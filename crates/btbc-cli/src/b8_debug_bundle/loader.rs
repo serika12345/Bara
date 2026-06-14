@@ -1,9 +1,9 @@
 use bara_oracle::{BinaryFormatProbeReport, BinaryInput, MachOEntryFunctionInput};
 use serde::Serialize;
 
+use super::helper_boundary::B8DebugHelperBoundaryRequestReport;
 use super::import_boundary::B8DebugImportBoundaryReport;
 use super::report::{B8DebugDecodeReport, B8DebugEntrySource, B8DebugStageStatus};
-use super::B8DebugHelperBoundaryRequestReport;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub(super) struct B8DebugLoaderPlanReport {
