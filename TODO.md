@@ -2604,6 +2604,51 @@ review gate:
 
 - attempt orchestration split を commit / push / draft PR 作成で停止する。
 
+#### PR Gate: B8-ARCH2d B8 Debug Bundle Loader Plan Shell Split
+
+branch: `task/b8-arch2d-debug-loader-plan-shell-split`
+
+B8-ARCH2c が review / merge 済みになるまで開始しない。B8-ARCH2 Guest Image Model
+Extraction の preparatory slice として、`GuestImage` 本体抽出に入る前に B8 debug
+bundle の loader plan shell だけを分ける。
+
+完了条件:
+
+- [x] `crates/btbc-cli/src/b8_debug_bundle.rs` 内の `B8DebugLoaderPlanReport` と直接の
+  loader plan shell DTO を `crates/btbc-cli/src/b8_debug_bundle/loader.rs` へ分ける。
+- [x] `generate_b8_debug_bundle` の `loader.plan.json` schema 名、field 名、JSON output、
+  helper boundary request の launch report 接続を維持する。
+- [x] import boundary projection、helper process execution、modeled continuation state、
+  runtime dispatcher、`GuestImage` / `MachOImage` domain model 本体抽出は移動しない。
+- [x] module split 後も behavior-changing refactor を混ぜず、既存 verification を維持する。
+
+completion evidence:
+
+- `crates/btbc-cli/src/b8_debug_bundle/loader.rs` を追加し、
+  `B8DebugLoaderPlanReport`、direct loader plan metadata DTO、loader deferred step DTO を
+  移した。
+- `generate_b8_debug_bundle` は `B8DebugLoaderPlanReport::real_lc_main_attempted` を呼び、
+  `helper_boundary_request()` で launch report へ既存 helper boundary request を接続する。
+- import boundary projection、helper process execution、modeled continuation state、
+  runtime dispatcher、`GuestImage` / `MachOImage` 本体抽出は移動していない。
+
+PR に含めない:
+
+- `GuestImage` / `MachOImage` domain model 本体抽出。
+- import/fixup projection の意味変更または schema 変更。
+- Objective-C / AppKit helper bridge 一般化。
+- return-to continuation dispatcher 抽出。
+- translation artifact/cache/dispatcher 実装。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- loader plan shell split を commit / push / draft PR 作成で停止する。
+
 #### Future Target: B8-ARCH2 Guest Image Model Extraction
 
 - [ ] public Mach-O metadata から runtime が使う `GuestImage` / `MachOImage` domain model を

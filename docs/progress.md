@@ -18,6 +18,7 @@
    `B8-ARCH1a ISA Semantic Coverage Plan`、`B8-ARCH2a B8 Debug Bundle Report DTO Module Split`、
    `B8-ARCH2b B8 Debug Bundle I/O Boundary Split`、
    `B8-ARCH2c B8 Debug Bundle Attempt Orchestration Split`、
+   `B8-ARCH2d B8 Debug Bundle Loader Plan Shell Split`、
    `B8-ARCH2 Guest Image Model Extraction`
 2. [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) の `R1` / `R1a` と
    `Instruction Coverage Strategy`
@@ -25,18 +26,19 @@
    B8-ARCH1 responsibility split audit と、`D4a: x86_64 ISA semantic coverage strategy`
 4. この `docs/progress.md` の現在の作業スナップショット
 
-B8-ARCH2c review / merge 後の次候補:
+B8-ARCH2d review / merge 後の次候補:
 
 - `main` を最新化したうえで、TODO-backed PR Gate を追加または選び、dedicated branch を作る。
-- 候補は B8-ARCH2 Guest Image Model Extraction の小さい slice、または loader/import
+- 候補は B8-ARCH2 Guest Image Model Extraction の小さい slice、または import/fixup
   projection を GuestImage boundary へ寄せる preparatory PR Gate である。
 - B8-ARCH2a では report DTO split、B8-ARCH2b では bundle file I/O split、B8-ARCH2c では
-  real-entry attempt orchestration split だけを完了しているため、JSON schema 名、field 名、
-  既存 B8-HWGUI debug bundle output を維持したまま後続境界を切る。
+  real-entry attempt orchestration split、B8-ARCH2d では loader plan shell split だけを
+  完了するため、JSON schema 名、field 名、既存 B8-HWGUI debug bundle output を維持したまま
+  後続境界を切る。
 - helper process execution、loader image model、runtime dispatcher、decoder dependency 採用は、
   対応する TODO / design TODO が具体化されるまで混ぜない。
 
-B8-ARCH2c review / merge 後にすぐ始めないもの:
+B8-ARCH2d review / merge 後にすぐ始めないもの:
 
 - B8-OSS0 source-built OSS GUI app automation
 - B8-ARCH2 `GuestImage` extraction の実装
@@ -45,18 +47,19 @@ B8-ARCH2c review / merge 後にすぐ始めないもの:
 - B8-HWGUI fixture 専用 path のさらなる機能追加
 - decoder dependency 採用、ISA implementation / lowering 追加、supply-chain lockfile 変更
 
-B8-ARCH2c review package で示すべきもの:
+B8-ARCH2d review package で示すべきもの:
 
-- `b8_debug_bundle/attempt.rs` に移した real-entry attempt orchestration の範囲
-- JSON output、blocker classification、runtime attempt behavior を維持したこと
-- bundle file I/O、report DTO、loader/import projection、helper process execution、
-  modeled continuation をまだ移していないこと
+- `b8_debug_bundle/loader.rs` に移した loader plan shell DTO の範囲
+- `loader.plan.json` schema 名、field 名、helper boundary request の launch report 接続を
+  維持したこと
+- import/fixup projection、helper process execution、modeled continuation、`GuestImage`
+  model 本体をまだ移していないこと
 - `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
 - `nix develop -c ./scripts/verify`
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-14 11:42 JST
+最終更新: 2026-06-14 12:04 JST
 
 状態:
 
@@ -252,15 +255,14 @@ B8-ARCH2c review package で示すべきもの:
   `next_action=review_b8_hello_world_gui_completion` に進む。
   arbitrary dynamic library data symbol read、return-to continuation の一般実行、
   arbitrary call-rel32 execution、translation cache、fallback JIT/interpreter はまだ行わない。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-ARCH2c B8 Debug
-  Bundle Attempt Orchestration Split を
-  `task/b8-arch2c-debug-attempt-orchestration-split` 上で進めた。B8-ARCH2b は PR #53 で
-  merge 済みであり、B8-ARCH2c では `B8RealEntryAttempt`、decode/lift/emit/runtime attempt
-  orchestration、unsupported terminator frontier helper を
-  `crates/btbc-cli/src/b8_debug_bundle/attempt.rs` に分けた。JSON output、
-  blocker classification、runtime attempt behavior は維持し、bundle file I/O、report DTO、
-  loader/import projection、helper process execution、runtime dispatcher 相当の処理には
-  進んでいない。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-ARCH2d B8 Debug
+  Bundle Loader Plan Shell Split を
+  `task/b8-arch2d-debug-loader-plan-shell-split` 上で進めた。B8-ARCH2c は PR #54 で
+  merge 済みであり、B8-ARCH2d では `B8DebugLoaderPlanReport` と直接の loader plan shell
+  DTO を `crates/btbc-cli/src/b8_debug_bundle/loader.rs` に分けた。JSON output、
+  `loader.plan.json` schema 名、field 名、helper boundary request の launch report 接続は
+  維持し、import/fixup projection、helper process execution、modeled continuation、
+  runtime dispatcher、`GuestImage` / `MachOImage` domain model 本体抽出には進まない。
 - active_design_focus: Bara の主対象は同 OS / 異アーキテクチャ実行である。
   `macOS x86_64 -> macOS arm64` を最初の concrete target とし、将来
   `Linux x86_64 -> Linux arm64` と `Windows x64 -> Wine on arm64` を OS personality として
@@ -276,10 +278,11 @@ B8-ARCH2c review package で示すべきもの:
   public docs とし、Intel XED、iced-x86、Zydis、Capstone、Remill / McSema、FEX、
   Box64、DynamoRIO などの permissive candidate / prior art は dependency candidate と
   research reference に分けて扱う。
-- active_branch: `task/b8-arch2c-debug-attempt-orchestration-split`。branch base は `65153db`
-  (`Merge pull request #53 from serika12345:task/b8-arch2b-debug-bundle-io-boundary`)。
-  この branch は B8-ARCH2c attempt orchestration split 用であり、loader/image model 抽出、
-  helper bridge 一般化、translation artifact/cache/dispatcher 実装には進まない。
+- active_branch: `task/b8-arch2d-debug-loader-plan-shell-split`。branch base は `b699cc5`
+  (`Merge pull request #54 from serika12345:task/b8-arch2c-debug-attempt-orchestration-split`)。
+  この branch は B8-ARCH2d loader plan shell split 用であり、GuestImage 本体抽出、
+  import/fixup projection の意味変更、helper bridge 一般化、translation artifact/cache/
+  dispatcher 実装には進まない。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
@@ -535,17 +538,31 @@ B8-ARCH2c review package で示すべきもの:
   unsupported terminator frontier helper を `b8_debug_bundle.rs` から分けた。既存
   `generate_b8_debug_bundle` は attempt result fields を読む形に留め、JSON output、
   blocker classification、runtime attempt behavior は維持した。
-- remaining_work: B8-ARCH2c review gate。commit / push / draft PR 作成後に停止する。
-  B8-ARCH2 Guest Image Model Extraction、helper bridge 一般化、
+- B8-ARCH2d として、`B8DebugLoaderPlanReport` と直接の loader plan shell DTO を
+  `crates/btbc-cli/src/b8_debug_bundle/loader.rs` へ分けた。既存 `generate_b8_debug_bundle`
+  は loader plan report を作り、`helper_boundary_request()` で launch report へ existing
+  helper boundary request を接続する。`loader.plan.json` schema 名、field 名、JSON output は
+  維持した。
+- remaining_work: B8-ARCH2d review gate。commit / push / draft PR 作成後に停止する。
+  B8-ARCH2 Guest Image Model Extraction 本体、helper bridge 一般化、
   translation artifact/cache/dispatcher 実装へはこの branch では進まない。
-- next_action: B8-ARCH2c attempt orchestration split を review する。merge 後は TODO の次の
-  PR Gate を追加または選び、GuestImage model extraction の小さい slice へ進む。
+- next_action: B8-ARCH2d loader plan shell split を review する。merge 後は TODO の次の
+  PR Gate を追加または選び、import/fixup projection を GuestImage boundary へ寄せる小さい
+  slice へ進む。
 - verification:
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
   code change のため、`nix develop -c ./scripts/verify` も実行し、通過した。
 
 直近で完了した作業:
 
+- 2026-06-14 11:57 JST: B8-ARCH2d B8 Debug Bundle Loader Plan Shell Split を開始し、
+  code PR Gate として完了状態にした。
+  TODO-backed PR Gate を追加し、`B8DebugLoaderPlanReport` と直接の loader plan shell DTO
+  だけを `loader.rs` へ分けた。`loader.plan.json` schema 名、field 名、JSON output は
+  維持し、import/fixup projection、helper process execution、modeled continuation state、
+  `GuestImage` / `MachOImage` 本体抽出はこの PR に含めない。対象テスト
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
+  full verification も通過した。
 - 2026-06-14 11:36 JST: B8-ARCH2c B8 Debug Bundle Attempt Orchestration Split を開始し、
   code PR Gate として完了状態にした。`attempt.rs` に `B8RealEntryAttempt`、
   decode/lift/emit/runtime attempt orchestration、unsupported terminator frontier helper を

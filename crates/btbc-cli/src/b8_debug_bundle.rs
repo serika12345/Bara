@@ -15,15 +15,16 @@ use bara_oracle::{
     BinaryFormatProbeReport, BinaryInput, JsonError, MachOChainedFixupTargetAddress,
     MachOChainedFixupsBlocker, MachOChainedFixupsTargetReport, MachOChainedImportIdentityReport,
     MachOChainedRebaseTargetIdentityReport, MachODyldInfoCommandKind, MachODylibImportCommandKind,
-    MachOEntryFunctionInput, MachOEntryFunctionTestCaseError, MachOLinkeditDataCommandKind,
-    MachOStubSymbolResolution, MachOStubSymbolResolutionBlocker, MachOStubSymbolResolutionStatus,
-    MachOStubVirtualAddress, MachOSymbolAddressResolution, MachOSymbolAddressResolutionBlocker,
+    MachOEntryFunctionTestCaseError, MachOLinkeditDataCommandKind, MachOStubSymbolResolution,
+    MachOStubSymbolResolutionBlocker, MachOStubSymbolResolutionStatus, MachOStubVirtualAddress,
+    MachOSymbolAddressResolution, MachOSymbolAddressResolutionBlocker,
     MachOSymbolAddressResolutionStatus,
 };
 use serde::{Deserialize, Serialize};
 
 mod attempt;
 mod io;
+mod loader;
 mod report;
 
 use self::attempt::B8RealEntryAttempt;
@@ -31,11 +32,11 @@ use self::io::{
     create_dir, read_binary_file, write_binary_file, write_json_file, write_text_file,
     B8DebugBundleOutputPaths, B8DebugReproScript,
 };
+use self::loader::B8DebugLoaderPlanReport;
 use self::report::{
     B8DebugDecodeReport, B8DebugDecodedInstructionKindReport, B8DebugDecodedInstructionReport,
-    B8DebugEntryBytesReport, B8DebugEntrySource, B8DebugMemoryReadWidthReport,
-    B8DebugProcessedPcRange, B8DebugSourceIsa, B8DebugStageStatus,
-    B8DebugUnsupportedInstructionReport,
+    B8DebugEntryBytesReport, B8DebugMemoryReadWidthReport, B8DebugProcessedPcRange,
+    B8DebugSourceIsa, B8DebugUnsupportedInstructionReport,
 };
 
 use crate::x86_64_mach_o_fixture::{b8_gui_hello_world_case_id, X8664MachOFixtureError};
@@ -85,7 +86,7 @@ pub(crate) fn generate_b8_debug_bundle(
     );
     let launch_report = attempt
         .launch_report
-        .with_helper_boundary_request(loader_plan.import_boundary.helper_boundary_request.clone());
+        .with_helper_boundary_request(loader_plan.helper_boundary_request());
     write_json_file(&paths.loader_plan_path(), &loader_plan)?;
     write_json_file(&paths.runtime_attempt_path(), &attempt.runtime_report)?;
     write_json_file(&paths.launch_report_path(), &launch_report)?;
@@ -98,107 +99,6 @@ pub(crate) fn generate_b8_debug_bundle(
     serde_json::to_string(&paths)
         .map_err(JsonError::new)
         .map_err(B8DebugBundleError::Json)
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-struct B8DebugLoaderPlanReport {
-    schema: &'static str,
-    source: &'static str,
-    status: B8DebugStageStatus,
-    input_metadata: B8DebugLoaderInputMetadata,
-    image_mapping: B8DebugLoaderImageMappingReport,
-    relocation_binding: B8DebugLoaderDeferredStepReport,
-    import_boundary: B8DebugImportBoundaryReport,
-    entry_source_for_this_bundle: B8DebugEntrySource,
-    next_entry_source: B8DebugLoaderNextEntrySource,
-}
-
-impl B8DebugLoaderPlanReport {
-    fn real_lc_main_attempted(
-        input: &BinaryInput,
-        entry_input: &MachOEntryFunctionInput,
-        input_probe: &BinaryFormatProbeReport,
-        decode_report: &B8DebugDecodeReport,
-    ) -> Self {
-        let code = entry_input.executable_image().code_segment().x86_bytes();
-        Self {
-            schema: "b8_debug_loader_plan_v0",
-            source: "bara_runtime_user_space_launch_plan",
-            status: B8DebugStageStatus::Executed,
-            input_metadata: B8DebugLoaderInputMetadata::PublicMachOProbe,
-            image_mapping: B8DebugLoaderImageMappingReport {
-                status: B8DebugStageStatus::Executed,
-                segment_source: B8DebugLoaderSegmentSource::LcSegment64FileRange,
-                address_space: B8DebugLoaderAddressSpace::MachOVirtualAddress,
-                code_segment_vmaddr: code.entry().value(),
-                code_segment_byte_len: code.bytes().len(),
-                entry_pc: entry_input.executable_image().entry().offset().value(),
-                mapped_bytes_source: B8DebugLoaderMappedBytesSource::ProgramImageMetadata,
-            },
-            relocation_binding: B8DebugLoaderDeferredStepReport {
-                status: B8DebugStageStatus::Skipped,
-                reason: "public rebase/bind/import application is represented as import_boundary and remains blocked until chained fixups are decoded",
-                next_action: B8DebugLoaderDeferredAction::ResolvePublicRebaseBindImports,
-            },
-            import_boundary: B8DebugImportBoundaryReport::from_probe_and_decode_report(
-                input,
-                input_probe,
-                decode_report,
-                code,
-                entry_input.program_image_metadata(),
-            ),
-            entry_source_for_this_bundle: B8DebugEntrySource::PublicLcMainEntryoff,
-            next_entry_source: B8DebugLoaderNextEntrySource::FirstUnsupportedBoundary,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-enum B8DebugLoaderInputMetadata {
-    PublicMachOProbe,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-struct B8DebugLoaderImageMappingReport {
-    status: B8DebugStageStatus,
-    segment_source: B8DebugLoaderSegmentSource,
-    address_space: B8DebugLoaderAddressSpace,
-    code_segment_vmaddr: u64,
-    code_segment_byte_len: usize,
-    entry_pc: u64,
-    mapped_bytes_source: B8DebugLoaderMappedBytesSource,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-enum B8DebugLoaderSegmentSource {
-    LcSegment64FileRange,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-enum B8DebugLoaderAddressSpace {
-    MachOVirtualAddress,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-enum B8DebugLoaderMappedBytesSource {
-    ProgramImageMetadata,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-struct B8DebugLoaderDeferredStepReport {
-    status: B8DebugStageStatus,
-    reason: &'static str,
-    next_action: B8DebugLoaderDeferredAction,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-enum B8DebugLoaderDeferredAction {
-    ResolvePublicRebaseBindImports,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -7272,12 +7172,6 @@ enum B8DebugImportBoundaryNextAction {
     DecodePublicDyldBindOpcodes,
     InspectUnsupportedLoaderMetadata,
     InspectNextDebugBundleBlocker,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-enum B8DebugLoaderNextEntrySource {
-    FirstUnsupportedBoundary,
 }
 
 #[derive(Debug)]
