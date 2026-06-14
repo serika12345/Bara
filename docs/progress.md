@@ -14,27 +14,26 @@
 
 開始時に読むもの:
 
-1. [TODO.md](../TODO.md) の `B8-ARCH1 Post-HWGUI Responsibility Split Audit` と
-   `B8-ARCH1a ISA Semantic Coverage Plan`
+1. [TODO.md](../TODO.md) の `B8-ARCH1 Post-HWGUI Responsibility Split Audit`、
+   `B8-ARCH1a ISA Semantic Coverage Plan`、`B8-ARCH2a B8 Debug Bundle Report DTO Module Split`
 2. [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) の `R1` / `R1a` と
    `Instruction Coverage Strategy`
-3. [design-todo.md](design-todo.md) の `D4a: x86_64 ISA semantic coverage strategy`
+3. [design-todo.md](design-todo.md) の `D1: CLI と command 境界` にある
+   B8-ARCH1 responsibility split audit と、`D4a: x86_64 ISA semantic coverage strategy`
 4. この `docs/progress.md` の現在の作業スナップショット
 
-merge 後の最初の作業:
+B8-ARCH1 review / merge 後の最初の作業:
 
-- `main` を最新化したうえで、`task/b8-arch1-responsibility-split-audit` のような
-  dedicated branch を作る。
-- まず B8-ARCH1 を具体的な `PR Gate` に落とす。実装や大きな file move から始めない。
-- `crates/btbc-cli/src/b8_debug_bundle.rs`、`crates/btbc-cli/src/main.rs`、
-  `crates/bara-oracle/src/binary_format/` に残る B8-specific logic を棚卸しし、
-  loader image model、runtime modeling、helper bridge、report DTO、
-  fixture / oracle I/O、CLI boundary に分類する。
-- B8-ARCH1a は同じ design/audit phase で進めてよいが、依存追加はしない。
+- `main` を最新化したうえで、`task/b8-arch1a-isa-semantic-coverage-plan` の dedicated
+  branch を作る。
+- B8-ARCH1a は docs-only plan とし、依存追加はしない。
   Intel XED / iced-x86 / Zydis などは候補分類までに留め、採用する場合は別 PR で
   supply-chain gate を通す。
+- B8-ARCH1a merge 後、最初の behavior-preserving code split は
+  `task/b8-arch2a-debug-report-dto-module-split` で B8 debug bundle report DTO module split
+  から始める。
 
-merge 後にすぐ始めないもの:
+B8-ARCH1 review / merge 後にすぐ始めないもの:
 
 - B8-OSS0 source-built OSS GUI app automation
 - B8-ARCH2 `GuestImage` extraction の実装
@@ -52,7 +51,7 @@ merge 後にすぐ始めないもの:
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-13 21:55 JST
+最終更新: 2026-06-14 10:15 JST
 
 状態:
 
@@ -248,14 +247,15 @@ merge 後にすぐ始めないもの:
   `next_action=review_b8_hello_world_gui_completion` に進む。
   arbitrary dynamic library data symbol read、return-to continuation の一般実行、
   arbitrary call-rel32 execution、translation cache、fallback JIT/interpreter はまだ行わない。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-HWGUI Self-Authored Hello
-  World GUI Completion と B8-ARCH0 Post-HWGUI Runtime Architecture Record を
-  `task/b8-hello-world-gui-complete` 上で完了した。B8-HWGUI は automated expected/actual、
-  real-entry modeled completion、manual visible mode の launch report 保存まで完了し、
-  draft PR https://github.com/serika12345/Bara/pull/49 を開いて review gate で停止中。
-  B8-ARCH0 では、B8-HWGUI 後の主経路をユーザー visible な converted app 出力ではなく、
-  internal translation artifact / runtime cache / dispatcher / OS personality として
-  [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) に固定した。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-ARCH1 Post-HWGUI
+  Responsibility Split Audit を `task/b8-arch1-responsibility-split-audit` 上で
+  docs-only gate として進めた。B8-HWGUI / B8-ARCH0 は PR #49 で merge 済みであり、
+  B8-ARCH1 では code refactor に入らず、`crates/btbc-cli/src/b8_debug_bundle.rs`、
+  `crates/btbc-cli/src/main.rs`、`crates/bara-oracle/src/binary_format/` に残る
+  B8-specific logic を report DTO、bundle I/O、real-entry attempt、loader/import
+  projection、modeled continuation state、Objective-C/AppKit helper process、
+  fixture/oracle I/O、CLI boundary へ分類した。次の unfinished PR Gate は
+  B8-ARCH1a ISA Semantic Coverage Plan である。
 - active_design_focus: Bara の主対象は同 OS / 異アーキテクチャ実行である。
   `macOS x86_64 -> macOS arm64` を最初の concrete target とし、将来
   `Linux x86_64 -> Linux arm64` と `Windows x64 -> Wine on arm64` を OS personality として
@@ -271,12 +271,10 @@ merge 後にすぐ始めないもの:
   public docs とし、Intel XED、iced-x86、Zydis、Capstone、Remill / McSema、FEX、
   Box64、DynamoRIO などの permissive candidate / prior art は dependency candidate と
   research reference に分けて扱う。
-- active_branch: `task/b8-hello-world-gui-complete`。branch base は `2258806`
-  (`docs: define b8 hello world gui completion target`)。latest completed implementation commit is
-  `32c8afb` (`feat: complete b8 modeled gui continuation`)。latest completed documentation commit
-  before this handoff update is `7bde631` (`docs: record isa coverage references`)。
-  この snapshot は B8-HWGUI / B8-ARCH0 completed state として更新されており、draft
-  PR #49 の merge review までは B8-OSS0 や B8-ARCH1 implementation に進まない。
+- active_branch: `task/b8-arch1-responsibility-split-audit`。branch base は `a996827`
+  (`Merge pull request #49 from serika12345:task/b8-hello-world-gui-complete`)。
+  この branch は B8-ARCH1 docs-only audit 用であり、code refactor、large file move、
+  B8-OSS0、B8-ARCH2 implementation には進まない。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
   B8-G3l / B8-G4 / B8-G4a / B8-G4b / B8-G4c / B8-G5 / B8-G5a /
@@ -285,7 +283,7 @@ merge 後にすぐ始めないもの:
   B8-G6n / B8-G6o / B8-G6p / B8-G6q / B8-G6r / B8-G6s / B8-G6t / B8-G6u /
   B8-G6v / B8-G6w / B8-G6x / B8-G6y / B8-G6z / B8-G6aa / B8-G6ab /
   B8-G6ac / B8-G6ad / B8-G6ae / B8-G6af / B8-HWGUI / B8-ARCH0 /
-  B8-ARCH1 / B8-ARCH1a / B8-ARCH2 / B8-ARCH3 / B8-ARCH4 / B8-ARCH5 / B8-ARCH6 /
+  B8-ARCH1 / B8-ARCH1a / B8-ARCH2a / B8-ARCH2 / B8-ARCH3 / B8-ARCH4 / B8-ARCH5 / B8-ARCH6 /
   B8-OSS0 / B8-WINE0。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
@@ -506,32 +504,37 @@ merge 後にすぐ始めないもの:
   operand semantics、guest semantic IR、direct lowering、helper/fallback、stable blocker
   に分けて進める方針を追加した。参照資料として Intel SDM などの primary source と、
   Intel XED / iced-x86 / Zydis / Capstone / Remill / McSema / FEX / Box64 / DynamoRIO
-  などの permissive candidate / prior art を分類した。この docs-only 更新はユーザー指示に
-  よりコミットしない。
-- remaining_work: B8-HWGUI / B8-ARCH0 review gate。draft PR #49 の review / merge までは
-  B8-ARCH1 implementation や B8-OSS0 に進まない。general continuation execution、
-  arbitrary Objective-C message send、translation cache、fallback JIT/interpreter、
-  `.app` bundle / resource 一般化、Wine bridge 実装はまだ行わない。
-- next_action: https://github.com/serika12345/Bara/pull/49 を review する。承認後は
-  `/merge-reviewed` で main に取り込む。次の実装は B8-ARCH1 responsibility split audit から
-  開始し、B8-OSS0 は抽象化 milestone の進行状況を見て開始する。
+  などの permissive candidate / prior art を分類した。
+- B8-ARCH1 として、B8-HWGUI 後の responsibility split audit を docs-only gate として
+  実施した。`b8_debug_bundle.rs`、`main.rs`、`bara-oracle/src/binary_format/` に残る
+  B8-specific logic を分類し、最初の code split は B8 debug bundle report DTO module split
+  として B8-ARCH2a に固定した。B8-ARCH1a は ISA semantic coverage plan の docs-only
+  gate として次に進める。
+- remaining_work: B8-ARCH1 review gate。commit / push / draft PR 作成後に停止する。
+  B8-ARCH1a、B8-ARCH2a、B8-OSS0、translation cache、fallback JIT/interpreter、
+  Wine bridge 実装へはこの branch では進まない。
+- next_action: B8-ARCH1 docs-only audit を review する。merge 後は
+  `task/b8-arch1a-isa-semantic-coverage-plan` で B8-ARCH1a に進み、依存採用や
+  ISA implementation は別 gate に分ける。
 - verification:
-  `nix develop -c cargo check -p btbc-cli`、
-  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle_reports_call_r14_as_indirect_call_boundary -- --nocapture`、
-  `nix develop -c cargo run -q -p btbc-cli -- generate-b8-debug-bundle target/b8/b8_gui_hello_world_x86_64 /tmp/bara-b8-g6af-inspect`
-  は通過。format 後に `nix develop -c ./scripts/verify` も通過した。
-  Final review boundary では `target/b8-hwgui-review/expected.json` と
-  `target/b8-hwgui-review/actual.json` の `compare-expected-actual` が `{"issues":[]}` で
-  一致し、debug bundle の modeled completion も確認済み。manual visible は WindowServer で
-  `Bara GUI Hello World` window title / bounds を確認し、
-  `target/b8-hwgui-review/manual-visible.launch-report.json` が `mode=manual_visible`、
-  `status=gui_visible_ready`、`exit_status=0`、`text=hello world` を保存している。
-  B8-ARCH0 は docs-only change として `git diff --check` と
-  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。今回の
-  B8-ARCH0 follow-up docs-only change でも同じ 2 checks が通過した。
+  docs-only change として `git diff --check` と
+  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。code / script /
+  configuration は変更していないため `nix develop -c ./scripts/verify` は省略した。
 
 直近で完了した作業:
 
+- 2026-06-14 10:15 JST: B8-ARCH1 Post-HWGUI Responsibility Split Audit を開始し、
+  concrete PR Gate として完了状態にした。`crates/btbc-cli/src/b8_debug_bundle.rs` は
+  debug bundle file I/O、real-entry attempt、stable report DTO、loader/import projection、
+  modeled continuation state、public Objective-C/AppKit helper process execution を同じ
+  file に持つと分類した。`crates/btbc-cli/src/main.rs` は command dispatch、
+  command implementation、fixture/oracle path construction、CLI behavior tests が
+  同居していると分類した。`crates/bara-oracle/src/binary_format/` は clean-room public
+  Mach-O parser / resolver として維持しつつ、runtime-facing `GuestImage` / `MachOImage`
+  model の入力として後続抽出対象にした。最初の behavior-preserving code split は
+  B8-ARCH2a B8 Debug Bundle Report DTO Module Split とし、次の docs-only gate は
+  B8-ARCH1a ISA Semantic Coverage Plan とした。検証は `git diff --check` と
+  `nix develop -c ./scripts/check-no-invisible-chars` が通過した。
 - 2026-06-13 21:16 JST: B8-ARCH0 Post-HWGUI Runtime Architecture Record を追加した。
   [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) に最終目標、同 OS /
   異アーキテクチャ主軸、internal translation artifact / cache 主経路、layer boundaries、

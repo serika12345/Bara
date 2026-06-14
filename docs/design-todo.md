@@ -20,6 +20,41 @@
 
 - 現在の `btbc-cli/src/main.rs` は肥大化しており、B1/B2 の前に優先して分割する。
 - CLI は今後 AOT / JIT / loader / oracle / artifact packaging を束ねるため、早めに薄くしておく。
+- 2026-06-14 の B8-ARCH1 audit として、B8-HWGUI 完遂後に残った責務集中を
+  behavior を変えずに棚卸しした。`crates/btbc-cli/src/b8_debug_bundle.rs` は
+  8510 行で、debug bundle I/O、real-entry attempt orchestration、report DTO、
+  loader/import projection、modeled continuation state、Objective-C/AppKit helper process
+  execution が同居している。`crates/btbc-cli/src/main.rs` は 4365 行で、
+  command dispatch、command implementation、fixture/oracle path construction、
+  command behavior tests が同居している。
+
+B8-ARCH1 responsibility split audit:
+
+| 現在地 | 主責務 | 問題 | 抽出先候補 | 最初の gate |
+| --- | --- | --- | --- | --- |
+| `btbc-cli/src/b8_debug_bundle.rs` の `B8Debug*Report` 群 | stable JSON report DTO / schema projection | DTO と orchestration が同じ巨大 file にあり、field 変更と execution 変更が混ざる | `btbc-cli/src/b8_debug_bundle/report.rs` | B8-ARCH2a |
+| `generate_b8_debug_bundle` と末尾の read/write helpers | bundle directory layout、JSON/bin/repro file I/O | I/O が decode/lift/report assembly と同じ module にある | `btbc-cli/src/b8_debug_bundle/io.rs` | B8-ARCH2b |
+| `B8RealEntryAttempt` | decode/lift/emit/runtime attempt orchestration | runtime attempt policy と debug report assembly が密結合している | `btbc-cli/src/b8_debug_bundle/attempt.rs`、後続で runtime application service | B8-ARCH2c |
+| `B8DebugLoaderPlanReport` と import/fixup projection | public Mach-O metadata から loader/import/debug report を作る | loader domain と report DTO が混ざり、`bara-oracle` の parser result を CLI で解釈している | `GuestImage` / `MachOImage` domain model | B8-ARCH2 |
+| return-to continuation / epilogue report 群 | B8 fixture の modeled continuation state と blocker classification | runtime dispatcher の前段 model が debug report と一体化している | runtime state / dispatcher planning module | B8-ARCH4 |
+| `run_public_objc_*` と Objective-C source constants | public Objective-C/AppKit helper process build/run | `clang` process execution、temporary file、host API observation が report model と同居している | helper bridge / OS personality service boundary | B8-ARCH5 |
+| `btbc-cli/src/main.rs` の `run_cli` と `run_*` 関数 | command dispatch と command implementation | CLI 境界が fixture/oracle/runtime commands を直接束ね、tests も同じ file にある | command modules + application service boundary | D1 follow-up |
+| `bara-oracle/src/binary_format/` | public Mach-O probing、entry extraction、symbol/fixup resolver | oracle crate に runtime loader model の種が残っている | future loader/image crate or module | B8-ARCH2 |
+
+抽出順:
+
+1. B8-ARCH1a で ISA semantic coverage plan を finish し、code split 前に
+   instruction coverage の責務語彙を固定する。
+2. B8-ARCH2a で B8 debug bundle report DTO を module split する。schema と JSON output は
+   変えない。
+3. B8-ARCH2b で bundle file I/O と repro script generation を I/O boundary へ切り出す。
+4. B8-ARCH2c で real-entry attempt orchestration と report assembly を分ける。
+5. B8-ARCH2 で public Mach-O metadata 由来の `GuestImage` / `MachOImage` domain model を
+   `bara-oracle` から runtime-facing boundary へ移す。
+6. B8-ARCH4 / B8-ARCH5 で continuation state と Objective-C/AppKit helper bridge を
+   dispatcher / OS personality boundary へ移す。
+7. D1 follow-up として `main.rs` の command dispatch、command implementation、tests を
+   分ける。これは behavior-preserving command split とし、feature work と混ぜない。
 
 ## D2: Artifact domain model
 
