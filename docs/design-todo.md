@@ -103,6 +103,20 @@ B8-ARCH2d result:
 - import/fixup projection、Objective-C/AppKit helper process execution、modeled continuation
   state、runtime dispatcher、`GuestImage` / `MachOImage` 本体抽出は同じ PR では動かさない。
 
+B8-ARCH2e result:
+
+- 2026-06-14 に `crates/btbc-cli/src/b8_debug_bundle/import_boundary.rs` を追加し、
+  `B8DebugImportBoundaryReport`、public import metadata report、dyld info / dylib /
+  linkedit projection DTO、import boundary resolution / next action enum を
+  `b8_debug_bundle.rs` から分けた。
+- `loader.rs` は import boundary projection module を呼び、`helper_boundary_request()` で
+  existing helper boundary request を launch report へ接続する形にした。
+- `loader.plan.json` import boundary field 名、JSON output、helper boundary request の
+  launch report 接続は変えない。
+- helper request / marshaling、Objective-C/AppKit helper process execution、modeled
+  continuation state、runtime dispatcher、`GuestImage` / `MachOImage` 本体抽出は同じ PR では
+  動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。

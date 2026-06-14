@@ -2649,6 +2649,55 @@ review gate:
 
 - loader plan shell split を commit / push / draft PR 作成で停止する。
 
+#### PR Gate: B8-ARCH2e B8 Debug Bundle Import Boundary Projection Split
+
+branch: `task/b8-arch2e-debug-import-boundary-projection-split`
+
+B8-ARCH2d が review / merge 済みになるまで開始しない。B8-ARCH2 Guest Image Model
+Extraction の preparatory slice として、loader plan shell の次に import boundary projection
+と public import metadata report を分ける。
+
+完了条件:
+
+- [x] `crates/btbc-cli/src/b8_debug_bundle.rs` 内の `B8DebugImportBoundaryReport` と
+  public import metadata projection DTO を
+  `crates/btbc-cli/src/b8_debug_bundle/import_boundary.rs` へ分ける。
+- [x] `loader.plan.json` の import boundary schema 名、field 名、JSON output、
+  helper boundary request の launch report 接続を維持する。
+- [x] helper request / marshaling、Objective-C / AppKit helper process execution、
+  modeled continuation state、runtime dispatcher、`GuestImage` / `MachOImage` domain model
+  本体抽出は移動しない。
+- [x] module split 後も behavior-changing refactor を混ぜず、既存 verification を維持する。
+
+completion evidence:
+
+- `crates/btbc-cli/src/b8_debug_bundle/import_boundary.rs` を追加し、
+  `B8DebugImportBoundaryReport`、public import metadata report、dyld info / dylib /
+  linkedit projection DTO、import boundary resolution / next action enum を移した。
+- `loader.rs` は `B8DebugImportBoundaryReport::from_probe_and_decode_report` を呼び、
+  `helper_boundary_request()` で launch report へ既存 helper boundary request を接続する。
+- helper request / marshaling、Objective-C / AppKit helper process execution、
+  modeled continuation state、runtime dispatcher、`GuestImage` / `MachOImage` 本体抽出は
+  移動していない。
+
+PR に含めない:
+
+- `GuestImage` / `MachOImage` domain model 本体抽出。
+- import/fixup projection の意味変更または schema 変更。
+- helper request / marshaling DTO の module split。
+- Objective-C / AppKit helper bridge 一般化。
+- return-to continuation dispatcher 抽出。
+- translation artifact/cache/dispatcher 実装。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- import boundary projection split を commit / push / draft PR 作成で停止する。
+
 #### Future Target: B8-ARCH2 Guest Image Model Extraction
 
 - [ ] public Mach-O metadata から runtime が使う `GuestImage` / `MachOImage` domain model を
