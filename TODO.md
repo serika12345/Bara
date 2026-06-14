@@ -2482,12 +2482,22 @@ branch: `task/b8-arch2a-debug-report-dto-module-split`
 
 完了条件:
 
-- [ ] B8-ARCH1 audit の抽出順に従い、`crates/btbc-cli/src/b8_debug_bundle.rs` 内の
+- [x] B8-ARCH1 audit の抽出順に従い、`crates/btbc-cli/src/b8_debug_bundle.rs` 内の
   schema-only `B8Debug*Report` DTO を `b8_debug_bundle` 配下の report module へ分ける。
-- [ ] JSON schema 名、field 名、既存 B8-HWGUI debug bundle output を維持する。
-- [ ] helper process execution、bundle file I/O、loader image model、runtime dispatcher は
+- [x] JSON schema 名、field 名、既存 B8-HWGUI debug bundle output を維持する。
+- [x] helper process execution、bundle file I/O、loader image model、runtime dispatcher は
   まだ移動しない。
-- [ ] module split 後も behavior-changing refactor を混ぜず、既存 verification を維持する。
+- [x] module split 後も behavior-changing refactor を混ぜず、既存 verification を維持する。
+
+completion evidence:
+
+- `crates/btbc-cli/src/b8_debug_bundle/report.rs` を追加し、entry bytes、
+  decode instruction、unsupported instruction、artifact、launch、runtime attempt、
+  blocker、stage / source / memory-width report DTO を移した。
+- JSON `schema` 文字列、serde tag / rename、field 名は維持し、親 module 側は既存の
+  orchestration から `report` module の DTO constructor を呼ぶだけにした。
+- helper process execution、bundle file I/O、loader/import projection、modeled continuation、
+  runtime dispatcher 相当の処理は `b8_debug_bundle.rs` に残し、後続 gate に分けた。
 
 PR に含めない:
 

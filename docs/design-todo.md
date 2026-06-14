@@ -56,6 +56,20 @@ B8-ARCH1 responsibility split audit:
 7. D1 follow-up として `main.rs` の command dispatch、command implementation、tests を
    分ける。これは behavior-preserving command split とし、feature work と混ぜない。
 
+B8-ARCH2a result:
+
+- 2026-06-14 に `crates/btbc-cli/src/b8_debug_bundle/report.rs` を追加し、entry
+  bytes、decode instruction、unsupported instruction、artifact、launch、runtime
+  attempt、blocker、stage / source / memory-width report DTO を
+  `b8_debug_bundle.rs` から分けた。
+- JSON schema 名、serde tag / rename、field 名は変えない。親 module は existing
+  orchestration、loader/import projection、helper process execution、bundle file I/O、
+  modeled continuation state を保持し、report DTO constructor だけを `report` module
+  から使う。
+- `B8DebugLoaderPlanReport` と import/fixup projection、Objective-C/AppKit helper
+  bridge、return-to continuation report 群は、それぞれ B8-ARCH2 / B8-ARCH4 /
+  B8-ARCH5 の責務境界が決まるまで同じ PR では動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。
