@@ -92,6 +92,17 @@ B8-ARCH2c result:
 - bundle file I/O、report DTO、loader/import projection、Objective-C/AppKit helper
   process execution、runtime dispatcher は同じ PR では動かさない。
 
+B8-ARCH2d result:
+
+- 2026-06-14 に `crates/btbc-cli/src/b8_debug_bundle/loader.rs` を追加し、
+  `B8DebugLoaderPlanReport`、direct loader plan metadata DTO、loader deferred step DTO を
+  `b8_debug_bundle.rs` から分けた。
+- `generate_b8_debug_bundle` は loader plan report を作り、`helper_boundary_request()`
+  で existing helper boundary request を launch report へ接続する形にした。
+- `loader.plan.json` schema 名、field 名、JSON output は変えない。
+- import/fixup projection、Objective-C/AppKit helper process execution、modeled continuation
+  state、runtime dispatcher、`GuestImage` / `MachOImage` 本体抽出は同じ PR では動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。
