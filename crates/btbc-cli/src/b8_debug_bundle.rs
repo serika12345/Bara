@@ -38,7 +38,7 @@ use self::io::{
     create_dir, read_binary_file, write_binary_file, write_json_file, write_text_file,
     B8DebugBundleOutputPaths, B8DebugReproScript,
 };
-use self::loader::B8DebugLoaderPlanReport;
+use self::loader::{B8DebugLoaderPlanError, B8DebugLoaderPlanReport};
 use self::report::{
     B8DebugDecodeReport, B8DebugDecodedInstructionKindReport, B8DebugDecodedInstructionReport,
     B8DebugEntryBytesReport, B8DebugMemoryReadWidthReport, B8DebugProcessedPcRange,
@@ -89,7 +89,8 @@ pub(crate) fn generate_b8_debug_bundle(
         &entry_input,
         &input_probe,
         &attempt.decode_report,
-    );
+    )
+    .map_err(B8DebugBundleError::Loader)?;
     let launch_report = attempt
         .launch_report
         .with_helper_boundary_request(loader_plan.helper_boundary_request());
@@ -6249,6 +6250,7 @@ pub(crate) enum B8DebugBundleError {
     },
     Probe(BinaryFormatProbeError),
     Entry(MachOEntryFunctionTestCaseError),
+    Loader(B8DebugLoaderPlanError),
     B8CaseId(X8664MachOFixtureError),
     Json(JsonError),
 }
@@ -6281,6 +6283,7 @@ impl fmt::Display for B8DebugBundleError {
             Self::Entry(error) => {
                 write!(formatter, "B8 debug entry extraction failed: {error:?}")
             }
+            Self::Loader(error) => write!(formatter, "B8 debug loader plan failed: {error:?}"),
             Self::B8CaseId(error) => write!(formatter, "B8 debug case id error: {error}"),
             Self::Json(error) => write!(formatter, "B8 debug JSON error: {error}"),
         }
