@@ -3,7 +3,7 @@ use bara_oracle::MachOEntryFunctionInput;
 use bara_runtime::{
     GuestImage, GuestImageAddressSpace, GuestImageEntryPoint, GuestImageError,
     GuestImageMappedBytesSource, GuestImageMetadata, GuestImageSegment, GuestImageSegmentKind,
-    GuestImageSegmentSource,
+    GuestImageSegmentSource, MachOImage,
 };
 use serde::Serialize;
 
@@ -24,8 +24,8 @@ impl B8DebugGuestImageMappingReport {
     pub(super) fn from_entry_input(
         entry_input: &MachOEntryFunctionInput,
     ) -> Result<Self, B8DebugGuestImageMappingError> {
-        let guest_image = guest_image_from_entry_input(entry_input)?;
-        Self::from_guest_image(&guest_image)
+        let mach_o_image = mach_o_image_from_entry_input(entry_input)?;
+        Self::from_guest_image(mach_o_image.guest_image())
     }
 
     fn from_guest_image(guest_image: &GuestImage) -> Result<Self, B8DebugGuestImageMappingError> {
@@ -49,9 +49,9 @@ impl B8DebugGuestImageMappingReport {
     }
 }
 
-fn guest_image_from_entry_input(
+fn mach_o_image_from_entry_input(
     entry_input: &MachOEntryFunctionInput,
-) -> Result<GuestImage, B8DebugGuestImageMappingError> {
+) -> Result<MachOImage, B8DebugGuestImageMappingError> {
     let code = entry_input.executable_image().code_segment().x86_bytes();
     let code_len = u64::try_from(code.bytes().len())
         .map_err(|_| B8DebugGuestImageMappingError::AddressOverflow)?;
@@ -67,7 +67,7 @@ fn guest_image_from_entry_input(
         GuestImageAddressSpace::MachOVirtualAddress,
     );
 
-    GuestImage::mach_o_executable(
+    MachOImage::executable(
         GuestImageEntryPoint::new(entry_input.executable_image().entry().offset()),
         code_segment,
         GuestImageMetadata::from_program_image_metadata(

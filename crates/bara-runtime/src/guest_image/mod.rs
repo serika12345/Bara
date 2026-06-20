@@ -102,6 +102,39 @@ pub enum GuestImageFormat {
     MachO,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MachOImage {
+    guest_image: GuestImage,
+}
+
+impl MachOImage {
+    pub fn executable(
+        entry_point: GuestImageEntryPoint,
+        code_segment: GuestImageSegment,
+        metadata: GuestImageMetadata,
+    ) -> Result<Self, GuestImageError> {
+        Ok(Self {
+            guest_image: GuestImage::mach_o_executable(entry_point, code_segment, metadata)?,
+        })
+    }
+
+    pub const fn guest_image(&self) -> &GuestImage {
+        &self.guest_image
+    }
+
+    pub const fn entry_point(&self) -> GuestImageEntryPoint {
+        self.guest_image.entry_point()
+    }
+
+    pub fn code_segment(&self) -> Option<GuestImageSegment> {
+        self.guest_image.code_segment()
+    }
+
+    pub const fn metadata(&self) -> &GuestImageMetadata {
+        self.guest_image.metadata()
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct GuestImageEntryPoint {
     address: X86Va,
@@ -302,8 +335,8 @@ pub enum GuestImageError {
 mod tests {
     use super::{
         GuestImage, GuestImageAddressSpace, GuestImageEntryPoint, GuestImageError,
-        GuestImageMappedBytesSource, GuestImageMetadata, GuestImageSegment, GuestImageSegmentKind,
-        GuestImageSegmentSource, GuestImageSegments,
+        GuestImageFormat, GuestImageMappedBytesSource, GuestImageMetadata, GuestImageSegment,
+        GuestImageSegmentKind, GuestImageSegmentSource, GuestImageSegments, MachOImage,
     };
     use bara_ir::{
         ExternalSymbolId, ExternalSymbolImport, ProgramImageImport, ProgramImageImports,
@@ -438,6 +471,22 @@ mod tests {
             image.unwind().entries()[0].range(),
             image_range(0x1_0000_0000, 0x1_0000_0040)
         );
+    }
+
+    #[test]
+    fn mach_o_image_wraps_runtime_guest_image_shell() {
+        let image = MachOImage::executable(
+            GuestImageEntryPoint::new(X86Va::new(0x1_0000_0010)),
+            code_segment(),
+            metadata(),
+        )
+        .expect("entry is inside code segment");
+
+        assert_eq!(image.guest_image().format(), GuestImageFormat::MachO);
+        assert_eq!(image.entry_point().address(), X86Va::new(0x1_0000_0010));
+        assert_eq!(image.code_segment(), Some(code_segment()));
+        assert_eq!(image.metadata(), &metadata());
+        assert_eq!(image.guest_image().metadata(), &metadata());
     }
 
     #[test]
