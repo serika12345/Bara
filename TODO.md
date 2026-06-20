@@ -2850,6 +2850,53 @@ review gate:
 
 - runtime `GuestImage` domain shell 接続を commit / push / draft PR 作成で停止する。
 
+#### PR Gate: B8-ARCH2i Runtime GuestImage Mapped Bytes Shell
+
+branch: `task/b8-arch2i-guest-image-mapped-bytes-shell`
+
+B8-ARCH2h が review / merge 済みになるまで開始しない。B8-ARCH2 Guest Image Model
+Extraction の次 slice として、runtime-facing `GuestImage` が mapped bytes domain object を
+保持するようにする。B8 debug bundle は既存 `ProgramImageMetadata.mapped_bytes` を
+`GuestImage` へ渡し、既存 debug bundle JSON を維持する。
+
+完了条件:
+
+- [x] `bara-runtime::GuestImage` が mapped bytes source だけでなく
+  `ProgramImageMappedBytes` を保持し、runtime-facing image shell から read-only に参照できる。
+- [x] B8 debug bundle の `GuestImage` projection は
+  `MachOEntryFunctionInput::program_image_metadata().mapped_bytes()` を runtime shell へ渡す。
+- [x] `loader.plan.json` の `image_mapping` field 名、nested field 名、serde 値、JSON output を
+  維持する。
+- [x] imports/fixups/symbol identity、`MachOImage` 本体、`bara-oracle` からの loader domain
+  抽出、helper bridge、runtime dispatcher は移動しない。
+
+completion evidence:
+
+- `GuestImage` に `ProgramImageMappedBytes` field と accessor を追加した。
+- `GuestImage::mach_o_executable` は B8 由来の mapped bytes を受け取り、
+  runtime-facing image shell に保持する。
+- B8 debug bundle は existing `ProgramImageMetadata.mapped_bytes()` を clone して
+  `GuestImage` へ渡し、existing `B8DebugGuestImageMappingReport` output は変えない。
+
+PR に含めない:
+
+- imports/fixups/symbol identity の runtime domain 化。
+- `MachOImage` domain model 本体抽出。
+- import/fixup projection の意味変更または schema 変更。
+- helper boundary / Objective-C / AppKit helper bridge 一般化。
+- return-to continuation dispatcher 抽出。
+- translation artifact/cache/dispatcher 実装。
+
+検証:
+
+- `nix develop -c cargo test -p bara-runtime guest_image -- --nocapture`
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- runtime `GuestImage` mapped bytes shell 接続を commit / push / draft PR 作成で停止する。
+
 #### Future Target: B8-ARCH2 Guest Image Model Extraction
 
 - [ ] public Mach-O metadata から runtime が使う `GuestImage` / `MachOImage` domain model を

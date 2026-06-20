@@ -70,6 +70,7 @@ fn guest_image_from_entry_input(
         GuestImageEntryPoint::new(entry_input.executable_image().entry().offset()),
         code_segment,
         GuestImageMappedBytesSource::ProgramImageMetadata,
+        entry_input.program_image_metadata().mapped_bytes().clone(),
     )
     .map_err(B8DebugGuestImageMappingError::GuestImage)
 }

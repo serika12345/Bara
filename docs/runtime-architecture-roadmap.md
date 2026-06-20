@@ -505,6 +505,9 @@ Mach-O parsing / probing から runtime が使える `GuestImage` / `MachOImage`
 - B8-ARCH2h で runtime-facing `GuestImage` shell を追加した。現時点では entry point、
   code segment range、segment source、address space、mapped bytes source だけを扱い、
   `MachOImage` 本体、imports/fixups/symbol identity は未抽出である。
+- B8-ARCH2i で `GuestImage` が `ProgramImageMappedBytes` を保持するようにした。
+  mapped bytes はまだ `bara-oracle` の public Mach-O materialization 由来であり、
+  imports/fixups/symbol identity と `MachOImage` 本体は未抽出である。
 
 ### R3: Translation Artifact And Debug Export
 

@@ -23,6 +23,7 @@
    `B8-ARCH2f B8 Debug Bundle Helper Boundary Marshaling Split`、
    `B8-ARCH2g B8 Debug Bundle Guest Image Mapping Shell Split`、
    `B8-ARCH2h Runtime GuestImage Domain Shell`、
+   `B8-ARCH2i Runtime GuestImage Mapped Bytes Shell`、
    `B8-ARCH2 Guest Image Model Extraction`
 2. [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) の `R1` / `R1a` と
    `Instruction Coverage Strategy`
@@ -30,7 +31,7 @@
    B8-ARCH1 responsibility split audit と、`D4a: x86_64 ISA semantic coverage strategy`
 4. この `docs/progress.md` の現在の作業スナップショット
 
-B8-ARCH2h review / merge 後の次候補:
+B8-ARCH2i review / merge 後の次候補:
 
 - `main` を最新化したうえで、TODO-backed PR Gate を追加または選び、dedicated branch を作る。
 - 候補は B8-ARCH2 Guest Image Model Extraction の次の小さい slice、または helper process /
@@ -39,12 +40,13 @@ B8-ARCH2h review / merge 後の次候補:
   real-entry attempt orchestration split、B8-ARCH2d では loader plan shell split、
   B8-ARCH2e では import boundary projection split、B8-ARCH2f では helper boundary
   marshaling split、B8-ARCH2g では guest image mapping shell split、B8-ARCH2h では
-  runtime `GuestImage` domain shell 接続だけを完了するため、JSON schema 名、field 名、
-  既存 B8-HWGUI debug bundle output を維持したまま後続境界を切る。
+  runtime `GuestImage` domain shell 接続、B8-ARCH2i では mapped bytes 接続だけを
+  完了するため、JSON schema 名、field 名、既存 B8-HWGUI debug bundle output を
+  維持したまま後続境界を切る。
 - helper process execution、loader image model、runtime dispatcher、decoder dependency 採用は、
   対応する TODO / design TODO が具体化されるまで混ぜない。
 
-B8-ARCH2h review / merge 後にすぐ始めないもの:
+B8-ARCH2i review / merge 後にすぐ始めないもの:
 
 - B8-OSS0 source-built OSS GUI app automation
 - B8-ARCH2 `MachOImage` 本体、imports/fixups/symbol identity の runtime domain 抽出
@@ -53,11 +55,12 @@ B8-ARCH2h review / merge 後にすぐ始めないもの:
 - B8-HWGUI fixture 専用 path のさらなる機能追加
 - decoder dependency 採用、ISA implementation / lowering 追加、supply-chain lockfile 変更
 
-B8-ARCH2h review package で示すべきもの:
+B8-ARCH2i review package で示すべきもの:
 
-- `bara-runtime/src/guest_image/mod.rs` に追加した runtime-facing `GuestImage` shell の範囲
-- B8 debug bundle の `image_mapping` report が `GuestImage::mach_o_executable` から
-  existing JSON DTO を作るようになったこと
+- `bara-runtime/src/guest_image/mod.rs` の `GuestImage` が `ProgramImageMappedBytes` を
+  保持する範囲
+- B8 debug bundle が existing `ProgramImageMetadata.mapped_bytes()` を
+  `GuestImage::mach_o_executable` へ渡すようになったこと
 - `loader.plan.json` の `image_mapping` field 名、nested field 名、serde 値、JSON output を
   維持したこと
 - `MachOImage` 本体、import/fixup projection、helper boundary、helper process execution、
@@ -65,14 +68,23 @@ B8-ARCH2h review package で示すべきもの:
 - `nix develop -c cargo test -p bara-runtime guest_image -- --nocapture`
 - `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
 - `nix develop -c ./scripts/verify`
-- `nix develop -c ./scripts/verify-supply-chain`
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-20 15:55 JST
+最終更新: 2026-06-20 22:02 JST
 
 状態:
 
+- active_work: completed。B8-ARCH2i Runtime GuestImage Mapped Bytes Shell を
+  `task/b8-arch2i-guest-image-mapped-bytes-shell` で実施した。`bara-runtime::GuestImage` は
+  `ProgramImageMappedBytes` を保持し、B8 debug bundle は
+  `MachOEntryFunctionInput::program_image_metadata().mapped_bytes()` を
+  `GuestImage::mach_o_executable` へ渡す。`loader.plan.json` の image mapping JSON は
+  維持。`MachOImage` 本体、imports/fixups/symbol identity、helper bridge、
+  runtime dispatcher は未移動。依存・lockfile・toolchain 変更はない。verification は
+  `nix develop -c cargo test -p bara-runtime guest_image -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
+  `nix develop -c ./scripts/verify`。
 - active_work: completed。B8-ARCH2h Runtime GuestImage Domain Shell を
   `task/b8-arch2h-guest-image-domain-shell` で実施した。`bara-runtime::guest_image` に
   parser 非依存の `GuestImage` shell を追加し、B8 debug bundle の `image_mapping`
