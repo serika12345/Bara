@@ -508,6 +508,9 @@ Mach-O parsing / probing から runtime が使える `GuestImage` / `MachOImage`
 - B8-ARCH2i で `GuestImage` が `ProgramImageMappedBytes` を保持するようにした。
   mapped bytes はまだ `bara-oracle` の public Mach-O materialization 由来であり、
   imports/fixups/symbol identity と `MachOImage` 本体は未抽出である。
+- B8-ARCH2j で `GuestImage` が `ProgramImageImports` を保持するようにした。
+  imports collection はまだ `ProgramImageMetadata` 由来であり、fixups/symbol identity と
+  `MachOImage` 本体は未抽出である。
 
 ### R3: Translation Artifact And Debug Export
 
