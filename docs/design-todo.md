@@ -177,6 +177,18 @@ B8-ARCH2j result:
   抽出、Objective-C/AppKit helper process execution、modeled continuation state、
   runtime dispatcher は同じ PR では動かさない。
 
+B8-ARCH2k result:
+
+- 2026-06-20 に runtime-facing `GuestImage` shell が `ProgramImageRelocations` を
+  保持するようにした。relocations collection は引き続き `ProgramImageMetadata` 由来だが、
+  runtime-facing image shell から read-only に参照できる。
+- B8 debug bundle は `MachOEntryFunctionInput::program_image_metadata().relocations()` を
+  `GuestImage::mach_o_executable` へ渡す。`loader.plan.json` の `image_mapping` field 名、
+  nested field 名、serde 値、JSON output は変えない。
+- symbol identity、`MachOImage` 本体、`bara-oracle` からの loader domain 抽出、
+  Objective-C/AppKit helper process execution、modeled continuation state、runtime
+  dispatcher は同じ PR では動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。
