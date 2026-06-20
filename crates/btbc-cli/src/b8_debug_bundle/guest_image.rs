@@ -2,7 +2,8 @@ use bara_ir::{ProgramImageMetadataError, ProgramImageRange};
 use bara_oracle::MachOEntryFunctionInput;
 use bara_runtime::{
     GuestImage, GuestImageAddressSpace, GuestImageEntryPoint, GuestImageError,
-    GuestImageMappedBytesSource, GuestImageSegment, GuestImageSegmentKind, GuestImageSegmentSource,
+    GuestImageMappedBytesSource, GuestImageMetadata, GuestImageSegment, GuestImageSegmentKind,
+    GuestImageSegmentSource,
 };
 use serde::Serialize;
 
@@ -69,10 +70,10 @@ fn guest_image_from_entry_input(
     GuestImage::mach_o_executable(
         GuestImageEntryPoint::new(entry_input.executable_image().entry().offset()),
         code_segment,
-        GuestImageMappedBytesSource::ProgramImageMetadata,
-        entry_input.program_image_metadata().mapped_bytes().clone(),
-        entry_input.program_image_metadata().imports().clone(),
-        entry_input.program_image_metadata().relocations().clone(),
+        GuestImageMetadata::from_program_image_metadata(
+            GuestImageMappedBytesSource::ProgramImageMetadata,
+            entry_input.program_image_metadata(),
+        ),
     )
     .map_err(B8DebugGuestImageMappingError::GuestImage)
 }
