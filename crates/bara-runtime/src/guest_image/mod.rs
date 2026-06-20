@@ -1,4 +1,6 @@
-use bara_ir::{ProgramImageImports, ProgramImageMappedBytes, ProgramImageRange, X86Va};
+use bara_ir::{
+    ProgramImageImports, ProgramImageMappedBytes, ProgramImageRange, ProgramImageRelocations, X86Va,
+};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GuestImage {
@@ -8,6 +10,7 @@ pub struct GuestImage {
     mapped_bytes_source: GuestImageMappedBytesSource,
     mapped_bytes: ProgramImageMappedBytes,
     imports: ProgramImageImports,
+    relocations: ProgramImageRelocations,
 }
 
 impl GuestImage {
@@ -17,6 +20,7 @@ impl GuestImage {
         mapped_bytes_source: GuestImageMappedBytesSource,
         mapped_bytes: ProgramImageMappedBytes,
         imports: ProgramImageImports,
+        relocations: ProgramImageRelocations,
     ) -> Result<Self, GuestImageError> {
         Self::new(
             GuestImageFormat::MachO,
@@ -25,6 +29,7 @@ impl GuestImage {
             mapped_bytes_source,
             mapped_bytes,
             imports,
+            relocations,
         )
     }
 
@@ -35,6 +40,7 @@ impl GuestImage {
         mapped_bytes_source: GuestImageMappedBytesSource,
         mapped_bytes: ProgramImageMappedBytes,
         imports: ProgramImageImports,
+        relocations: ProgramImageRelocations,
     ) -> Result<Self, GuestImageError> {
         if segments.code_segment().is_none() {
             return Err(GuestImageError::MissingCodeSegment);
@@ -51,6 +57,7 @@ impl GuestImage {
             mapped_bytes_source,
             mapped_bytes,
             imports,
+            relocations,
         })
     }
 
@@ -80,6 +87,10 @@ impl GuestImage {
 
     pub const fn imports(&self) -> &ProgramImageImports {
         &self.imports
+    }
+
+    pub const fn relocations(&self) -> &ProgramImageRelocations {
+        &self.relocations
     }
 }
 
@@ -217,7 +228,8 @@ mod tests {
     };
     use bara_ir::{
         ExternalSymbolId, ExternalSymbolImport, ProgramImageImport, ProgramImageImports,
-        ProgramImageMappedByteSegment, ProgramImageMappedBytes, ProgramImageRange, X86Va,
+        ProgramImageMappedByteSegment, ProgramImageMappedBytes, ProgramImageRange,
+        ProgramImageRelocation, ProgramImageRelocationTarget, ProgramImageRelocations, X86Va,
     };
 
     fn image_range(start: u64, end: u64) -> ProgramImageRange {
@@ -247,6 +259,13 @@ mod tests {
         ProgramImageImports::from_items([ProgramImageImport::new(import)])
     }
 
+    fn relocations() -> ProgramImageRelocations {
+        ProgramImageRelocations::from_items([ProgramImageRelocation::new(
+            X86Va::new(0x1_0000_0020),
+            ProgramImageRelocationTarget::ExternalSymbol(ExternalSymbolId::new(7)),
+        )])
+    }
+
     #[test]
     fn mach_o_guest_image_exposes_runtime_facing_mapping_shell() {
         let image = GuestImage::mach_o_executable(
@@ -255,6 +274,7 @@ mod tests {
             GuestImageMappedBytesSource::ProgramImageMetadata,
             mapped_bytes(),
             imports(),
+            relocations(),
         )
         .expect("entry is inside code segment");
 
@@ -273,6 +293,11 @@ mod tests {
             image.imports().items()[0].import(),
             ExternalSymbolImport::unresolved(ExternalSymbolId::new(7))
         );
+        assert_eq!(image.relocations().items().len(), 1);
+        assert_eq!(
+            image.relocations().items()[0].target(),
+            ProgramImageRelocationTarget::ExternalSymbol(ExternalSymbolId::new(7))
+        );
     }
 
     #[test]
@@ -284,6 +309,7 @@ mod tests {
                 GuestImageMappedBytesSource::ProgramImageMetadata,
                 mapped_bytes(),
                 imports(),
+                relocations(),
             ),
             Err(GuestImageError::EntryOutsideMappedSegments)
         );
@@ -299,6 +325,7 @@ mod tests {
                 GuestImageMappedBytesSource::ProgramImageMetadata,
                 mapped_bytes(),
                 imports(),
+                relocations(),
             ),
             Err(GuestImageError::MissingCodeSegment)
         );

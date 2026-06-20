@@ -511,6 +511,9 @@ Mach-O parsing / probing から runtime が使える `GuestImage` / `MachOImage`
 - B8-ARCH2j で `GuestImage` が `ProgramImageImports` を保持するようにした。
   imports collection はまだ `ProgramImageMetadata` 由来であり、fixups/symbol identity と
   `MachOImage` 本体は未抽出である。
+- B8-ARCH2k で `GuestImage` が `ProgramImageRelocations` を保持するようにした。
+  relocations collection はまだ `ProgramImageMetadata` 由来であり、symbol identity と
+  `MachOImage` 本体は未抽出である。
 
 ### R3: Translation Artifact And Debug Export
 
