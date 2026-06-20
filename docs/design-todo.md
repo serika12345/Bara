@@ -201,6 +201,18 @@ B8-ARCH2l result:
 - `MachOImage` 本体、`bara-oracle` からの loader domain 抽出、Objective-C/AppKit helper
   process execution、modeled continuation state、runtime dispatcher は同じ PR では動かさない。
 
+B8-ARCH2m result:
+
+- 2026-06-20 に runtime-facing `MachOImage` shell を追加し、valid `GuestImage` /
+  `GuestImageMetadata` を Mach-O specific image model から read-only に参照できるようにした。
+- B8 debug bundle は `MachOEntryFunctionInput` から `GuestImageMetadata` と
+  `MachOImage::executable` を作ってから、existing `B8DebugGuestImageMappingReport` へ
+  射影する。`loader.plan.json` の `image_mapping` field 名、nested field 名、serde 値、
+  JSON output は変えない。
+- `bara-oracle` からの loader domain 抽出、import/fixup/symbol projection の意味変更、
+  Objective-C/AppKit helper process execution、modeled continuation state、runtime
+  dispatcher は同じ PR では動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。

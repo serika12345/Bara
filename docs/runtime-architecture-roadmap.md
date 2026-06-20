@@ -517,6 +517,8 @@ Mach-O parsing / probing から runtime が使える `GuestImage` / `MachOImage`
 - B8-ARCH2l で `GuestImageMetadata` aggregate を追加し、`GuestImage` が
   `ProgramImageMetadata` 由来の sections / mapped bytes / symbols / relocations / imports /
   unwind を aggregate 経由で保持するようにした。`MachOImage` 本体は未抽出である。
+- B8-ARCH2m で `MachOImage` shell を追加し、Mach-O specific image model から valid
+  `GuestImage` / `GuestImageMetadata` を read-only に参照できるようにした。
 
 ### R3: Translation Artifact And Debug Export
 
