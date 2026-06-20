@@ -514,6 +514,9 @@ Mach-O parsing / probing から runtime が使える `GuestImage` / `MachOImage`
 - B8-ARCH2k で `GuestImage` が `ProgramImageRelocations` を保持するようにした。
   relocations collection はまだ `ProgramImageMetadata` 由来であり、symbol identity と
   `MachOImage` 本体は未抽出である。
+- B8-ARCH2l で `GuestImageMetadata` aggregate を追加し、`GuestImage` が
+  `ProgramImageMetadata` 由来の sections / mapped bytes / symbols / relocations / imports /
+  unwind を aggregate 経由で保持するようにした。`MachOImage` 本体は未抽出である。
 
 ### R3: Translation Artifact And Debug Export
 

@@ -2991,6 +2991,59 @@ review gate:
 
 - runtime `GuestImage` relocations shell 接続を commit / push / draft PR 作成で停止する。
 
+#### PR Gate: B8-ARCH2l Runtime GuestImage Metadata Collections Shell
+
+branch: `task/b8-arch2l-guest-image-metadata-collections-shell`
+
+B8-ARCH2k が review / merge 済みになるまで開始しない。B8-ARCH2 Guest Image Model
+Extraction の次 slice として、runtime-facing `GuestImage` に
+`ProgramImageMetadata` 由来の collection shell をまとめて接続する。既存 mapped bytes /
+imports / relocations は `GuestImageMetadata` aggregate に寄せ、残りの sections / symbols /
+unwind も runtime-facing image shell から read-only に参照できるようにする。既存 debug
+bundle JSON は維持する。
+
+完了条件:
+
+- [x] `bara-runtime::GuestImage` が `GuestImageMetadata` aggregate を保持し、mapped bytes /
+  imports / relocations / sections / symbols / unwind を read-only に参照できる。
+- [x] B8 debug bundle の `GuestImage` projection は
+  `MachOEntryFunctionInput::program_image_metadata()` から `GuestImageMetadata` を作る。
+- [x] `GuestImage::mach_o_executable` / `GuestImage::new` の引数肥大化を止め、metadata
+  collection 群を個別引数で増やさない。
+- [x] `loader.plan.json` の `image_mapping` field 名、nested field 名、serde 値、JSON output を
+  維持する。
+- [x] `MachOImage` 本体、`bara-oracle` からの loader domain 抽出、helper bridge、
+  runtime dispatcher は移動しない。
+
+completion evidence:
+
+- `GuestImageMetadata` aggregate を追加し、`GuestImage` は metadata collection 群を
+  個別 field ではなく aggregate として保持する。
+- `GuestImageMetadata::from_program_image_metadata` は existing `ProgramImageMetadata` から
+  sections / mapped bytes / symbols / relocations / imports / unwind を clone して
+  runtime-facing image shell に渡す。
+- B8 debug bundle は existing `MachOEntryFunctionInput::program_image_metadata()` を
+  `GuestImageMetadata` へ射影し、existing `B8DebugGuestImageMappingReport` output は
+  変えない。
+
+PR に含めない:
+
+- `MachOImage` domain model 本体抽出。
+- import/fixup/symbol projection の意味変更または schema 変更。
+- helper boundary / Objective-C / AppKit helper bridge 一般化。
+- return-to continuation dispatcher 抽出。
+- translation artifact/cache/dispatcher 実装。
+
+検証:
+
+- `nix develop -c cargo test -p bara-runtime guest_image -- --nocapture`
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- runtime `GuestImage` metadata collections shell 接続を commit / push / draft PR 作成で停止する。
+
 #### Future Target: B8-ARCH2 Guest Image Model Extraction
 
 - [ ] public Mach-O metadata から runtime が使う `GuestImage` / `MachOImage` domain model を
