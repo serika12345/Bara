@@ -1,4 +1,4 @@
-use bara_ir::{ProgramImageRange, X86Va};
+use bara_ir::{ProgramImageMappedBytes, ProgramImageRange, X86Va};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GuestImage {
@@ -6,6 +6,7 @@ pub struct GuestImage {
     entry_point: GuestImageEntryPoint,
     segments: GuestImageSegments,
     mapped_bytes_source: GuestImageMappedBytesSource,
+    mapped_bytes: ProgramImageMappedBytes,
 }
 
 impl GuestImage {
@@ -13,12 +14,14 @@ impl GuestImage {
         entry_point: GuestImageEntryPoint,
         code_segment: GuestImageSegment,
         mapped_bytes_source: GuestImageMappedBytesSource,
+        mapped_bytes: ProgramImageMappedBytes,
     ) -> Result<Self, GuestImageError> {
         Self::new(
             GuestImageFormat::MachO,
             entry_point,
             GuestImageSegments::from_items([code_segment]),
             mapped_bytes_source,
+            mapped_bytes,
         )
     }
 
@@ -27,6 +30,7 @@ impl GuestImage {
         entry_point: GuestImageEntryPoint,
         segments: GuestImageSegments,
         mapped_bytes_source: GuestImageMappedBytesSource,
+        mapped_bytes: ProgramImageMappedBytes,
     ) -> Result<Self, GuestImageError> {
         if segments.code_segment().is_none() {
             return Err(GuestImageError::MissingCodeSegment);
@@ -41,6 +45,7 @@ impl GuestImage {
             entry_point,
             segments,
             mapped_bytes_source,
+            mapped_bytes,
         })
     }
 
@@ -62,6 +67,10 @@ impl GuestImage {
 
     pub const fn mapped_bytes_source(&self) -> GuestImageMappedBytesSource {
         self.mapped_bytes_source
+    }
+
+    pub const fn mapped_bytes(&self) -> &ProgramImageMappedBytes {
+        &self.mapped_bytes
     }
 }
 
@@ -197,7 +206,9 @@ mod tests {
         GuestImageMappedBytesSource, GuestImageSegment, GuestImageSegmentKind,
         GuestImageSegmentSource, GuestImageSegments,
     };
-    use bara_ir::{ProgramImageRange, X86Va};
+    use bara_ir::{
+        ProgramImageMappedByteSegment, ProgramImageMappedBytes, ProgramImageRange, X86Va,
+    };
 
     fn image_range(start: u64, end: u64) -> ProgramImageRange {
         ProgramImageRange::new(X86Va::new(start), X86Va::new(end))
@@ -213,12 +224,21 @@ mod tests {
         )
     }
 
+    fn mapped_bytes() -> ProgramImageMappedBytes {
+        let bytes = vec![42, 0, 0, 0, 0, 0, 0, 0];
+        let segment =
+            ProgramImageMappedByteSegment::new(image_range(0x1_0000_0000, 0x1_0000_0008), bytes)
+                .expect("test mapped byte segment is valid");
+        ProgramImageMappedBytes::from_segments([segment])
+    }
+
     #[test]
     fn mach_o_guest_image_exposes_runtime_facing_mapping_shell() {
         let image = GuestImage::mach_o_executable(
             GuestImageEntryPoint::new(X86Va::new(0x1_0000_0010)),
             code_segment(),
             GuestImageMappedBytesSource::ProgramImageMetadata,
+            mapped_bytes(),
         )
         .expect("entry is inside code segment");
 
@@ -227,6 +247,10 @@ mod tests {
         assert_eq!(
             image.mapped_bytes_source(),
             GuestImageMappedBytesSource::ProgramImageMetadata
+        );
+        assert_eq!(
+            image.mapped_bytes().read_u64_le(X86Va::new(0x1_0000_0000)),
+            Some(42)
         );
     }
 
@@ -237,6 +261,7 @@ mod tests {
                 GuestImageEntryPoint::new(X86Va::new(0x1_0000_1000)),
                 code_segment(),
                 GuestImageMappedBytesSource::ProgramImageMetadata,
+                mapped_bytes(),
             ),
             Err(GuestImageError::EntryOutsideMappedSegments)
         );
@@ -250,6 +275,7 @@ mod tests {
                 GuestImageEntryPoint::new(X86Va::new(0x1_0000_0010)),
                 GuestImageSegments::empty(),
                 GuestImageMappedBytesSource::ProgramImageMetadata,
+                mapped_bytes(),
             ),
             Err(GuestImageError::MissingCodeSegment)
         );
