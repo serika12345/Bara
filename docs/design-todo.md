@@ -129,6 +129,17 @@ B8-ARCH2f result:
 - Objective-C/AppKit helper process execution、modeled continuation state、runtime
   dispatcher、`GuestImage` / `MachOImage` 本体抽出は同じ PR では動かさない。
 
+B8-ARCH2g result:
+
+- 2026-06-14 に `crates/btbc-cli/src/b8_debug_bundle/guest_image.rs` を追加し、
+  loader plan の image mapping summary DTO を `b8_debug_bundle.rs` から分けた。
+- `loader.rs` は `B8DebugGuestImageMappingReport::from_entry_input` を呼ぶ形にし、
+  `loader.plan.json` の `image_mapping` field 名、nested field 名、serde 値、JSON output は
+  変えない。
+- import/fixup projection、helper boundary、Objective-C/AppKit helper process execution、
+  modeled continuation state、runtime dispatcher、`GuestImage` / `MachOImage` 本体抽出は
+  同じ PR では動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。

@@ -21,6 +21,7 @@
    `B8-ARCH2d B8 Debug Bundle Loader Plan Shell Split`、
    `B8-ARCH2e B8 Debug Bundle Import Boundary Projection Split`、
    `B8-ARCH2f B8 Debug Bundle Helper Boundary Marshaling Split`、
+   `B8-ARCH2g B8 Debug Bundle Guest Image Mapping Shell Split`、
    `B8-ARCH2 Guest Image Model Extraction`
 2. [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) の `R1` / `R1a` と
    `Instruction Coverage Strategy`
@@ -28,20 +29,20 @@
    B8-ARCH1 responsibility split audit と、`D4a: x86_64 ISA semantic coverage strategy`
 4. この `docs/progress.md` の現在の作業スナップショット
 
-B8-ARCH2f review / merge 後の次候補:
+B8-ARCH2g review / merge 後の次候補:
 
 - `main` を最新化したうえで、TODO-backed PR Gate を追加または選び、dedicated branch を作る。
-- 候補は B8-ARCH2 Guest Image Model Extraction の小さい slice、または helper process /
+- 候補は B8-ARCH2 Guest Image Model Extraction の次の小さい slice、または helper process /
   Objective-C bridge 境界を `b8_debug_bundle.rs` から分ける preparatory PR Gate である。
 - B8-ARCH2a では report DTO split、B8-ARCH2b では bundle file I/O split、B8-ARCH2c では
   real-entry attempt orchestration split、B8-ARCH2d では loader plan shell split、
   B8-ARCH2e では import boundary projection split、B8-ARCH2f では helper boundary
-  marshaling split だけを完了するため、JSON schema 名、field 名、既存 B8-HWGUI debug
-  bundle output を維持したまま後続境界を切る。
+  marshaling split、B8-ARCH2g では guest image mapping shell split だけを完了するため、
+  JSON schema 名、field 名、既存 B8-HWGUI debug bundle output を維持したまま後続境界を切る。
 - helper process execution、loader image model、runtime dispatcher、decoder dependency 採用は、
   対応する TODO / design TODO が具体化されるまで混ぜない。
 
-B8-ARCH2f review / merge 後にすぐ始めないもの:
+B8-ARCH2g review / merge 後にすぐ始めないもの:
 
 - B8-OSS0 source-built OSS GUI app automation
 - B8-ARCH2 `GuestImage` extraction の実装
@@ -50,19 +51,19 @@ B8-ARCH2f review / merge 後にすぐ始めないもの:
 - B8-HWGUI fixture 専用 path のさらなる機能追加
 - decoder dependency 採用、ISA implementation / lowering 追加、supply-chain lockfile 変更
 
-B8-ARCH2f review package で示すべきもの:
+B8-ARCH2g review package で示すべきもの:
 
-- `b8_debug_bundle/helper_boundary.rs` に移した helper boundary request と import helper
-  marshaling contract shell の範囲
-- `loader.plan.json` と launch report の helper boundary request field 名、schema 名、
-  JSON output を維持したこと
-- helper process execution、modeled continuation、`GuestImage` model 本体をまだ移していないこと
+- `b8_debug_bundle/guest_image.rs` に移した loader plan image mapping summary shell の範囲
+- `loader.plan.json` の `image_mapping` field 名、nested field 名、serde 値、JSON output を
+  維持したこと
+- import/fixup projection、helper boundary、helper process execution、modeled continuation、
+  `GuestImage` model 本体をまだ移していないこと
 - `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
 - `nix develop -c ./scripts/verify`
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-14 13:40 JST
+最終更新: 2026-06-14 14:37 JST
 
 状態:
 
@@ -258,15 +259,15 @@ B8-ARCH2f review package で示すべきもの:
   `next_action=review_b8_hello_world_gui_completion` に進む。
   arbitrary dynamic library data symbol read、return-to continuation の一般実行、
   arbitrary call-rel32 execution、translation cache、fallback JIT/interpreter はまだ行わない。
-- active_milestone: completed。[TODO.md](../TODO.md) の B8-ARCH2f B8 Debug
-  Bundle Helper Boundary Marshaling Split を
-  `task/b8-arch2f-debug-helper-boundary-marshaling-split` 上で進めた。B8-ARCH2e は
-  PR #56 で merge 済みであり、B8-ARCH2f では helper boundary request と import helper
-  marshaling contract の shell を
-  `crates/btbc-cli/src/b8_debug_bundle/helper_boundary.rs` へ分ける。`loader.plan.json` と
-  launch report の helper boundary request schema 名、field 名、JSON output は維持し、
-  helper process execution、modeled continuation、runtime dispatcher、`GuestImage` /
-  `MachOImage` domain model 本体抽出には進まない。
+- active_milestone: completed。[TODO.md](../TODO.md) の B8-ARCH2g B8 Debug
+  Bundle Guest Image Mapping Shell Split を
+  `task/b8-arch2g-debug-guest-image-mapping-shell` 上で進めた。B8-ARCH2f は
+  PR #57 で merge 済みであり、B8-ARCH2g では loader plan shell に残っている image
+  mapping summary DTO を
+  `crates/btbc-cli/src/b8_debug_bundle/guest_image.rs` へ分ける。`loader.plan.json` の
+  `image_mapping` field 名、nested field 名、serde 値、JSON output は維持し、import/fixup
+  projection、helper process execution、modeled continuation、runtime dispatcher、
+  `GuestImage` / `MachOImage` domain model 本体抽出には進まない。
 - active_design_focus: Bara の主対象は同 OS / 異アーキテクチャ実行である。
   `macOS x86_64 -> macOS arm64` を最初の concrete target とし、将来
   `Linux x86_64 -> Linux arm64` と `Windows x64 -> Wine on arm64` を OS personality として
@@ -282,10 +283,10 @@ B8-ARCH2f review package で示すべきもの:
   public docs とし、Intel XED、iced-x86、Zydis、Capstone、Remill / McSema、FEX、
   Box64、DynamoRIO などの permissive candidate / prior art は dependency candidate と
   research reference に分けて扱う。
-- active_branch: `task/b8-arch2f-debug-helper-boundary-marshaling-split`。branch base は
-  `f9263e8`
-  (`Merge pull request #56 from serika12345:task/b8-arch2e-debug-import-boundary-projection-split`)。
-  この branch は B8-ARCH2f helper boundary marshaling split 用であり、GuestImage 本体抽出、
+- active_branch: `task/b8-arch2g-debug-guest-image-mapping-shell`。branch base は
+  `7290fe5`
+  (`Merge pull request #57 from serika12345:task/b8-arch2f-debug-helper-boundary-marshaling-split`)。
+  この branch は B8-ARCH2g guest image mapping shell split 用であり、GuestImage 本体抽出、
   helper bridge 一般化、translation artifact/cache/dispatcher 実装には進まない。
 - related_todo: [TODO.md](../TODO.md) B8-D0 / B8-G2 / B8-G3 / B8-G3b / B8-G3c /
   B8-G3d / B8-G3e / B8-G3f / B8-G3g / B8-G3h / B8-G3i / B8-G3j / B8-G3k /
@@ -295,8 +296,9 @@ B8-ARCH2f review package で示すべきもの:
   B8-G6n / B8-G6o / B8-G6p / B8-G6q / B8-G6r / B8-G6s / B8-G6t / B8-G6u /
   B8-G6v / B8-G6w / B8-G6x / B8-G6y / B8-G6z / B8-G6aa / B8-G6ab /
   B8-G6ac / B8-G6ad / B8-G6ae / B8-G6af / B8-HWGUI / B8-ARCH0 /
-  B8-ARCH1 / B8-ARCH1a / B8-ARCH2a / B8-ARCH2 / B8-ARCH3 / B8-ARCH4 / B8-ARCH5 / B8-ARCH6 /
-  B8-OSS0 / B8-WINE0。
+  B8-ARCH1 / B8-ARCH1a / B8-ARCH2a / B8-ARCH2b / B8-ARCH2c / B8-ARCH2d /
+  B8-ARCH2e / B8-ARCH2f / B8-ARCH2g / B8-ARCH2 / B8-ARCH3 / B8-ARCH4 /
+  B8-ARCH5 / B8-ARCH6 / B8-OSS0 / B8-WINE0。
 - completed_work: B8-G1 として、Rosetta 手動確認済みの
   `target/b8/b8_gui_hello_world_visible_x86_64` を入力に使い、
   translated entry path が `appkit_gui_hello_world` host trap request を発行し、
@@ -559,12 +561,17 @@ B8-ARCH2f review package で示すべきもの:
   `loader.rs`、`import_boundary.rs`、`report.rs` は helper boundary request type を
   `helper_boundary` module から使う形にした。`loader.plan.json` と launch report の helper
   boundary request field 名、schema 名、JSON output は維持した。
-- remaining_work: B8-ARCH2f review gate。commit / push / draft PR 作成後に停止する。
+- B8-ARCH2g として、`B8DebugGuestImageMappingReport` と直接の segment source / address
+  space / mapped bytes source enum を
+  `crates/btbc-cli/src/b8_debug_bundle/guest_image.rs` へ分けた。`loader.rs` は
+  `B8DebugGuestImageMappingReport::from_entry_input` を呼ぶ形にし、`loader.plan.json` の
+  `image_mapping` field 名、nested field 名、serde 値、JSON output は維持した。
+- remaining_work: B8-ARCH2g review gate。commit / push / draft PR 作成後に停止する。
   B8-ARCH2 Guest Image Model Extraction 本体、
   helper bridge 一般化、translation artifact/cache/dispatcher 実装へはこの branch では進まない。
-- next_action: B8-ARCH2f helper boundary marshaling split を review する。merge 後は TODO の
-  次の PR Gate を追加または選び、B8-ARCH2 Guest Image Model Extraction の小さい slice、
-  または helper process / Objective-C bridge 境界分割へ進む。
+- next_action: B8-ARCH2g guest image mapping shell split を review する。merge 後は TODO の
+  次の PR Gate を追加または選び、B8-ARCH2 Guest Image Model Extraction の次の小さい
+  slice、または helper process / Objective-C bridge 境界分割へ進む。
 - verification:
   `nix develop -c cargo check -p btbc-cli` が通過した。
   `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture` が通過した。
@@ -572,6 +579,11 @@ B8-ARCH2f review package で示すべきもの:
 
 直近で完了した作業:
 
+- 2026-06-14 14:37 JST: B8-ARCH2g B8 Debug Bundle Guest Image Mapping Shell Split を
+  code PR Gate として完了状態にした。B8-ARCH2f merge 後の次 slice として、
+  loader plan の image mapping summary shell だけを `guest_image.rs` へ分けた。
+  import/fixup projection、helper process execution、modeled continuation、runtime
+  dispatcher、`GuestImage` / `MachOImage` 本体抽出には進まない。
 - 2026-06-14 13:40 JST: B8-ARCH2f B8 Debug Bundle Helper Boundary Marshaling Split を
   code PR Gate として完了状態にした。B8-ARCH2e merge 後の次 slice として、
   `B8DebugHelperBoundaryRequestReport` と import helper marshaling contract shell を

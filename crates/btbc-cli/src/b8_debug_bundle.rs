@@ -22,6 +22,7 @@ use bara_oracle::{
 use serde::{Deserialize, Serialize};
 
 mod attempt;
+mod guest_image;
 mod helper_boundary;
 mod import_boundary;
 mod io;
