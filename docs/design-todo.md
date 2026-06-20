@@ -140,6 +140,18 @@ B8-ARCH2g result:
   modeled continuation state、runtime dispatcher、`GuestImage` / `MachOImage` 本体抽出は
   同じ PR では動かさない。
 
+B8-ARCH2h result:
+
+- 2026-06-20 に `crates/bara-runtime/src/guest_image/mod.rs` を追加し、
+  parser 非依存の runtime-facing `GuestImage` shell を置いた。
+- B8 debug bundle の image mapping DTO は、`MachOEntryFunctionInput` から直接値を
+  組み立てるだけでなく、`GuestImage::mach_o_executable` へ射影してから existing
+  report DTO へ戻す形にした。`loader.plan.json` の `image_mapping` field 名、
+  nested field 名、serde 値、JSON output は変えない。
+- `MachOImage` 本体、imports/fixups/symbol identity、`bara-oracle` からの loader domain
+  抽出、Objective-C/AppKit helper process execution、modeled continuation state、
+  runtime dispatcher は同じ PR では動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。

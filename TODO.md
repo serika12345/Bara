@@ -2798,6 +2798,58 @@ review gate:
 
 - guest image mapping shell split を commit / push / draft PR 作成で停止する。
 
+#### PR Gate: B8-ARCH2h Runtime GuestImage Domain Shell
+
+branch: `task/b8-arch2h-guest-image-domain-shell`
+
+B8-ARCH2g が review / merge 済みになるまで開始しない。B8-ARCH2 Guest Image Model
+Extraction の最初の実装 slice として、runtime-facing の `GuestImage` domain shell を
+追加し、B8 debug bundle の existing image mapping report をその shell から作る。
+これは `MachOImage` 本体抽出や import/fixup/symbol identity 移動の前段であり、既存
+debug bundle JSON を維持する。
+
+完了条件:
+
+- [x] `crates/bara-runtime/src/guest_image/` に parser 非依存の `GuestImage` shell を追加し、
+  entry point、code segment range、segment source、address space、mapped bytes source を
+  domain type として保持する。
+- [x] B8 debug bundle の `image_mapping` report は `MachOEntryFunctionInput` を直接読むだけでなく、
+  runtime-facing `GuestImage` shell へ射影してから既存 JSON DTO を作る。
+- [x] `loader.plan.json` の `image_mapping` field 名、nested field 名、serde 値、JSON output を
+  維持する。
+- [x] `MachOImage` domain model 本体、imports/fixups/symbol identity の移動、
+  `bara-oracle` からの loader domain 抽出、helper bridge、runtime dispatcher は移動しない。
+
+completion evidence:
+
+- `crates/bara-runtime/src/guest_image/mod.rs` を追加し、`GuestImage`、
+  `GuestImageEntryPoint`、`GuestImageSegment`、`GuestImageSegments`、mapping source enum、
+  validation error を定義した。
+- `crates/btbc-cli/src/b8_debug_bundle/guest_image.rs` は
+  `MachOEntryFunctionInput` から `GuestImage::mach_o_executable` へ射影し、その domain shell から
+  existing `B8DebugGuestImageMappingReport` を作る。
+- `loader.plan.json` の `image_mapping` schema / field / serde 値は変えない。
+
+PR に含めない:
+
+- `MachOImage` domain model 本体抽出。
+- public Mach-O imports / fixups / symbol identity を runtime domain へ移す作業。
+- import/fixup projection の意味変更または schema 変更。
+- helper boundary / Objective-C / AppKit helper bridge 一般化。
+- return-to continuation dispatcher 抽出。
+- translation artifact/cache/dispatcher 実装。
+
+検証:
+
+- `nix develop -c cargo test -p bara-runtime guest_image -- --nocapture`
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+- `nix develop -c ./scripts/verify-supply-chain`
+
+review gate:
+
+- runtime `GuestImage` domain shell 接続を commit / push / draft PR 作成で停止する。
+
 #### Future Target: B8-ARCH2 Guest Image Model Extraction
 
 - [ ] public Mach-O metadata から runtime が使う `GuestImage` / `MachOImage` domain model を
