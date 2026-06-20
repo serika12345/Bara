@@ -3091,6 +3091,56 @@ review gate:
 
 - runtime `MachOImage` domain shell 接続を commit / push / draft PR 作成で停止する。
 
+#### PR Gate: B8-ARCH2n Runtime MachOImage Code Range Constructor
+
+branch: `task/b8-arch2n-mach-o-code-range-constructor`
+
+B8-ARCH2m が review / merge 済みになるまで開始しない。B8-ARCH2 Guest Image Model
+Extraction の次 slice として、Mach-O executable code range から runtime-facing
+`MachOImage` を作る constructor を追加する。B8 debug bundle は existing
+`MachOEntryFunctionInput` から `ProgramImageRange` と `GuestImageMetadata` を作るが、
+Mach-O code segment の source / address-space 決定は runtime `MachOImage` 側へ寄せる。
+existing `loader.plan.json` output は維持する。
+
+完了条件:
+
+- [x] `bara-runtime::MachOImage` に executable code range から `GuestImageSegment` を作る
+  constructor を追加し、Mach-O code segment source / address-space 決定を runtime 側に閉じる。
+- [x] B8 debug bundle の image mapping projection は `GuestImageSegment` を直接作らず、
+  `ProgramImageRange` と `GuestImageMetadata` から `MachOImage` を作ってから existing
+  `B8DebugGuestImageMappingReport` へ射影する。
+- [x] `loader.plan.json` の `image_mapping` field 名、nested field 名、serde 値、JSON output を
+  維持する。
+- [x] `bara-oracle` からの loader domain 抽出、import/fixup/symbol projection の意味変更、
+  helper bridge、runtime dispatcher は移動しない。
+
+completion evidence:
+
+- `bara-runtime::MachOImage::executable_from_code_range` を追加し、Mach-O executable code
+  segment の source / address-space 決定を runtime constructor 側に閉じた。
+- B8 debug bundle は existing `MachOEntryFunctionInput` から `ProgramImageRange` と
+  `GuestImageMetadata` を作り、`MachOImage::executable_from_code_range` を通して existing
+  `B8DebugGuestImageMappingReport::from_guest_image` へ射影する。
+- existing `B8DebugGuestImageMappingReport` DTO と `loader.plan.json` output は変えない。
+
+PR に含めない:
+
+- public Mach-O parser / resolver logic の `bara-oracle` からの移動。
+- import/fixup/symbol projection の意味変更または schema 変更。
+- helper boundary / Objective-C / AppKit helper bridge 一般化。
+- return-to continuation dispatcher 抽出。
+- translation artifact/cache/dispatcher 実装。
+
+検証:
+
+- `nix develop -c cargo test -p bara-runtime guest_image -- --nocapture`
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- runtime `MachOImage` code range constructor 接続を commit / push / draft PR 作成で停止する。
+
 #### Future Target: B8-ARCH2 Guest Image Model Extraction
 
 - [ ] public Mach-O metadata から runtime が使う `GuestImage` / `MachOImage` domain model を

@@ -118,6 +118,18 @@ impl MachOImage {
         })
     }
 
+    pub fn executable_from_code_range(
+        entry_point: GuestImageEntryPoint,
+        code_range: ProgramImageRange,
+        metadata: GuestImageMetadata,
+    ) -> Result<Self, GuestImageError> {
+        Self::executable(
+            entry_point,
+            GuestImageSegment::mach_o_executable_code(code_range),
+            metadata,
+        )
+    }
+
     pub const fn guest_image(&self) -> &GuestImage {
         &self.guest_image
     }
@@ -193,6 +205,15 @@ pub struct GuestImageSegment {
 }
 
 impl GuestImageSegment {
+    pub const fn mach_o_executable_code(range: ProgramImageRange) -> Self {
+        Self::new(
+            GuestImageSegmentKind::Code,
+            range,
+            GuestImageSegmentSource::LcSegment64FileRange,
+            GuestImageAddressSpace::MachOVirtualAddress,
+        )
+    }
+
     pub const fn new(
         kind: GuestImageSegmentKind,
         range: ProgramImageRange,
@@ -487,6 +508,21 @@ mod tests {
         assert_eq!(image.code_segment(), Some(code_segment()));
         assert_eq!(image.metadata(), &metadata());
         assert_eq!(image.guest_image().metadata(), &metadata());
+    }
+
+    #[test]
+    fn mach_o_image_builds_executable_code_segment_from_range() {
+        let image = MachOImage::executable_from_code_range(
+            GuestImageEntryPoint::new(X86Va::new(0x1_0000_0010)),
+            image_range(0x1_0000_0000, 0x1_0000_1000),
+            metadata(),
+        )
+        .expect("entry is inside code segment");
+
+        assert_eq!(image.guest_image().format(), GuestImageFormat::MachO);
+        assert_eq!(image.entry_point().address(), X86Va::new(0x1_0000_0010));
+        assert_eq!(image.code_segment(), Some(code_segment()));
+        assert_eq!(image.metadata(), &metadata());
     }
 
     #[test]
