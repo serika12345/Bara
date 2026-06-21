@@ -28,6 +28,7 @@
    `B8-ARCH2k Runtime GuestImage Relocations Shell`、
    `B8-ARCH2l Runtime GuestImage Metadata Collections Shell`、
    `B8-ARCH2m Runtime MachOImage Domain Shell`、
+   `B8-ARCH2n Runtime MachOImage Code Range Constructor`、
    `B8-ARCH2 Guest Image Model Extraction`
 2. [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) の `R1` / `R1a` と
    `Instruction Coverage Strategy`
@@ -35,7 +36,7 @@
    B8-ARCH1 responsibility split audit と、`D4a: x86_64 ISA semantic coverage strategy`
 4. この `docs/progress.md` の現在の作業スナップショット
 
-B8-ARCH2m review / merge 後の次候補:
+B8-ARCH2n review / merge 後の次候補:
 
 - `main` を最新化したうえで、TODO-backed PR Gate を追加または選び、dedicated branch を作る。
 - 候補は B8-ARCH2 Guest Image Model Extraction の次の小さい slice、または helper process /
@@ -48,12 +49,13 @@ B8-ARCH2m review / merge 後の次候補:
   完了し、B8-ARCH2j では imports collection 接続、B8-ARCH2k では relocations
   collection 接続だけを完了し、B8-ARCH2l では remaining metadata collections を
   `GuestImageMetadata` aggregate にまとめ、B8-ARCH2m では `MachOImage` domain shell を
-  通すため、JSON schema 名、field 名、既存 B8-HWGUI debug bundle output を維持したまま
-  後続境界を切る。
+  通し、B8-ARCH2n では Mach-O code segment source / address-space 決定を runtime
+  constructor 側へ寄せるため、JSON schema 名、field 名、既存 B8-HWGUI debug bundle
+  output を維持したまま後続境界を切る。
 - helper process execution、loader image model、runtime dispatcher、decoder dependency 採用は、
   対応する TODO / design TODO が具体化されるまで混ぜない。
 
-B8-ARCH2m review / merge 後にすぐ始めないもの:
+B8-ARCH2n review / merge 後にすぐ始めないもの:
 
 - B8-OSS0 source-built OSS GUI app automation
 - B8-ARCH2 `MachOImage` 本体、imports/fixups/symbol identity の runtime domain 抽出
@@ -62,11 +64,12 @@ B8-ARCH2m review / merge 後にすぐ始めないもの:
 - B8-HWGUI fixture 専用 path のさらなる機能追加
 - decoder dependency 採用、ISA implementation / lowering 追加、supply-chain lockfile 変更
 
-B8-ARCH2m review package で示すべきもの:
+B8-ARCH2n review package で示すべきもの:
 
-- `bara-runtime/src/guest_image/mod.rs` の `MachOImage` shell が `GuestImage` /
-  `GuestImageMetadata` を保持する範囲
-- B8 debug bundle が `MachOImage::executable` を作ってから existing
+- `bara-runtime/src/guest_image/mod.rs` の `MachOImage::executable_from_code_range` が
+  Mach-O code segment source / address-space 決定を閉じる範囲
+- B8 debug bundle が `GuestImageSegment` を直接作らず、`ProgramImageRange` と
+  `GuestImageMetadata` から `MachOImage::executable_from_code_range` を作って existing
   `B8DebugGuestImageMappingReport` へ射影するようになったこと
 - `loader.plan.json` の `image_mapping` field 名、nested field 名、serde 値、JSON output を
   維持したこと
@@ -78,10 +81,22 @@ B8-ARCH2m review package で示すべきもの:
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-20 23:02 JST
+最終更新: 2026-06-20 23:37 JST
 
 状態:
 
+- active_work: completed。B8-ARCH2n Runtime MachOImage Code Range Constructor を
+  `task/b8-arch2n-mach-o-code-range-constructor` で実施した。`bara-runtime` は
+  `MachOImage::executable_from_code_range` を追加し、Mach-O executable code segment の
+  source / address-space 決定を runtime constructor 側に閉じる。B8 debug bundle は
+  existing `MachOEntryFunctionInput` から `ProgramImageRange` と `GuestImageMetadata` を作り、
+  `MachOImage::executable_from_code_range` を通して existing `B8DebugGuestImageMappingReport`
+  へ射影する。`loader.plan.json` の image mapping JSON は維持。`bara-oracle` からの
+  loader domain 抽出、helper bridge、runtime dispatcher は未移動。依存・lockfile・
+  toolchain 変更はない。verification は
+  `nix develop -c cargo test -p bara-runtime guest_image -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
+  `nix develop -c ./scripts/verify`。
 - active_work: completed。B8-ARCH2m Runtime MachOImage Domain Shell を
   `task/b8-arch2m-mach-o-image-domain-shell` で実施した。`bara-runtime` は
   `MachOImage` shell を追加し、valid `GuestImage` / `GuestImageMetadata` を
