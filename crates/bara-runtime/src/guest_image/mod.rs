@@ -120,7 +120,7 @@ impl MachOImage {
 
     pub fn executable_from_code_range(
         entry_point: GuestImageEntryPoint,
-        code_range: ProgramImageRange,
+        code_range: MachOExecutableCodeRange,
         metadata: GuestImageMetadata,
     ) -> Result<Self, GuestImageError> {
         Self::executable(
@@ -132,7 +132,7 @@ impl MachOImage {
 
     pub fn executable_from_program_image_metadata(
         entry_point: GuestImageEntryPoint,
-        code_range: ProgramImageRange,
+        code_range: MachOExecutableCodeRange,
         metadata: &ProgramImageMetadata,
     ) -> Result<Self, GuestImageError> {
         Self::executable_from_code_range(
@@ -159,6 +159,21 @@ impl MachOImage {
 
     pub const fn metadata(&self) -> &GuestImageMetadata {
         self.guest_image.metadata()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MachOExecutableCodeRange {
+    range: ProgramImageRange,
+}
+
+impl MachOExecutableCodeRange {
+    pub const fn new(range: ProgramImageRange) -> Self {
+        Self { range }
+    }
+
+    pub const fn range(self) -> ProgramImageRange {
+        self.range
     }
 }
 
@@ -220,10 +235,10 @@ pub struct GuestImageSegment {
 }
 
 impl GuestImageSegment {
-    pub const fn mach_o_executable_code(range: ProgramImageRange) -> Self {
+    pub const fn mach_o_executable_code(range: MachOExecutableCodeRange) -> Self {
         Self::new(
             GuestImageSegmentKind::Code,
-            range,
+            range.range(),
             GuestImageSegmentSource::LcSegment64FileRange,
             GuestImageAddressSpace::MachOVirtualAddress,
         )
@@ -372,7 +387,8 @@ mod tests {
     use super::{
         GuestImage, GuestImageAddressSpace, GuestImageEntryPoint, GuestImageError,
         GuestImageFormat, GuestImageMappedBytesSource, GuestImageMetadata, GuestImageSegment,
-        GuestImageSegmentKind, GuestImageSegmentSource, GuestImageSegments, MachOImage,
+        GuestImageSegmentKind, GuestImageSegmentSource, GuestImageSegments,
+        MachOExecutableCodeRange, MachOImage,
     };
     use bara_ir::{
         ExternalSymbolId, ExternalSymbolImport, ProgramImageImport, ProgramImageImports,
@@ -529,7 +545,7 @@ mod tests {
     fn mach_o_image_builds_executable_code_segment_from_range() {
         let image = MachOImage::executable_from_code_range(
             GuestImageEntryPoint::new(X86Va::new(0x1_0000_0010)),
-            image_range(0x1_0000_0000, 0x1_0000_1000),
+            MachOExecutableCodeRange::new(image_range(0x1_0000_0000, 0x1_0000_1000)),
             metadata(),
         )
         .expect("entry is inside code segment");
@@ -541,11 +557,17 @@ mod tests {
     }
 
     #[test]
+    fn mach_o_executable_code_range_exposes_program_image_range() {
+        let range = image_range(0x1_0000_0000, 0x1_0000_1000);
+        assert_eq!(MachOExecutableCodeRange::new(range).range(), range);
+    }
+
+    #[test]
     fn mach_o_image_builds_guest_metadata_from_program_image_metadata() {
         let program_metadata = program_image_metadata();
         let image = MachOImage::executable_from_program_image_metadata(
             GuestImageEntryPoint::new(X86Va::new(0x1_0000_0010)),
-            image_range(0x1_0000_0000, 0x1_0000_1000),
+            MachOExecutableCodeRange::new(image_range(0x1_0000_0000, 0x1_0000_1000)),
             &program_metadata,
         )
         .expect("entry is inside code segment");
