@@ -1,8 +1,7 @@
-use bara_ir::{ProgramImageMetadataError, ProgramImageRange};
 use bara_oracle::MachOEntryFunctionInput;
 use bara_runtime::{
     GuestImage, GuestImageAddressSpace, GuestImageEntryPoint, GuestImageError,
-    GuestImageMappedBytesSource, GuestImageSegmentSource, MachOExecutableCodeRange, MachOImage,
+    GuestImageMappedBytesSource, GuestImageSegmentSource, MachOImage,
 };
 use serde::Serialize;
 
@@ -51,17 +50,8 @@ impl B8DebugGuestImageMappingReport {
 fn mach_o_image_from_entry_input(
     entry_input: &MachOEntryFunctionInput,
 ) -> Result<MachOImage, B8DebugGuestImageMappingError> {
-    let code = entry_input.executable_image().code_segment().x86_bytes();
-    let code_len = u64::try_from(code.bytes().len())
-        .map_err(|_| B8DebugGuestImageMappingError::AddressOverflow)?;
-    let code_end = code.entry().checked_add(code_len).map_err(|_| {
-        B8DebugGuestImageMappingError::ImageMetadata(ProgramImageMetadataError::AddressOverflow)
-    })?;
-    let code_range = ProgramImageRange::new(code.entry(), code_end)
-        .map_err(B8DebugGuestImageMappingError::ImageMetadata)?;
     MachOImage::executable_from_program_image_metadata(
         GuestImageEntryPoint::new(entry_input.executable_image().entry().offset()),
-        MachOExecutableCodeRange::new(code_range),
         entry_input.program_image_metadata(),
     )
     .map_err(B8DebugGuestImageMappingError::GuestImage)
@@ -70,7 +60,6 @@ fn mach_o_image_from_entry_input(
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum B8DebugGuestImageMappingError {
     AddressOverflow,
-    ImageMetadata(ProgramImageMetadataError),
     GuestImage(GuestImageError),
     MissingCodeSegment,
 }

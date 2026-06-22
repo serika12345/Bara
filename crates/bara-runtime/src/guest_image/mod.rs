@@ -1,7 +1,7 @@
 use bara_ir::{
     ProgramImageImports, ProgramImageMappedBytes, ProgramImageMetadata, ProgramImageRange,
-    ProgramImageRelocations, ProgramImageSections, ProgramImageSymbols, ProgramUnwindMetadata,
-    X86Va,
+    ProgramImageRelocations, ProgramImageSectionKind, ProgramImageSections, ProgramImageSymbols,
+    ProgramUnwindMetadata, X86Va,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -132,9 +132,9 @@ impl MachOImage {
 
     pub fn executable_from_program_image_metadata(
         entry_point: GuestImageEntryPoint,
-        code_range: MachOExecutableCodeRange,
         metadata: &ProgramImageMetadata,
     ) -> Result<Self, GuestImageError> {
+        let code_range = MachOExecutableCodeRange::from_program_image_metadata(metadata)?;
         Self::executable_from_code_range(
             entry_point,
             code_range,
@@ -170,6 +170,24 @@ pub struct MachOExecutableCodeRange {
 impl MachOExecutableCodeRange {
     pub const fn new(range: ProgramImageRange) -> Self {
         Self { range }
+    }
+
+    pub fn from_program_image_metadata(
+        metadata: &ProgramImageMetadata,
+    ) -> Result<Self, GuestImageError> {
+        let mut code_sections = metadata
+            .sections()
+            .items()
+            .iter()
+            .filter(|section| section.kind() == ProgramImageSectionKind::Code);
+        let code_section = code_sections
+            .next()
+            .ok_or(GuestImageError::MissingMachOExecutableCodeSection)?;
+        if code_sections.next().is_some() {
+            return Err(GuestImageError::AmbiguousMachOExecutableCodeSections);
+        }
+
+        Ok(Self::new(code_section.range()))
     }
 
     pub const fn range(self) -> ProgramImageRange {
@@ -379,6 +397,8 @@ impl GuestImageMetadata {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum GuestImageError {
     MissingCodeSegment,
+    MissingMachOExecutableCodeSection,
+    AmbiguousMachOExecutableCodeSections,
     EntryOutsideMappedSegments,
 }
 
@@ -563,11 +583,67 @@ mod tests {
     }
 
     #[test]
+    fn mach_o_executable_code_range_uses_single_code_section_from_metadata() {
+        assert_eq!(
+            MachOExecutableCodeRange::from_program_image_metadata(&program_image_metadata()),
+            Ok(MachOExecutableCodeRange::new(image_range(
+                0x1_0000_0000,
+                0x1_0000_1000
+            )))
+        );
+    }
+
+    #[test]
+    fn mach_o_executable_code_range_rejects_missing_code_section() {
+        let metadata = ProgramImageMetadata::new_with_mapped_bytes(
+            ProgramImageSections::from_items([ProgramImageSection::new(
+                ProgramImageSectionKind::ConstData,
+                image_range(0x1_0000_2000, 0x1_0000_2010),
+            )]),
+            mapped_bytes(),
+            symbols(),
+            relocations(),
+            imports(),
+            unwind(),
+        );
+
+        assert_eq!(
+            MachOExecutableCodeRange::from_program_image_metadata(&metadata),
+            Err(GuestImageError::MissingMachOExecutableCodeSection)
+        );
+    }
+
+    #[test]
+    fn mach_o_executable_code_range_rejects_ambiguous_code_sections() {
+        let metadata = ProgramImageMetadata::new_with_mapped_bytes(
+            ProgramImageSections::from_items([
+                ProgramImageSection::new(
+                    ProgramImageSectionKind::Code,
+                    image_range(0x1_0000_0000, 0x1_0000_1000),
+                ),
+                ProgramImageSection::new(
+                    ProgramImageSectionKind::Code,
+                    image_range(0x1_0000_2000, 0x1_0000_3000),
+                ),
+            ]),
+            mapped_bytes(),
+            symbols(),
+            relocations(),
+            imports(),
+            unwind(),
+        );
+
+        assert_eq!(
+            MachOExecutableCodeRange::from_program_image_metadata(&metadata),
+            Err(GuestImageError::AmbiguousMachOExecutableCodeSections)
+        );
+    }
+
+    #[test]
     fn mach_o_image_builds_guest_metadata_from_program_image_metadata() {
         let program_metadata = program_image_metadata();
         let image = MachOImage::executable_from_program_image_metadata(
             GuestImageEntryPoint::new(X86Va::new(0x1_0000_0010)),
-            MachOExecutableCodeRange::new(image_range(0x1_0000_0000, 0x1_0000_1000)),
             &program_metadata,
         )
         .expect("entry is inside code segment");
