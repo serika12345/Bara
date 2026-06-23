@@ -318,6 +318,18 @@ fn guest_image_unwind_metadata_exposes_payload() {
 }
 
 #[test]
+fn guest_image_metadata_exposes_metadata_value_objects() {
+    let metadata = metadata();
+
+    assert_eq!(metadata.mapped_bytes_value(), &guest_image_mapped_bytes());
+    assert_eq!(metadata.sections_value(), &guest_image_sections());
+    assert_eq!(metadata.symbols_value(), &guest_image_symbols());
+    assert_eq!(metadata.relocations_value(), &guest_image_relocations());
+    assert_eq!(metadata.imports_value(), &guest_image_imports());
+    assert_eq!(metadata.unwind_value(), &guest_image_unwind());
+}
+
+#[test]
 fn mach_o_executable_code_range_exposes_program_image_range() {
     let range = image_range(0x1_0000_0000, 0x1_0000_1000);
     assert_eq!(MachOExecutableCodeRange::new(range).range(), range);

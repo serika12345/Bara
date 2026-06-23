@@ -4239,6 +4239,60 @@ review gate:
 
 - runtime Mach-O mapping mapped bytes snapshot を commit / push / draft PR 作成で停止する。
 
+#### PR Gate: B8-ARCH2ah Runtime GuestImage Metadata Value Accessors
+
+branch: `task/b8-arch2ah-guest-image-metadata-value-accessors`
+
+B8-ARCH2ag が review / merge 済みになるまで開始しない。B8-ARCH2 Guest Image Model
+Extraction の次 slice として、`GuestImageMetadata` が mapped bytes 以外の metadata collection も
+runtime-facing value object として返せるようにする。production behavior、existing payload
+accessor、B8 debug bundle の `loader.plan.json` output は維持する。
+
+完了条件:
+
+- [x] `GuestImageMetadata` に focused regression test を追加し、sections / symbols /
+  relocations / imports / unwind を value object として取得できることを固定する。
+- [x] `GuestImageMetadata` は `sections_value()`、`symbols_value()`、
+  `relocations_value()`、`imports_value()`、`unwind_value()` を公開する。
+- [x] 既存 caller 用の `sections()` / `symbols()` / `relocations()` / `imports()` /
+  `unwind()` payload accessor は維持する。
+- [x] B8 debug bundle の `loader.plan.json` field 名、nested field 名、serde 値、JSON output を
+  維持する。
+- [x] `bara-oracle` からの loader domain 抽出、public Mach-O parser / resolver logic、
+  import/fixup/symbol projection semantics の意味変更、helper bridge、runtime dispatcher は
+  移動しない。
+
+completion evidence:
+
+- 意図: 後続 runtime loader caller が `GuestImageMetadata` から metadata collection を
+  payload primitive ではなく runtime-facing value object として受け取れるようにし、
+  B8-ARCH2 の image model 境界を強める。
+- できるようになったこと: caller は `GuestImageMetadata::*_value()` で mapped bytes /
+  sections / symbols / relocations / imports / unwind を同じ value object 境界から扱える。
+- 既存 payload accessor は残し、existing B8 debug bundle behavior と `loader.plan.json` output は
+  変えない。
+- loader domain 抽出、public Mach-O parser / resolver logic、import/fixup/symbol projection
+  semantics、helper bridge、runtime dispatcher は未移動。
+
+PR に含めない:
+
+- public Mach-O parser / resolver logic の `bara-oracle` からの移動。
+- entry extraction / load command interpretation の runtime への移動。
+- import/fixup/symbol projection semantics の意味変更または schema 変更。
+- helper boundary / Objective-C / AppKit helper bridge 一般化。
+- return-to continuation dispatcher 抽出。
+- translation artifact/cache/dispatcher 実装。
+
+検証:
+
+- `nix develop -c cargo test -p bara-runtime guest_image_metadata_exposes_metadata_value_objects -- --nocapture`
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- runtime GuestImage metadata value accessors を commit / push / draft PR 作成で停止する。
+
 #### Future Target: B8-ARCH2 Guest Image Model Extraction
 
 - [ ] public Mach-O metadata から runtime が使う `GuestImage` / `MachOImage` domain model を

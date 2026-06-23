@@ -532,6 +532,11 @@ Mach-O parsing / probing から runtime が使える `GuestImage` / `MachOImage`
 - B8-ARCH2r で `MachOExecutableEntryPoint` を追加し、`MachOImage` constructor が
   generic `GuestImageEntryPoint` ではなく Mach-O specific entry point domain type を
   受け取るようにした。
+- B8-ARCH2s から B8-ARCH2ag で Mach-O code segment、metadata value object 群、
+  module split、debug mapping projection、mapping snapshot を段階的に runtime 側へ寄せた。
+  B8-ARCH2ah では `GuestImageMetadata` が sections / symbols / relocations / imports /
+  unwind を value object として返せるようにし、後続 runtime loader caller が payload
+  primitive ではなく runtime-facing value object 境界で metadata collection を扱えるようにした。
 
 ### R3: Translation Artifact And Debug Export
 

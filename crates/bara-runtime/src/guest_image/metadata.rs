@@ -86,6 +86,26 @@ impl GuestImageMetadata {
         &self.mapped_bytes
     }
 
+    pub const fn sections_value(&self) -> &GuestImageSections {
+        &self.sections
+    }
+
+    pub const fn symbols_value(&self) -> &GuestImageSymbols {
+        &self.symbols
+    }
+
+    pub const fn relocations_value(&self) -> &GuestImageRelocations {
+        &self.relocations
+    }
+
+    pub const fn imports_value(&self) -> &GuestImageImports {
+        &self.imports
+    }
+
+    pub const fn unwind_value(&self) -> &GuestImageUnwindMetadata {
+        &self.unwind
+    }
+
     pub const fn sections(&self) -> &ProgramImageSections {
         self.sections.payload()
     }
