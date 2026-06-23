@@ -4183,6 +4183,62 @@ review gate:
 
 - runtime Mach-O image mapping snapshot を commit / push / draft PR 作成で停止する。
 
+#### PR Gate: B8-ARCH2ag Runtime MachO Mapping Mapped Bytes Snapshot
+
+branch: `task/b8-arch2ag-macho-mapping-bytes-payload`
+
+B8-ARCH2af が review / merge 済みになるまで開始しない。B8-ARCH2 Guest Image Model
+Extraction の次 slice として、`MachOExecutableImageMapping` が mapped bytes source だけでなく
+runtime-facing `GuestImageMappedBytes` value object も保持するようにする。production behavior、
+existing report projection、B8 debug bundle の `loader.plan.json` output は維持する。
+
+完了条件:
+
+- [x] `MachOExecutableImageMapping` に focused regression test を追加し、snapshot が
+  `GuestImageMappedBytes` value object と payload を保持することを固定する。
+- [x] `MachOImage::executable_mapping()` は `GuestImageMetadata` から mapped bytes value object を
+  clone して snapshot に渡す。
+- [x] 既存 caller 用の `mapped_bytes_source()` は維持し、source は snapshot 内の
+  `GuestImageMappedBytes` から導出する。
+- [x] `B8DebugGuestImageMappingReport` の `loader.plan.json` output は mapped bytes source を
+  既存と同じ値で report し、field 名、nested field 名、serde 値、JSON output を維持する。
+- [x] `bara-oracle` からの loader domain 抽出、public Mach-O parser / resolver logic、
+  import/fixup/symbol projection semantics の意味変更、helper bridge、runtime dispatcher は
+  移動しない。
+
+completion evidence:
+
+- 意図: B8 debug bundle と後続 runtime loader caller が mapping snapshot から mapped bytes
+  value object まで読めるようにし、debug DTO projection の理由で `MachOImage` / metadata
+  内部構造へ戻らない境界を強める。
+- できるようになったこと: caller は `MachOExecutableImageMapping::mapped_bytes()` で
+  `GuestImageMappedBytes` を参照し、source と payload を同じ runtime-facing snapshot から扱える。
+- `MachOExecutableImageMapping::mapped_bytes_source()` は残し、既存 report DTO は source projection
+  のために同じ API を使える。
+- existing B8 debug bundle behavior と `loader.plan.json` output は変えない。
+- loader domain 抽出、public Mach-O parser / resolver logic、import/fixup/symbol projection
+  semantics、helper bridge、runtime dispatcher は未移動。
+
+PR に含めない:
+
+- public Mach-O parser / resolver logic の `bara-oracle` からの移動。
+- entry extraction / load command interpretation の runtime への移動。
+- import/fixup/symbol projection semantics の意味変更または schema 変更。
+- helper boundary / Objective-C / AppKit helper bridge 一般化。
+- return-to continuation dispatcher 抽出。
+- translation artifact/cache/dispatcher 実装。
+
+検証:
+
+- `nix develop -c cargo test -p bara-runtime mach_o_executable_mapping_carries_mapped_bytes_value -- --nocapture`
+- `nix develop -c cargo test -p btbc-cli image_mapping_report_uses_typed_mach_o_code_segment -- --nocapture`
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- runtime Mach-O mapping mapped bytes snapshot を commit / push / draft PR 作成で停止する。
+
 #### Future Target: B8-ARCH2 Guest Image Model Extraction
 
 - [ ] public Mach-O metadata から runtime が使う `GuestImage` / `MachOImage` domain model を

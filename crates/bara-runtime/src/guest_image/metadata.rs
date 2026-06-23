@@ -82,6 +82,10 @@ impl GuestImageMetadata {
         self.mapped_bytes.source()
     }
 
+    pub const fn mapped_bytes_value(&self) -> &GuestImageMappedBytes {
+        &self.mapped_bytes
+    }
+
     pub const fn sections(&self) -> &ProgramImageSections {
         self.sections.payload()
     }

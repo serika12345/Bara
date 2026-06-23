@@ -2,8 +2,8 @@ use bara_ir::{ProgramImageMetadata, ProgramImageRange, ProgramImageSectionKind, 
 
 use super::{
     GuestImage, GuestImageAddressSpace, GuestImageEntryPoint, GuestImageError,
-    GuestImageMappedBytesSource, GuestImageMetadata, GuestImageSegment, GuestImageSegmentKind,
-    GuestImageSegmentSource,
+    GuestImageMappedBytes, GuestImageMappedBytesSource, GuestImageMetadata, GuestImageSegment,
+    GuestImageSegmentKind, GuestImageSegmentSource,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -64,11 +64,11 @@ impl MachOImage {
         self.code_segment
     }
 
-    pub const fn executable_mapping(&self) -> MachOExecutableImageMapping {
+    pub fn executable_mapping(&self) -> MachOExecutableImageMapping {
         MachOExecutableImageMapping::new(
             self.code_segment,
             self.entry_point(),
-            self.metadata().mapped_bytes_source(),
+            self.metadata().mapped_bytes_value().clone(),
         )
     }
 
@@ -77,36 +77,40 @@ impl MachOImage {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MachOExecutableImageMapping {
     code_segment: MachOExecutableCodeSegment,
     entry_point: MachOExecutableEntryPoint,
-    mapped_bytes_source: GuestImageMappedBytesSource,
+    mapped_bytes: GuestImageMappedBytes,
 }
 
 impl MachOExecutableImageMapping {
-    pub const fn new(
+    pub fn new(
         code_segment: MachOExecutableCodeSegment,
         entry_point: MachOExecutableEntryPoint,
-        mapped_bytes_source: GuestImageMappedBytesSource,
+        mapped_bytes: GuestImageMappedBytes,
     ) -> Self {
         Self {
             code_segment,
             entry_point,
-            mapped_bytes_source,
+            mapped_bytes,
         }
     }
 
-    pub const fn code_segment(self) -> MachOExecutableCodeSegment {
+    pub const fn code_segment(&self) -> MachOExecutableCodeSegment {
         self.code_segment
     }
 
-    pub const fn entry_point(self) -> MachOExecutableEntryPoint {
+    pub const fn entry_point(&self) -> MachOExecutableEntryPoint {
         self.entry_point
     }
 
-    pub const fn mapped_bytes_source(self) -> GuestImageMappedBytesSource {
-        self.mapped_bytes_source
+    pub const fn mapped_bytes(&self) -> &GuestImageMappedBytes {
+        &self.mapped_bytes
+    }
+
+    pub const fn mapped_bytes_source(&self) -> GuestImageMappedBytesSource {
+        self.mapped_bytes.source()
     }
 }
 
