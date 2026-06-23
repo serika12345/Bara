@@ -144,10 +144,7 @@ impl MachOImage {
         Self::executable_from_code_range(
             entry_point,
             code_range,
-            GuestImageMetadata::from_program_image_metadata(
-                GuestImageMappedBytesSource::ProgramImageMetadata,
-                metadata,
-            ),
+            GuestImageMetadata::from_program_image_metadata(metadata),
         )
     }
 
@@ -373,10 +370,39 @@ pub enum GuestImageMappedBytesSource {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GuestImageMappedBytes {
+    source: GuestImageMappedBytesSource,
+    payload: ProgramImageMappedBytes,
+}
+
+impl GuestImageMappedBytes {
+    pub const fn new(
+        source: GuestImageMappedBytesSource,
+        payload: ProgramImageMappedBytes,
+    ) -> Self {
+        Self { source, payload }
+    }
+
+    pub fn from_program_image_metadata(metadata: &ProgramImageMetadata) -> Self {
+        Self::new(
+            GuestImageMappedBytesSource::ProgramImageMetadata,
+            metadata.mapped_bytes().clone(),
+        )
+    }
+
+    pub const fn source(&self) -> GuestImageMappedBytesSource {
+        self.source
+    }
+
+    pub const fn payload(&self) -> &ProgramImageMappedBytes {
+        &self.payload
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GuestImageMetadata {
-    mapped_bytes_source: GuestImageMappedBytesSource,
+    mapped_bytes: GuestImageMappedBytes,
     sections: ProgramImageSections,
-    mapped_bytes: ProgramImageMappedBytes,
     symbols: ProgramImageSymbols,
     relocations: ProgramImageRelocations,
     imports: ProgramImageImports,
@@ -385,18 +411,16 @@ pub struct GuestImageMetadata {
 
 impl GuestImageMetadata {
     pub const fn new(
-        mapped_bytes_source: GuestImageMappedBytesSource,
+        mapped_bytes: GuestImageMappedBytes,
         sections: ProgramImageSections,
-        mapped_bytes: ProgramImageMappedBytes,
         symbols: ProgramImageSymbols,
         relocations: ProgramImageRelocations,
         imports: ProgramImageImports,
         unwind: ProgramUnwindMetadata,
     ) -> Self {
         Self {
-            mapped_bytes_source,
-            sections,
             mapped_bytes,
+            sections,
             symbols,
             relocations,
             imports,
@@ -404,14 +428,10 @@ impl GuestImageMetadata {
         }
     }
 
-    pub fn from_program_image_metadata(
-        mapped_bytes_source: GuestImageMappedBytesSource,
-        metadata: &ProgramImageMetadata,
-    ) -> Self {
+    pub fn from_program_image_metadata(metadata: &ProgramImageMetadata) -> Self {
         Self::new(
-            mapped_bytes_source,
+            GuestImageMappedBytes::from_program_image_metadata(metadata),
             metadata.sections().clone(),
-            metadata.mapped_bytes().clone(),
             metadata.symbols().clone(),
             metadata.relocations().clone(),
             metadata.imports().clone(),
@@ -420,7 +440,7 @@ impl GuestImageMetadata {
     }
 
     pub const fn mapped_bytes_source(&self) -> GuestImageMappedBytesSource {
-        self.mapped_bytes_source
+        self.mapped_bytes.source()
     }
 
     pub const fn sections(&self) -> &ProgramImageSections {
@@ -428,7 +448,7 @@ impl GuestImageMetadata {
     }
 
     pub const fn mapped_bytes(&self) -> &ProgramImageMappedBytes {
-        &self.mapped_bytes
+        self.mapped_bytes.payload()
     }
 
     pub const fn symbols(&self) -> &ProgramImageSymbols {
@@ -460,8 +480,8 @@ pub enum GuestImageError {
 mod tests {
     use super::{
         GuestImage, GuestImageAddressSpace, GuestImageEntryPoint, GuestImageError,
-        GuestImageFormat, GuestImageMappedBytesSource, GuestImageMetadata, GuestImageSegment,
-        GuestImageSegmentKind, GuestImageSegmentSource, GuestImageSegments,
+        GuestImageFormat, GuestImageMappedBytes, GuestImageMappedBytesSource, GuestImageMetadata,
+        GuestImageSegment, GuestImageSegmentKind, GuestImageSegmentSource, GuestImageSegments,
         MachOExecutableCodeRange, MachOExecutableCodeSegment, MachOExecutableEntryPoint,
         MachOImage,
     };
@@ -501,6 +521,13 @@ mod tests {
             ProgramImageMappedByteSegment::new(image_range(0x1_0000_0000, 0x1_0000_0008), bytes)
                 .expect("test mapped byte segment is valid");
         ProgramImageMappedBytes::from_segments([segment])
+    }
+
+    fn guest_image_mapped_bytes() -> GuestImageMappedBytes {
+        GuestImageMappedBytes::new(
+            GuestImageMappedBytesSource::ProgramImageMetadata,
+            mapped_bytes(),
+        )
     }
 
     fn imports() -> ProgramImageImports {
@@ -552,9 +579,13 @@ mod tests {
     }
 
     fn metadata() -> GuestImageMetadata {
-        GuestImageMetadata::from_program_image_metadata(
-            GuestImageMappedBytesSource::ProgramImageMetadata,
-            &program_image_metadata(),
+        GuestImageMetadata::new(
+            guest_image_mapped_bytes(),
+            sections(),
+            symbols(),
+            relocations(),
+            imports(),
+            unwind(),
         )
     }
 
@@ -655,6 +686,22 @@ mod tests {
             GuestImageAddressSpace::MachOVirtualAddress
         );
         assert_eq!(segment.guest_image_segment(), code_segment());
+    }
+
+    #[test]
+    fn guest_image_mapped_bytes_exposes_source_and_payload() {
+        let mapped_bytes = guest_image_mapped_bytes();
+
+        assert_eq!(
+            mapped_bytes.source(),
+            GuestImageMappedBytesSource::ProgramImageMetadata
+        );
+        assert_eq!(
+            mapped_bytes
+                .payload()
+                .read_u64_le(X86Va::new(0x1_0000_0000)),
+            Some(42)
+        );
     }
 
     #[test]

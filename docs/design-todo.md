@@ -301,6 +301,23 @@ B8-ARCH2s result:
   Objective-C/AppKit helper process execution、modeled continuation state、runtime dispatcher は
   同じ PR では動かさない。
 
+B8-ARCH2t result:
+
+- 2026-06-23 に `GuestImageMappedBytes` を追加し、mapped bytes source と
+  `ProgramImageMappedBytes` payload を一体の runtime-facing value object として表すようにした。
+- `GuestImageMetadata` は `mapped_bytes_source` と `ProgramImageMappedBytes` を別々に
+  constructor へ受け取らず、`GuestImageMappedBytes` を受け取って保持する。
+- `GuestImageMetadata::from_program_image_metadata` は
+  `GuestImageMappedBytes::from_program_image_metadata` 経由で source selection と payload clone を
+  value object 側に閉じる。
+- `GuestImage` / `GuestImageMetadata` の existing `mapped_bytes_source()` と
+  `mapped_bytes()` accessor は維持し、B8 debug bundle の existing
+  `B8DebugGuestImageMappingReport` projection と `loader.plan.json` output は変えない。
+- `bara-oracle` からの loader domain 抽出、entry extraction / load command interpretation、
+  public Mach-O parser / resolver logic、import/fixup/symbol projection の意味変更、
+  Objective-C/AppKit helper process execution、modeled continuation state、runtime dispatcher は
+  同じ PR では動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。
