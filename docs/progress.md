@@ -46,6 +46,7 @@
    `B8-ARCH2ac Runtime GuestImage Test Module Split`、
    `B8-ARCH2ad Debug Guest Image MachO Projection Boundary`、
    `B8-ARCH2ae Runtime MachO Code Segment Derived Accessors`、
+   `B8-ARCH2af Runtime MachO Image Mapping Snapshot`、
    `B8-ARCH2 Guest Image Model Extraction`
 2. [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) の `R1` / `R1a` と
    `Instruction Coverage Strategy`
@@ -53,7 +54,7 @@
    B8-ARCH1 responsibility split audit と、`D4a: x86_64 ISA semantic coverage strategy`
 4. この `docs/progress.md` の現在の作業スナップショット
 
-B8-ARCH2ae review / merge 後の次候補:
+B8-ARCH2af review / merge 後の次候補:
 
 - `main` を最新化したうえで、TODO-backed PR Gate を追加または選び、dedicated branch を作る。
 - 候補は B8-ARCH2 Guest Image Model Extraction の次の小さい slice、または helper process /
@@ -88,11 +89,13 @@ B8-ARCH2ae review / merge 後の次候補:
   分け、B8-ARCH2ac では existing `guest_image` unit test 群を `guest_image/tests.rs` へ分け、
   B8-ARCH2ad では B8 debug bundle の `image_mapping` projection を typed
   `MachOImage::code_segment()` boundary へ寄せ、B8-ARCH2ae では Mach-O executable code
-  segment の vmaddr / byte length derivation を runtime domain accessor へ寄せる。
+  segment の vmaddr / byte length derivation を runtime domain accessor へ寄せ、B8-ARCH2af
+  では B8 debug bundle の `image_mapping` projection に渡す runtime mapping 構成を
+  `MachOExecutableImageMapping` snapshot としてまとめる。
 - helper process execution、loader image model、runtime dispatcher、decoder dependency 採用は、
   対応する TODO / design TODO が具体化されるまで混ぜない。
 
-B8-ARCH2ae review / merge 後にすぐ始めないもの:
+B8-ARCH2af review / merge 後にすぐ始めないもの:
 
 - B8-OSS0 source-built OSS GUI app automation
 - relocation/fixup projection semantics の変更、import projection semantics の変更、
@@ -102,36 +105,57 @@ B8-ARCH2ae review / merge 後にすぐ始めないもの:
 - B8-HWGUI fixture 専用 path のさらなる機能追加
 - decoder dependency 採用、ISA implementation / lowering 追加、supply-chain lockfile 変更
 
-B8-ARCH2ae review package で示すべきもの:
+B8-ARCH2af review package で示すべきもの:
 
-- `bara-runtime/src/guest_image/mach_o.rs` に `MachOExecutableCodeByteLen` と
-  `MachOExecutableCodeSegment::vmaddr()` / `byte_len()` を追加した範囲
-- 意図は Mach-O executable code segment から計算できる mapping 値を runtime domain 側へ寄せ、
-  B8 debug bundle DTO が `ProgramImageRange` の start / end を直接解釈しないようにすること
-- できるようになったこととして、caller が typed `MachOExecutableCodeSegment` から vmaddr と
-  typed byte length を取得でき、byte length overflow を `GuestImageError` として runtime
-  boundary で分類できること
-- `MachOExecutableCodeByteLen::as_usize()` は serialization DTO 境界で必要な deliberate
-  primitive accessor として `docs/domain-primitive-baseline.txt` に追加したこと
+- `bara-runtime/src/guest_image/mach_o.rs` に `MachOExecutableImageMapping` と
+  `MachOImage::executable_mapping()` を追加した範囲
+- 意図は B8 debug bundle の `image_mapping` projection が必要とする code segment、entry
+  point、mapped bytes source を `MachOImage` の内部 accessor 群から直接集めるのではなく、
+  runtime domain の snapshot として渡すこと
+- できるようになったこととして、caller が `MachOExecutableImageMapping` を単位に mapping
+  構成を扱えるようになり、debug DTO projection の理由で `MachOImage` の metadata 構造を
+  知る必要がなくなったこと
 - `btbc-cli/src/b8_debug_bundle/guest_image.rs` の `B8DebugGuestImageMappingReport` が
-  `code_segment.range().range()` ではなく derived accessor を使うこと
+  `MachOExecutableImageMapping` から report を組み立てること
 - focused regression test として
-  `mach_o_executable_code_segment_exposes_derived_mapping_values` を追加したこと
+  `mach_o_image_exposes_executable_mapping_snapshot` を追加したこと
 - `loader.plan.json` の `image_mapping` field 名、nested field 名、serde 値、JSON output を
   維持したこと
 - import/fixup projection、helper boundary、helper process execution、modeled continuation を
   まだ移していないこと
-- `nix develop -c cargo test -p bara-runtime mach_o_executable_code_segment_exposes_derived_mapping_values -- --nocapture`
+- `nix develop -c cargo test -p bara-runtime mach_o_image_exposes_executable_mapping_snapshot -- --nocapture`
 - `nix develop -c cargo test -p btbc-cli image_mapping_report_uses_typed_mach_o_code_segment -- --nocapture`
 - `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
 - `nix develop -c ./scripts/verify`
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-23 16:22 JST
+最終更新: 2026-06-23 16:32 JST
 
 状態:
 
+- active_work: completed。B8-ARCH2af Runtime MachO Image Mapping Snapshot を
+  `task/b8-arch2af-macho-image-mapping-snapshot` で実施した。関連 TODO は
+  `TODO.md` の `B8-ARCH2af Runtime MachO Image Mapping Snapshot`、関連設計メモは
+  `docs/design-todo.md` の `B8-ARCH2af result`。意図は B8 debug bundle の
+  `image_mapping` projection が必要とする code segment、entry point、mapped bytes source を
+  `MachOImage` の内部 accessor 群から直接集めるのではなく、runtime domain の snapshot として
+  渡すこと。`bara-runtime` は `MachOExecutableImageMapping` を追加し、
+  `MachOImage::executable_mapping()` で snapshot を返せるようにした。これにより caller は
+  `MachOExecutableImageMapping` を単位に mapping 構成を扱えるようになり、debug DTO
+  projection の理由で `MachOImage` の metadata 構造を知る必要がなくなった。`btbc-cli` の
+  `B8DebugGuestImageMappingReport` は `MachOExecutableImageMapping` から existing
+  `image_mapping` JSON を組み立てる。existing B8 debug bundle behavior と
+  `loader.plan.json` output は維持。`bara-oracle` からの loader domain 抽出、
+  entry extraction / load command interpretation、public Mach-O parser / resolver logic、
+  import/fixup/symbol projection semantics の意味変更、helper bridge、runtime dispatcher は
+  未移動。依存・lockfile・toolchain 変更はない。remaining work は PR review 後に
+  B8-ARCH2 Guest Image Model Extraction の次 slice または helper process / Objective-C bridge
+  境界の TODO-backed PR Gate を選ぶこと。verification は
+  `nix develop -c cargo test -p bara-runtime mach_o_image_exposes_executable_mapping_snapshot -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli image_mapping_report_uses_typed_mach_o_code_segment -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
+  `nix develop -c ./scripts/verify`。
 - active_work: completed。B8-ARCH2ae Runtime MachO Code Segment Derived Accessors を
   `task/b8-arch2ae-macho-code-segment-accessors` で実施した。関連 TODO は
   `TODO.md` の `B8-ARCH2ae Runtime MachO Code Segment Derived Accessors`、関連設計メモは
