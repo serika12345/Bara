@@ -435,6 +435,27 @@ B8-ARCH2z result:
   Objective-C/AppKit helper process execution、modeled continuation state、runtime dispatcher は
   同じ PR では動かさない。
 
+B8-ARCH2aa result:
+
+- 2026-06-23 に `crates/bara-runtime/src/guest_image/mach_o.rs` を追加し、
+  `MachOImage`、`MachOExecutableEntryPoint`、`MachOExecutableCodeRange`、
+  `MachOExecutableCodeSegment` を `guest_image/mod.rs` から分けた。
+- 意図は generic `GuestImage` shell と Mach-O specific image shell の変更理由を分け、
+  runtime image model の親 module が Mach-O constructor / executable code range の詳細で
+  肥大化しないようにすること。
+- `guest_image/mod.rs` は Mach-O module を re-export し、
+  `bara_runtime::MachOImage`、`MachOExecutableEntryPoint`、
+  `MachOExecutableCodeRange`、`MachOExecutableCodeSegment` の existing public API 名を維持する。
+- `GuestImageSegment::mach_o_executable_code` は generic shell から外し、
+  Mach-O executable code segment assembly は `MachOExecutableCodeSegment::new` 側へ閉じた。
+  これにより Mach-O specific constructor boundary の追加や調整を `guest_image/mach_o.rs`
+  側で扱える。
+- `GuestImage` / `MachOImage` の caller-visible behavior と B8 debug bundle の
+  `loader.plan.json` output は変えない。`bara-oracle` からの loader domain 抽出、
+  entry extraction / load command interpretation、public Mach-O parser / resolver logic、
+  import/fixup/symbol projection semantics の意味変更、Objective-C/AppKit helper process
+  execution、modeled continuation state、runtime dispatcher は同じ PR では動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。
