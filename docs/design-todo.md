@@ -416,6 +416,25 @@ B8-ARCH2y result:
   import/symbol projection の意味変更、Objective-C/AppKit helper process execution、
   modeled continuation state、runtime dispatcher は同じ PR では動かさない。
 
+B8-ARCH2z result:
+
+- 2026-06-23 に `crates/bara-runtime/src/guest_image/metadata.rs` を追加し、
+  `GuestImageMetadata` aggregate と metadata value object 群を
+  `guest_image/mod.rs` から分けた。
+- 意図は `GuestImage` / `MachOImage` の image shell と metadata payload boundary の
+  変更理由を分け、runtime image model の親 module を肥大化させずにすること。
+- `guest_image/mod.rs` は metadata module を re-export し、
+  `bara_runtime::GuestImageMetadata`、`GuestImageMappedBytes`、
+  `GuestImageSections`、`GuestImageImports`、`GuestImageRelocations`、
+  `GuestImageSymbols`、`GuestImageUnwindMetadata` などの existing public API 名を維持する。
+- これにより metadata aggregate / value object 群の追加や調整を
+  `guest_image/metadata.rs` 側で扱える。`GuestImage` / `MachOImage` の caller-visible
+  behavior と B8 debug bundle の `loader.plan.json` output は変えない。
+- `bara-oracle` からの loader domain 抽出、entry extraction / load command interpretation、
+  public Mach-O parser / resolver logic、import/fixup/symbol projection semantics の意味変更、
+  Objective-C/AppKit helper process execution、modeled continuation state、runtime dispatcher は
+  同じ PR では動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。

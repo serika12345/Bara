@@ -3776,6 +3776,62 @@ review gate:
 
 - runtime GuestImage relocations value object 接続を commit / push / draft PR 作成で停止する。
 
+#### PR Gate: B8-ARCH2z Runtime GuestImage Metadata Module Split
+
+branch: `task/b8-arch2z-guest-image-metadata-module-split`
+
+B8-ARCH2y が review / merge 済みになるまで開始しない。B8-ARCH2 Guest Image Model
+Extraction の次 slice として、肥大化した `bara-runtime::guest_image` module から
+`GuestImageMetadata` aggregate と metadata value object 群を専用 module へ分ける。
+B8 debug bundle は existing `GuestImage` projection 経由で
+`B8DebugGuestImageMappingReport` へ射影し、existing `loader.plan.json` output は維持する。
+
+完了条件:
+
+- [x] `crates/bara-runtime/src/guest_image/metadata.rs` を追加し、
+  `GuestImageMetadata`、`GuestImageMappedBytes`、`GuestImageMappedBytesSource`、
+  `GuestImageSections`、`GuestImageImports`、`GuestImageRelocations`、
+  `GuestImageSymbols`、`GuestImageUnwindMetadata` を移す。
+- [x] `guest_image/mod.rs` は metadata module を re-export し、existing public API 名を維持する。
+- [x] `GuestImage` / `MachOImage` / B8 debug bundle の caller-visible behavior と JSON output を
+  維持する。
+- [x] `bara-oracle` からの loader domain 抽出、public Mach-O parser / resolver logic、
+  import/fixup/symbol projection semantics の意味変更、helper bridge、runtime dispatcher は
+  移動しない。
+
+completion evidence:
+
+- 意図: `GuestImage` / `MachOImage` の image shell と metadata aggregate / value object 群の
+  変更理由を分け、`guest_image/mod.rs` の肥大化を抑える。
+- できるようになったこと: metadata payload 境界の追加や調整を
+  `guest_image/metadata.rs` で扱えるようになり、core image shell 側を変更せずに
+  metadata aggregate / value object 群を見直せる。
+- `guest_image/mod.rs` は `metadata` module を re-export し、
+  `bara_runtime::GuestImageMetadata` などの existing public API 名を維持する。
+- `GuestImage` / `MachOImage` / B8 debug bundle の caller-visible behavior と
+  `loader.plan.json` output は変えない。
+- loader domain 抽出、public Mach-O parser / resolver logic、import/fixup/symbol projection
+  semantics、helper bridge、runtime dispatcher は未移動。
+
+PR に含めない:
+
+- public Mach-O parser / resolver logic の `bara-oracle` からの移動。
+- entry extraction / load command interpretation の runtime への移動。
+- import/fixup/symbol projection semantics の意味変更または schema 変更。
+- helper boundary / Objective-C / AppKit helper bridge 一般化。
+- return-to continuation dispatcher 抽出。
+- translation artifact/cache/dispatcher 実装。
+
+検証:
+
+- `nix develop -c cargo test -p bara-runtime guest_image -- --nocapture`
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- runtime GuestImage metadata module split を commit / push / draft PR 作成で停止する。
+
 #### Future Target: B8-ARCH2 Guest Image Model Extraction
 
 - [ ] public Mach-O metadata から runtime が使う `GuestImage` / `MachOImage` domain model を
