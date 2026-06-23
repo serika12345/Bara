@@ -121,6 +121,21 @@ impl MachOExecutableCodeRange {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MachOExecutableCodeByteLen {
+    byte_len: usize,
+}
+
+impl MachOExecutableCodeByteLen {
+    const fn new(byte_len: usize) -> Self {
+        Self { byte_len }
+    }
+
+    pub const fn as_usize(self) -> usize {
+        self.byte_len
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MachOExecutableCodeSegment {
     segment: GuestImageSegment,
 }
@@ -139,6 +154,23 @@ impl MachOExecutableCodeSegment {
 
     pub const fn range(self) -> MachOExecutableCodeRange {
         MachOExecutableCodeRange::new(self.segment.range())
+    }
+
+    pub const fn vmaddr(self) -> X86Va {
+        self.segment.range().start()
+    }
+
+    pub fn byte_len(self) -> Result<MachOExecutableCodeByteLen, GuestImageError> {
+        let range = self.segment.range();
+        let byte_len = range
+            .end()
+            .value()
+            .checked_sub(range.start().value())
+            .ok_or(GuestImageError::MachOExecutableCodeByteLenOverflow)?;
+        let byte_len = usize::try_from(byte_len)
+            .map_err(|_| GuestImageError::MachOExecutableCodeByteLenOverflow)?;
+
+        Ok(MachOExecutableCodeByteLen::new(byte_len))
     }
 
     pub const fn source(self) -> GuestImageSegmentSource {

@@ -227,6 +227,20 @@ fn mach_o_executable_code_segment_exposes_mapping_identity() {
 }
 
 #[test]
+fn mach_o_executable_code_segment_exposes_derived_mapping_values() {
+    let segment = mach_o_code_segment();
+
+    assert_eq!(segment.vmaddr(), X86Va::new(0x1_0000_0000));
+    assert_eq!(
+        segment
+            .byte_len()
+            .expect("test code segment length is valid")
+            .as_usize(),
+        0x1000
+    );
+}
+
+#[test]
 fn guest_image_mapped_bytes_exposes_source_and_payload() {
     let mapped_bytes = guest_image_mapped_bytes();
 
