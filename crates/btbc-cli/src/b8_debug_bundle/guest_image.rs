@@ -1,7 +1,7 @@
 use bara_oracle::MachOEntryFunctionInput;
 use bara_runtime::{
-    GuestImage, GuestImageAddressSpace, GuestImageError, GuestImageMappedBytesSource,
-    GuestImageSegmentSource, MachOExecutableEntryPoint, MachOImage,
+    GuestImageAddressSpace, GuestImageError, GuestImageMappedBytesSource, GuestImageSegmentSource,
+    MachOExecutableEntryPoint, MachOImage,
 };
 use serde::Serialize;
 
@@ -23,14 +23,12 @@ impl B8DebugGuestImageMappingReport {
         entry_input: &MachOEntryFunctionInput,
     ) -> Result<Self, B8DebugGuestImageMappingError> {
         let mach_o_image = mach_o_image_from_entry_input(entry_input)?;
-        Self::from_guest_image(mach_o_image.guest_image())
+        Self::from_mach_o_image(&mach_o_image)
     }
 
-    fn from_guest_image(guest_image: &GuestImage) -> Result<Self, B8DebugGuestImageMappingError> {
-        let code_segment = guest_image
-            .code_segment()
-            .ok_or(B8DebugGuestImageMappingError::MissingCodeSegment)?;
-        let code_segment_range = code_segment.range();
+    fn from_mach_o_image(mach_o_image: &MachOImage) -> Result<Self, B8DebugGuestImageMappingError> {
+        let code_segment = mach_o_image.code_segment();
+        let code_segment_range = code_segment.range().range();
         let code_segment_byte_len =
             usize::try_from(code_segment_range.end().value() - code_segment_range.start().value())
                 .map_err(|_| B8DebugGuestImageMappingError::AddressOverflow)?;
@@ -41,8 +39,8 @@ impl B8DebugGuestImageMappingReport {
             address_space: code_segment.address_space().into(),
             code_segment_vmaddr: code_segment_range.start().value(),
             code_segment_byte_len,
-            entry_pc: guest_image.entry_point().address().value(),
-            mapped_bytes_source: guest_image.mapped_bytes_source().into(),
+            entry_pc: mach_o_image.entry_point().address().value(),
+            mapped_bytes_source: mach_o_image.metadata().mapped_bytes_source().into(),
         })
     }
 }
@@ -61,7 +59,6 @@ fn mach_o_image_from_entry_input(
 pub(crate) enum B8DebugGuestImageMappingError {
     AddressOverflow,
     GuestImage(GuestImageError),
-    MissingCodeSegment,
 }
 
 impl From<GuestImageSegmentSource> for B8DebugGuestImageSegmentSource {
@@ -104,4 +101,68 @@ enum B8DebugGuestImageAddressSpace {
 #[serde(rename_all = "snake_case")]
 enum B8DebugGuestImageMappedBytesSource {
     ProgramImageMetadata,
+}
+
+#[cfg(test)]
+mod tests {
+    use bara_ir::{
+        ProgramImageImports, ProgramImageMappedByteSegment, ProgramImageMappedBytes,
+        ProgramImageMetadata, ProgramImageRange, ProgramImageRelocations, ProgramImageSection,
+        ProgramImageSectionKind, ProgramImageSections, ProgramImageSymbols, ProgramUnwindMetadata,
+        X86Va,
+    };
+
+    use super::*;
+
+    fn image_range(start: u64, end: u64) -> ProgramImageRange {
+        ProgramImageRange::new(X86Va::new(start), X86Va::new(end))
+            .expect("test image range is valid")
+    }
+
+    fn program_image_metadata() -> ProgramImageMetadata {
+        let code_range = image_range(0x1_0000_0000, 0x1_0000_0010);
+        let mapped_segment = ProgramImageMappedByteSegment::new(code_range, vec![0x90; 0x10])
+            .expect("test mapped byte segment is valid");
+
+        ProgramImageMetadata::new_with_mapped_bytes(
+            ProgramImageSections::from_items([ProgramImageSection::new(
+                ProgramImageSectionKind::Code,
+                code_range,
+            )]),
+            ProgramImageMappedBytes::from_segments([mapped_segment]),
+            ProgramImageSymbols::empty(),
+            ProgramImageRelocations::empty(),
+            ProgramImageImports::empty(),
+            ProgramUnwindMetadata::empty(),
+        )
+    }
+
+    #[test]
+    fn image_mapping_report_uses_typed_mach_o_code_segment() {
+        let image = MachOImage::executable_from_program_image_metadata(
+            MachOExecutableEntryPoint::new(X86Va::new(0x1_0000_0008)),
+            &program_image_metadata(),
+        )
+        .expect("test Mach-O image is valid");
+
+        let report = B8DebugGuestImageMappingReport::from_mach_o_image(&image)
+            .expect("test mapping report is valid");
+
+        assert_eq!(report.status, B8DebugStageStatus::Executed);
+        assert_eq!(
+            report.segment_source,
+            B8DebugGuestImageSegmentSource::LcSegment64FileRange
+        );
+        assert_eq!(
+            report.address_space,
+            B8DebugGuestImageAddressSpace::MachOVirtualAddress
+        );
+        assert_eq!(report.code_segment_vmaddr, 0x1_0000_0000);
+        assert_eq!(report.code_segment_byte_len, 0x10);
+        assert_eq!(report.entry_pc, 0x1_0000_0008);
+        assert_eq!(
+            report.mapped_bytes_source,
+            B8DebugGuestImageMappedBytesSource::ProgramImageMetadata
+        );
+    }
 }
