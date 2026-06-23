@@ -9,8 +9,8 @@ pub use guest_image::{
     GuestImage, GuestImageAddressSpace, GuestImageEntryPoint, GuestImageError, GuestImageFormat,
     GuestImageMappedBytes, GuestImageMappedBytesSource, GuestImageMetadata, GuestImageSections,
     GuestImageSegment, GuestImageSegmentKind, GuestImageSegmentSource, GuestImageSegments,
-    GuestImageSymbols, MachOExecutableCodeRange, MachOExecutableCodeSegment,
-    MachOExecutableEntryPoint, MachOImage,
+    GuestImageSymbols, GuestImageUnwindMetadata, MachOExecutableCodeRange,
+    MachOExecutableCodeSegment, MachOExecutableEntryPoint, MachOImage,
 };
 pub use host_trap::{HostTrapPlan, RunStdout, RunStdoutError};
 pub use launch::{
