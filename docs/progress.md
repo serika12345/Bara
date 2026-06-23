@@ -39,6 +39,7 @@
    `B8-ARCH2v Runtime GuestImage Symbols Value Object`、
    `B8-ARCH2w Runtime GuestImage Unwind Metadata Value Object`、
    `B8-ARCH2x Runtime GuestImage Imports Value Object`、
+   `B8-ARCH2y Runtime GuestImage Relocations Value Object`、
    `B8-ARCH2 Guest Image Model Extraction`
 2. [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) の `R1` / `R1a` と
    `Instruction Coverage Strategy`
@@ -46,7 +47,7 @@
    B8-ARCH1 responsibility split audit と、`D4a: x86_64 ISA semantic coverage strategy`
 4. この `docs/progress.md` の現在の作業スナップショット
 
-B8-ARCH2x review / merge 後の次候補:
+B8-ARCH2y review / merge 後の次候補:
 
 - `main` を最新化したうえで、TODO-backed PR Gate を追加または選び、dedicated branch を作る。
 - 候補は B8-ARCH2 Guest Image Model Extraction の次の小さい slice、または helper process /
@@ -73,31 +74,32 @@ B8-ARCH2x review / merge 後の次候補:
   `GuestImageSymbols` value object にまとめ、B8-ARCH2w では unwind metadata payload を
   `GuestImageUnwindMetadata` value object にまとめるため、JSON schema 名、field 名、既存
   B8-HWGUI debug bundle output を維持したまま後続境界を切り、B8-ARCH2x では imports
-  payload を `GuestImageImports` value object にまとめる。
+  payload を `GuestImageImports` value object にまとめ、B8-ARCH2y では relocations payload を
+  `GuestImageRelocations` value object にまとめる。
 - helper process execution、loader image model、runtime dispatcher、decoder dependency 採用は、
   対応する TODO / design TODO が具体化されるまで混ぜない。
 
-B8-ARCH2x review / merge 後にすぐ始めないもの:
+B8-ARCH2y review / merge 後にすぐ始めないもの:
 
 - B8-OSS0 source-built OSS GUI app automation
-- fixups の runtime domain 抽出、import projection semantics の変更、
+- relocation/fixup projection semantics の変更、import projection semantics の変更、
   symbol projection semantics の変更
 - arbitrary Objective-C message send、general continuation execution、
   translation cache、fallback JIT/interpreter、Wine bridge
 - B8-HWGUI fixture 専用 path のさらなる機能追加
 - decoder dependency 採用、ISA implementation / lowering 追加、supply-chain lockfile 変更
 
-B8-ARCH2x review package で示すべきもの:
+B8-ARCH2y review package で示すべきもの:
 
-- `bara-runtime/src/guest_image/mod.rs` の `GuestImageImports` が `ProgramImageImports`
+- `bara-runtime/src/guest_image/mod.rs` の `GuestImageRelocations` が `ProgramImageRelocations`
   payload を runtime-facing value object として表す範囲
-- 意図は imports payload を direct collection field から分け、import projection semantics を
-  変えずに後続の loader/import 境界を扱いやすくすること
-- `GuestImageMetadata::new` が `ProgramImageImports` を直接受け取らず、
-  `GuestImageImports` を受け取ること
-- `GuestImageMetadata::from_program_image_metadata` が imports clone を
-  `GuestImageImports::from_program_image_metadata` に閉じること
-- できるようになったこととして、runtime-facing metadata assembly が imports payload を
+- 意図は relocations payload を direct collection field から分け、relocation/fixup
+  projection semantics を変えずに後続の loader/fixup 境界を扱いやすくすること
+- `GuestImageMetadata::new` が `ProgramImageRelocations` を直接受け取らず、
+  `GuestImageRelocations` を受け取ること
+- `GuestImageMetadata::from_program_image_metadata` が relocations clone を
+  `GuestImageRelocations::from_program_image_metadata` に閉じること
+- できるようになったこととして、runtime-facing metadata assembly が relocations payload を
   型付き境界として保持できること
 - B8 debug bundle が existing `GuestImage` projection 経由で existing
   `B8DebugGuestImageMappingReport` へ射影し続けること
@@ -111,10 +113,29 @@ B8-ARCH2x review package で示すべきもの:
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-23 13:53 JST
+最終更新: 2026-06-23 14:02 JST
 
 状態:
 
+- active_work: completed。B8-ARCH2y Runtime GuestImage Relocations Value Object を
+  `task/b8-arch2y-guest-image-relocations-value` で実施した。意図は relocations payload を
+  `GuestImageMetadata` の direct collection field から分け、relocation/fixup projection
+  semantics を変えずに後続の loader/fixup 境界を扱いやすくすること。`bara-runtime` は
+  `GuestImageRelocations` を追加し、`ProgramImageRelocations` payload を runtime-facing
+  value object として保持する。これにより `GuestImageMetadata` construction は
+  `ProgramImageRelocations` を直接受け取らず、`GuestImageRelocations` を受け取って保持できる。
+  `GuestImageMetadata::from_program_image_metadata` は
+  `GuestImageRelocations::from_program_image_metadata` 経由で relocations clone を value object 側に
+  閉じる。`GuestImage` / `GuestImageMetadata` の existing `relocations()` accessor は維持。
+  B8 debug bundle は existing `GuestImage` projection 経由で existing
+  `B8DebugGuestImageMappingReport` へ射影し、`loader.plan.json` の image mapping JSON は維持。
+  `bara-oracle` からの loader domain 抽出、entry extraction / load command interpretation、
+  public Mach-O parser / resolver logic、relocation/fixup projection semantics の意味変更、
+  import/symbol projection の意味変更、helper bridge、runtime dispatcher は未移動。
+  依存・lockfile・toolchain 変更はない。verification は
+  `nix develop -c cargo test -p bara-runtime guest_image -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
+  `nix develop -c ./scripts/verify`。
 - active_work: completed。B8-ARCH2x Runtime GuestImage Imports Value Object を
   `task/b8-arch2x-guest-image-imports-value` で実施した。意図は imports payload を
   `GuestImageMetadata` の direct collection field から分け、import projection semantics を

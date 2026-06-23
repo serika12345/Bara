@@ -8,9 +8,9 @@ pub use executable_memory::{ExecutableMemory, ExecutableMemoryError};
 pub use guest_image::{
     GuestImage, GuestImageAddressSpace, GuestImageEntryPoint, GuestImageError, GuestImageFormat,
     GuestImageImports, GuestImageMappedBytes, GuestImageMappedBytesSource, GuestImageMetadata,
-    GuestImageSections, GuestImageSegment, GuestImageSegmentKind, GuestImageSegmentSource,
-    GuestImageSegments, GuestImageSymbols, GuestImageUnwindMetadata, MachOExecutableCodeRange,
-    MachOExecutableCodeSegment, MachOExecutableEntryPoint, MachOImage,
+    GuestImageRelocations, GuestImageSections, GuestImageSegment, GuestImageSegmentKind,
+    GuestImageSegmentSource, GuestImageSegments, GuestImageSymbols, GuestImageUnwindMetadata,
+    MachOExecutableCodeRange, MachOExecutableCodeSegment, MachOExecutableEntryPoint, MachOImage,
 };
 pub use host_trap::{HostTrapPlan, RunStdout, RunStdoutError};
 pub use launch::{
