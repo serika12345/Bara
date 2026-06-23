@@ -3947,6 +3947,62 @@ review gate:
 
 - runtime GuestImage core module split を commit / push / draft PR 作成で停止する。
 
+#### PR Gate: B8-ARCH2ac Runtime GuestImage Test Module Split
+
+branch: `task/b8-arch2ac-guest-image-test-module-split`
+
+B8-ARCH2ab が review / merge 済みになるまで開始しない。B8-ARCH2 Guest Image Model
+Extraction の次 slice として、`bara-runtime::guest_image` parent module に残った unit test
+群を専用 test module へ分ける。production behavior、public API、B8 debug bundle の
+`loader.plan.json` output は維持する。
+
+完了条件:
+
+- [x] `crates/bara-runtime/src/guest_image/tests.rs` を追加し、existing `guest_image` unit test
+  群を `mod.rs` から移す。
+- [x] `guest_image/mod.rs` は submodule wiring / re-export / test module declaration に寄せ、
+  production type definitions を持たない。
+- [x] existing `guest_image` tests の coverage と names を維持し、caller-visible behavior と
+  JSON output を維持する。
+- [x] `bara-oracle` からの loader domain 抽出、public Mach-O parser / resolver logic、
+  import/fixup/symbol projection semantics の意味変更、helper bridge、runtime dispatcher は
+  移動しない。
+
+completion evidence:
+
+- 意図: `guest_image/mod.rs` に残った unit test 群を分け、parent module を submodule wiring /
+  re-export / test module declaration に近づける。
+- できるようになったこと: production module wiring と test fixture / regression coverage の
+  変更理由を分けられるようになり、`guest_image` 親 module の diff から production boundary を
+  読み取りやすくなった。
+- `crates/bara-runtime/src/guest_image/tests.rs` を追加し、existing `guest_image` unit test 群を
+  移した。
+- `guest_image/mod.rs` は production type definitions を持たず、`image` / `mach_o` /
+  `metadata` module wiring と public re-export、test module declaration だけを持つ。
+- existing `guest_image` tests の names と coverage、caller-visible behavior、
+  `loader.plan.json` output は変えない。
+- loader domain 抽出、public Mach-O parser / resolver logic、import/fixup/symbol projection
+  semantics、helper bridge、runtime dispatcher は未移動。
+
+PR に含めない:
+
+- public Mach-O parser / resolver logic の `bara-oracle` からの移動。
+- entry extraction / load command interpretation の runtime への移動。
+- import/fixup/symbol projection semantics の意味変更または schema 変更。
+- helper boundary / Objective-C / AppKit helper bridge 一般化。
+- return-to continuation dispatcher 抽出。
+- translation artifact/cache/dispatcher 実装。
+
+検証:
+
+- `nix develop -c cargo test -p bara-runtime guest_image -- --nocapture`
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- runtime GuestImage test module split を commit / push / draft PR 作成で停止する。
+
 #### Future Target: B8-ARCH2 Guest Image Model Extraction
 
 - [ ] public Mach-O metadata から runtime が使う `GuestImage` / `MachOImage` domain model を

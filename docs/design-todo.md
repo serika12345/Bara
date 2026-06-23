@@ -474,6 +474,23 @@ B8-ARCH2ab result:
   Objective-C/AppKit helper process execution、modeled continuation state、runtime dispatcher は
   同じ PR では動かさない。
 
+B8-ARCH2ac result:
+
+- 2026-06-23 に `crates/bara-runtime/src/guest_image/tests.rs` を追加し、existing
+  `guest_image` unit test 群を `guest_image/mod.rs` から分けた。
+- 意図は parent module に残った test fixture / regression coverage と production module
+  wiring の変更理由を分け、`guest_image/mod.rs` を submodule wiring / re-export /
+  test module declaration に近づけること。
+- `guest_image/mod.rs` は production type definitions を持たず、`image` / `mach_o` /
+  `metadata` module wiring と public re-export、test module declaration だけを持つ。
+- これにより production boundary の diff と test coverage の diff を分けて読める。
+  existing `guest_image` test names / coverage、caller-visible behavior、B8 debug bundle の
+  `loader.plan.json` output は変えない。
+- `bara-oracle` からの loader domain 抽出、entry extraction / load command interpretation、
+  public Mach-O parser / resolver logic、import/fixup/symbol projection semantics の意味変更、
+  Objective-C/AppKit helper process execution、modeled continuation state、runtime dispatcher は
+  同じ PR では動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。
