@@ -11,6 +11,10 @@ Follow it together with the repository documentation, especially
 Agents should report status, summaries, review packages, blockers, and final
 answers in Japanese by default.
 
+When reporting implementation work, include the intent behind the change and
+what the change makes possible, not only the mechanical list of edited files or
+behaviors.
+
 Keep source code, command names, file paths, identifiers, quoted output, and
 documentation edits in the language and format appropriate to the surrounding
 context, unless the user explicitly requests translation.
