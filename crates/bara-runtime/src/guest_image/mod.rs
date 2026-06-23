@@ -105,20 +105,22 @@ pub enum GuestImageFormat {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MachOImage {
     guest_image: GuestImage,
+    code_segment: MachOExecutableCodeSegment,
 }
 
 impl MachOImage {
     pub fn executable(
         entry_point: MachOExecutableEntryPoint,
-        code_segment: GuestImageSegment,
+        code_segment: MachOExecutableCodeSegment,
         metadata: GuestImageMetadata,
     ) -> Result<Self, GuestImageError> {
         Ok(Self {
             guest_image: GuestImage::mach_o_executable(
                 entry_point.guest_image_entry_point(),
-                code_segment,
+                code_segment.guest_image_segment(),
                 metadata,
             )?,
+            code_segment,
         })
     }
 
@@ -129,7 +131,7 @@ impl MachOImage {
     ) -> Result<Self, GuestImageError> {
         Self::executable(
             entry_point,
-            GuestImageSegment::mach_o_executable_code(code_range),
+            MachOExecutableCodeSegment::new(code_range),
             metadata,
         )
     }
@@ -157,8 +159,8 @@ impl MachOImage {
         MachOExecutableEntryPoint::new(self.guest_image.entry_point().address())
     }
 
-    pub fn code_segment(&self) -> Option<GuestImageSegment> {
-        self.guest_image.code_segment()
+    pub const fn code_segment(&self) -> MachOExecutableCodeSegment {
+        self.code_segment
     }
 
     pub const fn metadata(&self) -> &GuestImageMetadata {
@@ -215,6 +217,35 @@ impl MachOExecutableCodeRange {
 
     pub const fn range(self) -> ProgramImageRange {
         self.range
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MachOExecutableCodeSegment {
+    segment: GuestImageSegment,
+}
+
+impl MachOExecutableCodeSegment {
+    pub const fn new(range: MachOExecutableCodeRange) -> Self {
+        Self {
+            segment: GuestImageSegment::mach_o_executable_code(range),
+        }
+    }
+
+    pub const fn range(self) -> MachOExecutableCodeRange {
+        MachOExecutableCodeRange::new(self.segment.range())
+    }
+
+    pub const fn source(self) -> GuestImageSegmentSource {
+        self.segment.source()
+    }
+
+    pub const fn address_space(self) -> GuestImageAddressSpace {
+        self.segment.address_space()
+    }
+
+    const fn guest_image_segment(self) -> GuestImageSegment {
+        self.segment
     }
 }
 
@@ -431,7 +462,8 @@ mod tests {
         GuestImage, GuestImageAddressSpace, GuestImageEntryPoint, GuestImageError,
         GuestImageFormat, GuestImageMappedBytesSource, GuestImageMetadata, GuestImageSegment,
         GuestImageSegmentKind, GuestImageSegmentSource, GuestImageSegments,
-        MachOExecutableCodeRange, MachOExecutableEntryPoint, MachOImage,
+        MachOExecutableCodeRange, MachOExecutableCodeSegment, MachOExecutableEntryPoint,
+        MachOImage,
     };
     use bara_ir::{
         ExternalSymbolId, ExternalSymbolImport, ProgramImageImport, ProgramImageImports,
@@ -454,6 +486,13 @@ mod tests {
             GuestImageSegmentSource::LcSegment64FileRange,
             GuestImageAddressSpace::MachOVirtualAddress,
         )
+    }
+
+    fn mach_o_code_segment() -> MachOExecutableCodeSegment {
+        MachOExecutableCodeSegment::new(MachOExecutableCodeRange::new(image_range(
+            0x1_0000_0000,
+            0x1_0000_1000,
+        )))
     }
 
     fn mapped_bytes() -> ProgramImageMappedBytes {
@@ -572,14 +611,14 @@ mod tests {
     fn mach_o_image_wraps_runtime_guest_image_shell() {
         let image = MachOImage::executable(
             MachOExecutableEntryPoint::new(X86Va::new(0x1_0000_0010)),
-            code_segment(),
+            mach_o_code_segment(),
             metadata(),
         )
         .expect("entry is inside code segment");
 
         assert_eq!(image.guest_image().format(), GuestImageFormat::MachO);
         assert_eq!(image.entry_point().address(), X86Va::new(0x1_0000_0010));
-        assert_eq!(image.code_segment(), Some(code_segment()));
+        assert_eq!(image.code_segment(), mach_o_code_segment());
         assert_eq!(image.metadata(), &metadata());
         assert_eq!(image.guest_image().metadata(), &metadata());
     }
@@ -595,8 +634,27 @@ mod tests {
 
         assert_eq!(image.guest_image().format(), GuestImageFormat::MachO);
         assert_eq!(image.entry_point().address(), X86Va::new(0x1_0000_0010));
-        assert_eq!(image.code_segment(), Some(code_segment()));
+        assert_eq!(image.code_segment(), mach_o_code_segment());
         assert_eq!(image.metadata(), &metadata());
+    }
+
+    #[test]
+    fn mach_o_executable_code_segment_exposes_mapping_identity() {
+        let segment = mach_o_code_segment();
+
+        assert_eq!(
+            segment.range(),
+            MachOExecutableCodeRange::new(image_range(0x1_0000_0000, 0x1_0000_1000))
+        );
+        assert_eq!(
+            segment.source(),
+            GuestImageSegmentSource::LcSegment64FileRange
+        );
+        assert_eq!(
+            segment.address_space(),
+            GuestImageAddressSpace::MachOVirtualAddress
+        );
+        assert_eq!(segment.guest_image_segment(), code_segment());
     }
 
     #[test]
@@ -686,7 +744,7 @@ mod tests {
             image.guest_image().mapped_bytes_source(),
             GuestImageMappedBytesSource::ProgramImageMetadata
         );
-        assert_eq!(image.code_segment(), Some(code_segment()));
+        assert_eq!(image.code_segment(), mach_o_code_segment());
         assert_eq!(image.metadata(), &metadata());
     }
 
