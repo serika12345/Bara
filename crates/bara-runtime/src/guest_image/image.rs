@@ -217,5 +217,6 @@ pub enum GuestImageError {
     MissingCodeSegment,
     MissingMachOExecutableCodeSection,
     AmbiguousMachOExecutableCodeSections,
+    MachOExecutableCodeByteLenOverflow,
     EntryOutsideMappedSegments,
 }

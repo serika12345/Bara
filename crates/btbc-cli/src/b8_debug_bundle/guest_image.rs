@@ -28,17 +28,16 @@ impl B8DebugGuestImageMappingReport {
 
     fn from_mach_o_image(mach_o_image: &MachOImage) -> Result<Self, B8DebugGuestImageMappingError> {
         let code_segment = mach_o_image.code_segment();
-        let code_segment_range = code_segment.range().range();
-        let code_segment_byte_len =
-            usize::try_from(code_segment_range.end().value() - code_segment_range.start().value())
-                .map_err(|_| B8DebugGuestImageMappingError::AddressOverflow)?;
+        let code_segment_byte_len = code_segment
+            .byte_len()
+            .map_err(B8DebugGuestImageMappingError::GuestImage)?;
 
         Ok(Self {
             status: B8DebugStageStatus::Executed,
             segment_source: code_segment.source().into(),
             address_space: code_segment.address_space().into(),
-            code_segment_vmaddr: code_segment_range.start().value(),
-            code_segment_byte_len,
+            code_segment_vmaddr: code_segment.vmaddr().value(),
+            code_segment_byte_len: code_segment_byte_len.as_usize(),
             entry_pc: mach_o_image.entry_point().address().value(),
             mapped_bytes_source: mach_o_image.metadata().mapped_bytes_source().into(),
         })
@@ -57,7 +56,6 @@ fn mach_o_image_from_entry_input(
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum B8DebugGuestImageMappingError {
-    AddressOverflow,
     GuestImage(GuestImageError),
 }
 

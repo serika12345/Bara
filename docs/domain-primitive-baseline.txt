@@ -41,6 +41,7 @@ crates/bara-oracle/src/testcase/mod.rs:    pub fn from_bytes(bytes: Vec<u8>) -> 
 crates/bara-oracle/src/testcase/mod.rs:pub struct TestCaseU64(u64);
 crates/bara-runtime/src/executable_memory/mod.rs:    pub const fn entry_ptr(&self) -> NonNull<u8> {
 crates/bara-runtime/src/executable_memory/mod.rs:    pub fn allocate(code: &[u8]) -> Result<Self, ExecutableMemoryError> {
+crates/bara-runtime/src/guest_image/mach_o.rs:    pub const fn as_usize(self) -> usize {
 crates/bara-runtime/src/host_trap/mod.rs:    pub fn from_text(text: String) -> Result<Self, RunStdoutError> {
 crates/bara-runtime/src/runner/mod.rs:    pub const fn new(return_value: u64) -> Self {
 crates/bara-runtime/src/runner/mod.rs:    pub const fn new(value: u64) -> Self {

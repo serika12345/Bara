@@ -507,6 +507,26 @@ B8-ARCH2ad result:
   Objective-C/AppKit helper process execution、modeled continuation state、runtime dispatcher は
   同じ PR では動かさない。
 
+B8-ARCH2ae result:
+
+- 2026-06-23 に `MachOExecutableCodeByteLen` を追加し、
+  `MachOExecutableCodeSegment::vmaddr()` / `byte_len()` から Mach-O executable code segment の
+  mapping 値を導出できるようにした。
+- 意図は Mach-O executable code segment から計算できる vmaddr / byte length を runtime
+  domain 側へ寄せ、B8 debug bundle DTO が `ProgramImageRange` の start / end を直接解釈しない
+  ようにすること。
+- `byte_len()` は typed `MachOExecutableCodeByteLen` を返し、JSON DTO 用の primitive `usize`
+  変換は `as_usize()` accessor に閉じた。byte length overflow は `GuestImageError` として
+  runtime boundary で分類する。`as_usize()` は serialization DTO 境界で必要な deliberate
+  primitive accessor として `docs/domain-primitive-baseline.txt` に追加した。
+- `B8DebugGuestImageMappingReport` は `code_segment.range().range()` を使わず、
+  `MachOExecutableCodeSegment` の derived accessor から existing `image_mapping` JSON を
+  組み立てる。existing B8 debug bundle behavior と `loader.plan.json` output は変えない。
+- `bara-oracle` からの loader domain 抽出、entry extraction / load command interpretation、
+  public Mach-O parser / resolver logic、import/fixup/symbol projection semantics の意味変更、
+  Objective-C/AppKit helper process execution、modeled continuation state、runtime dispatcher は
+  同じ PR では動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。
