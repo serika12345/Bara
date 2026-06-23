@@ -7,8 +7,8 @@ pub mod runner;
 pub use executable_memory::{ExecutableMemory, ExecutableMemoryError};
 pub use guest_image::{
     GuestImage, GuestImageAddressSpace, GuestImageEntryPoint, GuestImageError, GuestImageFormat,
-    GuestImageMappedBytesSource, GuestImageMetadata, GuestImageSegment, GuestImageSegmentKind,
-    GuestImageSegmentSource, GuestImageSegments, MachOExecutableCodeRange,
+    GuestImageMappedBytes, GuestImageMappedBytesSource, GuestImageMetadata, GuestImageSegment,
+    GuestImageSegmentKind, GuestImageSegmentSource, GuestImageSegments, MachOExecutableCodeRange,
     MachOExecutableCodeSegment, MachOExecutableEntryPoint, MachOImage,
 };
 pub use host_trap::{HostTrapPlan, RunStdout, RunStdoutError};
