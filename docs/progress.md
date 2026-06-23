@@ -47,6 +47,7 @@
    `B8-ARCH2ad Debug Guest Image MachO Projection Boundary`、
    `B8-ARCH2ae Runtime MachO Code Segment Derived Accessors`、
    `B8-ARCH2af Runtime MachO Image Mapping Snapshot`、
+   `B8-ARCH2ag Runtime MachO Mapping Mapped Bytes Snapshot`、
    `B8-ARCH2 Guest Image Model Extraction`
 2. [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) の `R1` / `R1a` と
    `Instruction Coverage Strategy`
@@ -54,7 +55,7 @@
    B8-ARCH1 responsibility split audit と、`D4a: x86_64 ISA semantic coverage strategy`
 4. この `docs/progress.md` の現在の作業スナップショット
 
-B8-ARCH2af review / merge 後の次候補:
+B8-ARCH2ag review / merge 後の次候補:
 
 - `main` を最新化したうえで、TODO-backed PR Gate を追加または選び、dedicated branch を作る。
 - 候補は B8-ARCH2 Guest Image Model Extraction の次の小さい slice、または helper process /
@@ -91,11 +92,12 @@ B8-ARCH2af review / merge 後の次候補:
   `MachOImage::code_segment()` boundary へ寄せ、B8-ARCH2ae では Mach-O executable code
   segment の vmaddr / byte length derivation を runtime domain accessor へ寄せ、B8-ARCH2af
   では B8 debug bundle の `image_mapping` projection に渡す runtime mapping 構成を
-  `MachOExecutableImageMapping` snapshot としてまとめる。
+  `MachOExecutableImageMapping` snapshot としてまとめ、B8-ARCH2ag では mapping snapshot が
+  `GuestImageMappedBytes` value object も保持するようにする。
 - helper process execution、loader image model、runtime dispatcher、decoder dependency 採用は、
   対応する TODO / design TODO が具体化されるまで混ぜない。
 
-B8-ARCH2af review / merge 後にすぐ始めないもの:
+B8-ARCH2ag review / merge 後にすぐ始めないもの:
 
 - B8-OSS0 source-built OSS GUI app automation
 - relocation/fixup projection semantics の変更、import projection semantics の変更、
@@ -105,35 +107,55 @@ B8-ARCH2af review / merge 後にすぐ始めないもの:
 - B8-HWGUI fixture 専用 path のさらなる機能追加
 - decoder dependency 採用、ISA implementation / lowering 追加、supply-chain lockfile 変更
 
-B8-ARCH2af review package で示すべきもの:
+B8-ARCH2ag review package で示すべきもの:
 
-- `bara-runtime/src/guest_image/mach_o.rs` に `MachOExecutableImageMapping` と
-  `MachOImage::executable_mapping()` を追加した範囲
-- 意図は B8 debug bundle の `image_mapping` projection が必要とする code segment、entry
-  point、mapped bytes source を `MachOImage` の内部 accessor 群から直接集めるのではなく、
-  runtime domain の snapshot として渡すこと
-- できるようになったこととして、caller が `MachOExecutableImageMapping` を単位に mapping
-  構成を扱えるようになり、debug DTO projection の理由で `MachOImage` の metadata 構造を
-  知る必要がなくなったこと
-- `btbc-cli/src/b8_debug_bundle/guest_image.rs` の `B8DebugGuestImageMappingReport` が
-  `MachOExecutableImageMapping` から report を組み立てること
+- `bara-runtime/src/guest_image/mach_o.rs` の `MachOExecutableImageMapping` が
+  `GuestImageMappedBytes` value object を保持するようになった範囲
+- 意図は B8 debug bundle と後続 runtime loader caller が mapping snapshot から mapped bytes
+  source だけでなく payload value object も読めるようにすること
+- できるようになったこととして、caller が `MachOExecutableImageMapping::mapped_bytes()` から
+  source と payload を同じ runtime-facing snapshot 経由で扱えること
+- `MachOExecutableImageMapping::mapped_bytes_source()` は残し、既存 CLI report projection は
+  existing API で同じ JSON output を維持すること
 - focused regression test として
-  `mach_o_image_exposes_executable_mapping_snapshot` を追加したこと
+  `mach_o_executable_mapping_carries_mapped_bytes_value` を追加したこと
 - `loader.plan.json` の `image_mapping` field 名、nested field 名、serde 値、JSON output を
   維持したこと
 - import/fixup projection、helper boundary、helper process execution、modeled continuation を
   まだ移していないこと
-- `nix develop -c cargo test -p bara-runtime mach_o_image_exposes_executable_mapping_snapshot -- --nocapture`
+- `nix develop -c cargo test -p bara-runtime mach_o_executable_mapping_carries_mapped_bytes_value -- --nocapture`
 - `nix develop -c cargo test -p btbc-cli image_mapping_report_uses_typed_mach_o_code_segment -- --nocapture`
 - `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
 - `nix develop -c ./scripts/verify`
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-23 16:32 JST
+最終更新: 2026-06-23 16:56 JST
 
 状態:
 
+- active_work: completed。B8-ARCH2ag Runtime MachO Mapping Mapped Bytes Snapshot を
+  `task/b8-arch2ag-macho-mapping-bytes-payload` で実施した。関連 TODO は
+  `TODO.md` の `B8-ARCH2ag Runtime MachO Mapping Mapped Bytes Snapshot`、関連設計メモは
+  `docs/design-todo.md` の `B8-ARCH2ag result`。意図は B8 debug bundle と後続 runtime loader
+  caller が mapping snapshot から mapped bytes source だけでなく payload value object も
+  読めるようにし、debug DTO projection の理由で `MachOImage` / metadata 内部構造へ戻らない
+  境界を強めること。`bara-runtime` は `MachOExecutableImageMapping` が
+  `GuestImageMappedBytes` value object を保持するようにし、
+  `MachOExecutableImageMapping::mapped_bytes()` で source と payload を同じ runtime-facing
+  snapshot から扱えるようにした。`MachOExecutableImageMapping::mapped_bytes_source()` は残し、
+  source は snapshot 内の value object から導出する。`btbc-cli` の
+  `B8DebugGuestImageMappingReport` は existing API で mapped bytes source を report し、
+  existing B8 debug bundle behavior と `loader.plan.json` output は維持。`bara-oracle` からの
+  loader domain 抽出、entry extraction / load command interpretation、public Mach-O parser /
+  resolver logic、import/fixup/symbol projection semantics の意味変更、helper bridge、runtime
+  dispatcher は未移動。依存・lockfile・toolchain 変更はない。remaining work は PR review 後に
+  B8-ARCH2 Guest Image Model Extraction の次 slice または helper process / Objective-C bridge
+  境界の TODO-backed PR Gate を選ぶこと。verification は
+  `nix develop -c cargo test -p bara-runtime mach_o_executable_mapping_carries_mapped_bytes_value -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli image_mapping_report_uses_typed_mach_o_code_segment -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
+  `nix develop -c ./scripts/verify`。
 - active_work: completed。B8-ARCH2af Runtime MachO Image Mapping Snapshot を
   `task/b8-arch2af-macho-image-mapping-snapshot` で実施した。関連 TODO は
   `TODO.md` の `B8-ARCH2af Runtime MachO Image Mapping Snapshot`、関連設計メモは

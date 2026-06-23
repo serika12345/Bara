@@ -430,6 +430,26 @@ fn mach_o_image_exposes_executable_mapping_snapshot() {
 }
 
 #[test]
+fn mach_o_executable_mapping_carries_mapped_bytes_value() {
+    let image = MachOImage::executable(
+        MachOExecutableEntryPoint::new(X86Va::new(0x1_0000_0010)),
+        mach_o_code_segment(),
+        metadata(),
+    )
+    .expect("entry is inside code segment");
+    let mapping = image.executable_mapping();
+
+    assert_eq!(mapping.mapped_bytes(), &guest_image_mapped_bytes());
+    assert_eq!(
+        mapping
+            .mapped_bytes()
+            .payload()
+            .read_u64_le(X86Va::new(0x1_0000_0000)),
+        Some(42)
+    );
+}
+
+#[test]
 fn guest_image_rejects_entry_outside_mapped_segments() {
     assert_eq!(
         GuestImage::mach_o_executable(
