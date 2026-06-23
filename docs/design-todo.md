@@ -491,6 +491,22 @@ B8-ARCH2ac result:
   Objective-C/AppKit helper process execution、modeled continuation state、runtime dispatcher は
   同じ PR では動かさない。
 
+B8-ARCH2ad result:
+
+- 2026-06-23 に `crates/btbc-cli/src/b8_debug_bundle/guest_image.rs` の
+  `B8DebugGuestImageMappingReport` projection を generic `GuestImage::code_segment()` lookup
+  から typed `MachOImage::code_segment()` boundary に寄せた。
+- 意図は B8 debug bundle の `image_mapping` projection が runtime の typed `MachOImage`
+  boundary を直接使うようにし、generic image invariant の再検証を CLI report DTO 側から外すこと。
+- `MachOImage` が code segment を non-optional に保持している contract を caller 側で使い、
+  debug bundle 固有の impossible `MissingCodeSegment` error branch を削った。
+- これにより `MachOImage::code_segment()` の non-optional contract を report projection 側で
+  利用できる。existing B8 debug bundle behavior と `loader.plan.json` output は変えない。
+- `bara-oracle` からの loader domain 抽出、entry extraction / load command interpretation、
+  public Mach-O parser / resolver logic、import/fixup/symbol projection semantics の意味変更、
+  Objective-C/AppKit helper process execution、modeled continuation state、runtime dispatcher は
+  同じ PR では動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。

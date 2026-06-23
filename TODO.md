@@ -4003,6 +4003,65 @@ review gate:
 
 - runtime GuestImage test module split を commit / push / draft PR 作成で停止する。
 
+#### PR Gate: B8-ARCH2ad Debug Guest Image MachO Projection Boundary
+
+branch: `task/b8-arch2ad-debug-guest-image-macho-projection`
+
+B8-ARCH2ac が review / merge 済みになるまで開始しない。B8-ARCH2 Guest Image Model
+Extraction の次 slice として、B8 debug bundle の `image_mapping` report projection を
+generic `GuestImage::code_segment()` lookup ではなく runtime の typed `MachOImage`
+boundary から読むように寄せる。production behavior、public API、B8 debug bundle の
+`loader.plan.json` output は維持する。
+
+完了条件:
+
+- [x] `B8DebugGuestImageMappingReport` に focused regression test を追加し、typed
+  `MachOImage` code segment から `image_mapping` report が作られることを固定する。
+- [x] `B8DebugGuestImageMappingReport::from_entry_input` は `MachOImage` を構築したあと、
+  generic `GuestImage::code_segment()` ではなく `MachOImage::code_segment()` から report を
+  組み立てる。
+- [x] runtime `MachOImage` が code segment を non-optional に保持している前提を caller 側で使い、
+  debug bundle 固有の impossible `MissingCodeSegment` error branch を削る。
+- [x] `loader.plan.json` の `image_mapping` field 名、nested field 名、serde 値、JSON output を
+  維持する。
+- [x] `bara-oracle` からの loader domain 抽出、public Mach-O parser / resolver logic、
+  import/fixup/symbol projection semantics の意味変更、helper bridge、runtime dispatcher は
+  移動しない。
+
+completion evidence:
+
+- 意図: B8 debug bundle の `image_mapping` projection が runtime の typed `MachOImage`
+  boundary を直接使うようにし、generic image invariant の再検証を CLI report DTO 側から外す。
+- できるようになったこと: `MachOImage::code_segment()` の non-optional contract を caller 側で
+  利用できるようになり、debug report projection から存在しない code segment 欠落 path を
+  読まなくてよくなった。
+- `crates/btbc-cli/src/b8_debug_bundle/guest_image.rs` に
+  `image_mapping_report_uses_typed_mach_o_code_segment` を追加した。
+- `B8DebugGuestImageMappingReport::from_entry_input` は `MachOImage` から report を組み立て、
+  `GuestImage::code_segment()` lookup と `MissingCodeSegment` error branch を使わない。
+- existing B8 debug bundle behavior と `loader.plan.json` output は変えない。
+- loader domain 抽出、public Mach-O parser / resolver logic、import/fixup/symbol projection
+  semantics、helper bridge、runtime dispatcher は未移動。
+
+PR に含めない:
+
+- public Mach-O parser / resolver logic の `bara-oracle` からの移動。
+- entry extraction / load command interpretation の runtime への移動。
+- import/fixup/symbol projection semantics の意味変更または schema 変更。
+- helper boundary / Objective-C / AppKit helper bridge 一般化。
+- return-to continuation dispatcher 抽出。
+- translation artifact/cache/dispatcher 実装。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli image_mapping_report_uses_typed_mach_o_code_segment -- --nocapture`
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- debug guest image Mach-O projection boundary を commit / push / draft PR 作成で停止する。
+
 #### Future Target: B8-ARCH2 Guest Image Model Extraction
 
 - [ ] public Mach-O metadata から runtime が使う `GuestImage` / `MachOImage` domain model を
