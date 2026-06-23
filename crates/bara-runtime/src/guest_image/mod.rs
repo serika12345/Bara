@@ -404,7 +404,7 @@ pub struct GuestImageMetadata {
     mapped_bytes: GuestImageMappedBytes,
     sections: GuestImageSections,
     symbols: GuestImageSymbols,
-    relocations: ProgramImageRelocations,
+    relocations: GuestImageRelocations,
     imports: GuestImageImports,
     unwind: GuestImageUnwindMetadata,
 }
@@ -414,7 +414,7 @@ impl GuestImageMetadata {
         mapped_bytes: GuestImageMappedBytes,
         sections: GuestImageSections,
         symbols: GuestImageSymbols,
-        relocations: ProgramImageRelocations,
+        relocations: GuestImageRelocations,
         imports: GuestImageImports,
         unwind: GuestImageUnwindMetadata,
     ) -> Self {
@@ -433,7 +433,7 @@ impl GuestImageMetadata {
             GuestImageMappedBytes::from_program_image_metadata(metadata),
             GuestImageSections::from_program_image_metadata(metadata),
             GuestImageSymbols::from_program_image_metadata(metadata),
-            metadata.relocations().clone(),
+            GuestImageRelocations::from_program_image_metadata(metadata),
             GuestImageImports::from_program_image_metadata(metadata),
             GuestImageUnwindMetadata::from_program_image_metadata(metadata),
         )
@@ -456,7 +456,7 @@ impl GuestImageMetadata {
     }
 
     pub const fn relocations(&self) -> &ProgramImageRelocations {
-        &self.relocations
+        self.relocations.payload()
     }
 
     pub const fn imports(&self) -> &ProgramImageImports {
@@ -502,6 +502,25 @@ impl GuestImageImports {
     }
 
     pub const fn payload(&self) -> &ProgramImageImports {
+        &self.payload
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GuestImageRelocations {
+    payload: ProgramImageRelocations,
+}
+
+impl GuestImageRelocations {
+    pub const fn new(payload: ProgramImageRelocations) -> Self {
+        Self { payload }
+    }
+
+    pub fn from_program_image_metadata(metadata: &ProgramImageMetadata) -> Self {
+        Self::new(metadata.relocations().clone())
+    }
+
+    pub const fn payload(&self) -> &ProgramImageRelocations {
         &self.payload
     }
 }
@@ -557,10 +576,10 @@ mod tests {
     use super::{
         GuestImage, GuestImageAddressSpace, GuestImageEntryPoint, GuestImageError,
         GuestImageFormat, GuestImageImports, GuestImageMappedBytes, GuestImageMappedBytesSource,
-        GuestImageMetadata, GuestImageSections, GuestImageSegment, GuestImageSegmentKind,
-        GuestImageSegmentSource, GuestImageSegments, GuestImageSymbols, GuestImageUnwindMetadata,
-        MachOExecutableCodeRange, MachOExecutableCodeSegment, MachOExecutableEntryPoint,
-        MachOImage,
+        GuestImageMetadata, GuestImageRelocations, GuestImageSections, GuestImageSegment,
+        GuestImageSegmentKind, GuestImageSegmentSource, GuestImageSegments, GuestImageSymbols,
+        GuestImageUnwindMetadata, MachOExecutableCodeRange, MachOExecutableCodeSegment,
+        MachOExecutableEntryPoint, MachOImage,
     };
     use bara_ir::{
         ExternalSymbolId, ExternalSymbolImport, ProgramImageImport, ProgramImageImports,
@@ -623,6 +642,10 @@ mod tests {
         )])
     }
 
+    fn guest_image_relocations() -> GuestImageRelocations {
+        GuestImageRelocations::new(relocations())
+    }
+
     fn sections() -> ProgramImageSections {
         ProgramImageSections::from_items([
             ProgramImageSection::new(
@@ -676,7 +699,7 @@ mod tests {
             guest_image_mapped_bytes(),
             guest_image_sections(),
             guest_image_symbols(),
-            relocations(),
+            guest_image_relocations(),
             guest_image_imports(),
             guest_image_unwind(),
         )
@@ -805,6 +828,17 @@ mod tests {
         assert_eq!(
             imports.payload().items()[0].import(),
             ExternalSymbolImport::unresolved(ExternalSymbolId::new(7))
+        );
+    }
+
+    #[test]
+    fn guest_image_relocations_exposes_payload() {
+        let relocations = guest_image_relocations();
+
+        assert_eq!(relocations.payload().items().len(), 1);
+        assert_eq!(
+            relocations.payload().items()[0].target(),
+            ProgramImageRelocationTarget::ExternalSymbol(ExternalSymbolId::new(7))
         );
     }
 
