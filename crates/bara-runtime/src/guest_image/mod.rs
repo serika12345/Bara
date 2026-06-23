@@ -406,7 +406,7 @@ pub struct GuestImageMetadata {
     symbols: GuestImageSymbols,
     relocations: ProgramImageRelocations,
     imports: ProgramImageImports,
-    unwind: ProgramUnwindMetadata,
+    unwind: GuestImageUnwindMetadata,
 }
 
 impl GuestImageMetadata {
@@ -416,7 +416,7 @@ impl GuestImageMetadata {
         symbols: GuestImageSymbols,
         relocations: ProgramImageRelocations,
         imports: ProgramImageImports,
-        unwind: ProgramUnwindMetadata,
+        unwind: GuestImageUnwindMetadata,
     ) -> Self {
         Self {
             mapped_bytes,
@@ -435,7 +435,7 @@ impl GuestImageMetadata {
             GuestImageSymbols::from_program_image_metadata(metadata),
             metadata.relocations().clone(),
             metadata.imports().clone(),
-            metadata.unwind().clone(),
+            GuestImageUnwindMetadata::from_program_image_metadata(metadata),
         )
     }
 
@@ -464,7 +464,7 @@ impl GuestImageMetadata {
     }
 
     pub const fn unwind(&self) -> &ProgramUnwindMetadata {
-        &self.unwind
+        self.unwind.payload()
     }
 }
 
@@ -506,6 +506,25 @@ impl GuestImageSymbols {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GuestImageUnwindMetadata {
+    payload: ProgramUnwindMetadata,
+}
+
+impl GuestImageUnwindMetadata {
+    pub const fn new(payload: ProgramUnwindMetadata) -> Self {
+        Self { payload }
+    }
+
+    pub fn from_program_image_metadata(metadata: &ProgramImageMetadata) -> Self {
+        Self::new(metadata.unwind().clone())
+    }
+
+    pub const fn payload(&self) -> &ProgramUnwindMetadata {
+        &self.payload
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum GuestImageError {
     MissingCodeSegment,
@@ -520,7 +539,7 @@ mod tests {
         GuestImage, GuestImageAddressSpace, GuestImageEntryPoint, GuestImageError,
         GuestImageFormat, GuestImageMappedBytes, GuestImageMappedBytesSource, GuestImageMetadata,
         GuestImageSections, GuestImageSegment, GuestImageSegmentKind, GuestImageSegmentSource,
-        GuestImageSegments, GuestImageSymbols, MachOExecutableCodeRange,
+        GuestImageSegments, GuestImageSymbols, GuestImageUnwindMetadata, MachOExecutableCodeRange,
         MachOExecutableCodeSegment, MachOExecutableEntryPoint, MachOImage,
     };
     use bara_ir::{
@@ -613,6 +632,10 @@ mod tests {
         ))])
     }
 
+    fn guest_image_unwind() -> GuestImageUnwindMetadata {
+        GuestImageUnwindMetadata::new(unwind())
+    }
+
     fn program_image_metadata() -> ProgramImageMetadata {
         ProgramImageMetadata::new_with_mapped_bytes(
             sections(),
@@ -631,7 +654,7 @@ mod tests {
             guest_image_symbols(),
             relocations(),
             imports(),
-            unwind(),
+            guest_image_unwind(),
         )
     }
 
@@ -775,6 +798,17 @@ mod tests {
             ProgramImageSymbol::external_import(ExternalSymbolImport::unresolved(
                 ExternalSymbolId::new(7)
             ))
+        );
+    }
+
+    #[test]
+    fn guest_image_unwind_metadata_exposes_payload() {
+        let unwind = guest_image_unwind();
+
+        assert_eq!(unwind.payload().entries().len(), 1);
+        assert_eq!(
+            unwind.payload().entries()[0].range(),
+            image_range(0x1_0000_0000, 0x1_0000_0040)
         );
     }
 

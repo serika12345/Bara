@@ -37,6 +37,7 @@
    `B8-ARCH2t Runtime GuestImage Mapped Bytes Value Object`、
    `B8-ARCH2u Runtime GuestImage Sections Value Object`、
    `B8-ARCH2v Runtime GuestImage Symbols Value Object`、
+   `B8-ARCH2w Runtime GuestImage Unwind Metadata Value Object`、
    `B8-ARCH2 Guest Image Model Extraction`
 2. [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) の `R1` / `R1a` と
    `Instruction Coverage Strategy`
@@ -44,7 +45,7 @@
    B8-ARCH1 responsibility split audit と、`D4a: x86_64 ISA semantic coverage strategy`
 4. この `docs/progress.md` の現在の作業スナップショット
 
-B8-ARCH2v review / merge 後の次候補:
+B8-ARCH2w review / merge 後の次候補:
 
 - `main` を最新化したうえで、TODO-backed PR Gate を追加または選び、dedicated branch を作る。
 - 候補は B8-ARCH2 Guest Image Model Extraction の次の小さい slice、または helper process /
@@ -68,12 +69,13 @@ B8-ARCH2v review / merge 後の次候補:
   Mach-O specific type にし、B8-ARCH2t では mapped bytes source と payload を
   `GuestImageMappedBytes` value object にまとめ、B8-ARCH2u では sections payload を
   `GuestImageSections` value object にまとめ、B8-ARCH2v では symbols payload を
-  `GuestImageSymbols` value object にまとめるため、JSON schema 名、field 名、既存 B8-HWGUI
-  debug bundle output を維持したまま後続境界を切る。
+  `GuestImageSymbols` value object にまとめ、B8-ARCH2w では unwind metadata payload を
+  `GuestImageUnwindMetadata` value object にまとめるため、JSON schema 名、field 名、既存
+  B8-HWGUI debug bundle output を維持したまま後続境界を切る。
 - helper process execution、loader image model、runtime dispatcher、decoder dependency 採用は、
   対応する TODO / design TODO が具体化されるまで混ぜない。
 
-B8-ARCH2v review / merge 後にすぐ始めないもの:
+B8-ARCH2w review / merge 後にすぐ始めないもの:
 
 - B8-OSS0 source-built OSS GUI app automation
 - imports/fixups の runtime domain 抽出、symbol projection semantics の変更
@@ -82,17 +84,17 @@ B8-ARCH2v review / merge 後にすぐ始めないもの:
 - B8-HWGUI fixture 専用 path のさらなる機能追加
 - decoder dependency 採用、ISA implementation / lowering 追加、supply-chain lockfile 変更
 
-B8-ARCH2v review package で示すべきもの:
+B8-ARCH2w review package で示すべきもの:
 
-- `bara-runtime/src/guest_image/mod.rs` の `GuestImageSymbols` が `ProgramImageSymbols`
+- `bara-runtime/src/guest_image/mod.rs` の `GuestImageUnwindMetadata` が `ProgramUnwindMetadata`
   payload を runtime-facing value object として表す範囲
-- 意図は symbols payload を direct collection field から分け、後続の symbol identity /
-  import projection 境界を意味変更なしに切り出しやすくすること
-- `GuestImageMetadata::new` が `ProgramImageSymbols` を直接受け取らず、
-  `GuestImageSymbols` を受け取ること
-- `GuestImageMetadata::from_program_image_metadata` が symbols clone を
-  `GuestImageSymbols::from_program_image_metadata` に閉じること
-- できるようになったこととして、runtime-facing metadata assembly が symbols payload を
+- 意図は unwind metadata payload を direct collection field から分け、loader / exception
+  関連 metadata を後続で扱う場合の runtime-facing 境界を先に作ること
+- `GuestImageMetadata::new` が `ProgramUnwindMetadata` を直接受け取らず、
+  `GuestImageUnwindMetadata` を受け取ること
+- `GuestImageMetadata::from_program_image_metadata` が unwind clone を
+  `GuestImageUnwindMetadata::from_program_image_metadata` に閉じること
+- できるようになったこととして、runtime-facing metadata assembly が unwind metadata payload を
   型付き境界として保持できること
 - B8 debug bundle が existing `GuestImage` projection 経由で existing
   `B8DebugGuestImageMappingReport` へ射影し続けること
@@ -106,10 +108,28 @@ B8-ARCH2v review package で示すべきもの:
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-23 13:06 JST
+最終更新: 2026-06-23 13:17 JST
 
 状態:
 
+- active_work: completed。B8-ARCH2w Runtime GuestImage Unwind Metadata Value Object を
+  `task/b8-arch2w-guest-image-unwind-value` で実施した。意図は unwind metadata payload を
+  `GuestImageMetadata` の direct collection field から分け、loader / exception 関連
+  metadata を後続で扱う場合の runtime-facing 境界を先に作ること。`bara-runtime` は
+  `GuestImageUnwindMetadata` を追加し、`ProgramUnwindMetadata` payload を runtime-facing
+  value object として保持する。これにより `GuestImageMetadata` construction は
+  `ProgramUnwindMetadata` を直接受け取らず、`GuestImageUnwindMetadata` を受け取って
+  保持できる。`GuestImageMetadata::from_program_image_metadata` は
+  `GuestImageUnwindMetadata::from_program_image_metadata` 経由で unwind clone を value object
+  側に閉じる。`GuestImage` / `GuestImageMetadata` の existing `unwind()` accessor は維持。
+  B8 debug bundle は existing `GuestImage` projection 経由で existing
+  `B8DebugGuestImageMappingReport` へ射影し、`loader.plan.json` の image mapping JSON は維持。
+  `bara-oracle` からの loader domain 抽出、entry extraction / load command interpretation、
+  public Mach-O parser / resolver logic、import/fixup/symbol projection の意味変更、
+  helper bridge、runtime dispatcher は未移動。依存・lockfile・toolchain 変更はない。
+  verification は `nix develop -c cargo test -p bara-runtime guest_image -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
+  `nix develop -c ./scripts/verify`。
 - active_work: completed。B8-ARCH2v Runtime GuestImage Symbols Value Object を
   `task/b8-arch2v-guest-image-symbols-value` で実施した。意図は symbols payload を
   `GuestImageMetadata` の direct collection field から分け、後続の symbol identity /
