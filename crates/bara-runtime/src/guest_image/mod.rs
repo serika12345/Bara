@@ -402,7 +402,7 @@ impl GuestImageMappedBytes {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GuestImageMetadata {
     mapped_bytes: GuestImageMappedBytes,
-    sections: ProgramImageSections,
+    sections: GuestImageSections,
     symbols: ProgramImageSymbols,
     relocations: ProgramImageRelocations,
     imports: ProgramImageImports,
@@ -412,7 +412,7 @@ pub struct GuestImageMetadata {
 impl GuestImageMetadata {
     pub const fn new(
         mapped_bytes: GuestImageMappedBytes,
-        sections: ProgramImageSections,
+        sections: GuestImageSections,
         symbols: ProgramImageSymbols,
         relocations: ProgramImageRelocations,
         imports: ProgramImageImports,
@@ -431,7 +431,7 @@ impl GuestImageMetadata {
     pub fn from_program_image_metadata(metadata: &ProgramImageMetadata) -> Self {
         Self::new(
             GuestImageMappedBytes::from_program_image_metadata(metadata),
-            metadata.sections().clone(),
+            GuestImageSections::from_program_image_metadata(metadata),
             metadata.symbols().clone(),
             metadata.relocations().clone(),
             metadata.imports().clone(),
@@ -444,7 +444,7 @@ impl GuestImageMetadata {
     }
 
     pub const fn sections(&self) -> &ProgramImageSections {
-        &self.sections
+        self.sections.payload()
     }
 
     pub const fn mapped_bytes(&self) -> &ProgramImageMappedBytes {
@@ -468,6 +468,25 @@ impl GuestImageMetadata {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GuestImageSections {
+    payload: ProgramImageSections,
+}
+
+impl GuestImageSections {
+    pub const fn new(payload: ProgramImageSections) -> Self {
+        Self { payload }
+    }
+
+    pub fn from_program_image_metadata(metadata: &ProgramImageMetadata) -> Self {
+        Self::new(metadata.sections().clone())
+    }
+
+    pub const fn payload(&self) -> &ProgramImageSections {
+        &self.payload
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum GuestImageError {
     MissingCodeSegment,
@@ -481,9 +500,9 @@ mod tests {
     use super::{
         GuestImage, GuestImageAddressSpace, GuestImageEntryPoint, GuestImageError,
         GuestImageFormat, GuestImageMappedBytes, GuestImageMappedBytesSource, GuestImageMetadata,
-        GuestImageSegment, GuestImageSegmentKind, GuestImageSegmentSource, GuestImageSegments,
-        MachOExecutableCodeRange, MachOExecutableCodeSegment, MachOExecutableEntryPoint,
-        MachOImage,
+        GuestImageSections, GuestImageSegment, GuestImageSegmentKind, GuestImageSegmentSource,
+        GuestImageSegments, MachOExecutableCodeRange, MachOExecutableCodeSegment,
+        MachOExecutableEntryPoint, MachOImage,
     };
     use bara_ir::{
         ExternalSymbolId, ExternalSymbolImport, ProgramImageImport, ProgramImageImports,
@@ -555,6 +574,10 @@ mod tests {
         ])
     }
 
+    fn guest_image_sections() -> GuestImageSections {
+        GuestImageSections::new(sections())
+    }
+
     fn symbols() -> ProgramImageSymbols {
         let import = ExternalSymbolImport::unresolved(ExternalSymbolId::new(7));
         ProgramImageSymbols::from_items([ProgramImageSymbol::external_import(import)])
@@ -581,7 +604,7 @@ mod tests {
     fn metadata() -> GuestImageMetadata {
         GuestImageMetadata::new(
             guest_image_mapped_bytes(),
-            sections(),
+            guest_image_sections(),
             symbols(),
             relocations(),
             imports(),
@@ -701,6 +724,21 @@ mod tests {
                 .payload()
                 .read_u64_le(X86Va::new(0x1_0000_0000)),
             Some(42)
+        );
+    }
+
+    #[test]
+    fn guest_image_sections_exposes_payload() {
+        let sections = guest_image_sections();
+
+        assert_eq!(sections.payload().items().len(), 2);
+        assert_eq!(
+            sections.payload().items()[0].kind(),
+            ProgramImageSectionKind::Code
+        );
+        assert_eq!(
+            sections.payload().items()[1].range(),
+            image_range(0x1_0000_2000, 0x1_0000_2010)
         );
     }
 

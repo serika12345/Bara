@@ -318,6 +318,23 @@ B8-ARCH2t result:
   Objective-C/AppKit helper process execution、modeled continuation state、runtime dispatcher は
   同じ PR では動かさない。
 
+B8-ARCH2u result:
+
+- 2026-06-23 に `GuestImageSections` を追加し、`ProgramImageSections` payload を
+  runtime-facing value object として表すようにした。
+- `GuestImageMetadata` は `ProgramImageSections` を直接 constructor へ受け取らず、
+  `GuestImageSections` を受け取って保持する。
+- `GuestImageMetadata::from_program_image_metadata` は
+  `GuestImageSections::from_program_image_metadata` 経由で sections clone を value object 側に
+  閉じる。
+- `GuestImage` / `GuestImageMetadata` の existing `sections()` accessor は維持し、
+  B8 debug bundle の existing `B8DebugGuestImageMappingReport` projection と
+  `loader.plan.json` output は変えない。
+- `bara-oracle` からの loader domain 抽出、entry extraction / load command interpretation、
+  public Mach-O parser / resolver logic、import/fixup/symbol projection の意味変更、
+  Objective-C/AppKit helper process execution、modeled continuation state、runtime dispatcher は
+  同じ PR では動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。
