@@ -456,6 +456,24 @@ B8-ARCH2aa result:
   import/fixup/symbol projection semantics の意味変更、Objective-C/AppKit helper process
   execution、modeled continuation state、runtime dispatcher は同じ PR では動かさない。
 
+B8-ARCH2ab result:
+
+- 2026-06-23 に `crates/bara-runtime/src/guest_image/image.rs` を追加し、generic
+  `GuestImage` shell、entry point、segments、segment identity、image error を
+  `guest_image/mod.rs` から分けた。
+- 意図は generic image invariant と親 `guest_image/mod.rs` の変更理由を分け、
+  parent module を submodule wiring / re-export / tests に近づけること。
+- `guest_image/mod.rs` は generic image module を re-export し、
+  `bara_runtime::GuestImage`、`GuestImageEntryPoint`、`GuestImageSegments`、
+  `GuestImageSegment`、`GuestImageError` などの existing public API 名を維持する。
+- これにより generic image invariant、entry point、segment identity、image error の追加や
+  調整を `guest_image/image.rs` 側で扱える。metadata / Mach-O specific module と
+  B8 debug bundle の `loader.plan.json` output は変えない。
+- `bara-oracle` からの loader domain 抽出、entry extraction / load command interpretation、
+  public Mach-O parser / resolver logic、import/fixup/symbol projection semantics の意味変更、
+  Objective-C/AppKit helper process execution、modeled continuation state、runtime dispatcher は
+  同じ PR では動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。
