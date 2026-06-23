@@ -250,6 +250,22 @@ B8-ARCH2p result:
   意味変更、Objective-C/AppKit helper process execution、modeled continuation state、
   runtime dispatcher は同じ PR では動かさない。
 
+B8-ARCH2q result:
+
+- 2026-06-22 に `MachOExecutableCodeRange::from_program_image_metadata` を追加し、
+  `ProgramImageMetadata.sections()` の単一 code section から executable code range を
+  選ぶ判断を runtime-facing Mach-O constructor 側に寄せた。
+- `MachOImage::executable_from_program_image_metadata` は caller-provided
+  `MachOExecutableCodeRange` を受け取らず、entry point と `ProgramImageMetadata` だけから
+  code range selection と `GuestImageMetadata` assembly を行う。
+- B8 debug bundle は existing `MachOEntryFunctionInput` から code bytes length 由来の
+  `ProgramImageRange` を計算せず、entry point と `ProgramImageMetadata` を渡して
+  existing `B8DebugGuestImageMappingReport` へ射影する。`loader.plan.json` の
+  `image_mapping` field 名、nested field 名、serde 値、JSON output は変えない。
+- `bara-oracle` からの loader domain 抽出、public Mach-O parser / resolver logic、
+  import/fixup/symbol projection の意味変更、Objective-C/AppKit helper process execution、
+  modeled continuation state、runtime dispatcher は同じ PR では動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。

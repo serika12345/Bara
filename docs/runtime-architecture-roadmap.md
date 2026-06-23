@@ -526,6 +526,9 @@ Mach-O parsing / probing から runtime が使える `GuestImage` / `MachOImage`
   runtime constructor 側に閉じた。
 - B8-ARCH2p で `MachOExecutableCodeRange` を追加し、`MachOImage` constructor が
   汎用 `ProgramImageRange` ではなく Mach-O specific code range domain type を受け取るようにした。
+- B8-ARCH2q で `MachOExecutableCodeRange::from_program_image_metadata` を追加し、
+  `ProgramImageMetadata.sections()` の single code section から executable code range を
+  選ぶ判断を runtime constructor 側に閉じた。
 
 ### R3: Translation Artifact And Debug Export
 

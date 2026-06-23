@@ -31,6 +31,7 @@
    `B8-ARCH2n Runtime MachOImage Code Range Constructor`、
    `B8-ARCH2o Runtime MachOImage Program Metadata Constructor`、
    `B8-ARCH2p Runtime MachO Executable Code Range Domain Type`、
+   `B8-ARCH2q Runtime MachO Code Section Range Constructor`、
    `B8-ARCH2 Guest Image Model Extraction`
 2. [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) の `R1` / `R1a` と
    `Instruction Coverage Strategy`
@@ -38,7 +39,7 @@
    B8-ARCH1 responsibility split audit と、`D4a: x86_64 ISA semantic coverage strategy`
 4. この `docs/progress.md` の現在の作業スナップショット
 
-B8-ARCH2p review / merge 後の次候補:
+B8-ARCH2q review / merge 後の次候補:
 
 - `main` を最新化したうえで、TODO-backed PR Gate を追加または選び、dedicated branch を作る。
 - 候補は B8-ARCH2 Guest Image Model Extraction の次の小さい slice、または helper process /
@@ -54,12 +55,14 @@ B8-ARCH2p review / merge 後の次候補:
   通し、B8-ARCH2n では Mach-O code segment source / address-space 決定を runtime
   constructor 側へ寄せ、B8-ARCH2o では `ProgramImageMetadata` からの `GuestImageMetadata`
   assembly と mapped bytes source 選択を runtime constructor 側へ寄せ、B8-ARCH2p では
-  executable code range を `MachOExecutableCodeRange` として型付けするため、JSON schema 名、
-  field 名、既存 B8-HWGUI debug bundle output を維持したまま後続境界を切る。
+  executable code range を `MachOExecutableCodeRange` として型付けし、B8-ARCH2q では
+  `ProgramImageMetadata.sections()` の single code section から executable code range を
+  選ぶ判断を runtime constructor 側へ寄せるため、JSON schema 名、field 名、既存
+  B8-HWGUI debug bundle output を維持したまま後続境界を切る。
 - helper process execution、loader image model、runtime dispatcher、decoder dependency 採用は、
   対応する TODO / design TODO が具体化されるまで混ぜない。
 
-B8-ARCH2p review / merge 後にすぐ始めないもの:
+B8-ARCH2q review / merge 後にすぐ始めないもの:
 
 - B8-OSS0 source-built OSS GUI app automation
 - B8-ARCH2 `MachOImage` 本体、imports/fixups/symbol identity の runtime domain 抽出
@@ -68,12 +71,16 @@ B8-ARCH2p review / merge 後にすぐ始めないもの:
 - B8-HWGUI fixture 専用 path のさらなる機能追加
 - decoder dependency 採用、ISA implementation / lowering 追加、supply-chain lockfile 変更
 
-B8-ARCH2p review package で示すべきもの:
+B8-ARCH2q review package で示すべきもの:
 
-- `bara-runtime/src/guest_image/mod.rs` の `MachOExecutableCodeRange` が executable code range
-  の意味を表し、`MachOImage` constructor が汎用 `ProgramImageRange` 直ではなくその型を
-  受け取る範囲
-- B8 debug bundle が calculated `ProgramImageRange` を `MachOExecutableCodeRange` に変換してから
+- `bara-runtime/src/guest_image/mod.rs` の
+  `MachOExecutableCodeRange::from_program_image_metadata` が
+  `ProgramImageMetadata.sections()` の single code section から executable code range を
+  選ぶ範囲
+- `MachOImage::executable_from_program_image_metadata` が caller-provided
+  `MachOExecutableCodeRange` を受け取らず、entry point と `ProgramImageMetadata` だけから
+  image shell を作るようになったこと
+- B8 debug bundle が code bytes length 由来の `ProgramImageRange` を計算せず、
   `MachOImage::executable_from_program_image_metadata` を作って existing
   `B8DebugGuestImageMappingReport` へ射影するようになったこと
 - `loader.plan.json` の `image_mapping` field 名、nested field 名、serde 値、JSON output を
@@ -86,10 +93,25 @@ B8-ARCH2p review package で示すべきもの:
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-21 11:50 JST
+最終更新: 2026-06-22 20:33 JST
 
 状態:
 
+- active_work: completed。B8-ARCH2q Runtime MachO Code Section Range Constructor を
+  `task/b8-arch2q-mach-o-code-section-range-constructor` で実施した。`bara-runtime` は
+  `MachOExecutableCodeRange::from_program_image_metadata` を追加し、
+  `ProgramImageMetadata.sections()` の単一 code section から executable code range を
+  選ぶ判断を runtime constructor 側に閉じる。missing / ambiguous code section は
+  `GuestImageError` として分類する。`MachOImage::executable_from_program_image_metadata` は
+  caller-provided `MachOExecutableCodeRange` を受け取らず、entry point と
+  `ProgramImageMetadata` だけから image shell を作る。B8 debug bundle は code bytes length
+  由来の `ProgramImageRange` を計算せず、existing `B8DebugGuestImageMappingReport` へ射影する。
+  `loader.plan.json` の image mapping JSON は維持。`bara-oracle` からの loader domain 抽出、
+  public Mach-O parser / resolver logic、helper bridge、runtime dispatcher は未移動。
+  依存・lockfile・toolchain 変更はない。verification は
+  `nix develop -c cargo test -p bara-runtime guest_image -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
+  `nix develop -c ./scripts/verify`。
 - active_work: completed。B8-ARCH2p Runtime MachO Executable Code Range Domain Type を
   `task/b8-arch2p-mach-o-code-range-domain-type` で実施した。`bara-runtime` は
   `MachOExecutableCodeRange` を追加し、`MachOImage` constructor は汎用
