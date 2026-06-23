@@ -1,9 +1,10 @@
 use bara_ir::{ProgramImageMetadata, ProgramImageRange, ProgramImageSectionKind, X86Va};
 
 use super::{
-    GuestImage, GuestImageAddressSpace, GuestImageEntryPoint, GuestImageError,
-    GuestImageMappedBytes, GuestImageMappedBytesSource, GuestImageMetadata, GuestImageSegment,
-    GuestImageSegmentKind, GuestImageSegmentSource,
+    GuestImage, GuestImageAddressSpace, GuestImageEntryPoint, GuestImageError, GuestImageImports,
+    GuestImageMappedBytes, GuestImageMappedBytesSource, GuestImageMetadata, GuestImageRelocations,
+    GuestImageSections, GuestImageSegment, GuestImageSegmentKind, GuestImageSegmentSource,
+    GuestImageSymbols, GuestImageUnwindMetadata,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -72,8 +73,47 @@ impl MachOImage {
         )
     }
 
+    pub fn executable_metadata(&self) -> MachOExecutableImageMetadata {
+        MachOExecutableImageMetadata::new(self.metadata().clone())
+    }
+
     pub const fn metadata(&self) -> &GuestImageMetadata {
         self.guest_image.metadata()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MachOExecutableImageMetadata {
+    metadata: GuestImageMetadata,
+}
+
+impl MachOExecutableImageMetadata {
+    pub const fn new(metadata: GuestImageMetadata) -> Self {
+        Self { metadata }
+    }
+
+    pub const fn mapped_bytes(&self) -> &GuestImageMappedBytes {
+        self.metadata.mapped_bytes_value()
+    }
+
+    pub const fn sections(&self) -> &GuestImageSections {
+        self.metadata.sections_value()
+    }
+
+    pub const fn symbols(&self) -> &GuestImageSymbols {
+        self.metadata.symbols_value()
+    }
+
+    pub const fn relocations(&self) -> &GuestImageRelocations {
+        self.metadata.relocations_value()
+    }
+
+    pub const fn imports(&self) -> &GuestImageImports {
+        self.metadata.imports_value()
+    }
+
+    pub const fn unwind(&self) -> &GuestImageUnwindMetadata {
+        self.metadata.unwind_value()
     }
 }
 

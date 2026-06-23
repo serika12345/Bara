@@ -579,6 +579,22 @@ B8-ARCH2ah result:
   Objective-C/AppKit helper process execution、modeled continuation state、runtime dispatcher は
   同じ PR では動かさない。
 
+B8-ARCH2ai result:
+
+- 2026-06-23 に `MachOExecutableImageMetadata` を追加し、
+  `MachOImage::executable_metadata()` から Mach-O executable metadata snapshot を取得できるようにした。
+- 意図は後続の import / relocation / symbol / unwind projection が generic metadata 内部ではなく
+  Mach-O executable image snapshot を入口にできるようにし、B8-ARCH2 の Mach-O specific
+  image model 境界を強めること。
+- `MachOExecutableImageMetadata` は `GuestImageMetadata` value object accessor 境界を使い、
+  mapped bytes / sections / symbols / relocations / imports / unwind を value object として返す。
+- これにより caller は Mach-O specific snapshot 経由で executable metadata collection を扱える。
+  existing B8 debug bundle behavior と `loader.plan.json` output は変えない。
+- `bara-oracle` からの loader domain 抽出、entry extraction / load command interpretation、
+  public Mach-O parser / resolver logic、import/fixup/symbol projection semantics の意味変更、
+  Objective-C/AppKit helper process execution、modeled continuation state、runtime dispatcher は
+  同じ PR では動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。
