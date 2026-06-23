@@ -40,6 +40,7 @@
    `B8-ARCH2w Runtime GuestImage Unwind Metadata Value Object`、
    `B8-ARCH2x Runtime GuestImage Imports Value Object`、
    `B8-ARCH2y Runtime GuestImage Relocations Value Object`、
+   `B8-ARCH2z Runtime GuestImage Metadata Module Split`、
    `B8-ARCH2 Guest Image Model Extraction`
 2. [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) の `R1` / `R1a` と
    `Instruction Coverage Strategy`
@@ -47,7 +48,7 @@
    B8-ARCH1 responsibility split audit と、`D4a: x86_64 ISA semantic coverage strategy`
 4. この `docs/progress.md` の現在の作業スナップショット
 
-B8-ARCH2y review / merge 後の次候補:
+B8-ARCH2z review / merge 後の次候補:
 
 - `main` を最新化したうえで、TODO-backed PR Gate を追加または選び、dedicated branch を作る。
 - 候補は B8-ARCH2 Guest Image Model Extraction の次の小さい slice、または helper process /
@@ -75,11 +76,12 @@ B8-ARCH2y review / merge 後の次候補:
   `GuestImageUnwindMetadata` value object にまとめるため、JSON schema 名、field 名、既存
   B8-HWGUI debug bundle output を維持したまま後続境界を切り、B8-ARCH2x では imports
   payload を `GuestImageImports` value object にまとめ、B8-ARCH2y では relocations payload を
-  `GuestImageRelocations` value object にまとめる。
+  `GuestImageRelocations` value object にまとめ、B8-ARCH2z では `GuestImageMetadata`
+  aggregate と metadata value object 群を `guest_image/metadata.rs` へ分ける。
 - helper process execution、loader image model、runtime dispatcher、decoder dependency 採用は、
   対応する TODO / design TODO が具体化されるまで混ぜない。
 
-B8-ARCH2y review / merge 後にすぐ始めないもの:
+B8-ARCH2z review / merge 後にすぐ始めないもの:
 
 - B8-OSS0 source-built OSS GUI app automation
 - relocation/fixup projection semantics の変更、import projection semantics の変更、
@@ -89,18 +91,16 @@ B8-ARCH2y review / merge 後にすぐ始めないもの:
 - B8-HWGUI fixture 専用 path のさらなる機能追加
 - decoder dependency 採用、ISA implementation / lowering 追加、supply-chain lockfile 変更
 
-B8-ARCH2y review package で示すべきもの:
+B8-ARCH2z review package で示すべきもの:
 
-- `bara-runtime/src/guest_image/mod.rs` の `GuestImageRelocations` が `ProgramImageRelocations`
-  payload を runtime-facing value object として表す範囲
-- 意図は relocations payload を direct collection field から分け、relocation/fixup
-  projection semantics を変えずに後続の loader/fixup 境界を扱いやすくすること
-- `GuestImageMetadata::new` が `ProgramImageRelocations` を直接受け取らず、
-  `GuestImageRelocations` を受け取ること
-- `GuestImageMetadata::from_program_image_metadata` が relocations clone を
-  `GuestImageRelocations::from_program_image_metadata` に閉じること
-- できるようになったこととして、runtime-facing metadata assembly が relocations payload を
-  型付き境界として保持できること
+- `bara-runtime/src/guest_image/metadata.rs` に `GuestImageMetadata` aggregate と
+  metadata value object 群を移した範囲
+- 意図は `GuestImage` / `MachOImage` の image shell と metadata payload boundary の
+  変更理由を分け、runtime image model の親 module を肥大化させずにすること
+- `guest_image/mod.rs` が metadata module を re-export し、
+  `bara_runtime::GuestImageMetadata` などの existing public API 名を維持すること
+- できるようになったこととして、metadata payload 境界の追加や調整を
+  `guest_image/metadata.rs` 側で扱えること
 - B8 debug bundle が existing `GuestImage` projection 経由で existing
   `B8DebugGuestImageMappingReport` へ射影し続けること
 - `loader.plan.json` の `image_mapping` field 名、nested field 名、serde 値、JSON output を
@@ -113,10 +113,33 @@ B8-ARCH2y review package で示すべきもの:
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-23 14:02 JST
+最終更新: 2026-06-23 14:25 JST
 
 状態:
 
+- active_work: completed。B8-ARCH2z Runtime GuestImage Metadata Module Split を
+  `task/b8-arch2z-guest-image-metadata-module-split` で実施した。関連 TODO は
+  `TODO.md` の `B8-ARCH2z Runtime GuestImage Metadata Module Split`、関連設計メモは
+  `docs/design-todo.md` の `B8-ARCH2z result`。意図は `GuestImage` / `MachOImage` の
+  image shell と metadata payload boundary の変更理由を分け、runtime image model の
+  親 module を肥大化させずにすること。`bara-runtime` は
+  `crates/bara-runtime/src/guest_image/metadata.rs` を追加し、`GuestImageMetadata` aggregate と
+  `GuestImageMappedBytes`、`GuestImageSections`、`GuestImageImports`、
+  `GuestImageRelocations`、`GuestImageSymbols`、`GuestImageUnwindMetadata` などの metadata
+  value object 群を `guest_image/mod.rs` から分けた。これにより metadata payload 境界の追加や
+  調整を `guest_image/metadata.rs` 側で扱えるようになり、core image shell 側を変更せずに
+  metadata aggregate / value object 群を見直せる。`guest_image/mod.rs` は metadata module を
+  re-export し、`bara_runtime::GuestImageMetadata` などの existing public API 名は維持。
+  `GuestImage` / `MachOImage` / B8 debug bundle の caller-visible behavior と
+  `loader.plan.json` output は維持。`bara-oracle` からの loader domain 抽出、
+  entry extraction / load command interpretation、public Mach-O parser / resolver logic、
+  import/fixup/symbol projection semantics の意味変更、helper bridge、runtime dispatcher は
+  未移動。依存・lockfile・toolchain 変更はない。remaining work は PR review 後に
+  B8-ARCH2 Guest Image Model Extraction の次 slice または helper process / Objective-C bridge
+  境界の TODO-backed PR Gate を選ぶこと。verification は
+  `nix develop -c cargo test -p bara-runtime guest_image -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
+  `nix develop -c ./scripts/verify`。
 - active_work: completed。B8-ARCH2y Runtime GuestImage Relocations Value Object を
   `task/b8-arch2y-guest-image-relocations-value` で実施した。意図は relocations payload を
   `GuestImageMetadata` の direct collection field から分け、relocation/fixup projection
