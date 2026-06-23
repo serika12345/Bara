@@ -33,6 +33,7 @@
    `B8-ARCH2p Runtime MachO Executable Code Range Domain Type`、
    `B8-ARCH2q Runtime MachO Code Section Range Constructor`、
    `B8-ARCH2r Runtime MachO Entry Point Domain Type`、
+   `B8-ARCH2s Runtime MachO Code Segment Domain Type`、
    `B8-ARCH2 Guest Image Model Extraction`
 2. [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) の `R1` / `R1a` と
    `Instruction Coverage Strategy`
@@ -40,7 +41,7 @@
    B8-ARCH1 responsibility split audit と、`D4a: x86_64 ISA semantic coverage strategy`
 4. この `docs/progress.md` の現在の作業スナップショット
 
-B8-ARCH2r review / merge 後の次候補:
+B8-ARCH2s review / merge 後の次候補:
 
 - `main` を最新化したうえで、TODO-backed PR Gate を追加または選び、dedicated branch を作る。
 - 候補は B8-ARCH2 Guest Image Model Extraction の次の小さい slice、または helper process /
@@ -59,42 +60,60 @@ B8-ARCH2r review / merge 後の次候補:
   executable code range を `MachOExecutableCodeRange` として型付けし、B8-ARCH2q では
   `ProgramImageMetadata.sections()` の single code section から executable code range を
   選ぶ判断を runtime constructor 側へ寄せ、B8-ARCH2r では executable entry point を
-  `MachOExecutableEntryPoint` として型付けするため、JSON schema 名、field 名、既存
-  B8-HWGUI debug bundle output を維持したまま後続境界を切る。
+  `MachOExecutableEntryPoint` として型付けし、B8-ARCH2s では executable code segment を
+  `MachOExecutableCodeSegment` として型付けして `MachOImage::code_segment` を non-optional
+  Mach-O specific type にするため、JSON schema 名、field 名、既存 B8-HWGUI debug bundle
+  output を維持したまま後続境界を切る。
 - helper process execution、loader image model、runtime dispatcher、decoder dependency 採用は、
   対応する TODO / design TODO が具体化されるまで混ぜない。
 
-B8-ARCH2r review / merge 後にすぐ始めないもの:
+B8-ARCH2s review / merge 後にすぐ始めないもの:
 
 - B8-OSS0 source-built OSS GUI app automation
-- B8-ARCH2 `MachOImage` 本体、imports/fixups/symbol identity の runtime domain 抽出
+- imports/fixups/symbol identity の runtime domain 抽出
 - arbitrary Objective-C message send、general continuation execution、
   translation cache、fallback JIT/interpreter、Wine bridge
 - B8-HWGUI fixture 専用 path のさらなる機能追加
 - decoder dependency 採用、ISA implementation / lowering 追加、supply-chain lockfile 変更
 
-B8-ARCH2r review package で示すべきもの:
+B8-ARCH2s review package で示すべきもの:
 
-- `bara-runtime/src/guest_image/mod.rs` の `MachOExecutableEntryPoint` が Mach-O executable
-  entry point address の意味を表し、`MachOImage` constructor が generic
-  `GuestImageEntryPoint` 直ではなくその型を受け取る範囲
-- B8 debug bundle が existing entry address を `MachOExecutableEntryPoint` に変換してから
-  `MachOImage::executable_from_program_image_metadata` を作って existing
-  `B8DebugGuestImageMappingReport` へ射影するようになったこと
+- `bara-runtime/src/guest_image/mod.rs` の `MachOExecutableCodeSegment` が Mach-O executable
+  code segment の range、source、address-space の意味を表し、`MachOImage` constructor が
+  generic `GuestImageSegment` 直ではなくその型を受け取る範囲
+- `MachOImage::code_segment` が `Option<GuestImageSegment>` ではなく
+  `MachOExecutableCodeSegment` を返し、valid code segment を持つ invariant を API に反映したこと
+- B8 debug bundle が existing `GuestImage` projection 経由で existing
+  `B8DebugGuestImageMappingReport` へ射影し続けること
 - `loader.plan.json` の `image_mapping` field 名、nested field 名、serde 値、JSON output を
   維持したこと
-- `MachOImage` 本体、import/fixup projection、helper boundary、helper process execution、
-  modeled continuation をまだ移していないこと
+- import/fixup projection、helper boundary、helper process execution、modeled continuation を
+  まだ移していないこと
 - `nix develop -c cargo test -p bara-runtime guest_image -- --nocapture`
 - `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
 - `nix develop -c ./scripts/verify`
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-23 10:15 JST
+最終更新: 2026-06-23 10:47 JST
 
 状態:
 
+- active_work: completed。B8-ARCH2s Runtime MachO Code Segment Domain Type を
+  `task/b8-arch2s-mach-o-code-segment-domain-type` で実施した。`bara-runtime` は
+  `MachOExecutableCodeSegment` を追加し、Mach-O executable code segment の range、source、
+  address-space を runtime-facing domain type として保持する。`MachOImage` constructor は
+  generic `GuestImageSegment` ではなく `MachOExecutableCodeSegment` を受け取り、underlying
+  `GuestImageSegment` への変換を constructor 内に閉じる。`MachOImage::code_segment` は
+  `Option<GuestImageSegment>` ではなく `MachOExecutableCodeSegment` を返し、valid code segment
+  を持つ invariant を API に反映する。B8 debug bundle は existing `GuestImage` projection
+  経由で existing `B8DebugGuestImageMappingReport` へ射影し、`loader.plan.json` の image
+  mapping JSON は維持。`bara-oracle` からの loader domain 抽出、entry extraction / load
+  command interpretation、public Mach-O parser / resolver logic、helper bridge、runtime
+  dispatcher は未移動。依存・lockfile・toolchain 変更はない。verification は
+  `nix develop -c cargo test -p bara-runtime guest_image -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
+  `nix develop -c ./scripts/verify`。
 - active_work: completed。B8-ARCH2r Runtime MachO Entry Point Domain Type を
   `task/b8-arch2r-mach-o-entry-point-domain-type` で実施した。`bara-runtime` は
   `MachOExecutableEntryPoint` を追加し、Mach-O executable entry point address を
