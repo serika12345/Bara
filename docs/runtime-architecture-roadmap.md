@@ -537,6 +537,9 @@ Mach-O parsing / probing から runtime が使える `GuestImage` / `MachOImage`
   B8-ARCH2ah では `GuestImageMetadata` が sections / symbols / relocations / imports /
   unwind を value object として返せるようにし、後続 runtime loader caller が payload
   primitive ではなく runtime-facing value object 境界で metadata collection を扱えるようにした。
+- B8-ARCH2ai で `MachOExecutableImageMetadata` を追加し、Mach-O specific executable
+  image snapshot から mapped bytes / sections / symbols / relocations / imports / unwind を
+  value object として扱えるようにした。
 
 ### R3: Translation Artifact And Debug Export
 

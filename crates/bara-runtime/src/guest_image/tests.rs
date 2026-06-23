@@ -462,6 +462,24 @@ fn mach_o_executable_mapping_carries_mapped_bytes_value() {
 }
 
 #[test]
+fn mach_o_image_exposes_executable_metadata_snapshot() {
+    let image = MachOImage::executable(
+        MachOExecutableEntryPoint::new(X86Va::new(0x1_0000_0010)),
+        mach_o_code_segment(),
+        metadata(),
+    )
+    .expect("entry is inside code segment");
+    let metadata = image.executable_metadata();
+
+    assert_eq!(metadata.mapped_bytes(), &guest_image_mapped_bytes());
+    assert_eq!(metadata.sections(), &guest_image_sections());
+    assert_eq!(metadata.symbols(), &guest_image_symbols());
+    assert_eq!(metadata.relocations(), &guest_image_relocations());
+    assert_eq!(metadata.imports(), &guest_image_imports());
+    assert_eq!(metadata.unwind(), &guest_image_unwind());
+}
+
+#[test]
 fn guest_image_rejects_entry_outside_mapped_segments() {
     assert_eq!(
         GuestImage::mach_o_executable(

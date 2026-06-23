@@ -49,6 +49,7 @@
    `B8-ARCH2af Runtime MachO Image Mapping Snapshot`、
    `B8-ARCH2ag Runtime MachO Mapping Mapped Bytes Snapshot`、
    `B8-ARCH2ah Runtime GuestImage Metadata Value Accessors`、
+   `B8-ARCH2ai Runtime MachO Executable Metadata Snapshot`、
    `B8-ARCH2 Guest Image Model Extraction`
 2. [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) の `R1` / `R1a` と
    `Instruction Coverage Strategy`
@@ -56,7 +57,7 @@
    B8-ARCH1 responsibility split audit と、`D4a: x86_64 ISA semantic coverage strategy`
 4. この `docs/progress.md` の現在の作業スナップショット
 
-B8-ARCH2ah review / merge 後の次候補:
+B8-ARCH2ai review / merge 後の次候補:
 
 - `main` を最新化したうえで、TODO-backed PR Gate を追加または選び、dedicated branch を作る。
 - 候補は B8-ARCH2 Guest Image Model Extraction の次の小さい slice、または helper process /
@@ -95,11 +96,12 @@ B8-ARCH2ah review / merge 後の次候補:
   では B8 debug bundle の `image_mapping` projection に渡す runtime mapping 構成を
   `MachOExecutableImageMapping` snapshot としてまとめ、B8-ARCH2ag では mapping snapshot が
   `GuestImageMappedBytes` value object も保持するようにし、B8-ARCH2ah では
-  `GuestImageMetadata` が remaining metadata collection value object も返せるようにする。
+  `GuestImageMetadata` が remaining metadata collection value object も返せるようにし、
+  B8-ARCH2ai では Mach-O executable metadata snapshot からそれらの value object を読めるようにする。
 - helper process execution、loader image model、runtime dispatcher、decoder dependency 採用は、
   対応する TODO / design TODO が具体化されるまで混ぜない。
 
-B8-ARCH2ah review / merge 後にすぐ始めないもの:
+B8-ARCH2ai review / merge 後にすぐ始めないもの:
 
 - B8-OSS0 source-built OSS GUI app automation
 - relocation/fixup projection semantics の変更、import projection semantics の変更、
@@ -109,32 +111,49 @@ B8-ARCH2ah review / merge 後にすぐ始めないもの:
 - B8-HWGUI fixture 専用 path のさらなる機能追加
 - decoder dependency 採用、ISA implementation / lowering 追加、supply-chain lockfile 変更
 
-B8-ARCH2ah review package で示すべきもの:
+B8-ARCH2ai review package で示すべきもの:
 
-- `bara-runtime/src/guest_image/metadata.rs` に `GuestImageMetadata` の
-  `sections_value()` / `symbols_value()` / `relocations_value()` / `imports_value()` /
-  `unwind_value()` を追加した範囲
-- 意図は後続 runtime loader caller が metadata collection を payload primitive ではなく
-  runtime-facing value object として受け取れるようにすること
-- できるようになったこととして、caller が mapped bytes / sections / symbols / relocations /
-  imports / unwind を同じ value object 境界から扱えること
+- `bara-runtime/src/guest_image/mach_o.rs` に `MachOExecutableImageMetadata` と
+  `MachOImage::executable_metadata()` を追加した範囲
+- 意図は後続の import / relocation / symbol / unwind projection が generic metadata 内部ではなく
+  Mach-O executable image snapshot を入口にできるようにすること
+- できるようになったこととして、caller が Mach-O specific snapshot 経由で mapped bytes /
+  sections / symbols / relocations / imports / unwind value object を扱えること
 - 既存 payload accessor は残し、existing CLI report projection は同じ JSON output を維持すること
 - focused regression test として
-  `guest_image_metadata_exposes_metadata_value_objects` を追加したこと
+  `mach_o_image_exposes_executable_metadata_snapshot` を追加したこと
 - `loader.plan.json` の `image_mapping` field 名、nested field 名、serde 値、JSON output を
   維持したこと
 - import/fixup projection、helper boundary、helper process execution、modeled continuation を
   まだ移していないこと
-- `nix develop -c cargo test -p bara-runtime guest_image_metadata_exposes_metadata_value_objects -- --nocapture`
+- `nix develop -c cargo test -p bara-runtime mach_o_image_exposes_executable_metadata_snapshot -- --nocapture`
 - `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
 - `nix develop -c ./scripts/verify`
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-23 17:09 JST
+最終更新: 2026-06-23 17:24 JST
 
 状態:
 
+- active_work: completed。B8-ARCH2ai Runtime MachO Executable Metadata Snapshot を
+  `task/b8-arch2ai-macho-metadata-snapshot` で実施した。関連 TODO は
+  `TODO.md` の `B8-ARCH2ai Runtime MachO Executable Metadata Snapshot`、関連設計メモは
+  `docs/design-todo.md` の `B8-ARCH2ai result`。意図は後続の import / relocation / symbol /
+  unwind projection が generic metadata 内部ではなく Mach-O executable image snapshot を入口に
+  できるようにし、B8-ARCH2 の Mach-O specific image model 境界を強めること。`bara-runtime` は
+  `MachOExecutableImageMetadata` と `MachOImage::executable_metadata()` を追加し、caller が
+  Mach-O specific snapshot 経由で mapped bytes / sections / symbols / relocations / imports /
+  unwind value object を扱えるようにした。既存の payload accessor は維持し、existing B8
+  debug bundle behavior と `loader.plan.json` output は維持。`bara-oracle` からの loader
+  domain 抽出、entry extraction / load command interpretation、public Mach-O parser / resolver
+  logic、import/fixup/symbol projection semantics の意味変更、helper bridge、runtime dispatcher は
+  未移動。依存・lockfile・toolchain 変更はない。remaining work は PR review 後に B8-ARCH2
+  Guest Image Model Extraction の次 slice または helper process / Objective-C bridge 境界の
+  TODO-backed PR Gate を選ぶこと。verification は
+  `nix develop -c cargo test -p bara-runtime mach_o_image_exposes_executable_metadata_snapshot -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
+  `nix develop -c ./scripts/verify`。
 - active_work: completed。B8-ARCH2ah Runtime GuestImage Metadata Value Accessors を
   `task/b8-arch2ah-guest-image-metadata-value-accessors` で実施した。関連 TODO は
   `TODO.md` の `B8-ARCH2ah Runtime GuestImage Metadata Value Accessors`、関連設計メモは
