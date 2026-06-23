@@ -595,6 +595,25 @@ B8-ARCH2ai result:
   Objective-C/AppKit helper process execution、modeled continuation state、runtime dispatcher は
   同じ PR では動かさない。
 
+B8-ARCH2aj result:
+
+- 2026-06-23 に `MachOExecutableImageSnapshot` を追加し、
+  `MachOImage::executable_snapshot()` から Mach-O executable image snapshot を取得できるようにした。
+- 意図は後続の import / relocation / symbol / unwind projection が mapping と metadata を別々の
+  accessor から集めず、Mach-O executable image snapshot を単一の入口にできるようにし、
+  B8-ARCH2 の image model 境界を強めること。
+- `MachOExecutableImageSnapshot` は `MachOExecutableImageMapping` と
+  `MachOExecutableImageMetadata` を保持し、payload primitive を直接公開するための新しい API は
+  増やさない。
+- これにより caller は mapping snapshot と metadata snapshot を同じ Mach-O specific boundary
+  経由で扱える。B8 debug bundle の通常経路も executable image snapshot を入口にして existing
+  `image_mapping` report を組み立て、mapped bytes source は metadata snapshot の value object から
+  読む。existing B8 debug bundle behavior と `loader.plan.json` output は変えない。
+- `bara-oracle` からの loader domain 抽出、entry extraction / load command interpretation、
+  public Mach-O parser / resolver logic、import/fixup/symbol projection semantics の意味変更、
+  Objective-C/AppKit helper process execution、modeled continuation state、runtime dispatcher は
+  同じ PR では動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。

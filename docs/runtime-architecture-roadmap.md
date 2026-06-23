@@ -540,6 +540,8 @@ Mach-O parsing / probing から runtime が使える `GuestImage` / `MachOImage`
 - B8-ARCH2ai で `MachOExecutableImageMetadata` を追加し、Mach-O specific executable
   image snapshot から mapped bytes / sections / symbols / relocations / imports / unwind を
   value object として扱えるようにした。
+- B8-ARCH2aj で `MachOExecutableImageSnapshot` を追加し、Mach-O specific executable
+  image snapshot から mapping snapshot と metadata snapshot を同じ boundary で扱えるようにした。
 
 ### R3: Translation Artifact And Debug Export
 
