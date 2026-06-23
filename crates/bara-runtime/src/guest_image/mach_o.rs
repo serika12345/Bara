@@ -1,8 +1,9 @@
 use bara_ir::{ProgramImageMetadata, ProgramImageRange, ProgramImageSectionKind, X86Va};
 
 use super::{
-    GuestImage, GuestImageAddressSpace, GuestImageEntryPoint, GuestImageError, GuestImageMetadata,
-    GuestImageSegment, GuestImageSegmentKind, GuestImageSegmentSource,
+    GuestImage, GuestImageAddressSpace, GuestImageEntryPoint, GuestImageError,
+    GuestImageMappedBytesSource, GuestImageMetadata, GuestImageSegment, GuestImageSegmentKind,
+    GuestImageSegmentSource,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -63,8 +64,49 @@ impl MachOImage {
         self.code_segment
     }
 
+    pub const fn executable_mapping(&self) -> MachOExecutableImageMapping {
+        MachOExecutableImageMapping::new(
+            self.code_segment,
+            self.entry_point(),
+            self.metadata().mapped_bytes_source(),
+        )
+    }
+
     pub const fn metadata(&self) -> &GuestImageMetadata {
         self.guest_image.metadata()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MachOExecutableImageMapping {
+    code_segment: MachOExecutableCodeSegment,
+    entry_point: MachOExecutableEntryPoint,
+    mapped_bytes_source: GuestImageMappedBytesSource,
+}
+
+impl MachOExecutableImageMapping {
+    pub const fn new(
+        code_segment: MachOExecutableCodeSegment,
+        entry_point: MachOExecutableEntryPoint,
+        mapped_bytes_source: GuestImageMappedBytesSource,
+    ) -> Self {
+        Self {
+            code_segment,
+            entry_point,
+            mapped_bytes_source,
+        }
+    }
+
+    pub const fn code_segment(self) -> MachOExecutableCodeSegment {
+        self.code_segment
+    }
+
+    pub const fn entry_point(self) -> MachOExecutableEntryPoint {
+        self.entry_point
+    }
+
+    pub const fn mapped_bytes_source(self) -> GuestImageMappedBytesSource {
+        self.mapped_bytes_source
     }
 }
 

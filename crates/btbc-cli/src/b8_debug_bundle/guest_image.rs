@@ -1,7 +1,7 @@
 use bara_oracle::MachOEntryFunctionInput;
 use bara_runtime::{
     GuestImageAddressSpace, GuestImageError, GuestImageMappedBytesSource, GuestImageSegmentSource,
-    MachOExecutableEntryPoint, MachOImage,
+    MachOExecutableEntryPoint, MachOExecutableImageMapping, MachOImage,
 };
 use serde::Serialize;
 
@@ -23,11 +23,13 @@ impl B8DebugGuestImageMappingReport {
         entry_input: &MachOEntryFunctionInput,
     ) -> Result<Self, B8DebugGuestImageMappingError> {
         let mach_o_image = mach_o_image_from_entry_input(entry_input)?;
-        Self::from_mach_o_image(&mach_o_image)
+        Self::from_mach_o_mapping(mach_o_image.executable_mapping())
     }
 
-    fn from_mach_o_image(mach_o_image: &MachOImage) -> Result<Self, B8DebugGuestImageMappingError> {
-        let code_segment = mach_o_image.code_segment();
+    fn from_mach_o_mapping(
+        mapping: MachOExecutableImageMapping,
+    ) -> Result<Self, B8DebugGuestImageMappingError> {
+        let code_segment = mapping.code_segment();
         let code_segment_byte_len = code_segment
             .byte_len()
             .map_err(B8DebugGuestImageMappingError::GuestImage)?;
@@ -38,8 +40,8 @@ impl B8DebugGuestImageMappingReport {
             address_space: code_segment.address_space().into(),
             code_segment_vmaddr: code_segment.vmaddr().value(),
             code_segment_byte_len: code_segment_byte_len.as_usize(),
-            entry_pc: mach_o_image.entry_point().address().value(),
-            mapped_bytes_source: mach_o_image.metadata().mapped_bytes_source().into(),
+            entry_pc: mapping.entry_point().address().value(),
+            mapped_bytes_source: mapping.mapped_bytes_source().into(),
         })
     }
 }
@@ -143,8 +145,9 @@ mod tests {
         )
         .expect("test Mach-O image is valid");
 
-        let report = B8DebugGuestImageMappingReport::from_mach_o_image(&image)
-            .expect("test mapping report is valid");
+        let report =
+            B8DebugGuestImageMappingReport::from_mach_o_mapping(image.executable_mapping())
+                .expect("test mapping report is valid");
 
         assert_eq!(report.status, B8DebugStageStatus::Executed);
         assert_eq!(
