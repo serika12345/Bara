@@ -43,6 +43,7 @@
    `B8-ARCH2z Runtime GuestImage Metadata Module Split`、
    `B8-ARCH2aa Runtime MachOImage Module Split`、
    `B8-ARCH2ab Runtime GuestImage Core Module Split`、
+   `B8-ARCH2ac Runtime GuestImage Test Module Split`、
    `B8-ARCH2 Guest Image Model Extraction`
 2. [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) の `R1` / `R1a` と
    `Instruction Coverage Strategy`
@@ -50,7 +51,7 @@
    B8-ARCH1 responsibility split audit と、`D4a: x86_64 ISA semantic coverage strategy`
 4. この `docs/progress.md` の現在の作業スナップショット
 
-B8-ARCH2ab review / merge 後の次候補:
+B8-ARCH2ac review / merge 後の次候補:
 
 - `main` を最新化したうえで、TODO-backed PR Gate を追加または選び、dedicated branch を作る。
 - 候補は B8-ARCH2 Guest Image Model Extraction の次の小さい slice、または helper process /
@@ -82,11 +83,11 @@ B8-ARCH2ab review / merge 後の次候補:
   aggregate と metadata value object 群を `guest_image/metadata.rs` へ分け、B8-ARCH2aa では
   `MachOImage` shell と Mach-O executable value object 群を `guest_image/mach_o.rs` へ分け、
   B8-ARCH2ab では generic `GuestImage` shell と segment/error 型を `guest_image/image.rs` へ
-  分ける。
+  分け、B8-ARCH2ac では existing `guest_image` unit test 群を `guest_image/tests.rs` へ分ける。
 - helper process execution、loader image model、runtime dispatcher、decoder dependency 採用は、
   対応する TODO / design TODO が具体化されるまで混ぜない。
 
-B8-ARCH2ab review / merge 後にすぐ始めないもの:
+B8-ARCH2ac review / merge 後にすぐ始めないもの:
 
 - B8-OSS0 source-built OSS GUI app automation
 - relocation/fixup projection semantics の変更、import projection semantics の変更、
@@ -96,18 +97,16 @@ B8-ARCH2ab review / merge 後にすぐ始めないもの:
 - B8-HWGUI fixture 専用 path のさらなる機能追加
 - decoder dependency 採用、ISA implementation / lowering 追加、supply-chain lockfile 変更
 
-B8-ARCH2ab review package で示すべきもの:
+B8-ARCH2ac review package で示すべきもの:
 
-- `bara-runtime/src/guest_image/image.rs` に generic `GuestImage` shell、entry point、
-  segments、segment identity、image error を移した範囲
-- 意図は generic image invariant と親 `guest_image/mod.rs` の変更理由を分け、
-  parent module を submodule wiring / re-export / tests に近づけること
-- `guest_image/mod.rs` が generic image module を re-export し、
-  `bara_runtime::GuestImage` などの existing public API 名を維持すること
-- できるようになったこととして、generic image invariant、entry point、segment identity、
-  image error の調整を `guest_image/image.rs` 側で扱えること
-- metadata / Mach-O specific modules が existing public API / caller-visible behavior を
-  維持したまま generic image shell を module boundary 経由で使うこと
+- `bara-runtime/src/guest_image/tests.rs` に existing `guest_image` unit test 群を移した範囲
+- 意図は test fixture / regression coverage と production module wiring の変更理由を分け、
+  parent module を submodule wiring / re-export / test module declaration に近づけること
+- `guest_image/mod.rs` が production type definitions を持たず、`image` / `mach_o` /
+  `metadata` module wiring と public re-export、test module declaration だけを持つこと
+- できるようになったこととして、production boundary の diff と test coverage の diff を
+  分けて読めること
+- existing `guest_image` test names / coverage を維持したこと
 - B8 debug bundle が existing `GuestImage` projection 経由で existing
   `B8DebugGuestImageMappingReport` へ射影し続けること
 - `loader.plan.json` の `image_mapping` field 名、nested field 名、serde 値、JSON output を
@@ -120,10 +119,31 @@ B8-ARCH2ab review package で示すべきもの:
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-23 15:03 JST
+最終更新: 2026-06-23 15:13 JST
 
 状態:
 
+- active_work: completed。B8-ARCH2ac Runtime GuestImage Test Module Split を
+  `task/b8-arch2ac-guest-image-test-module-split` で実施した。関連 TODO は
+  `TODO.md` の `B8-ARCH2ac Runtime GuestImage Test Module Split`、関連設計メモは
+  `docs/design-todo.md` の `B8-ARCH2ac result`。意図は parent module に残った
+  test fixture / regression coverage と production module wiring の変更理由を分け、
+  `guest_image/mod.rs` を submodule wiring / re-export / test module declaration に近づけること。
+  `bara-runtime` は `crates/bara-runtime/src/guest_image/tests.rs` を追加し、existing
+  `guest_image` unit test 群を `guest_image/mod.rs` から分けた。これにより production boundary の
+  diff と test coverage の diff を分けて読める。`guest_image/mod.rs` は production type
+  definitions を持たず、`image` / `mach_o` / `metadata` module wiring と public re-export、
+  test module declaration だけを持つ。existing `guest_image` test names / coverage、
+  `GuestImage` / `MachOImage` / B8 debug bundle の caller-visible behavior と
+  `loader.plan.json` output は維持。`bara-oracle` からの loader domain 抽出、
+  entry extraction / load command interpretation、public Mach-O parser / resolver logic、
+  import/fixup/symbol projection semantics の意味変更、helper bridge、runtime dispatcher は
+  未移動。依存・lockfile・toolchain 変更はない。remaining work は PR review 後に
+  B8-ARCH2 Guest Image Model Extraction の次 slice または helper process / Objective-C bridge
+  境界の TODO-backed PR Gate を選ぶこと。verification は
+  `nix develop -c cargo test -p bara-runtime guest_image -- --nocapture`、
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
+  `nix develop -c ./scripts/verify`。
 - active_work: completed。B8-ARCH2ab Runtime GuestImage Core Module Split を
   `task/b8-arch2ab-guest-image-core-module-split` で実施した。関連 TODO は
   `TODO.md` の `B8-ARCH2ab Runtime GuestImage Core Module Split`、関連設計メモは
