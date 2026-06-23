@@ -266,6 +266,22 @@ B8-ARCH2q result:
   import/fixup/symbol projection の意味変更、Objective-C/AppKit helper process execution、
   modeled continuation state、runtime dispatcher は同じ PR では動かさない。
 
+B8-ARCH2r result:
+
+- 2026-06-23 に `MachOExecutableEntryPoint` を追加し、Mach-O executable entry point
+  address を runtime-facing Mach-O domain type として表すようにした。
+- `MachOImage` constructor は generic `GuestImageEntryPoint` ではなく
+  `MachOExecutableEntryPoint` を受け取り、underlying `GuestImageEntryPoint` への変換を
+  `MachOImage` constructor 内に閉じる。
+- B8 debug bundle は existing `MachOEntryFunctionInput` の entry address を
+  `MachOExecutableEntryPoint` に変換して existing `B8DebugGuestImageMappingReport` へ射影する。
+  `loader.plan.json` の `image_mapping` field 名、nested field 名、serde 値、JSON output は
+  変えない。
+- `bara-oracle` からの loader domain 抽出、entry extraction / load command interpretation、
+  public Mach-O parser / resolver logic、import/fixup/symbol projection の意味変更、
+  Objective-C/AppKit helper process execution、modeled continuation state、runtime dispatcher は
+  同じ PR では動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。

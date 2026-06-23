@@ -109,17 +109,21 @@ pub struct MachOImage {
 
 impl MachOImage {
     pub fn executable(
-        entry_point: GuestImageEntryPoint,
+        entry_point: MachOExecutableEntryPoint,
         code_segment: GuestImageSegment,
         metadata: GuestImageMetadata,
     ) -> Result<Self, GuestImageError> {
         Ok(Self {
-            guest_image: GuestImage::mach_o_executable(entry_point, code_segment, metadata)?,
+            guest_image: GuestImage::mach_o_executable(
+                entry_point.guest_image_entry_point(),
+                code_segment,
+                metadata,
+            )?,
         })
     }
 
     pub fn executable_from_code_range(
-        entry_point: GuestImageEntryPoint,
+        entry_point: MachOExecutableEntryPoint,
         code_range: MachOExecutableCodeRange,
         metadata: GuestImageMetadata,
     ) -> Result<Self, GuestImageError> {
@@ -131,7 +135,7 @@ impl MachOImage {
     }
 
     pub fn executable_from_program_image_metadata(
-        entry_point: GuestImageEntryPoint,
+        entry_point: MachOExecutableEntryPoint,
         metadata: &ProgramImageMetadata,
     ) -> Result<Self, GuestImageError> {
         let code_range = MachOExecutableCodeRange::from_program_image_metadata(metadata)?;
@@ -149,8 +153,8 @@ impl MachOImage {
         &self.guest_image
     }
 
-    pub const fn entry_point(&self) -> GuestImageEntryPoint {
-        self.guest_image.entry_point()
+    pub const fn entry_point(&self) -> MachOExecutableEntryPoint {
+        MachOExecutableEntryPoint::new(self.guest_image.entry_point().address())
     }
 
     pub fn code_segment(&self) -> Option<GuestImageSegment> {
@@ -159,6 +163,25 @@ impl MachOImage {
 
     pub const fn metadata(&self) -> &GuestImageMetadata {
         self.guest_image.metadata()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MachOExecutableEntryPoint {
+    address: X86Va,
+}
+
+impl MachOExecutableEntryPoint {
+    pub const fn new(address: X86Va) -> Self {
+        Self { address }
+    }
+
+    pub const fn address(self) -> X86Va {
+        self.address
+    }
+
+    const fn guest_image_entry_point(self) -> GuestImageEntryPoint {
+        GuestImageEntryPoint::new(self.address)
     }
 }
 
@@ -408,7 +431,7 @@ mod tests {
         GuestImage, GuestImageAddressSpace, GuestImageEntryPoint, GuestImageError,
         GuestImageFormat, GuestImageMappedBytesSource, GuestImageMetadata, GuestImageSegment,
         GuestImageSegmentKind, GuestImageSegmentSource, GuestImageSegments,
-        MachOExecutableCodeRange, MachOImage,
+        MachOExecutableCodeRange, MachOExecutableEntryPoint, MachOImage,
     };
     use bara_ir::{
         ExternalSymbolId, ExternalSymbolImport, ProgramImageImport, ProgramImageImports,
@@ -548,7 +571,7 @@ mod tests {
     #[test]
     fn mach_o_image_wraps_runtime_guest_image_shell() {
         let image = MachOImage::executable(
-            GuestImageEntryPoint::new(X86Va::new(0x1_0000_0010)),
+            MachOExecutableEntryPoint::new(X86Va::new(0x1_0000_0010)),
             code_segment(),
             metadata(),
         )
@@ -564,7 +587,7 @@ mod tests {
     #[test]
     fn mach_o_image_builds_executable_code_segment_from_range() {
         let image = MachOImage::executable_from_code_range(
-            GuestImageEntryPoint::new(X86Va::new(0x1_0000_0010)),
+            MachOExecutableEntryPoint::new(X86Va::new(0x1_0000_0010)),
             MachOExecutableCodeRange::new(image_range(0x1_0000_0000, 0x1_0000_1000)),
             metadata(),
         )
@@ -580,6 +603,17 @@ mod tests {
     fn mach_o_executable_code_range_exposes_program_image_range() {
         let range = image_range(0x1_0000_0000, 0x1_0000_1000);
         assert_eq!(MachOExecutableCodeRange::new(range).range(), range);
+    }
+
+    #[test]
+    fn mach_o_executable_entry_point_exposes_typed_address() {
+        let entry_point = MachOExecutableEntryPoint::new(X86Va::new(0x1_0000_0010));
+
+        assert_eq!(entry_point.address(), X86Va::new(0x1_0000_0010));
+        assert_eq!(
+            entry_point.guest_image_entry_point(),
+            GuestImageEntryPoint::new(X86Va::new(0x1_0000_0010))
+        );
     }
 
     #[test]
@@ -643,7 +677,7 @@ mod tests {
     fn mach_o_image_builds_guest_metadata_from_program_image_metadata() {
         let program_metadata = program_image_metadata();
         let image = MachOImage::executable_from_program_image_metadata(
-            GuestImageEntryPoint::new(X86Va::new(0x1_0000_0010)),
+            MachOExecutableEntryPoint::new(X86Va::new(0x1_0000_0010)),
             &program_metadata,
         )
         .expect("entry is inside code segment");

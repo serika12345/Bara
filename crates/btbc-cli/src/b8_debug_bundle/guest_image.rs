@@ -1,7 +1,7 @@
 use bara_oracle::MachOEntryFunctionInput;
 use bara_runtime::{
-    GuestImage, GuestImageAddressSpace, GuestImageEntryPoint, GuestImageError,
-    GuestImageMappedBytesSource, GuestImageSegmentSource, MachOImage,
+    GuestImage, GuestImageAddressSpace, GuestImageError, GuestImageMappedBytesSource,
+    GuestImageSegmentSource, MachOExecutableEntryPoint, MachOImage,
 };
 use serde::Serialize;
 
@@ -51,7 +51,7 @@ fn mach_o_image_from_entry_input(
     entry_input: &MachOEntryFunctionInput,
 ) -> Result<MachOImage, B8DebugGuestImageMappingError> {
     MachOImage::executable_from_program_image_metadata(
-        GuestImageEntryPoint::new(entry_input.executable_image().entry().offset()),
+        MachOExecutableEntryPoint::new(entry_input.executable_image().entry().offset()),
         entry_input.program_image_metadata(),
     )
     .map_err(B8DebugGuestImageMappingError::GuestImage)
