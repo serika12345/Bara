@@ -20,15 +20,8 @@ pub(super) struct B8DebugGuestImageMappingReport {
 }
 
 impl B8DebugGuestImageMappingReport {
-    pub(super) fn from_entry_input(
-        entry_input: &MachOEntryFunctionInput,
-    ) -> Result<Self, B8DebugGuestImageMappingError> {
-        let mach_o_image = mach_o_image_from_entry_input(entry_input)?;
-        Self::from_mach_o_snapshot(mach_o_image.executable_snapshot())
-    }
-
-    fn from_mach_o_snapshot(
-        snapshot: MachOExecutableImageSnapshot,
+    pub(super) fn from_mach_o_snapshot(
+        snapshot: &MachOExecutableImageSnapshot,
     ) -> Result<Self, B8DebugGuestImageMappingError> {
         Self::from_mach_o_mapping_parts(
             snapshot.mapping(),
@@ -72,6 +65,12 @@ fn mach_o_image_from_entry_input(
         entry_input.program_image_metadata(),
     )
     .map_err(B8DebugGuestImageMappingError::GuestImage)
+}
+
+pub(super) fn mach_o_executable_snapshot_from_entry_input(
+    entry_input: &MachOEntryFunctionInput,
+) -> Result<MachOExecutableImageSnapshot, B8DebugGuestImageMappingError> {
+    Ok(mach_o_image_from_entry_input(entry_input)?.executable_snapshot())
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -193,9 +192,9 @@ mod tests {
         )
         .expect("test Mach-O image is valid");
 
-        let report =
-            B8DebugGuestImageMappingReport::from_mach_o_snapshot(image.executable_snapshot())
-                .expect("test mapping report is valid");
+        let snapshot = image.executable_snapshot();
+        let report = B8DebugGuestImageMappingReport::from_mach_o_snapshot(&snapshot)
+            .expect("test mapping report is valid");
 
         assert_eq!(report.status, B8DebugStageStatus::Executed);
         assert_eq!(

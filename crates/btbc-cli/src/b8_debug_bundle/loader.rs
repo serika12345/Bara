@@ -1,7 +1,10 @@
 use bara_oracle::{BinaryFormatProbeReport, BinaryInput, MachOEntryFunctionInput};
 use serde::Serialize;
 
-use super::guest_image::{B8DebugGuestImageMappingError, B8DebugGuestImageMappingReport};
+use super::guest_image::{
+    mach_o_executable_snapshot_from_entry_input, B8DebugGuestImageMappingError,
+    B8DebugGuestImageMappingReport,
+};
 use super::helper_boundary::B8DebugHelperBoundaryRequestReport;
 use super::import_boundary::B8DebugImportBoundaryReport;
 use super::report::{B8DebugDecodeReport, B8DebugEntrySource, B8DebugStageStatus};
@@ -27,12 +30,14 @@ impl B8DebugLoaderPlanReport {
         decode_report: &B8DebugDecodeReport,
     ) -> Result<Self, B8DebugLoaderPlanError> {
         let code = entry_input.executable_image().code_segment().x86_bytes();
+        let mach_o_snapshot = mach_o_executable_snapshot_from_entry_input(entry_input)
+            .map_err(B8DebugLoaderPlanError::ImageMapping)?;
         Ok(Self {
             schema: "b8_debug_loader_plan_v0",
             source: "bara_runtime_user_space_launch_plan",
             status: B8DebugStageStatus::Executed,
             input_metadata: B8DebugLoaderInputMetadata::PublicMachOProbe,
-            image_mapping: B8DebugGuestImageMappingReport::from_entry_input(entry_input)
+            image_mapping: B8DebugGuestImageMappingReport::from_mach_o_snapshot(&mach_o_snapshot)
                 .map_err(B8DebugLoaderPlanError::ImageMapping)?,
             relocation_binding: B8DebugLoaderDeferredStepReport {
                 status: B8DebugStageStatus::Skipped,
