@@ -77,8 +77,35 @@ impl MachOImage {
         MachOExecutableImageMetadata::new(self.metadata().clone())
     }
 
+    pub fn executable_snapshot(&self) -> MachOExecutableImageSnapshot {
+        MachOExecutableImageSnapshot::new(self.executable_mapping(), self.executable_metadata())
+    }
+
     pub const fn metadata(&self) -> &GuestImageMetadata {
         self.guest_image.metadata()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MachOExecutableImageSnapshot {
+    mapping: MachOExecutableImageMapping,
+    metadata: MachOExecutableImageMetadata,
+}
+
+impl MachOExecutableImageSnapshot {
+    const fn new(
+        mapping: MachOExecutableImageMapping,
+        metadata: MachOExecutableImageMetadata,
+    ) -> Self {
+        Self { mapping, metadata }
+    }
+
+    pub const fn mapping(&self) -> &MachOExecutableImageMapping {
+        &self.mapping
+    }
+
+    pub const fn metadata(&self) -> &MachOExecutableImageMetadata {
+        &self.metadata
     }
 }
 

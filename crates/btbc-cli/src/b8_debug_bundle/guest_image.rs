@@ -1,7 +1,8 @@
 use bara_oracle::MachOEntryFunctionInput;
 use bara_runtime::{
     GuestImageAddressSpace, GuestImageError, GuestImageMappedBytesSource, GuestImageSegmentSource,
-    MachOExecutableEntryPoint, MachOExecutableImageMapping, MachOImage,
+    MachOExecutableEntryPoint, MachOExecutableImageMapping, MachOExecutableImageSnapshot,
+    MachOImage,
 };
 use serde::Serialize;
 
@@ -23,11 +24,28 @@ impl B8DebugGuestImageMappingReport {
         entry_input: &MachOEntryFunctionInput,
     ) -> Result<Self, B8DebugGuestImageMappingError> {
         let mach_o_image = mach_o_image_from_entry_input(entry_input)?;
-        Self::from_mach_o_mapping(mach_o_image.executable_mapping())
+        Self::from_mach_o_snapshot(mach_o_image.executable_snapshot())
     }
 
+    fn from_mach_o_snapshot(
+        snapshot: MachOExecutableImageSnapshot,
+    ) -> Result<Self, B8DebugGuestImageMappingError> {
+        Self::from_mach_o_mapping_parts(
+            snapshot.mapping(),
+            snapshot.metadata().mapped_bytes().source(),
+        )
+    }
+
+    #[cfg(test)]
     fn from_mach_o_mapping(
         mapping: MachOExecutableImageMapping,
+    ) -> Result<Self, B8DebugGuestImageMappingError> {
+        Self::from_mach_o_mapping_parts(&mapping, mapping.mapped_bytes_source())
+    }
+
+    fn from_mach_o_mapping_parts(
+        mapping: &MachOExecutableImageMapping,
+        mapped_bytes_source: GuestImageMappedBytesSource,
     ) -> Result<Self, B8DebugGuestImageMappingError> {
         let code_segment = mapping.code_segment();
         let code_segment_byte_len = code_segment
@@ -41,7 +59,7 @@ impl B8DebugGuestImageMappingReport {
             code_segment_vmaddr: code_segment.vmaddr().value(),
             code_segment_byte_len: code_segment_byte_len.as_usize(),
             entry_pc: mapping.entry_point().address().value(),
-            mapped_bytes_source: mapping.mapped_bytes_source().into(),
+            mapped_bytes_source: mapped_bytes_source.into(),
         })
     }
 }
@@ -147,6 +165,36 @@ mod tests {
 
         let report =
             B8DebugGuestImageMappingReport::from_mach_o_mapping(image.executable_mapping())
+                .expect("test mapping report is valid");
+
+        assert_eq!(report.status, B8DebugStageStatus::Executed);
+        assert_eq!(
+            report.segment_source,
+            B8DebugGuestImageSegmentSource::LcSegment64FileRange
+        );
+        assert_eq!(
+            report.address_space,
+            B8DebugGuestImageAddressSpace::MachOVirtualAddress
+        );
+        assert_eq!(report.code_segment_vmaddr, 0x1_0000_0000);
+        assert_eq!(report.code_segment_byte_len, 0x10);
+        assert_eq!(report.entry_pc, 0x1_0000_0008);
+        assert_eq!(
+            report.mapped_bytes_source,
+            B8DebugGuestImageMappedBytesSource::ProgramImageMetadata
+        );
+    }
+
+    #[test]
+    fn image_mapping_report_uses_mach_o_executable_image_snapshot() {
+        let image = MachOImage::executable_from_program_image_metadata(
+            MachOExecutableEntryPoint::new(X86Va::new(0x1_0000_0008)),
+            &program_image_metadata(),
+        )
+        .expect("test Mach-O image is valid");
+
+        let report =
+            B8DebugGuestImageMappingReport::from_mach_o_snapshot(image.executable_snapshot())
                 .expect("test mapping report is valid");
 
         assert_eq!(report.status, B8DebugStageStatus::Executed);

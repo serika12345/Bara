@@ -9,7 +9,7 @@ pub use image::{
 pub use mach_o::{
     MachOExecutableCodeByteLen, MachOExecutableCodeRange, MachOExecutableCodeSegment,
     MachOExecutableEntryPoint, MachOExecutableImageMapping, MachOExecutableImageMetadata,
-    MachOImage,
+    MachOExecutableImageSnapshot, MachOImage,
 };
 pub use metadata::{
     GuestImageImports, GuestImageMappedBytes, GuestImageMappedBytesSource, GuestImageMetadata,
