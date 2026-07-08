@@ -1,6 +1,7 @@
 use bara_ir::ProgramImageMetadata;
 use bara_isa_x86::X86Bytes;
 use bara_oracle::{BinaryFormatProbeReport, BinaryInput, MachOChainedImportIdentityReport};
+use bara_runtime::{MachOExecutableImageMetadata, MachOExecutableImageSnapshot};
 use serde::Serialize;
 
 use super::report::{B8DebugDecodeReport, B8DebugMemoryReadWidthReport, B8DebugSourceIsa};
@@ -43,7 +44,7 @@ impl B8DebugHelperBoundaryRequestReport {
         input_probe: &BinaryFormatProbeReport,
         decode_report: &B8DebugDecodeReport,
         code_bytes: &X86Bytes,
-        image_metadata: &ProgramImageMetadata,
+        mach_o_snapshot: &MachOExecutableImageSnapshot,
     ) -> Self {
         let request = B8DebugImportHelperRequestReport::from_boundary_and_import(
             call_boundary,
@@ -52,7 +53,7 @@ impl B8DebugHelperBoundaryRequestReport {
             input_probe,
             decode_report,
             code_bytes,
-            image_metadata,
+            mach_o_snapshot,
         );
         let reason = request.boundary_blocked_reason();
         let blockers = request.boundary_blockers();
@@ -101,14 +102,16 @@ impl B8DebugImportHelperRequestReport {
         input_probe: &BinaryFormatProbeReport,
         decode_report: &B8DebugDecodeReport,
         code_bytes: &X86Bytes,
-        image_metadata: &ProgramImageMetadata,
+        mach_o_snapshot: &MachOExecutableImageSnapshot,
     ) -> Self {
+        let image_metadata =
+            program_image_metadata_from_mach_o_metadata(mach_o_snapshot.metadata());
         let required_marshaling = B8DebugHelperMarshalingReport::blocked(
             call_boundary,
             input,
             input_probe,
             decode_report,
-            image_metadata,
+            &image_metadata,
         );
         let preserved_register_values =
             B8DebugReturnToContinuationSavedRegisterValueReport::from_decode_report(
@@ -127,7 +130,7 @@ impl B8DebugImportHelperRequestReport {
                     input,
                     input_probe,
                     code_bytes,
-                    image_metadata,
+                    image_metadata: &image_metadata,
                 },
             );
         Self {
@@ -158,6 +161,19 @@ impl B8DebugImportHelperRequestReport {
             .map(B8DebugObjcHelperExecutionRequestReport::boundary_blockers)
             .unwrap_or_else(|| self.required_marshaling.blockers.clone())
     }
+}
+
+fn program_image_metadata_from_mach_o_metadata(
+    metadata: &MachOExecutableImageMetadata,
+) -> ProgramImageMetadata {
+    ProgramImageMetadata::new_with_mapped_bytes(
+        metadata.sections().payload().clone(),
+        metadata.mapped_bytes().payload().clone(),
+        metadata.symbols().payload().clone(),
+        metadata.relocations().payload().clone(),
+        metadata.imports().payload().clone(),
+        metadata.unwind().payload().clone(),
+    )
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
