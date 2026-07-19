@@ -17,6 +17,7 @@ pub(super) struct B8DebugBundleOutputPaths {
     decode_report: String,
     lift_ir: String,
     emit_report: String,
+    translation_artifact: String,
     pcmap: String,
     fixups: String,
     helpers: String,
@@ -37,6 +38,7 @@ impl B8DebugBundleOutputPaths {
             decode_report: path_string(&bundle_dir.join("decode.report.json")),
             lift_ir: path_string(&bundle_dir.join("lift.ir.json")),
             emit_report: path_string(&bundle_dir.join("emit.report.json")),
+            translation_artifact: path_string(&bundle_dir.join("translation-artifact.json")),
             pcmap: path_string(&bundle_dir.join("pcmap.json")),
             fixups: path_string(&bundle_dir.join("fixups.json")),
             helpers: path_string(&bundle_dir.join("helpers.json")),
@@ -70,6 +72,10 @@ impl B8DebugBundleOutputPaths {
 
     pub(super) fn emit_report_path(&self) -> PathBuf {
         PathBuf::from(&self.emit_report)
+    }
+
+    pub(super) fn translation_artifact_path(&self) -> PathBuf {
+        PathBuf::from(&self.translation_artifact)
     }
 
     pub(super) fn pcmap_path(&self) -> PathBuf {

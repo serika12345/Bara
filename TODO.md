@@ -4701,7 +4701,7 @@ debug bundle の blocker を source of truth として複数の `PR Gate` へ分
 - [x] decode / lift / emit の結果を `TranslationArtifact` として runtime へ渡す。
   - [x] image metadata を持たない通常 fixture を typed artifact runtime input へ接続する。
   - [x] Mach-O / B8 real-entry を image metadata-aware source identity とともに接続する。
-- [ ] artifact bytes、PC map、fixups、helper requirements、source/cache identity を debug export
+- [x] artifact bytes、PC map、fixups、helper requirements、source/cache identity を debug export
   できるようにする。
 - [x] existing fixture expected / actual を artifact path 経由でも通し、CLI report DTO を
   runtime input として使わない。
@@ -4806,6 +4806,53 @@ review gate:
 
 - Mach-O/B8 real-entryのtyped artifact runtime input接続をcommit / push / draft PR作成で停止する。
   B8-LAUNCH1c debug exportまたはB8-LAUNCH2へ進まない。
+
+#### PR Gate: B8-LAUNCH1c Executed Translation Artifact Debug Export
+
+branch: `task/b8-launch1c-artifact-debug-export`
+
+目的:
+
+- B8 real `LC_MAIN` first-blockで実際にruntimeへ渡した`TranslationArtifact`から、ARM64 code、
+  PC map、fixups、helper requirements、source/cache identityを一つのstable debug reportへprojectする。
+- 後続loader / dispatcherがCLI report DTOや再変換した別artifactをsource of truthにせず、実行対象と
+  同じartifactを監査入力として参照できるようにする。
+
+完了条件:
+
+- [x] B8専用serialization DTOを`&TranslationArtifact`からpureに構築し、schema version、ARM64
+  code bytes、PC map、fixups、helper requirements、source identity、cache identityを保持する。
+- [x] source hashはSHA-256 identityとしてlowercase hexで、cache identityはsource hash、backend-owned
+  translator version、concrete `arm64_macos` targetとしてexportし、artifact invariantを迂回しない。
+- [x] `B8RealEntryAttempt`はruntimeへ渡す同じartifact referenceからdebug reportを構築する。
+  decode / lift / emit / artifact constructionが失敗した場合も、stable failed / skipped reportを返す。
+- [x] B8 bundleへ`translation-artifact.json`とoutput-path fieldを追加し、existing `emit.report.json`、
+  `pcmap.json`、`fixups.json`、`helpers.json`、runtime / blocker schemaは変更しない。
+- [x] focused serialization testでcode、non-empty PC map / fixups / helper requirements、source/cache
+  identityの値とschemaを固定し、B8 bundle integration testで新しいpath / fileを確認する。
+- [x] public domain typeへ`Serialize`を追加せず、public primitive baseline、dependency / lockfile、
+  runtime normal dependency graphを変更しない。
+- [x] TODO、design TODO、runtime architecture roadmap、progress snapshotを同期し、
+  `nix develop -c ./scripts/verify`が通る。
+
+PR に含めない:
+
+- artifact deserialization、translation cache storage / lookup、generic cross-crate serializer。
+- relocation / rebase / bind、fixup適用、import address解決、mapped image preparation。
+- runtime dispatcher / typed runtime state接続、helper service execution、standalone linker migration。
+- existing reportの削除 / schema統合、cross-platform personality、PE / ELF / Wine。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli b8_debug_bundle`
+- `nix develop -c cargo test -p btbc-cli function_run`
+- `nix develop -c ./scripts/check-domain-types`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- 実行済みB8 translation artifactのdebug exportをcommit / push / draft PR作成で停止する。
+  B8-LAUNCH2 executable image preparationへ進まない。
 
 #### 中マイルストーン: B8-LAUNCH2 Executable Image Preparation
 
