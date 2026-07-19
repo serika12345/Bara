@@ -28,6 +28,7 @@ mod import_boundary;
 mod io;
 mod loader;
 mod report;
+mod translation_source;
 
 use self::attempt::B8RealEntryAttempt;
 use self::helper_boundary::{
@@ -44,6 +45,9 @@ use self::report::{
     B8DebugEntryBytesReport, B8DebugMemoryReadWidthReport, B8DebugProcessedPcRange,
     B8DebugSourceIsa, B8DebugUnsupportedInstructionReport,
 };
+use self::translation_source::{
+    b8_lc_main_first_block_translation_source_identity, B8LcMainTranslationSourceIdentityError,
+};
 
 use crate::x86_64_mach_o_fixture::{b8_gui_hello_world_case_id, X8664MachOFixtureError};
 
@@ -56,6 +60,8 @@ pub(crate) fn generate_b8_debug_bundle(
     create_dir(&bundle_dir)?;
 
     let input_bytes = read_binary_file(binary_path)?;
+    let source_identity = b8_lc_main_first_block_translation_source_identity(&input_bytes)
+        .map_err(B8DebugBundleError::LcMainTranslationSourceIdentity)?;
     let input =
         BinaryInput::from_file_bytes(BinaryFileBytes::from_untrusted_file_contents(input_bytes));
     let input_probe = probe_public_binary_format(&input).map_err(B8DebugBundleError::Probe)?;
@@ -77,7 +83,11 @@ pub(crate) fn generate_b8_debug_bundle(
         &B8DebugEntryBytesReport::real_lc_main_entry(&entry_test_case),
     )?;
 
-    let attempt = B8RealEntryAttempt::run(&entry_test_case, entry_input.program_image_metadata());
+    let attempt = B8RealEntryAttempt::run(
+        &entry_test_case,
+        entry_input.program_image_metadata(),
+        source_identity,
+    );
     write_json_file(&paths.decode_report_path(), &attempt.decode_report)?;
     write_json_file(&paths.lift_ir_path(), &attempt.lift_ir)?;
     write_json_file(&paths.emit_report_path(), &attempt.emit_report)?;
@@ -6250,6 +6260,7 @@ pub(crate) enum B8DebugBundleError {
     },
     Probe(BinaryFormatProbeError),
     Entry(MachOEntryFunctionTestCaseError),
+    LcMainTranslationSourceIdentity(B8LcMainTranslationSourceIdentityError),
     Loader(B8DebugLoaderPlanError),
     B8CaseId(X8664MachOFixtureError),
     Json(JsonError),
@@ -6282,6 +6293,12 @@ impl fmt::Display for B8DebugBundleError {
             Self::Probe(error) => write!(formatter, "B8 debug input probe failed: {error:?}"),
             Self::Entry(error) => {
                 write!(formatter, "B8 debug entry extraction failed: {error:?}")
+            }
+            Self::LcMainTranslationSourceIdentity(error) => {
+                write!(
+                    formatter,
+                    "B8 LC_MAIN translation source identity failed: {error}"
+                )
             }
             Self::Loader(error) => write!(formatter, "B8 debug loader plan failed: {error:?}"),
             Self::B8CaseId(error) => write!(formatter, "B8 debug case id error: {error}"),

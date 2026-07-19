@@ -4698,9 +4698,9 @@ debug bundle の blocker を source of truth として複数の `PR Gate` へ分
 
 #### 中マイルストーン: B8-LAUNCH1 Translation Artifact Execution Path
 
-- [ ] decode / lift / emit の結果を `TranslationArtifact` として runtime へ渡す。
+- [x] decode / lift / emit の結果を `TranslationArtifact` として runtime へ渡す。
   - [x] image metadata を持たない通常 fixture を typed artifact runtime input へ接続する。
-  - [ ] Mach-O / B8 real-entry を image metadata-aware source identity とともに接続する。
+  - [x] Mach-O / B8 real-entry を image metadata-aware source identity とともに接続する。
 - [ ] artifact bytes、PC map、fixups、helper requirements、source/cache identity を debug export
   できるようにする。
 - [x] existing fixture expected / actual を artifact path 経由でも通し、CLI report DTO を
@@ -4756,6 +4756,56 @@ review gate:
 
 - fixture expected / actual の typed artifact runtime input 接続を commit / push / draft PR 作成で
   停止する。B8-LAUNCH1b debug export または Mach-O / B8 real-entry migration へ進まない。
+
+#### PR Gate: B8-LAUNCH1b Mach-O Real-Entry Translation Artifact Runtime Input
+
+branch: `task/b8-launch1b-macho-artifact-runtime-input`
+
+目的:
+
+- B8 real `LC_MAIN` first-block の decode / lift(image metadata) / emit result を
+  `TranslationArtifact` として typed runtime runner へ渡し、raw ARM64 bytes をruntime inputにする
+  最後のproduction consumerを解消する。
+- 実行したcode、PC map、fixups、helper requirements、source/cache identityを一つのartifactとして
+  保持できるようにし、後続debug exportとdispatcherが同じ翻訳成果物を参照できる前提を作る。
+
+完了条件:
+
+- [x] Mach-O source identityはfixture identityを流用せず、専用domain tag、full source image byte
+  length、full source image bytesをcanonical SHA-256へ入力する。entry codeが同じでもmapped dataを
+  含むinput imageが異なればidentityが異なり、同じimageは同じidentityになるtestを持つ。
+- [x] B8 debug bundleのI/O境界でfull source imageからtyped `TranslationSourceIdentity`を構築し、
+  `B8RealEntryAttempt`へraw file bytesを渡さない。
+- [x] B8 real-entryのemit result、source identity、backend-owned current translator version、
+  concrete `Arm64MacOs` targetから`TranslationArtifact`を構築し、typed artifact runtime entryで
+  existing no-args first-block behaviorを実行する。
+- [x] `EmittedFunction::code().bytes()`をruntime inputにするB8 raw adapterを削除し、通常fixtureと
+  Mach-O/B8 real-entryのproduction runtime call siteをtyped artifact境界へ統一する。
+- [x] existing B8 debug bundleのfile layout、output-path schema、各JSON、blocker classification、
+  expected / actual、通常fixtureの3 ABI / host trap behaviorを維持する。
+- [x] public primitive baseline、dependency / lockfile、runtime normal dependency graphを変更せず、
+  B8 identityをこのgateではJSON exportしない。
+- [x] TODO、design TODO、runtime architecture roadmap、progress snapshotを同期し、
+  `nix develop -c ./scripts/verify`が通る。
+
+PR に含めない:
+
+- B8 debug bundleまたは通常fixture sidecarへのartifact identity / ARM64 bytes exportとschema追加。
+- relocation / rebase / bind、fixup適用、import address解決、mapped image preparation。
+- runtime dispatcher / typed runtime state接続、helper service execution、translation cache storage。
+- standalone linker / native artifact migration、generic serializer / personality、PE / ELF / Wine。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli b8_debug_bundle`
+- `nix develop -c cargo test -p btbc-cli function_run`
+- `nix develop -c ./scripts/check-domain-types`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- Mach-O/B8 real-entryのtyped artifact runtime input接続をcommit / push / draft PR作成で停止する。
+  B8-LAUNCH1c debug exportまたはB8-LAUNCH2へ進まない。
 
 #### 中マイルストーン: B8-LAUNCH2 Executable Image Preparation
 

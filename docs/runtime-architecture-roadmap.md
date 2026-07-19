@@ -585,15 +585,16 @@ B8-TYPE1 completion result:
 
 typed `TranslationArtifact` を compile、debug export、runtime input の実経路へ接続する。
 
-最初の PR Gate では image metadata を持たない通常 fixture だけを対象とし、decode / lift / emit
-result から domain-separated SHA-256 source identity、backend-owned translator version、concrete
-`Arm64MacOs` target を持つ artifact を構築する。runtime は `&TranslationArtifact` を受ける typed
-entry から existing executable memory / ABI runner へ委譲し、CLI report DTO や raw ARM64 bytes を
-runtime call site の input にしない。
+最初の PR Gate では image metadata を持たない通常 fixture の decode / lift / emit result から
+domain-separated SHA-256 source identity、backend-owned translator version、concrete `Arm64MacOs`
+target を持つ artifact を構築した。次の PR Gate では B8 real `LC_MAIN` first-blockを、fixtureとは
+分離したfull Mach-O file identityとともに同じtyped ABI adapterへ接続した。runtime call siteは
+`&TranslationArtifact`を受け、CLI report DTOやraw ARM64 bytesをinputにしない。
 
-B8 debug export と Mach-O / B8 real-entry は image metadata を含む source identity が必要なため、
-fixture identity を再利用せず後続 PR Gate に残す。standalone linker、dispatcher、runtime state、
-fixup、helper service execution、cache storage も最初の gate には含めない。
+これにより通常fixtureとMach-O / B8 real-entryのproduction execution pathはartifact境界へ
+統一された。残るB8 debug exportは、実際に実行したartifactからbytes、PC map、fixups、helper
+requirements、source/cache identityをprojectする後続PR Gateとする。standalone linker、dispatcher、
+runtime state、fixup適用、helper service execution、cache storageは引き続き含めない。
 
 完了条件:
 

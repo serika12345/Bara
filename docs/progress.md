@@ -62,27 +62,44 @@
    B8-ARCH1 responsibility split audit と、`D4a: x86_64 ISA semantic coverage strategy`
 4. この `docs/progress.md` の現在の作業スナップショット
 
-B8-LAUNCH1a completion 後の次候補:
+B8-LAUNCH1b completion 後の次候補:
 
-- `B8-LAUNCH1a Fixture Translation Artifact Runtime Input` の draft PR を review / merge する。
-- 次の PR Gate は B8 debug export または Mach-O / B8 real-entry identity migration の一方へ限定し、
-  image metadata-aware source identity を fixture identity から分ける。
+- `B8-LAUNCH1b Mach-O Real-Entry Translation Artifact Runtime Input` の draft PR を review / mergeする。
+- 次の PR Gate はB8 debug exportに限定し、実際に実行した`TranslationArtifact`からcode、PC map、
+  fixups、helper requirements、source/cache identityをprojectする。
 - existing expected / actual JSON、public primitive baseline、B8 debug bundle schema を維持し、
   debug bundle の blocker を実装順の source of truth にする。
 
-B8-LAUNCH1a completion 後にすぐ始めないもの:
+B8-LAUNCH1b completion 後にすぐ始めないもの:
 
 - relocation / rebase / bind 適用、import address 解決、runtime dispatcher loop
 - Objective-C / AppKit host service execution、process environment、一般 GUI app 起動
 - cross-platform personality selection、Wine thunk、PE / ELF interface、translation cache
-- B8-LAUNCH1a の review gate を越えた次 gate または B8-LAUNCH2 以降の自動実装
+- B8-LAUNCH1b の review gate を越えた次 gate または B8-LAUNCH2 以降の自動実装
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-07-19 16:07 JST
+最終更新: 2026-07-19 17:23 JST
 
 状態:
 
+- active_work: completed。`B8-LAUNCH1b Mach-O Real-Entry Translation Artifact Runtime Input`を
+  `task/b8-launch1b-macho-artifact-runtime-input`で完了した。関連TODOは`TODO.md`の同PR Gate、関連
+  設計メモは`docs/design-todo.md`の`B8-LAUNCH1b implementation result`、関連roadmapは
+  `docs/runtime-architecture-roadmap.md`の`R3 / B8-LAUNCH1`。B8 real `LC_MAIN` first-blockのcode、
+  PC map、fixups、helper requirements、source/cache identityを一つの`TranslationArtifact`として
+  runtimeへ渡せるようにし、raw ARM64 bytesを渡す最後のproduction consumerを削除した。意図は
+  後続debug export / dispatcherが実際に実行した同じartifactを参照できる前提を作ること。
+  source identityはB8 / Mach-O x86_64 / `LC_MAIN` first-block専用domain tagとfull source imageで
+  構築し、raw file bytesはI/O境界からattemptへ漏らさない。通常fixtureと共有するtyped ABI adapter、
+  same-source cache identity regression、existing B8 schema / blocker / expected / actual、3 ABI / host
+  trap behaviorを維持した。dependency、lockfile、public primitive baselineは変更していない。
+  artifact debug export、loader / fixup適用、dispatcher、helper service、cache storageは未着手。
+  remaining workはdraft PRのreview / merge。next actionはreview後にB8-LAUNCH1c debug exportを
+  1 gateとして定義すること。verificationは`cargo test -p btbc-cli` 105 tests、Clippy
+  `-D warnings`、domain type check、schema / dependency / raw consumer auditがpassし、repository-wide
+  `./scripts/verify`もinvisible character、RustSec、cargo-deny、Nix package、workspace test、
+  blackbox expected / actualを含めてpassした。
 - active_work: completed。`B8-LAUNCH1a Fixture Translation Artifact Runtime Input` を
   `task/b8-launch1a-fixture-artifact-runtime-input` で完了した。関連 TODO は `TODO.md` の同 PR Gate、
   関連設計メモは `docs/design-todo.md` の `B8-LAUNCH1a implementation result`、関連 roadmap は

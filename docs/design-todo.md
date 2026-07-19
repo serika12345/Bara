@@ -731,6 +731,25 @@ B8-LAUNCH1a implementation result:
   image metadata を含む source boundary を決める後続 gate に残す。dispatcher、runtime state、fixup、
   helper service execution、translation cache storage もこの gate では開始しない。
 
+B8-LAUNCH1b implementation result:
+
+- 2026-07-19 に B8 real `LC_MAIN` first-block の decode / lift(image metadata) / emit resultを
+  `TranslationArtifact`へまとめ、通常fixtureと共有するtyped ABI adapterからruntimeへ渡す
+  production pathを追加した。B8側で`EmittedFunction::code().bytes()`をruntime inputにするraw
+  adapterは削除し、PC map、fixups、helper requirementsのreport projectionも実行対象artifactから行う。
+- source identityはfixture identityを流用せず、B8 / Mach-O x86_64 / `LC_MAIN` first-block専用の
+  domain tag、full source image byte length、full source image bytesをcanonical SHA-256へ入力する。
+  full-file hashは未使用領域の変更でも再変換する保守的なidentityだが、image metadataに依存する
+  translationで異なるfile imageを同一視しない。canonical metadata serializerの先行抽象化はしない。
+- raw file bytesを扱うdebug bundle I/O境界でtyped `TranslationSourceIdentity`へ変換し、attempt境界は
+  typed identityだけを受ける。cache identityはsource hash、backend-owned current translator
+  version、concrete `Arm64MacOs` targetから構築する。
+- fixture source identity失敗とartifact invariant失敗を別errorに保ち、existing failure kind、B8
+  blocker classification、file layout、output-path schema、各JSON、expected / actual、通常fixtureの
+  3 ABI / host trap behaviorを維持した。dependency、lockfile、public primitive baselineは変更しない。
+- artifact identity / ARM64 bytesのdebug export、loader / fixup適用、dispatcher、runtime state、
+  helper service execution、cache storage、standalone linker、cross-platform abstractionは後続gateに残す。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。
