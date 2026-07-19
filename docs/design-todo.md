@@ -785,6 +785,19 @@ B8-LAUNCH2a implementation result:
   dependency / lockfileは変更しない。relocation / rebase / bind、import address解決、executable memory /
   W^X、full runtime state / stack、dispatcherは後続のobserved blockerに残す。
 
+B8 launch PR boundary decision:
+
+- 2026-07-19 に、実アプリ反復開始までの基本PRを `B8-LAUNCH3a`、`3b`、`3c`、`4a`、`4b`、
+  `4c`、`6`、`7a`、`7b-N`、`7z` として確定した。責務境界はentry dispatcher、direct
+  continuation、guest call/return、macOS ABI suspend/resume、Objective-C/libSystem、AppKit lifecycle、
+  self-authored acceptance、OSS input harness、observed blocker、OSS acceptanceである。
+- `B8-LAUNCH2b`と`B8-LAUNCH5a`は固定先行gateにしない。dispatcher実行でfixture import/fixupまたは
+  process stateがblockerになった場合だけ現在gate直後へ挿入する。未観測のrelocation、opcode、TLS、
+  thread、signal、runtime serviceも同様に先行実装しない。
+- `B8-LAUNCH7a`は実OSS appを変更せず投入してstable blockerを得る入力自動化、`7b-N`は一件の
+  semantic blockerだけを解消する反復、`7z`は新機能を含まないlifecycle acceptanceとする。
+  `7a` merge後から実アプリ入力による反復を開始し、`7b-N`ではone-blocker/one-PRを維持する。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。

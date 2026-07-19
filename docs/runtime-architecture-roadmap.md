@@ -617,6 +617,11 @@ public Mach-O metadata から実行直前の mapped image と initial entry stat
 R4 は self-authored fixture の entry block を dispatcher へ渡せる最小 mapped image で停止する。
 R5 / R6 で新しい loader blocker が観測された場合は、R4 の focused PR Gate へ戻って解消する。
 
+R4以降の基本delivery sequenceは`B8-LAUNCH3a -> 3b -> 3c -> 4a -> 4b -> 4c -> 6 -> 7a ->
+7b-N -> 7z`とする。`B8-LAUNCH2b`のloader/import対応と`B8-LAUNCH5a`のprocess stateは、実行で
+blockerが観測された場合だけ現在gate直後へ挿入する。各gateのcompletion、exclusion、stop conditionは
+`TODO.md`の確定PR順序をsource of truthとし、`7a`以降は実OSS appのone-blocker/one-PR反復とする。
+
 最初のfocused PR Gateでは、実memory mappingの前段として
 `MachOExecutableImagePreparation`を追加する。snapshotのcode range全体がowned mapped bytesで
 裏付けられることを構築時に検証し、`LC_MAIN`由来のinitial PCを`GuestProgramCounter`として保持する。

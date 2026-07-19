@@ -64,9 +64,9 @@
 
 B8-LAUNCH2a completion 後の次候補:
 
-- `B8-LAUNCH2a Mach-O Entry Image Static Preparation`のdraft PRをreview / mergeする。
-- review後は同じstatic preparationと`TranslationArtifact`を受け取るdispatcher前段の最小境界を、
-  debug bundleで観測されたblockerに基づいて次のfocused PR Gateへ分割する。
+- PR #96でmerge済みの`B8-LAUNCH2a`を前提に、`B8-LAUNCH3a Entry Dispatcher Spine`を開始する。
+- 同じstatic preparation、`TranslationArtifact`、sentinel-free initial stateを一度dispatchし、
+  debug bundleで最初のconcrete blockerを観測する。
 - existing expected / actual JSON、public primitive baseline、B8の既存sidecar schemaを維持し、
   debug bundle の blocker を実装順の source of truth にする。
 
@@ -75,14 +75,21 @@ B8-LAUNCH2a completion 後にすぐ始めないもの:
 - relocation / rebase / bind 適用、import address 解決、runtime dispatcher loop
 - Objective-C / AppKit host service execution、process environment、一般 GUI app 起動
 - cross-platform personality selection、Wine thunk、PE / ELF interface、translation cache
-- B8-LAUNCH2a の review gate を越えた次 gateまたはB8-LAUNCH2の一括実装
+- B8-LAUNCH2の一括実装。loader/process対応はdispatcherでblockerを観測してからfocused gateへ戻す
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-07-19 18:04 JST
+最終更新: 2026-07-19 19:30 JST
 
 状態:
 
+- active_work: completed。実アプリ反復へ到達するPR単位をmain `03ab1d3`上でdocs-only確定した。
+  基本順序は`B8-LAUNCH3a -> 3b -> 3c -> 4a -> 4b -> 4c -> 6 -> 7a -> 7b-N -> 7z`。
+  `B8-LAUNCH2b` loader/importと`B8-LAUNCH5a` process stateは観測時だけ挿入する。意図はloaderや
+  型の完成を待たず実entryをdispatcherへ流し、`7a`以降を実OSS appのone-blocker/one-PR反復にすること。
+  関連TODOは`確定 PR 順序: B8-LAUNCH3a〜B8-LAUNCH7z`、設計判断は`B8 launch PR boundary
+  decision`。next actionは`B8-LAUNCH3a`。documentation-onlyのためruntime test/full verifyは省略し、
+  Markdown/invisible-character checksを実行する。
 - active_work: completed。`B8-LAUNCH2a Mach-O Entry Image Static Preparation`を
   `task/b8-launch2a-prepared-macho-entry-image`で完了した。baseはPR #95 merge後のmain
   `3c9b89a`。関連TODOは`TODO.md`の同PR Gate、関連roadmapは
@@ -96,8 +103,8 @@ B8-LAUNCH2a completion 後にすぐ始めないもの:
   domain byte length、initial PCはinfallibleで、不完全なmapped bytesはtyped errorになる。existing
   JSON、blocker、public primitive baseline、dependency / lockfileは変更していない。relocation / bind、
   import address解決、executable memory / W^X、full runtime state / stack、dispatcherは未着手。
-  remaining workはdraft PRのreview / merge。next actionはreview後にdebug bundleのcurrent blockerと
-  R5 dispatcher入力要件を照合し、追加loader preparationが必要な場合だけ次のfocused R4 gateを切ること。
+  PR #96としてmainへmerge済み。next actionは`B8-LAUNCH3a`でentry dispatcher spineを接続し、
+  追加loader preparationが必要かを実行blockerから判断すること。
   verificationはtest-first red、runtime preparation focused 2 tests、B8 focused 8 tests、通常fixture
   15 tests、Clippy `-D warnings`、domain type / dependency / schema / responsibility auditがpassし、
   repository-wide `./scripts/verify`もinvisible character、RustSec、cargo-deny、Nix package、workspace

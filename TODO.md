@@ -4913,12 +4913,106 @@ review gate:
 - Mach-O entry image static preparationとB8 production consumer接続をcommit / push / draft PR作成で
   停止する。relocation / bind、executable memory、full runtime state、dispatcherへ進まない。
 
+#### 確定 PR 順序: B8-LAUNCH3a〜B8-LAUNCH7z
+
+実アプリ反復へ最短で到達する固定経路を以下とする。`B8-LAUNCH2` の全機能を先に完成させず、
+まず dispatcher へ実入力を渡して blocker を観測する。各 gate は前 gate の merge を開始条件とし、
+完了後は review で停止する。
+
+| 基本順序 | PR Gate | 到達点 |
+| --- | --- | --- |
+| 1 | B8-LAUNCH3a Entry Dispatcher Spine | 実`LC_MAIN` entry blockをtyped outcomeまで一度dispatchする |
+| 2 | B8-LAUNCH3b Direct Continuation Loop | direct fallthroughをbudget付きで複数block継続する |
+| 3 | B8-LAUNCH3c Guest Call/Return Continuation | direct call/returnとguest return PCを継続する |
+| 4 | B8-LAUNCH4a macOS SysV Host-Service Suspension/Resume | typed host-service request/returnをdispatcherへ接続する |
+| 5 | B8-LAUNCH4b Objective-C/libSystem Minimum Service Set | fixtureが要求する最小public serviceを接続する |
+| 6 | B8-LAUNCH4c AppKit Window/Run-Loop Service Set | window/label/run-loopの最小lifecycleを接続する |
+| 7 | B8-LAUNCH6 Sentinel-Free GUI Acceptance | self-authored GUIの統合受入を行う |
+| 8 | B8-LAUNCH7a OSS Target Freeze And Reproducible Harness | 最初のOSS app入力とstable blockerを固定する |
+| 9+ | B8-LAUNCH7b-N Observed Semantic Blocker | one-blocker/one-PRで対象lifecycleまで反復する |
+| 最終 | B8-LAUNCH7z OSS Lifecycle Acceptance | 対象OSS appのdeterministic lifecycleを受け入れる |
+
+条件付き gate:
+
+- `B8-LAUNCH2b Fixture Import/Fixup Resolution` は `3a`以降でloader/import blockerが観測された時だけ、
+  現在gateの直後へ挿入する。segment/rebase/bind/import/W^Xを機械的に別PRへ分けない。
+- `B8-LAUNCH5a Minimal LC_MAIN Process State` はinitial stack/argv/envpがblockerになった時だけ、
+  `4b`または`4c`の直前へ挿入する。TLS/thread/signal/FDを先回りして含めない。
+- unsupported opcode、indirect target、callback、追加runtime serviceも、観測後に一責務・一semantic
+  bucketのfocused PRを現在gate直後へ挿入する。
+
+#### PR Gate: B8-LAUNCH2b Fixture Import/Fixup Resolution（条件付き）
+
+branch: `task/b8-launch2b-fixture-import-fixup`
+
+完了条件:
+
+- [ ] 観測されたfixture blockerに必要なimport identityとrebase/bind/relocationだけを、runtime helper
+  targetまたはstable unresolved blockerへ解決する。
+- [ ] 適用前後image、bounds/ownership、unresolved import、W^X/ownership failureをtyped loader resultとし、
+  entry直前stateをdebug bundleへ保存する。
+
+PRに含めない: 汎用dyld、全relocation種、任意dylib、blockerになっていないloader機能。
+
+検証: loader focused tests、B8 bundle regression、`verify-security`、`./scripts/verify`。
+
+停止条件: 観測されたloader semantic bucket一件の解消で停止し、dispatcher機能を追加しない。
+
 #### 中マイルストーン: B8-LAUNCH3 Runtime Dispatcher Core
 
 - [ ] `TranslationArtifact` と typed runtime state から entry block を実行する dispatcher を作る。
 - [ ] direct fallthrough、direct call、return、helper suspend / return writeback を継続実行する。
 - [ ] indirect target は resolved target または stable blocker とし、silent fallback しない。
 - [ ] translation cache / interpreter / JIT は dispatcher interface 上の future strategy として保つ。
+
+#### PR Gate: B8-LAUNCH3a Entry Dispatcher Spine
+
+branch: `task/b8-launch3a-entry-dispatcher-spine`
+
+完了条件:
+
+- [ ] `MachOExecutableImagePreparation`、`TranslationArtifact`、sentinel-free initial
+  `GuestRuntimeState`を受け、実`LC_MAIN` entry blockを一度dispatchする。
+- [ ] outcomeを`Continue`、`HelperSuspend`、`Return`、`Blocked`のtyped resultとし、同じinput、
+  終了state、next actionをdebug bundleへ保存する。
+- [ ] B8 production pathはraw runner直呼びをやめ、unsupported boundaryをstable blockerにする。
+
+PRに含めない: relocation/import解決、複数block loop、call/return、host API実行。
+
+検証: dispatcher focused tests、B8 bundle regression、`check-domain-types`、`./scripts/verify`。
+
+停止条件: entry blockを一度dispatchして最初のconcrete blockerを観測した時点で停止する。
+
+#### PR Gate: B8-LAUNCH3b Direct Continuation Loop
+
+branch: `task/b8-launch3b-direct-continuation-loop`
+
+完了条件:
+
+- [ ] PC map/terminatorからdirect fallthroughを次blockへ接続し、on-demand translate/executeを
+  typed execution budget付きで2 block以上継続する。
+- [ ] budget exhaustion、unknown target、indirect targetをstable blockerとして保存する。
+
+PRに含めない: guest call stack、direct/indirect call、helper実行、cache永続化。
+
+検証: continuation/budget tests、B8 bundle regression、`./scripts/verify`。
+
+停止条件: direct fallthrough loop成立または観測blocker一件の保存で停止する。
+
+#### PR Gate: B8-LAUNCH3c Guest Call/Return Continuation
+
+branch: `task/b8-launch3c-guest-call-return`
+
+完了条件:
+
+- [ ] direct call/return、guest stack、typed return PCをdispatcher stateとして継続する。
+- [ ] self-authored nested-call fixtureをentryからreturnまで実行し、遷移をdebug bundleへ保存する。
+
+PRに含めない: indirect call、host helper、process initial stack、汎用unwind。
+
+検証: nested-call/stack tests、B8 bundle regression、`./scripts/verify`。
+
+停止条件: guest call/return継続の成立または最初のhelper/indirect blockerで停止する。
 
 #### 中マイルストーン: B8-LAUNCH4 macOS ABI And Service Bridge
 
@@ -4928,12 +5022,74 @@ review gate:
 - [ ] autorelease pool、run loop、callback の最小 lifecycle を typed request / return として扱う。
 - [ ] 未対応 syscall、TLS、thread、signal、exception は stable blocker として維持する。
 
+#### PR Gate: B8-LAUNCH4a macOS SysV Host-Service Suspension/Resume
+
+branch: `task/b8-launch4a-macos-sysv-suspend-resume`
+
+完了条件:
+
+- [ ] `GuestCall -> MacOsHostServiceRequest -> GuestReturn`をdispatcher実経路へ接続し、観測された
+  x86_64 macOS SysV引数materialization、RAX writeback、guest PC再開を行う。
+- [ ] pure fake serviceでsuspend/resume round tripを通し、service failureをtyped blockerにする。
+
+PRに含めない: 実Objective-C/AppKit、import binding、callback、thread/TLS、personality trait。
+
+検証: ABI/service round-trip tests、B8 bundle regression、`verify-security`、`./scripts/verify`。
+
+停止条件: concrete public host serviceの実行直前で停止する。
+
+#### PR Gate: B8-LAUNCH4b Objective-C/libSystem Minimum Service Set
+
+branch: `task/b8-launch4b-objc-libsystem-services`
+
+完了条件:
+
+- [ ] self-authored fixtureで観測されたautorelease pool、class/selector/message、必要なlibSystem callだけを
+  public API adapterとしてtyped service contractへ載せる。
+- [ ] helper returnをdispatcherへ戻し、次のAppKit/process blockerをdebug bundleへ保存する。
+
+PRに含めない: AppKit window/run-loop、任意selector、callback一般化、未観測syscall。
+
+検証: public API adapter tests、B8 lifecycle regression、`verify-security`、`./scripts/verify`。
+
+停止条件: AppKit lifecycleまたはprocess environment boundaryで停止する。
+
+#### PR Gate: B8-LAUNCH4c AppKit Window/Run-Loop Service Set
+
+branch: `task/b8-launch4c-appkit-window-run-loop`
+
+完了条件:
+
+- [ ] self-authored fixtureに必要なapplication、window、label、run-loop entryだけをpublic AppKit API経由で
+  実行し、window/label observationまたはcallback/indirect blockerをlaunch reportへ保存する。
+
+PRに含めない: 任意AppKit API、一般callback framework、thread/TLS一般化、OSS app対応。
+
+検証: AppKit service tests、GUI lifecycle integration、`verify-security`、`./scripts/verify`。
+
+停止条件: window/label observationまたは最初のstable lifecycle blockerで停止する。
+
 #### 中マイルストーン: B8-LAUNCH5 Process Environment
 
 - [ ] initial stack、argv / envp、process metadata を self-authored target に必要な範囲で作る。
 - [ ] TLS、thread、signal、exception、file descriptor は target の blocker になった順に追加し、
   最初の GUI 完了条件へ一括投入しない。
 - [ ] `.app` bundle / resource handling は single executable の限界が blocker になるまで扱わない。
+
+#### PR Gate: B8-LAUNCH5a Minimal LC_MAIN Process State（条件付き）
+
+branch: `task/b8-launch5a-minimal-lc-main-process-state`
+
+完了条件:
+
+- [ ] 対象fixtureで実際にblockerになったinitial stack、argc/argv/envp、process metadataだけをtyped
+  ownership付きで構築し、entry stateとdebug bundleへ接続する。
+
+PRに含めない: blockerでないTLS/thread/signal/exception/FD、`.app` resources一般化。
+
+検証: stack/environment tests、B8 launch regression、`verify-security`、`./scripts/verify`。
+
+停止条件: 観測されたprocess-state blocker一件の解消で停止する。
 
 #### 中マイルストーン: B8-LAUNCH6 Sentinel-Free Self-Authored GUI Launch
 
@@ -4943,6 +5099,22 @@ review gate:
 - [ ] expected / actual / launch report / debug bundle が一致し、専用成功経路を使っていないことを
   report で確認する。
 
+#### PR Gate: B8-LAUNCH6 Sentinel-Free GUI Acceptance
+
+branch: `task/b8-launch6-sentinel-free-gui-acceptance`
+
+完了条件:
+
+- [ ] self-authored x86_64 Mach-Oを実`LC_MAIN`からloader、dispatcher、service bridge経由でwindow/label
+  表示まで実行し、Rosetta external observation、expected/actual/launch/debug reportを一致させる。
+- [ ] sentinel、host trap、fixture専用成功分岐を使用していないことをaudit/testで証明する。
+
+PRに含めない: 新しい汎用機能、OSS app、PE/Wine、未観測runtime service。
+
+検証: sentinel audit、GUI acceptance、`verify-security`、`./scripts/verify`。
+
+停止条件: integration/acceptanceだけを提出し、OSS入力へ進まない。
+
 #### 中マイルストーン: B8-LAUNCH7 Source-Built OSS GUI Expansion
 
 - [ ] license、build inputs、success criteria を固定した小さい OSS GUI app を source から
@@ -4950,6 +5122,52 @@ review gate:
 - [ ] first unsupported boundary を debug bundle で固定し、ISA、loader、helper、dispatcher の
   focused PR Gate へ一つずつ分解する。
 - [ ] 任意アプリ対応を完了条件にせず、対象 app の deterministic lifecycle 到達で停止する。
+
+#### PR Gate: B8-LAUNCH7a OSS Target Freeze And Reproducible Harness
+
+branch: `task/b8-launch7a-oss-target-harness`
+
+完了条件:
+
+- [ ] license、固定source/build inputs、対象binary hash、deterministic lifecycle success criteriaを記録した
+  小さいOSS GUI appをx86_64 macOS向けに再現可能buildする。
+- [ ] Rosetta expected observationとBara debug bundle生成を一つのautomation entryから実行し、未修正の
+  first stable blockerを保存する。
+
+PRに含めない: blocker修正、複数app、任意package manager統合。
+
+検証: supply-chain gate、reproducibility manifest、debug bundle smoke、`./scripts/verify`。
+
+停止条件: first blockerを保存して停止する。
+
+#### PR Gate Template: B8-LAUNCH7b-N Observed Semantic Blocker
+
+branch: `task/b8-launch7b-<sequence>-<semantic-bucket>`
+
+完了条件:
+
+- [ ] 直前bundleのfirst blockerをISA/loader/dispatcher/helper/serviceの一責務へ分類し、回帰fixtureを
+  test-firstで追加してその一件だけを解消する。
+- [ ] 対象appを再実行し、次のstable blockerまたはlifecycle到達を保存する。
+
+PRに含めない: 二つ目のblocker、別app、無関係なarchitecture refactor。
+
+検証: blocker regression、OSS app cycle、該当security/supply-chain gate、`./scripts/verify`。
+
+停止条件: one-blocker/one-PRを維持し、次blockerへ自動で進まない。
+
+#### PR Gate: B8-LAUNCH7z OSS Lifecycle Acceptance
+
+branch: `task/b8-launch7z-oss-lifecycle-acceptance`
+
+完了条件: [ ] 固定した対象appが定義済みdeterministic lifecycleへ到達し、expected/actual/debug bundleと
+blocker historyが一致する。
+
+PRに含めない: 新機能、別app、任意アプリ互換、PE/Wine。
+
+検証: OSS lifecycle acceptance、supply-chain gate、`verify-security`、`./scripts/verify`。
+
+停止条件: B8-LAUNCH7 review gateとして停止し、次のappやB9/B10へ進まない。
 
 ### 後続の cross-platform 設計
 
