@@ -658,6 +658,16 @@ B8-ARCH2am result:
   `loader.plan.json` output は維持する。dependency、schema、import/fixup/symbol semantics、
   Objective-C/AppKit helper process execution、runtime dispatcher は変更しない。
 
+B8-ARCH2an result:
+
+- 2026-07-19 に `MachOExecutableImageSnapshot::program_image_metadata()` を追加し、snapshot
+  自体から existing downstream materialization 用の `ProgramImageMetadata` compatibility view を
+  取得できるようにした。
+- 意図は loader plan で一度作った snapshot を helper boundary の単一入口にし、CLI が
+  `snapshot.metadata()` という nested representation を知る必要をなくすこと。
+- method は `MachOExecutableImageMetadata::program_image_metadata()` へ明示委譲するだけとし、
+  existing behavior、JSON output、metadata assembly semantics、dependency は変更しない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。

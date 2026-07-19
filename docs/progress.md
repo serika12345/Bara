@@ -54,6 +54,7 @@
    `B8-ARCH2ak Debug Loader MachO Snapshot Boundary`、
    `B8-ARCH2al Debug Import Boundary MachO Snapshot Boundary`、
    `B8-ARCH2am Runtime MachO Program Metadata View`、
+   `B8-ARCH2an Runtime MachO Snapshot Program Metadata View`、
    `B8-ARCH2 Guest Image Model Extraction`
 2. [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) の `R1` / `R1a` と
    `Instruction Coverage Strategy`
@@ -144,10 +145,22 @@ B8-ARCH2ak review package で示すべきもの:
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-07-19 12:46 JST
+最終更新: 2026-07-19 12:58 JST
 
 状態:
 
+- active_work: completed。B8-ARCH2an Runtime MachO Snapshot Program Metadata View を
+  `task/b8-arch2an-snapshot-program-metadata-view` で実施した。関連 TODO は
+  `TODO.md` の `B8-ARCH2an Runtime MachO Snapshot Program Metadata View`、関連設計メモは
+  `docs/design-todo.md` の `B8-ARCH2an result`。意図は loader plan で一度作った snapshot を
+  helper boundary の単一入口にし、CLI が nested metadata representation を知らなくてよい
+  境界にすること。`MachOExecutableImageSnapshot::program_image_metadata()` は existing
+  metadata compatibility view へ委譲し、CLI は snapshot-level API を使う。existing B8 debug
+  bundle behavior と `loader.plan.json` output は維持。dependency、schema、metadata assembly
+  semantics、helper bridge、runtime dispatcher は未変更。remaining work は commit / push /
+  draft PR 作成。verification は focused runtime test、existing B8 debug bundle regression、
+  `nix develop -c cargo fmt --check`、`git diff --check`、
+  `nix develop -c ./scripts/verify` が pass。
 - active_work: completed。B8-ARCH2am Runtime MachO Program Metadata View を
   `task/b8-arch2am-macho-program-metadata-view` で実施した。関連 TODO は
   `TODO.md` の `B8-ARCH2am Runtime MachO Program Metadata View`、関連設計メモは

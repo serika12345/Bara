@@ -107,6 +107,10 @@ impl MachOExecutableImageSnapshot {
     pub const fn metadata(&self) -> &MachOExecutableImageMetadata {
         &self.metadata
     }
+
+    pub fn program_image_metadata(&self) -> ProgramImageMetadata {
+        self.metadata.program_image_metadata()
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
