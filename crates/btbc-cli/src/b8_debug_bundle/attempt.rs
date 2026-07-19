@@ -1,4 +1,7 @@
-use bara_arm64::{emit_program, EmitError};
+use bara_arm64::{
+    emit_program, EmitError, TranslationArtifact, TranslationCacheIdentity,
+    TranslationSourceIdentity, TranslationTarget, TranslatorVersion,
+};
 use bara_ir::{Program, ProgramImageMetadata, Terminator, UnsupportedReason};
 use bara_isa_x86::{decode_function, lift_decoded_function_with_image_metadata};
 use bara_oracle::TestCase;
@@ -10,9 +13,8 @@ use super::report::{
 };
 
 use crate::function_run::{
-    run_compiled_test_case_function_with_bundle, FunctionArtifactReport, FunctionCompileResult,
-    FunctionCompiledIrArtifact, FunctionFixupsArtifact, FunctionHelpersArtifact,
-    FunctionPcMapArtifact, FunctionRunError,
+    run_test_case_translation_artifact, FunctionArtifactReport, FunctionCompiledIrArtifact,
+    FunctionFixupsArtifact, FunctionHelpersArtifact, FunctionPcMapArtifact, FunctionRunError,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -29,7 +31,11 @@ pub(super) struct B8RealEntryAttempt {
 }
 
 impl B8RealEntryAttempt {
-    pub(super) fn run(test_case: &TestCase, image_metadata: &ProgramImageMetadata) -> Self {
+    pub(super) fn run(
+        test_case: &TestCase,
+        image_metadata: &ProgramImageMetadata,
+        source_identity: TranslationSourceIdentity,
+    ) -> Self {
         let decoded_result = decode_function(test_case.x86_bytes());
         let decode_report = B8DebugDecodeReport::from_result(decoded_result.as_ref());
         let decoded = match decoded_result {
@@ -122,8 +128,45 @@ impl B8RealEntryAttempt {
             }
         };
 
+        let cache_identity = TranslationCacheIdentity::new(
+            source_identity.source_hash(),
+            TranslatorVersion::current(),
+            TranslationTarget::Arm64MacOs,
+        );
+        let artifact = match TranslationArtifact::new(source_identity, emitted, cache_identity) {
+            Ok(artifact) => artifact,
+            Err(error) => {
+                let run_error = FunctionRunError::TranslationArtifact(error);
+                let blocker_report = B8DebugBlockerReport::from_function_error(&run_error);
+                return Self {
+                    decode_report,
+                    lift_ir,
+                    emit_report: B8DebugArtifactReport::failed(run_error.to_string()),
+                    pcmap: B8DebugArtifactReport::skipped(
+                        "translation artifact construction failed",
+                    ),
+                    fixups: B8DebugArtifactReport::skipped(
+                        "translation artifact construction failed",
+                    ),
+                    helpers: B8DebugArtifactReport::skipped(
+                        "translation artifact construction failed",
+                    ),
+                    runtime_report: B8DebugRuntimeAttemptReport::failed(
+                        &run_error,
+                        B8DebugRuntimeRunScope::RealLcMainEntryFirstBlock,
+                    ),
+                    launch_report: B8DebugLaunchReport::from_attempt(
+                        test_case,
+                        processed_pc_range,
+                        &blocker_report,
+                    ),
+                    blocker_report,
+                };
+            }
+        };
+        let emitted = artifact.emitted_function();
         let emit_report = B8DebugArtifactReport::available(
-            FunctionArtifactReport::from_source_and_emitted(test_case, &emitted),
+            FunctionArtifactReport::from_source_and_emitted(test_case, emitted),
         );
         let pcmap =
             B8DebugArtifactReport::available(FunctionPcMapArtifact::from_entries(emitted.pc_map()));
@@ -133,9 +176,8 @@ impl B8RealEntryAttempt {
         let helpers = B8DebugArtifactReport::available(FunctionHelpersArtifact::from_requests(
             emitted.host_trap_requests(),
         ));
-        let compiled = FunctionCompileResult::new(program, emitted);
-        match run_compiled_test_case_function_with_bundle(test_case, compiled) {
-            Ok(bundle) => {
+        match run_test_case_translation_artifact(test_case, &artifact) {
+            Ok(result) => {
                 let blocker_report = B8DebugBlockerReport::none();
                 Self {
                     decode_report,
@@ -145,7 +187,7 @@ impl B8RealEntryAttempt {
                     fixups,
                     helpers,
                     runtime_report: B8DebugRuntimeAttemptReport::from_result(
-                        bundle.result(),
+                        &result,
                         B8DebugRuntimeRunScope::RealLcMainEntryFirstBlock,
                     ),
                     launch_report: B8DebugLaunchReport::from_attempt(
@@ -223,4 +265,55 @@ fn frontier_unsupported_terminator_reason(program: &Program) -> Option<&Unsuppor
             | Terminator::DirectCall { .. }
             | Terminator::CondJump { .. } => None,
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use bara_arm64::{TranslationSourceHash, TranslationSourceIdentity};
+    use bara_ir::ProgramImageMetadata;
+    use bara_oracle::test_case_from_json;
+
+    use super::B8RealEntryAttempt;
+
+    #[test]
+    fn return_42_reaches_the_typed_translation_artifact_runtime_branch() {
+        let test_case = test_case_from_json(include_str!("../../../../tests/cases/return_42.json"))
+            .expect("return_42 testcase parses");
+        let source_hash = TranslationSourceHash::from_str(
+            "0000000000000000000000000000000000000000000000000000000000000001",
+        )
+        .expect("test source hash is valid");
+
+        let attempt = B8RealEntryAttempt::run(
+            &test_case,
+            &ProgramImageMetadata::empty(),
+            TranslationSourceIdentity::new(source_hash),
+        );
+        let runtime_report =
+            serde_json::to_value(&attempt.runtime_report).expect("runtime report serializes");
+
+        assert_eq!(runtime_report["schema"], "b8_debug_runtime_attempt_v0");
+        assert_eq!(
+            runtime_report["run_scope"],
+            "real_lc_main_entry_first_block"
+        );
+        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+        {
+            assert_eq!(runtime_report["status"], "executed");
+            assert_eq!(runtime_report["return_value"], 42);
+            assert_eq!(runtime_report["stdout"], "");
+            assert!(runtime_report["error"].is_null());
+        }
+        #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
+        {
+            assert_eq!(runtime_report["status"], "failed");
+            assert!(runtime_report["return_value"].is_null());
+            assert!(runtime_report["stdout"].is_null());
+            assert!(runtime_report["error"]
+                .as_str()
+                .is_some_and(|error| error.contains("unsupported host")));
+        }
+    }
 }

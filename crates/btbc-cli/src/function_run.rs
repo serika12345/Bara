@@ -3,7 +3,8 @@ use std::{error::Error, fmt};
 use bara_arm64::{
     emit_program, verify_emitted_function, BranchFixup, BranchFixupKind,
     EmittedFunctionVerificationIssue, EmittedFunctionVerificationReport, EmittedHostTrapRequests,
-    PcMapEntry,
+    PcMapEntry, TranslationArtifact, TranslationArtifactError, TranslationCacheIdentity,
+    TranslationTarget, TranslatorVersion,
 };
 use bara_ir::{
     ExternalImportTarget, Program, PublicDyldSymbol, PublicLibcSymbol, PublicSymbolImport,
@@ -14,7 +15,6 @@ use bara_oracle::{
     FailureKind, MachOEntryFunctionInput, ObservedResult, TestCase, TestCaseAbi, TestCaseStackState,
 };
 use bara_runtime::{
-    run_no_args_u64_with_host_traps, run_one_input_memory_ptr, run_one_u64,
     run_translation_artifact_no_args_u64_with_host_traps,
     run_translation_artifact_one_input_memory_ptr, run_translation_artifact_one_u64, HostTrapPlan,
     InputMemory, InputMemoryError, RunArgumentU64, RunError, RunStdout, RunStdoutError,
@@ -22,7 +22,7 @@ use bara_runtime::{
 use serde::Serialize;
 
 use self::fixture_translation_artifact::{
-    build_fixture_translation_artifact, FixtureTranslationArtifactError,
+    fixture_translation_source_identity, FixtureTranslationSourceIdentityError,
 };
 
 mod fixture_translation_artifact;
@@ -1115,7 +1115,8 @@ pub(crate) enum FunctionRunError {
     StandaloneArtifact(FunctionStandaloneArtifactError),
     InputMemory(InputMemoryError),
     StdoutTrap(RunStdoutError),
-    TranslationArtifact(FixtureTranslationArtifactError),
+    FixtureTranslationSourceIdentity(FixtureTranslationSourceIdentityError),
+    TranslationArtifact(TranslationArtifactError),
     Run(RunError),
 }
 
@@ -1125,7 +1126,9 @@ impl FunctionRunError {
             Self::Decode(_) => FailureKind::DecodeError,
             Self::Lift(_) => FailureKind::LiftError,
             Self::Emit(error) => failure_kind_from_emit_error(error),
-            Self::StandaloneArtifact(_) | Self::TranslationArtifact(_) => FailureKind::EmitError,
+            Self::StandaloneArtifact(_)
+            | Self::FixtureTranslationSourceIdentity(_)
+            | Self::TranslationArtifact(_) => FailureKind::EmitError,
             Self::InputMemory(_) | Self::StdoutTrap(_) | Self::Run(_) => FailureKind::RunError,
         }
     }
@@ -1169,6 +1172,12 @@ impl fmt::Display for FunctionRunError {
             }
             Self::InputMemory(error) => write!(formatter, "input memory error: {error:?}"),
             Self::StdoutTrap(error) => write!(formatter, "stdout trap error: {error:?}"),
+            Self::FixtureTranslationSourceIdentity(error) => {
+                write!(
+                    formatter,
+                    "fixture translation source identity error: {error}"
+                )
+            }
             Self::TranslationArtifact(error) => {
                 write!(formatter, "translation artifact error: {error}")
             }
@@ -1462,61 +1471,52 @@ fn run_compiled_fixture_translation_artifact_with_bundle(
     test_case: &TestCase,
     compiled: FunctionCompileResult,
 ) -> Result<FunctionRunBundle, FunctionRunError> {
-    let artifact = build_fixture_translation_artifact(test_case, &compiled)
-        .map_err(FunctionRunError::TranslationArtifact)?;
+    let artifact = build_fixture_translation_artifact(test_case, &compiled)?;
+    let result = run_test_case_translation_artifact(test_case, &artifact)?;
+
+    Ok(FunctionRunBundle::new(compiled, result))
+}
+
+fn build_fixture_translation_artifact(
+    test_case: &TestCase,
+    compiled: &FunctionCompileResult,
+) -> Result<TranslationArtifact, FunctionRunError> {
+    let source_identity = fixture_translation_source_identity(test_case)
+        .map_err(FunctionRunError::FixtureTranslationSourceIdentity)?;
+    let cache_identity = TranslationCacheIdentity::new(
+        source_identity.source_hash(),
+        TranslatorVersion::current(),
+        TranslationTarget::Arm64MacOs,
+    );
+
+    TranslationArtifact::new(source_identity, compiled.emitted().clone(), cache_identity)
+        .map_err(FunctionRunError::TranslationArtifact)
+}
+
+pub(crate) fn run_test_case_translation_artifact(
+    test_case: &TestCase,
+    artifact: &TranslationArtifact,
+) -> Result<FunctionRunResult, FunctionRunError> {
     let result = match test_case.abi() {
         TestCaseAbi::NoArgsU64 => run_translation_artifact_no_args_u64_with_host_traps(
-            &artifact,
+            artifact,
             runtime_host_trap_plan(
                 test_case.host_trap_plan(),
                 artifact.emitted_function().host_trap_requests(),
             )?,
         ),
         TestCaseAbi::OneU64ArgReturnsU64 { argument } => {
-            run_translation_artifact_one_u64(&artifact, RunArgumentU64::new(argument.value()))
+            run_translation_artifact_one_u64(artifact, RunArgumentU64::new(argument.value()))
         }
         TestCaseAbi::OneInputMemoryPtrReturnsU64 { memory } => {
             let memory = InputMemory::from_bytes(memory.bytes().to_vec())
                 .map_err(FunctionRunError::InputMemory)?;
-            run_translation_artifact_one_input_memory_ptr(&artifact, memory)
+            run_translation_artifact_one_input_memory_ptr(artifact, memory)
         }
     }
     .map_err(FunctionRunError::Run)?;
 
-    Ok(FunctionRunBundle::new(
-        compiled,
-        FunctionRunResult::from_runtime(&result),
-    ))
-}
-
-pub(crate) fn run_compiled_test_case_function_with_bundle(
-    test_case: &TestCase,
-    compiled: FunctionCompileResult,
-) -> Result<FunctionRunBundle, FunctionRunError> {
-    let result = match test_case.abi() {
-        TestCaseAbi::NoArgsU64 => run_no_args_u64_with_host_traps(
-            compiled.emitted().code().bytes(),
-            runtime_host_trap_plan(
-                test_case.host_trap_plan(),
-                compiled.emitted().host_trap_requests(),
-            )?,
-        ),
-        TestCaseAbi::OneU64ArgReturnsU64 { argument } => run_one_u64(
-            compiled.emitted().code().bytes(),
-            RunArgumentU64::new(argument.value()),
-        ),
-        TestCaseAbi::OneInputMemoryPtrReturnsU64 { memory } => {
-            let memory = InputMemory::from_bytes(memory.bytes().to_vec())
-                .map_err(FunctionRunError::InputMemory)?;
-            run_one_input_memory_ptr(compiled.emitted().code().bytes(), memory)
-        }
-    }
-    .map_err(FunctionRunError::Run)?;
-
-    Ok(FunctionRunBundle::new(
-        compiled,
-        FunctionRunResult::from_runtime(&result),
-    ))
+    Ok(FunctionRunResult::from_runtime(&result))
 }
 
 fn runtime_host_trap_plan(
@@ -1537,6 +1537,7 @@ fn runtime_host_trap_plan(
 
 #[cfg(test)]
 mod tests {
+    use bara_arm64::{TranslationTarget, TranslatorVersion};
     use bara_ir::{
         ExternalCallRequest, ExternalSymbolId, ExternalSymbolImport, PublicLibcSymbol,
         PublicSymbolImport, SyscallAbi, SyscallRequest, UnsupportedReason, ValidationIssue, X86Reg,
@@ -1545,8 +1546,9 @@ mod tests {
     use bara_oracle::{test_case_from_json, FailureKind};
 
     use super::{
-        compile_test_case_function, compile_test_case_function_standalone_artifact,
-        run_test_case_function_with_bundle, FunctionRegisterArtifact, FunctionRunError,
+        build_fixture_translation_artifact, compile_test_case_function,
+        compile_test_case_function_standalone_artifact, run_test_case_function_with_bundle,
+        run_test_case_translation_artifact, FunctionRegisterArtifact, FunctionRunError,
         FunctionStandaloneArtifactError,
     };
 
@@ -1576,6 +1578,86 @@ mod tests {
         assert_eq!(
             bundle.compiled().arm64_bytes().as_slice(),
             &[0x40, 0x05, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]
+        );
+    }
+
+    #[test]
+    fn typed_translation_artifact_adapter_runs_a_prebuilt_artifact() {
+        let test_case = test_case_from_json(include_str!("../../../tests/cases/return_42.json"))
+            .expect("return_42 testcase parses");
+        let compiled = compile_test_case_function(&test_case).expect("return_42 fixture compiles");
+        let artifact = build_fixture_translation_artifact(&test_case, &compiled)
+            .expect("return_42 translation artifact is constructible");
+
+        assert_eq!(
+            artifact.source_identity().source_hash(),
+            artifact.cache_identity().source_hash()
+        );
+        assert_eq!(
+            artifact.cache_identity().translator_version(),
+            &TranslatorVersion::current()
+        );
+        assert_eq!(
+            artifact.cache_identity().target(),
+            TranslationTarget::Arm64MacOs
+        );
+
+        let result = run_test_case_translation_artifact(&test_case, &artifact)
+            .expect("prebuilt translation artifact runs through the typed adapter");
+
+        assert_eq!(result.return_value(), 42);
+    }
+
+    #[test]
+    fn fixture_artifact_cache_identity_is_stable_and_changes_with_translation_source() {
+        let baseline = test_case_from_json(
+            r#"{"case_id":"baseline","entry":0,"bytes":"b82a000000c3","abi":{"args":[],"return":"u64"}}"#,
+        )
+        .expect("baseline testcase parses");
+        let same_source = test_case_from_json(
+            r#"{"case_id":"same_source","entry":0,"bytes":"b82a000000c3","abi":{"args":[],"return":"u64"}}"#,
+        )
+        .expect("same-source testcase parses");
+        let different_entry = test_case_from_json(
+            r#"{"case_id":"different_entry","entry":4096,"bytes":"b82a000000c3","abi":{"args":[],"return":"u64"}}"#,
+        )
+        .expect("different-entry testcase parses");
+        let different_bytes = test_case_from_json(
+            r#"{"case_id":"different_bytes","entry":0,"bytes":"b82b000000c3","abi":{"args":[],"return":"u64"}}"#,
+        )
+        .expect("different-bytes testcase parses");
+
+        let baseline_compiled =
+            compile_test_case_function(&baseline).expect("baseline fixture compiles");
+        let same_source_compiled =
+            compile_test_case_function(&same_source).expect("same-source fixture compiles");
+        let different_entry_compiled =
+            compile_test_case_function(&different_entry).expect("different-entry fixture compiles");
+        let different_bytes_compiled =
+            compile_test_case_function(&different_bytes).expect("different-bytes fixture compiles");
+        let baseline_artifact = build_fixture_translation_artifact(&baseline, &baseline_compiled)
+            .expect("baseline artifact is constructible");
+        let same_source_artifact =
+            build_fixture_translation_artifact(&same_source, &same_source_compiled)
+                .expect("same-source artifact is constructible");
+        let different_entry_artifact =
+            build_fixture_translation_artifact(&different_entry, &different_entry_compiled)
+                .expect("different-entry artifact is constructible");
+        let different_bytes_artifact =
+            build_fixture_translation_artifact(&different_bytes, &different_bytes_compiled)
+                .expect("different-bytes artifact is constructible");
+
+        assert_eq!(
+            baseline_artifact.cache_identity(),
+            same_source_artifact.cache_identity()
+        );
+        assert_ne!(
+            baseline_artifact.cache_identity(),
+            different_entry_artifact.cache_identity()
+        );
+        assert_ne!(
+            baseline_artifact.cache_identity(),
+            different_bytes_artifact.cache_identity()
         );
     }
 

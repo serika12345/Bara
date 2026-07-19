@@ -1,39 +1,28 @@
 use std::{error::Error, fmt, str::FromStr};
 
 use bara_arm64::{
-    TranslationArtifact, TranslationArtifactError, TranslationCacheIdentity, TranslationSourceHash,
-    TranslationSourceHashParseError, TranslationSourceIdentity, TranslationTarget,
-    TranslatorVersion,
+    TranslationSourceHash, TranslationSourceHashParseError, TranslationSourceIdentity,
 };
 use bara_oracle::TestCase;
 use sha2::{Digest, Sha256};
 
-use super::{encode_lower_hex, FunctionCompileResult};
+use super::encode_lower_hex;
 
 const SOURCE_DOMAIN_TAG: &[u8] = b"bara.fixture-translation-source.v1\0";
 
-pub(super) fn build_fixture_translation_artifact(
+pub(super) fn fixture_translation_source_identity(
     test_case: &TestCase,
-    compiled: &FunctionCompileResult,
-) -> Result<TranslationArtifact, FixtureTranslationArtifactError> {
+) -> Result<TranslationSourceIdentity, FixtureTranslationSourceIdentityError> {
     let source_hash = fixture_translation_source_hash(test_case)?;
-    let source_identity = TranslationSourceIdentity::new(source_hash);
-    let cache_identity = TranslationCacheIdentity::new(
-        source_hash,
-        TranslatorVersion::current(),
-        TranslationTarget::Arm64MacOs,
-    );
-
-    TranslationArtifact::new(source_identity, compiled.emitted().clone(), cache_identity)
-        .map_err(FixtureTranslationArtifactError::Artifact)
+    Ok(TranslationSourceIdentity::new(source_hash))
 }
 
 fn fixture_translation_source_hash(
     test_case: &TestCase,
-) -> Result<TranslationSourceHash, FixtureTranslationArtifactError> {
+) -> Result<TranslationSourceHash, FixtureTranslationSourceIdentityError> {
     let source_bytes = test_case.x86_bytes().bytes();
     let source_byte_length = u64::try_from(source_bytes.len())
-        .map_err(|_| FixtureTranslationArtifactError::SourceByteLengthOverflow)?;
+        .map_err(|_| FixtureTranslationSourceIdentityError::SourceByteLengthOverflow)?;
     let mut hasher = Sha256::new();
     hasher.update(SOURCE_DOMAIN_TAG);
     hasher.update(test_case.x86_bytes().entry().value().to_le_bytes());
@@ -42,36 +31,33 @@ fn fixture_translation_source_hash(
     let digest = hasher.finalize();
 
     TranslationSourceHash::from_str(&encode_lower_hex(&digest))
-        .map_err(FixtureTranslationArtifactError::SourceHash)
+        .map_err(FixtureTranslationSourceIdentityError::SourceHash)
 }
 
 #[derive(Debug)]
-pub(crate) enum FixtureTranslationArtifactError {
+pub(crate) enum FixtureTranslationSourceIdentityError {
     SourceByteLengthOverflow,
     SourceHash(TranslationSourceHashParseError),
-    Artifact(TranslationArtifactError),
 }
 
-impl fmt::Display for FixtureTranslationArtifactError {
+impl fmt::Display for FixtureTranslationSourceIdentityError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::SourceByteLengthOverflow => {
                 formatter.write_str("fixture source byte length exceeds u64")
             }
             Self::SourceHash(error) => write!(formatter, "invalid fixture source hash: {error}"),
-            Self::Artifact(error) => write!(formatter, "invalid translation artifact: {error}"),
         }
     }
 }
 
-impl Error for FixtureTranslationArtifactError {}
+impl Error for FixtureTranslationSourceIdentityError {}
 
 #[cfg(test)]
 mod tests {
     use bara_oracle::test_case_from_json;
 
-    use super::{build_fixture_translation_artifact, TranslationTarget, TranslatorVersion};
-    use crate::function_run::compile_test_case_function;
+    use super::fixture_translation_source_identity;
 
     #[test]
     fn identities_are_stable_for_the_same_source() {
@@ -81,37 +67,13 @@ mod tests {
             r#"{"case_id":"same_source","entry":0,"bytes":"b82a000000c3","abi":{"args":[],"return":"u64"}}"#,
         )
         .expect("same-source testcase parses");
-        let compiled = compile_test_case_function(&test_case).expect("baseline fixture compiles");
-        let same_source_compiled = compile_test_case_function(&same_source_with_different_case_id)
-            .expect("same-source fixture compiles");
-        let artifact = build_fixture_translation_artifact(&test_case, &compiled)
-            .expect("fixture artifact should be constructible");
-        let same_source_artifact = build_fixture_translation_artifact(
-            &same_source_with_different_case_id,
-            &same_source_compiled,
-        )
-        .expect("same-source fixture artifact should be constructible");
+        let identity = fixture_translation_source_identity(&test_case)
+            .expect("fixture identity should be constructible");
+        let same_source_identity =
+            fixture_translation_source_identity(&same_source_with_different_case_id)
+                .expect("same-source fixture identity should be constructible");
 
-        assert_eq!(
-            artifact.source_identity(),
-            same_source_artifact.source_identity()
-        );
-        assert_eq!(
-            artifact.cache_identity(),
-            same_source_artifact.cache_identity()
-        );
-        assert_eq!(
-            artifact.cache_identity().source_hash(),
-            artifact.source_identity().source_hash()
-        );
-        assert_eq!(
-            artifact.cache_identity().target(),
-            TranslationTarget::Arm64MacOs
-        );
-        assert_eq!(
-            artifact.cache_identity().translator_version(),
-            &TranslatorVersion::current()
-        );
+        assert_eq!(identity, same_source_identity);
     }
 
     #[test]
@@ -129,36 +91,14 @@ mod tests {
         )
         .expect("different-bytes testcase parses");
 
-        let baseline_compiled =
-            compile_test_case_function(&baseline).expect("baseline fixture compiles");
-        let different_entry_compiled =
-            compile_test_case_function(&different_entry).expect("different-entry fixture compiles");
-        let different_bytes_compiled =
-            compile_test_case_function(&different_bytes).expect("different-bytes fixture compiles");
-        let baseline_artifact = build_fixture_translation_artifact(&baseline, &baseline_compiled)
-            .expect("baseline fixture artifact should be constructible");
-        let different_entry_artifact =
-            build_fixture_translation_artifact(&different_entry, &different_entry_compiled)
-                .expect("different-entry fixture artifact should be constructible");
-        let different_bytes_artifact =
-            build_fixture_translation_artifact(&different_bytes, &different_bytes_compiled)
-                .expect("different-bytes fixture artifact should be constructible");
+        let baseline_identity = fixture_translation_source_identity(&baseline)
+            .expect("baseline identity is constructible");
+        let different_entry_identity = fixture_translation_source_identity(&different_entry)
+            .expect("different-entry identity is constructible");
+        let different_bytes_identity = fixture_translation_source_identity(&different_bytes)
+            .expect("different-bytes identity is constructible");
 
-        assert_ne!(
-            different_entry_artifact.source_identity(),
-            baseline_artifact.source_identity()
-        );
-        assert_ne!(
-            different_entry_artifact.cache_identity(),
-            baseline_artifact.cache_identity()
-        );
-        assert_ne!(
-            different_bytes_artifact.source_identity(),
-            baseline_artifact.source_identity()
-        );
-        assert_ne!(
-            different_bytes_artifact.cache_identity(),
-            baseline_artifact.cache_identity()
-        );
+        assert_ne!(different_entry_identity, baseline_identity);
+        assert_ne!(different_bytes_identity, baseline_identity);
     }
 }

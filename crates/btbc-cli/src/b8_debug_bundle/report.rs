@@ -720,6 +720,7 @@ impl B8DebugBlockerReport {
             | FunctionRunError::StandaloneArtifact(_)
             | FunctionRunError::InputMemory(_)
             | FunctionRunError::StdoutTrap(_)
+            | FunctionRunError::FixtureTranslationSourceIdentity(_)
             | FunctionRunError::TranslationArtifact(_)
             | FunctionRunError::Run(_) => B8DebugNextAction::AdvanceToNextIsaBlocker,
         };
