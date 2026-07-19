@@ -142,6 +142,17 @@ impl MachOExecutableImageMetadata {
     pub const fn unwind(&self) -> &GuestImageUnwindMetadata {
         self.metadata.unwind_value()
     }
+
+    pub fn program_image_metadata(&self) -> ProgramImageMetadata {
+        ProgramImageMetadata::new_with_mapped_bytes(
+            self.sections().payload().clone(),
+            self.mapped_bytes().payload().clone(),
+            self.symbols().payload().clone(),
+            self.relocations().payload().clone(),
+            self.imports().payload().clone(),
+            self.unwind().payload().clone(),
+        )
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

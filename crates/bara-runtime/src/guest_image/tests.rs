@@ -498,6 +498,24 @@ fn mach_o_image_exposes_executable_image_snapshot() {
 }
 
 #[test]
+fn mach_o_executable_image_metadata_exposes_program_image_metadata_view() {
+    let image = MachOImage::executable(
+        MachOExecutableEntryPoint::new(X86Va::new(0x1_0000_0010)),
+        mach_o_code_segment(),
+        metadata(),
+    )
+    .expect("entry is inside code segment");
+
+    assert_eq!(
+        image
+            .executable_snapshot()
+            .metadata()
+            .program_image_metadata(),
+        program_image_metadata()
+    );
+}
+
+#[test]
 fn guest_image_rejects_entry_outside_mapped_segments() {
     assert_eq!(
         GuestImage::mach_o_executable(

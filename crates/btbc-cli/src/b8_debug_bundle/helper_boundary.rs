@@ -1,7 +1,7 @@
 use bara_ir::ProgramImageMetadata;
 use bara_isa_x86::X86Bytes;
 use bara_oracle::{BinaryFormatProbeReport, BinaryInput, MachOChainedImportIdentityReport};
-use bara_runtime::{MachOExecutableImageMetadata, MachOExecutableImageSnapshot};
+use bara_runtime::MachOExecutableImageSnapshot;
 use serde::Serialize;
 
 use super::report::{B8DebugDecodeReport, B8DebugMemoryReadWidthReport, B8DebugSourceIsa};
@@ -104,8 +104,7 @@ impl B8DebugImportHelperRequestReport {
         code_bytes: &X86Bytes,
         mach_o_snapshot: &MachOExecutableImageSnapshot,
     ) -> Self {
-        let image_metadata =
-            program_image_metadata_from_mach_o_metadata(mach_o_snapshot.metadata());
+        let image_metadata = mach_o_snapshot.metadata().program_image_metadata();
         let required_marshaling = B8DebugHelperMarshalingReport::blocked(
             call_boundary,
             input,
@@ -161,19 +160,6 @@ impl B8DebugImportHelperRequestReport {
             .map(B8DebugObjcHelperExecutionRequestReport::boundary_blockers)
             .unwrap_or_else(|| self.required_marshaling.blockers.clone())
     }
-}
-
-fn program_image_metadata_from_mach_o_metadata(
-    metadata: &MachOExecutableImageMetadata,
-) -> ProgramImageMetadata {
-    ProgramImageMetadata::new_with_mapped_bytes(
-        metadata.sections().payload().clone(),
-        metadata.mapped_bytes().payload().clone(),
-        metadata.symbols().payload().clone(),
-        metadata.relocations().payload().clone(),
-        metadata.imports().payload().clone(),
-        metadata.unwind().payload().clone(),
-    )
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
