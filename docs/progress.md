@@ -62,93 +62,46 @@
    B8-ARCH1 responsibility split audit と、`D4a: x86_64 ISA semantic coverage strategy`
 4. この `docs/progress.md` の現在の作業スナップショット
 
-B8-ARCH2an review / merge 後の次候補:
+B8-TYPE1 review / merge 後の次候補:
 
-- `main` を最新化したうえで、TODO-backed PR Gate を追加または選び、dedicated branch を作る。
-- `B8-TYPE1` の最初の unfinished boundary である executable code bytes domain value と
-  snapshot 接続を、次の小さい PR Gate 候補にする。
-- B8-ARCH2a では report DTO split、B8-ARCH2b では bundle file I/O split、B8-ARCH2c では
-  real-entry attempt orchestration split、B8-ARCH2d では loader plan shell split、
-  B8-ARCH2e では import boundary projection split、B8-ARCH2f では helper boundary
-  marshaling split、B8-ARCH2g では guest image mapping shell split、B8-ARCH2h では
-  runtime `GuestImage` domain shell 接続、B8-ARCH2i では mapped bytes 接続だけを
-  完了し、B8-ARCH2j では imports collection 接続、B8-ARCH2k では relocations
-  collection 接続だけを完了し、B8-ARCH2l では remaining metadata collections を
-  `GuestImageMetadata` aggregate にまとめ、B8-ARCH2m では `MachOImage` domain shell を
-  通し、B8-ARCH2n では Mach-O code segment source / address-space 決定を runtime
-  constructor 側へ寄せ、B8-ARCH2o では `ProgramImageMetadata` からの `GuestImageMetadata`
-  assembly と mapped bytes source 選択を runtime constructor 側へ寄せ、B8-ARCH2p では
-  executable code range を `MachOExecutableCodeRange` として型付けし、B8-ARCH2q では
-  `ProgramImageMetadata.sections()` の single code section から executable code range を
-  選ぶ判断を runtime constructor 側へ寄せ、B8-ARCH2r では executable entry point を
-  `MachOExecutableEntryPoint` として型付けし、B8-ARCH2s では executable code segment を
-  `MachOExecutableCodeSegment` として型付けして `MachOImage::code_segment` を non-optional
-  Mach-O specific type にし、B8-ARCH2t では mapped bytes source と payload を
-  `GuestImageMappedBytes` value object にまとめ、B8-ARCH2u では sections payload を
-  `GuestImageSections` value object にまとめ、B8-ARCH2v では symbols payload を
-  `GuestImageSymbols` value object にまとめ、B8-ARCH2w では unwind metadata payload を
-  `GuestImageUnwindMetadata` value object にまとめるため、JSON schema 名、field 名、既存
-  B8-HWGUI debug bundle output を維持したまま後続境界を切り、B8-ARCH2x では imports
-  payload を `GuestImageImports` value object にまとめ、B8-ARCH2y では relocations payload を
-  `GuestImageRelocations` value object にまとめ、B8-ARCH2z では `GuestImageMetadata`
-  aggregate と metadata value object 群を `guest_image/metadata.rs` へ分け、B8-ARCH2aa では
-  `MachOImage` shell と Mach-O executable value object 群を `guest_image/mach_o.rs` へ分け、
-  B8-ARCH2ab では generic `GuestImage` shell と segment/error 型を `guest_image/image.rs` へ
-  分け、B8-ARCH2ac では existing `guest_image` unit test 群を `guest_image/tests.rs` へ分け、
-  B8-ARCH2ad では B8 debug bundle の `image_mapping` projection を typed
-  `MachOImage::code_segment()` boundary へ寄せ、B8-ARCH2ae では Mach-O executable code
-  segment の vmaddr / byte length derivation を runtime domain accessor へ寄せ、B8-ARCH2af
-  では B8 debug bundle の `image_mapping` projection に渡す runtime mapping 構成を
-  `MachOExecutableImageMapping` snapshot としてまとめ、B8-ARCH2ag では mapping snapshot が
-  `GuestImageMappedBytes` value object も保持するようにし、B8-ARCH2ah では
-  `GuestImageMetadata` が remaining metadata collection value object も返せるようにし、
-  B8-ARCH2ai では Mach-O executable metadata snapshot からそれらの value object を読めるようにし、
-  B8-ARCH2aj では Mach-O executable image snapshot から mapping snapshot と metadata snapshot を
-  同じ boundary で読めるようにし、B8-ARCH2ak では B8 debug bundle loader plan が
-  `MachOEntryFunctionInput` から Mach-O executable image snapshot を一度作って
-  `image_mapping` projection へ渡すようにする。
-- helper process execution、loader image model、runtime dispatcher、decoder dependency 採用は、
-  対応する TODO / design TODO が具体化されるまで混ぜない。
+- `main` を最新化したうえで、`B8-LAUNCH1 Translation Artifact Execution Path` を concrete
+  compile / runtime connection 単位の複数 PR Gate へ分割する。
+- 最初の gate は decode / lift / emit result から `TranslationArtifact` を構築し、runtime input
+  または debug export の一方へだけ接続する最小 slice とする。両方を一括で実装しない。
+- production GuestImage path、existing expected / actual JSON、public primitive baseline を維持し、
+  debug bundle の blocker を次の実装範囲の source of truth にする。
 
-B8-ARCH2ak review / merge 後にすぐ始めないもの:
+B8-TYPE1 review / merge 後にすぐ始めないもの:
 
-- B8-OSS0 source-built OSS GUI app automation
-- relocation/fixup projection semantics の変更、import projection semantics の変更、
-  symbol projection semantics の変更
-- arbitrary Objective-C message send、general continuation execution、
-  translation cache、fallback JIT/interpreter、Wine bridge
-- B8-HWGUI fixture 専用 path のさらなる機能追加
-- decoder dependency 採用、ISA implementation / lowering 追加、supply-chain lockfile 変更
-
-B8-ARCH2ak review package で示すべきもの:
-
-- `btbc-cli/src/b8_debug_bundle/loader.rs` が `MachOEntryFunctionInput` から
-  `MachOExecutableImageSnapshot` を一度作り、`image_mapping` projection へ渡す範囲
-- 意図は B8 debug bundle loader plan が Mach-O executable image snapshot を単一の入口として
-  扱い始め、debug DTO 側が entry input から image model を作り直さない境界にすること
-- できるようになったこととして、後続の import / relocation / symbol / unwind projection を
-  loader plan assembly で作った同じ snapshot へ段階的に寄せやすくなること
-- `mach_o_executable_snapshot_from_entry_input` を追加し、
-  `B8DebugGuestImageMappingReport::from_mach_o_snapshot` が borrowed snapshot から
-  existing `image_mapping` report を組み立てること
-- existing CLI report projection は同じ JSON output を維持すること
-- focused regression test として
-  `image_mapping_report_uses_mach_o_executable_image_snapshot` を snapshot-borrowing path で
-  維持したこと
-- `loader.plan.json` の `image_mapping` field 名、nested field 名、serde 値、JSON output を
-  維持したこと
-- import/fixup projection、helper boundary、helper process execution、modeled continuation を
-  まだ移していないこと
-- `nix develop -c cargo test -p btbc-cli image_mapping_report_uses_mach_o_executable_image_snapshot -- --nocapture`
-- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
-- `nix develop -c ./scripts/verify`
+- relocation / rebase / bind 適用、import address 解決、runtime dispatcher loop
+- Objective-C / AppKit host service execution、process environment、一般 GUI app 起動
+- cross-platform personality selection、Wine thunk、PE / ELF interface、translation cache
+- B8-LAUNCH1 の review gate を越えた B8-LAUNCH2 以降の自動実装
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-07-19 15:07 JST
+最終更新: 2026-07-19 15:35 JST
 
 状態:
 
+- active_work: completed。`B8-TYPE1 Typed Runtime Execution Foundation` を
+  `task/b8-type1-typed-runtime-foundation` で完了した。関連 TODO は `TODO.md` の
+  `B8-TYPE1`、関連設計メモは `docs/design-todo.md` の
+  `B8-TYPE1 implementation result`、runtime roadmap は
+  `docs/runtime-architecture-roadmap.md` の `R2 / B8-TYPE1`。executable snapshot から typed code
+  bytes / source range を取得でき、pure `TranslationArtifact` と source / minimal cache identity、
+  guest PC / register / stack / helper phase state、concrete
+  `GuestCall -> MacOsHostServiceRequest -> GuestReturn`、loader / dispatcher / helper blocker を追加した。
+  runtime normal dependency は `bara-ir` / `libc` のみに保ち、CLI adapter が public Mach-O
+  observation を runtime-owned constructor へ渡す境界と existing B8 debug bundle / expected /
+  actual JSON を維持した。public primitive baseline、dependency、lockfile、schema は変更していない。
+  artifact execution、relocation / bind、dispatcher loop、host service execution、cross-platform /
+  Wine abstraction は含めない。remaining work は coherent commit、push、pull request 作成と review。
+  next action は PR review 後に B8-LAUNCH1 を複数 PR Gate へ分割すること。verification は focused
+  `bara-ir` 46 tests、`bara-arm64` 54 tests、`bara-runtime` 58 unit + 38 integration tests、
+  `cargo tree -p bara-runtime --edges normal`、`check-domain-types`、
+  `nix develop -c ./scripts/verify` が pass。aggregate gate 内の invisible character、RustSec、
+  cargo-deny、Nix package、Clippy、workspace tests、blackbox expected / actual も pass。
 - active_work: completed。B8 roadmap phase separation の監査指摘を documentation-only で
   反映した。`B8-TYPE1` は cross-platform personality selection、Wine thunk、PE / ELF interface、
   executable memory identity を除外し、`GuestCall -> MacOsHostServiceRequest -> GuestReturn`、

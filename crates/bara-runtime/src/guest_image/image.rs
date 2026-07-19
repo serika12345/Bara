@@ -1,6 +1,7 @@
 use bara_ir::{
-    ProgramImageImports, ProgramImageMappedBytes, ProgramImageRange, ProgramImageRelocations,
-    ProgramImageSections, ProgramImageSymbols, ProgramUnwindMetadata, X86Va,
+    ProgramImageImports, ProgramImageMappedBytes, ProgramImageMetadataError, ProgramImageRange,
+    ProgramImageRelocations, ProgramImageSections, ProgramImageSymbols, ProgramUnwindMetadata,
+    X86Va,
 };
 
 use super::{GuestImageMappedBytesSource, GuestImageMetadata};
@@ -218,5 +219,6 @@ pub enum GuestImageError {
     MissingMachOExecutableCodeSection,
     AmbiguousMachOExecutableCodeSections,
     MachOExecutableCodeByteLenOverflow,
+    MachOExecutableCodeBytesUnavailable(ProgramImageMetadataError),
     EntryOutsideMappedSegments,
 }

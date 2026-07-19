@@ -2,7 +2,10 @@ pub mod executable_memory;
 pub mod guest_image;
 pub mod host_trap;
 pub mod launch;
+pub mod macos_host_service;
 pub mod runner;
+pub mod runtime_blocker;
+pub mod runtime_state;
 
 pub use executable_memory::{ExecutableMemory, ExecutableMemoryError};
 pub use guest_image::{
@@ -10,9 +13,9 @@ pub use guest_image::{
     GuestImageImports, GuestImageMappedBytes, GuestImageMappedBytesSource, GuestImageMetadata,
     GuestImageRelocations, GuestImageSections, GuestImageSegment, GuestImageSegmentKind,
     GuestImageSegmentSource, GuestImageSegments, GuestImageSymbols, GuestImageUnwindMetadata,
-    MachOExecutableCodeByteLen, MachOExecutableCodeRange, MachOExecutableCodeSegment,
-    MachOExecutableEntryPoint, MachOExecutableImageMapping, MachOExecutableImageMetadata,
-    MachOExecutableImageSnapshot, MachOImage,
+    MachOExecutableCodeByteLen, MachOExecutableCodeBytes, MachOExecutableCodeRange,
+    MachOExecutableCodeSegment, MachOExecutableEntryPoint, MachOExecutableImageMapping,
+    MachOExecutableImageMetadata, MachOExecutableImageSnapshot, MachOImage,
 };
 pub use host_trap::{HostTrapPlan, RunStdout, RunStdoutError};
 pub use launch::{
@@ -42,7 +45,19 @@ pub use launch::{
     UserSpacePrivateIntegrationRequirement, UserSpaceProcessBoundary, UserSpaceProcessScope,
     UserSpaceSourceIsaMode, UserSpaceSourceIsaProfile, UserSpaceSourceWidth,
 };
+pub use macos_host_service::{
+    GuestCall, GuestReturn, GuestReturnValue, MacOsHostService, MacOsHostServiceRequest,
+};
 pub use runner::{
     run_no_args_u64, run_no_args_u64_with_host_traps, run_one_input_memory_ptr, run_one_u64,
     InputMemory, InputMemoryError, RunArgumentU64, RunError, RunResult,
+};
+pub use runtime_blocker::{
+    DispatcherBoundaryBlocker, DispatcherUnsupportedState, HelperBoundaryBlocker,
+    LoaderBoundaryBlocker, LoaderUnsupportedState, RuntimeBoundary, RuntimeBoundaryBlocker,
+};
+pub use runtime_state::{
+    GuestHelperReturnState, GuestHelperSuspendState, GuestProgramCounter, GuestRegisterState,
+    GuestRegisterStateEntry, GuestRegisterValue, GuestRuntimePhase, GuestRuntimeState,
+    GuestRuntimeStateError, GuestStackBounds, GuestStackPointer, GuestStackState,
 };

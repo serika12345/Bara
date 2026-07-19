@@ -557,6 +557,23 @@ host service execution は後続 R3 以降に置く。
   image mapping、import、helper projection の共通入口にし、metadata compatibility view の
   assembly と snapshot-level access を runtime domain 側へ寄せた。
 
+B8-TYPE1 completion result:
+
+- executable snapshot から `MachOExecutableCodeBytes` と typed source range を取得できるようにし、
+  mapped byte payload を bare byte buffer として新規公開しない。
+- `bara-arm64::TranslationArtifact` は emitted ARM64 function と source / minimal cache identity を
+  pure にまとめ、cache target を concrete `Arm64MacOs` として区別する。
+- `bara-runtime` は guest PC、register、stack、helper suspend / return phase の最小 state、concrete
+  macOS host service request / return contract、loader / dispatcher / helper blocker を pure domain
+  model として持つ。
+- production B8 debug bundle は existing Mach-O snapshot path を維持する。新しい artifact / state /
+  service contract は focused construction / validation までで停止し、execution path へ接続しない。
+- runtime normal dependency graph は `bara-oracle` を含まない。external Mach-O observation は CLI
+  adapter で runtime-owned constructor へ渡し、loader domain construction の依存方向を runtime 側に
+  保つ。
+- public primitive baseline、dependency、lockfile、JSON schema は増やさず、OS personality selection、
+  Wine thunk、PE / ELF interface、dispatcher / host execution を実装しない。
+
 停止条件:
 
 - production GuestImage consumer が snapshot 境界を通り、その他の新しい型が focused

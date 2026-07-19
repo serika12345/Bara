@@ -230,6 +230,46 @@ mod tests {
     }
 
     #[test]
+    fn mapped_image_bytes_extract_typed_segment_for_source_range() {
+        let mapped_range = ProgramImageRange::new(X86Va::new(0x1000), X86Va::new(0x1010))
+            .expect("range is non-empty");
+        let source_range = ProgramImageRange::new(X86Va::new(0x1004), X86Va::new(0x100c))
+            .expect("range is non-empty");
+        let mapped_segment = ProgramImageMappedByteSegment::new(
+            mapped_range,
+            vec![
+                0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d,
+                0x9e, 0x9f,
+            ],
+        )
+        .expect("mapped bytes match range");
+        let mapped_bytes = ProgramImageMappedBytes::from_segments([mapped_segment]);
+        let expected = ProgramImageMappedByteSegment::new(
+            source_range,
+            vec![0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x9a, 0x9b],
+        )
+        .expect("expected bytes match source range");
+
+        assert_eq!(mapped_bytes.segment_for_range(source_range), Ok(expected));
+    }
+
+    #[test]
+    fn mapped_image_bytes_reject_unavailable_source_range() {
+        let mapped_range = ProgramImageRange::new(X86Va::new(0x1000), X86Va::new(0x1008))
+            .expect("range is non-empty");
+        let unavailable_range = ProgramImageRange::new(X86Va::new(0x1004), X86Va::new(0x100c))
+            .expect("range is non-empty");
+        let mapped_segment = ProgramImageMappedByteSegment::new(mapped_range, vec![0; 8])
+            .expect("mapped bytes match range");
+        let mapped_bytes = ProgramImageMappedBytes::from_segments([mapped_segment]);
+
+        assert_eq!(
+            mapped_bytes.segment_for_range(unavailable_range),
+            Err(ProgramImageMetadataError::MappedBytesRangeUnavailable)
+        );
+    }
+
+    #[test]
     fn mapped_image_bytes_read_nul_terminated_utf8_by_vm_address() {
         let range = ProgramImageRange::new(X86Va::new(0x1000), X86Va::new(0x1010))
             .expect("range is non-empty");

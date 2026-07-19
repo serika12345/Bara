@@ -531,6 +531,67 @@ fn mach_o_executable_image_snapshot_exposes_program_image_metadata_view() {
 }
 
 #[test]
+fn mach_o_executable_image_snapshot_exposes_typed_code_bytes_and_source_range() {
+    let source_range = image_range(0x1_0000_0000, 0x1_0000_0010);
+    let mapped_segment = ProgramImageMappedByteSegment::new(
+        source_range,
+        vec![
+            0x55, 0x48, 0x89, 0xe5, 0xb8, 0x2a, 0x00, 0x00, 0x00, 0x5d, 0xc3, 0x90, 0x90, 0x90,
+            0x90, 0x90,
+        ],
+    )
+    .expect("test mapped bytes match code range");
+    let expected_segment = mapped_segment.clone();
+    let executable_metadata = GuestImageMetadata::new(
+        GuestImageMappedBytes::new(
+            GuestImageMappedBytesSource::ProgramImageMetadata,
+            ProgramImageMappedBytes::from_segments([mapped_segment]),
+        ),
+        GuestImageSections::new(ProgramImageSections::from_items([
+            ProgramImageSection::new(ProgramImageSectionKind::Code, source_range),
+        ])),
+        guest_image_symbols(),
+        guest_image_relocations(),
+        guest_image_imports(),
+        guest_image_unwind(),
+    );
+    let image = MachOImage::executable_from_code_range(
+        MachOExecutableEntryPoint::new(X86Va::new(0x1_0000_0004)),
+        MachOExecutableCodeRange::new(source_range),
+        executable_metadata,
+    )
+    .expect("entry is inside code segment");
+
+    let code_bytes = image
+        .executable_snapshot()
+        .executable_code_bytes()
+        .expect("code range is backed by mapped bytes");
+
+    assert_eq!(
+        code_bytes.source_range(),
+        MachOExecutableCodeRange::new(source_range)
+    );
+    assert_eq!(code_bytes.mapped_segment(), &expected_segment);
+}
+
+#[test]
+fn mach_o_executable_image_snapshot_rejects_unmapped_code_range() {
+    let image = MachOImage::executable(
+        MachOExecutableEntryPoint::new(X86Va::new(0x1_0000_0010)),
+        mach_o_code_segment(),
+        metadata(),
+    )
+    .expect("entry is inside code segment");
+
+    assert_eq!(
+        image.executable_snapshot().executable_code_bytes(),
+        Err(GuestImageError::MachOExecutableCodeBytesUnavailable(
+            bara_ir::ProgramImageMetadataError::MappedBytesRangeUnavailable
+        ))
+    );
+}
+
+#[test]
 fn guest_image_rejects_entry_outside_mapped_segments() {
     assert_eq!(
         GuestImage::mach_o_executable(
