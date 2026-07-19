@@ -585,6 +585,16 @@ B8-TYPE1 completion result:
 
 typed `TranslationArtifact` を compile、debug export、runtime input の実経路へ接続する。
 
+最初の PR Gate では image metadata を持たない通常 fixture だけを対象とし、decode / lift / emit
+result から domain-separated SHA-256 source identity、backend-owned translator version、concrete
+`Arm64MacOs` target を持つ artifact を構築する。runtime は `&TranslationArtifact` を受ける typed
+entry から existing executable memory / ABI runner へ委譲し、CLI report DTO や raw ARM64 bytes を
+runtime call site の input にしない。
+
+B8 debug export と Mach-O / B8 real-entry は image metadata を含む source identity が必要なため、
+fixture identity を再利用せず後続 PR Gate に残す。standalone linker、dispatcher、runtime state、
+fixup、helper service execution、cache storage も最初の gate には含めない。
+
 完了条件:
 
 - ARM64 bytes、PC map、fixups、helper requirements、source/cache identity が artifact 経由で渡る

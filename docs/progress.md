@@ -62,28 +62,40 @@
    B8-ARCH1 responsibility split audit と、`D4a: x86_64 ISA semantic coverage strategy`
 4. この `docs/progress.md` の現在の作業スナップショット
 
-B8-TYPE1 review / merge 後の次候補:
+B8-LAUNCH1a completion 後の次候補:
 
-- `main` を最新化したうえで、`B8-LAUNCH1 Translation Artifact Execution Path` を concrete
-  compile / runtime connection 単位の複数 PR Gate へ分割する。
-- 最初の gate は decode / lift / emit result から `TranslationArtifact` を構築し、runtime input
-  または debug export の一方へだけ接続する最小 slice とする。両方を一括で実装しない。
-- production GuestImage path、existing expected / actual JSON、public primitive baseline を維持し、
-  debug bundle の blocker を次の実装範囲の source of truth にする。
+- `B8-LAUNCH1a Fixture Translation Artifact Runtime Input` の draft PR を review / merge する。
+- 次の PR Gate は B8 debug export または Mach-O / B8 real-entry identity migration の一方へ限定し、
+  image metadata-aware source identity を fixture identity から分ける。
+- existing expected / actual JSON、public primitive baseline、B8 debug bundle schema を維持し、
+  debug bundle の blocker を実装順の source of truth にする。
 
-B8-TYPE1 review / merge 後にすぐ始めないもの:
+B8-LAUNCH1a completion 後にすぐ始めないもの:
 
 - relocation / rebase / bind 適用、import address 解決、runtime dispatcher loop
 - Objective-C / AppKit host service execution、process environment、一般 GUI app 起動
 - cross-platform personality selection、Wine thunk、PE / ELF interface、translation cache
-- B8-LAUNCH1 の review gate を越えた B8-LAUNCH2 以降の自動実装
+- B8-LAUNCH1a の review gate を越えた次 gate または B8-LAUNCH2 以降の自動実装
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-07-19 15:35 JST
+最終更新: 2026-07-19 16:07 JST
 
 状態:
 
+- active_work: completed。`B8-LAUNCH1a Fixture Translation Artifact Runtime Input` を
+  `task/b8-launch1a-fixture-artifact-runtime-input` で完了した。関連 TODO は `TODO.md` の同 PR Gate、
+  関連設計メモは `docs/design-todo.md` の `B8-LAUNCH1a implementation result`、関連 roadmap は
+  `docs/runtime-architecture-roadmap.md` の `R3 / B8-LAUNCH1`。通常 fixture の decode / lift /
+  emit result から domain-separated canonical SHA-256 source identity、backend-owned translator
+  version、`Arm64MacOs` target を持つ `TranslationArtifact` を構築し、3 ABI と host trap を typed
+  runtime runner から実行する。identity adapter と test は `function_run` の専用 submodule に分離した。
+  runtime normal dependency は `bara-arm64` を追加したが `bara-oracle` を含めず、public primitive
+  baseline、existing expected / actual JSON、B8 debug bundle schema は維持した。B8 debug export、
+  Mach-O / real-entry identity、standalone linker、dispatcher、cache storage は未着手。remaining work は
+  PR review / merge 後に B8-LAUNCH1b の一方の境界を選ぶこと。next action はこの draft PR の review。
+  verification は 3 crate test、focused test、Clippy `-D warnings`、domain type check、runtime normal
+  dependency audit、supply-chain gate、repository-wide `./scripts/verify` を実施して成功した。
 - active_work: completed。`B8-TYPE1 Typed Runtime Execution Foundation` を
   `task/b8-type1-typed-runtime-foundation` で完了した。関連 TODO は `TODO.md` の
   `B8-TYPE1`、関連設計メモは `docs/design-todo.md` の

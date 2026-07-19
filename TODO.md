@@ -4699,10 +4699,63 @@ debug bundle の blocker を source of truth として複数の `PR Gate` へ分
 #### 中マイルストーン: B8-LAUNCH1 Translation Artifact Execution Path
 
 - [ ] decode / lift / emit の結果を `TranslationArtifact` として runtime へ渡す。
+  - [x] image metadata を持たない通常 fixture を typed artifact runtime input へ接続する。
+  - [ ] Mach-O / B8 real-entry を image metadata-aware source identity とともに接続する。
 - [ ] artifact bytes、PC map、fixups、helper requirements、source/cache identity を debug export
   できるようにする。
-- [ ] existing fixture expected / actual を artifact path 経由でも通し、CLI report DTO を
+- [x] existing fixture expected / actual を artifact path 経由でも通し、CLI report DTO を
   runtime input として使わない。
+
+#### PR Gate: B8-LAUNCH1a Fixture Translation Artifact Runtime Input
+
+branch: `task/b8-launch1a-fixture-artifact-runtime-input`
+
+目的:
+
+- image metadata を持たない通常 fixture の decode / lift / emit result を最初の concrete
+  `TranslationArtifact` execution path とし、runtime input から raw ARM64 byte buffer と
+  CLI report DTO への依存を外す。
+- Mach-O / B8 real-entry source identity と debug export は別 gate に残し、fixture 用 identity を
+  metadata-dependent translation へ誤って再利用しない。
+
+完了条件:
+
+- [x] `bara-runtime` に existing no-args / one-u64 / input-memory-ptr ABI を
+  `&TranslationArtifact` から実行する typed runner entry を追加し、内部の executable memory /
+  ABI runner behavior は既存実装へ委譲する。
+- [x] 通常 fixture production adapter は decode / lift(empty image metadata) / emit result から
+  `TranslationArtifact` を pure に構築し、typed runner entry へ渡す。runtime call site は
+  `EmittedFunction::code().bytes()` または CLI report DTO を直接 input にしない。
+- [x] fixture source identity は domain tag、guest entry、source byte length、source bytes を
+  canonical SHA-256 に入力して作る。translator version は backend-owned current version、target は
+  concrete `Arm64MacOs` とし、固定値 / zero sentinel / unstable default hasher を使わない。
+- [x] source entry または bytes が異なると source / cache identity が異なり、同じ input は同じ
+  identity になる focused regression test を追加する。
+- [x] existing fixture expected / actual、host trap、3 ABI behavior と existing JSON output を維持する。
+- [x] runtime normal dependency に `bara-arm64` を追加しても `bara-oracle` を含めず、public primitive
+  baseline を増やさない。
+- [x] TODO、design TODO、runtime architecture roadmap、progress snapshot を同期し、
+  `nix develop -c ./scripts/verify` と dependency 変更に必要な supply-chain gate が通る。
+
+PR に含めない:
+
+- B8 debug bundle の artifact export、schema、file layout、Mach-O / B8 real-entry identity migration。
+- standalone linker / native artifact path の migration。
+- runtime dispatcher、typed runtime state 接続、PC map / fixup 適用、helper service execution。
+- relocation / bind / import address 解決、translation cache storage。
+
+検証:
+
+- `nix develop -c cargo test -p bara-runtime`
+- `nix develop -c cargo test -p btbc-cli function_run`
+- `nix develop -c ./scripts/check-domain-types`
+- `nix develop -c ./scripts/verify-supply-chain`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- fixture expected / actual の typed artifact runtime input 接続を commit / push / draft PR 作成で
+  停止する。B8-LAUNCH1b debug export または Mach-O / B8 real-entry migration へ進まない。
 
 #### 中マイルストーン: B8-LAUNCH2 Executable Image Preparation
 

@@ -60,6 +60,12 @@ impl Error for TranslationSourceHashParseError {}
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct TranslatorVersion(Box<str>);
 
+impl TranslatorVersion {
+    pub fn current() -> Self {
+        Self(env!("CARGO_PKG_VERSION").into())
+    }
+}
+
 impl FromStr for TranslatorVersion {
     type Err = TranslatorVersionParseError;
 

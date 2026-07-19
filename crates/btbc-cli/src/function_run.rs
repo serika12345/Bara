@@ -14,10 +14,18 @@ use bara_oracle::{
     FailureKind, MachOEntryFunctionInput, ObservedResult, TestCase, TestCaseAbi, TestCaseStackState,
 };
 use bara_runtime::{
-    run_no_args_u64_with_host_traps, run_one_input_memory_ptr, run_one_u64, HostTrapPlan,
+    run_no_args_u64_with_host_traps, run_one_input_memory_ptr, run_one_u64,
+    run_translation_artifact_no_args_u64_with_host_traps,
+    run_translation_artifact_one_input_memory_ptr, run_translation_artifact_one_u64, HostTrapPlan,
     InputMemory, InputMemoryError, RunArgumentU64, RunError, RunStdout, RunStdoutError,
 };
 use serde::Serialize;
+
+use self::fixture_translation_artifact::{
+    build_fixture_translation_artifact, FixtureTranslationArtifactError,
+};
+
+mod fixture_translation_artifact;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct FunctionCompileResult {
@@ -1107,6 +1115,7 @@ pub(crate) enum FunctionRunError {
     StandaloneArtifact(FunctionStandaloneArtifactError),
     InputMemory(InputMemoryError),
     StdoutTrap(RunStdoutError),
+    TranslationArtifact(FixtureTranslationArtifactError),
     Run(RunError),
 }
 
@@ -1116,7 +1125,7 @@ impl FunctionRunError {
             Self::Decode(_) => FailureKind::DecodeError,
             Self::Lift(_) => FailureKind::LiftError,
             Self::Emit(error) => failure_kind_from_emit_error(error),
-            Self::StandaloneArtifact(_) => FailureKind::EmitError,
+            Self::StandaloneArtifact(_) | Self::TranslationArtifact(_) => FailureKind::EmitError,
             Self::InputMemory(_) | Self::StdoutTrap(_) | Self::Run(_) => FailureKind::RunError,
         }
     }
@@ -1160,6 +1169,9 @@ impl fmt::Display for FunctionRunError {
             }
             Self::InputMemory(error) => write!(formatter, "input memory error: {error:?}"),
             Self::StdoutTrap(error) => write!(formatter, "stdout trap error: {error:?}"),
+            Self::TranslationArtifact(error) => {
+                write!(formatter, "translation artifact error: {error}")
+            }
             Self::Run(error) => write!(formatter, "run error: {error:?}"),
         }
     }
@@ -1443,7 +1455,38 @@ pub(crate) fn run_test_case_function_with_bundle(
     test_case: &TestCase,
 ) -> Result<FunctionRunBundle, FunctionRunError> {
     let compiled = compile_test_case_function(test_case)?;
-    run_compiled_test_case_function_with_bundle(test_case, compiled)
+    run_compiled_fixture_translation_artifact_with_bundle(test_case, compiled)
+}
+
+fn run_compiled_fixture_translation_artifact_with_bundle(
+    test_case: &TestCase,
+    compiled: FunctionCompileResult,
+) -> Result<FunctionRunBundle, FunctionRunError> {
+    let artifact = build_fixture_translation_artifact(test_case, &compiled)
+        .map_err(FunctionRunError::TranslationArtifact)?;
+    let result = match test_case.abi() {
+        TestCaseAbi::NoArgsU64 => run_translation_artifact_no_args_u64_with_host_traps(
+            &artifact,
+            runtime_host_trap_plan(
+                test_case.host_trap_plan(),
+                artifact.emitted_function().host_trap_requests(),
+            )?,
+        ),
+        TestCaseAbi::OneU64ArgReturnsU64 { argument } => {
+            run_translation_artifact_one_u64(&artifact, RunArgumentU64::new(argument.value()))
+        }
+        TestCaseAbi::OneInputMemoryPtrReturnsU64 { memory } => {
+            let memory = InputMemory::from_bytes(memory.bytes().to_vec())
+                .map_err(FunctionRunError::InputMemory)?;
+            run_translation_artifact_one_input_memory_ptr(&artifact, memory)
+        }
+    }
+    .map_err(FunctionRunError::Run)?;
+
+    Ok(FunctionRunBundle::new(
+        compiled,
+        FunctionRunResult::from_runtime(&result),
+    ))
 }
 
 pub(crate) fn run_compiled_test_case_function_with_bundle(
@@ -1503,7 +1546,8 @@ mod tests {
 
     use super::{
         compile_test_case_function, compile_test_case_function_standalone_artifact,
-        FunctionRegisterArtifact, FunctionRunError, FunctionStandaloneArtifactError,
+        run_test_case_function_with_bundle, FunctionRegisterArtifact, FunctionRunError,
+        FunctionStandaloneArtifactError,
     };
 
     #[test]
@@ -1518,6 +1562,47 @@ mod tests {
             compiled.arm64_bytes().as_slice(),
             &[0x40, 0x05, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]
         );
+    }
+
+    #[test]
+    fn regular_fixture_compile_and_run_preserves_the_existing_result() {
+        let test_case = test_case_from_json(include_str!("../../../tests/cases/return_42.json"))
+            .expect("return_42 testcase parses");
+
+        let bundle = run_test_case_function_with_bundle(&test_case)
+            .expect("return_42 should compile and run through a translation artifact");
+
+        assert_eq!(bundle.result().return_value(), 42);
+        assert_eq!(
+            bundle.compiled().arm64_bytes().as_slice(),
+            &[0x40, 0x05, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6]
+        );
+    }
+
+    #[test]
+    fn regular_fixture_artifact_path_preserves_argument_memory_and_host_trap_behavior() {
+        let identity = test_case_from_json(include_str!("../../../tests/cases/identity_u64.json"))
+            .expect("identity_u64 testcase parses");
+        let memory = test_case_from_json(include_str!(
+            "../../../tests/cases/load_u8_from_rdi_return_72.json"
+        ))
+        .expect("memory testcase parses");
+        let stdout = test_case_from_json(include_str!(
+            "../../../tests/cases/stdout_trap_return_0.json"
+        ))
+        .expect("stdout testcase parses");
+
+        let identity_result = run_test_case_function_with_bundle(&identity)
+            .expect("one-u64 fixture should run through a translation artifact");
+        let memory_result = run_test_case_function_with_bundle(&memory)
+            .expect("input-memory fixture should run through a translation artifact");
+        let stdout_result = run_test_case_function_with_bundle(&stdout)
+            .expect("host-trap fixture should run through a translation artifact");
+
+        assert_eq!(identity_result.result().return_value(), 123);
+        assert_eq!(memory_result.result().return_value(), 72);
+        assert_eq!(stdout_result.result().return_value(), 0);
+        assert_eq!(stdout_result.result().stdout(), "hello trap\n");
     }
 
     #[test]
