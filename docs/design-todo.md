@@ -646,6 +646,18 @@ B8-ARCH2al result:
   Objective-C/AppKit helper process execution、modeled continuation state、runtime dispatcher は
   同じ PR では動かさない。
 
+B8-ARCH2am result:
+
+- 2026-07-19 に `MachOExecutableImageMetadata::program_image_metadata()` を追加し、typed
+  metadata value object 群から existing downstream materialization 用の
+  `ProgramImageMetadata` compatibility view を runtime domain 側で組み立てるようにした。
+- 意図は snapshot-backed helper boundary が sections / mapped bytes / symbols / relocations /
+  imports / unwind の aggregate 構成を知る状態を解消し、Mach-O executable metadata snapshot を
+  単一の typed metadata boundary として扱えるようにすること。
+- B8 debug helper boundary の local assembly function は削除し、existing behavior と
+  `loader.plan.json` output は維持する。dependency、schema、import/fixup/symbol semantics、
+  Objective-C/AppKit helper process execution、runtime dispatcher は変更しない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。

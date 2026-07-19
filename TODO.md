@@ -4514,6 +4514,53 @@ review gate:
 
 - debug import boundary Mach-O snapshot boundary を commit / push / draft PR 作成で停止する。
 
+#### PR Gate: B8-ARCH2am Runtime MachO Program Metadata View
+
+branch: `task/b8-arch2am-macho-program-metadata-view`
+
+B8-ARCH2al が review / merge 済みになるまで開始しない。B8-ARCH2 Guest Image Model
+Extraction の次 slice として、Mach-O executable metadata snapshot から downstream
+compatibility 用の `ProgramImageMetadata` view を runtime domain 側で組み立てる。
+production behavior、existing public API、B8 debug bundle の `loader.plan.json` output は維持する。
+
+完了条件:
+
+- [x] `MachOExecutableImageMetadata` は typed metadata value object 群から
+  `ProgramImageMetadata` compatibility view を返す。
+- [x] B8 debug helper boundary は sections / mapped bytes / symbols / relocations / imports /
+  unwind を CLI 側で手組みせず、Mach-O executable metadata snapshot の typed API を使う。
+- [x] focused runtime regression test と existing B8 debug bundle regression test が
+  metadata payload と existing JSON output の維持を検証する。
+- [x] dependency、schema、import/fixup/symbol semantics、helper bridge、runtime dispatcher は
+  変更しない。
+
+completion evidence:
+
+- 意図: B8-ARCH2al で snapshot-backed になった helper boundary から metadata aggregate の
+  組み立て責務も runtime domain へ寄せ、CLI が Mach-O metadata value object の構成を
+  知らなくてよい境界にする。
+- できるようになったこと: `MachOExecutableImageMetadata::program_image_metadata()` が
+  existing downstream materialization 用の compatibility view を返し、CLI の重複 assembly
+  function を削除できる。
+- existing B8 debug bundle behavior と `loader.plan.json` output は変えない。
+
+PR に含めない:
+
+- public Mach-O parser / resolver logic の `bara-oracle` からの移動。
+- entry code bytes、import/fixup/symbol projection semantics の変更または schema 変更。
+- helper boundary / Objective-C / AppKit helper bridge 一般化。
+- return-to continuation dispatcher、translation artifact/cache/dispatcher 実装。
+
+検証:
+
+- `nix develop -c cargo test -p bara-runtime mach_o_executable_image_metadata_exposes_program_image_metadata_view -- --nocapture`
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- runtime Mach-O program metadata view を commit / push / draft PR 作成で停止する。
+
 #### Future Target: B8-ARCH2 Guest Image Model Extraction
 
 - [ ] public Mach-O metadata から runtime が使う `GuestImage` / `MachOImage` domain model を
