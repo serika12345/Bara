@@ -4460,6 +4460,60 @@ review gate:
 
 - debug loader Mach-O snapshot boundary を commit / push / draft PR 作成で停止する。
 
+#### PR Gate: B8-ARCH2al Debug Import Boundary MachO Snapshot Boundary
+
+branch: `task/b8-arch2al-import-boundary-macho-snapshot`
+
+B8-ARCH2ak が review / merge 済みになるまで開始しない。B8-ARCH2 Guest Image Model
+Extraction の次 slice として、B8 debug bundle loader plan で一度作った
+`MachOExecutableImageSnapshot` を import boundary / helper boundary projection へ渡す。
+production behavior、existing public API、B8 debug bundle の `loader.plan.json` output は維持する。
+
+完了条件:
+
+- [x] `B8DebugLoaderPlanReport::real_lc_main_attempted` は
+  `B8DebugImportBoundaryReport` に borrowed `MachOExecutableImageSnapshot` を渡す。
+- [x] `B8DebugImportBoundaryReport` と helper boundary request assembly は
+  `MachOEntryFunctionInput` 由来の `ProgramImageMetadata` を loader から直接受け取らず、
+  Mach-O executable image snapshot の metadata boundary を使う。
+- [x] existing focused regression test は snapshot-backed import/helper projection を通し、
+  `loader.plan.json` の `import_boundary` / `helper_boundary_request` field 名、nested field 名、
+  serde 値、JSON output を維持する。
+- [x] `bara-oracle` からの loader domain 抽出、public Mach-O parser / resolver logic、
+  import/fixup/symbol projection semantics の意味変更、helper bridge、runtime dispatcher は
+  移動しない。
+
+completion evidence:
+
+- 意図: B8 debug bundle loader plan で作った `MachOExecutableImageSnapshot` を
+  `image_mapping` だけでなく import boundary / helper boundary projection でも使い、
+  loader plan assembly の image model 入口をさらに揃える。
+- できるようになったこと: `B8DebugImportBoundaryReport::from_probe_and_decode_report` は
+  loader から `ProgramImageMetadata` を直接受け取らず、borrowed
+  `MachOExecutableImageSnapshot` を受け取る。helper boundary request は snapshot metadata から
+  existing downstream materialization 用の `ProgramImageMetadata` view を作る。
+- existing B8 debug bundle behavior と `loader.plan.json` output は変えない。
+- loader domain 抽出、public Mach-O parser / resolver logic、import/fixup/symbol projection
+  semantics、helper bridge、runtime dispatcher は未移動。
+
+PR に含めない:
+
+- public Mach-O parser / resolver logic の `bara-oracle` からの移動。
+- entry extraction / load command interpretation の runtime への移動。
+- import/fixup/symbol projection semantics の意味変更または schema 変更。
+- helper boundary / Objective-C / AppKit helper bridge 一般化。
+- return-to continuation dispatcher 抽出。
+- translation artifact/cache/dispatcher 実装。
+
+検証:
+
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- debug import boundary Mach-O snapshot boundary を commit / push / draft PR 作成で停止する。
+
 #### Future Target: B8-ARCH2 Guest Image Model Extraction
 
 - [ ] public Mach-O metadata から runtime が使う `GuestImage` / `MachOImage` domain model を

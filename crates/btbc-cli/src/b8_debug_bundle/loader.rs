@@ -49,7 +49,7 @@ impl B8DebugLoaderPlanReport {
                 input_probe,
                 decode_report,
                 code,
-                entry_input.program_image_metadata(),
+                &mach_o_snapshot,
             ),
             entry_source_for_this_bundle: B8DebugEntrySource::PublicLcMainEntryoff,
             next_entry_source: B8DebugLoaderNextEntrySource::FirstUnsupportedBoundary,

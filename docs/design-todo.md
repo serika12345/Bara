@@ -630,6 +630,22 @@ B8-ARCH2ak result:
   Objective-C/AppKit helper process execution、modeled continuation state、runtime dispatcher は
   同じ PR では動かさない。
 
+B8-ARCH2al result:
+
+- 2026-07-08 に B8 debug bundle loader plan が `MachOExecutableImageSnapshot` を
+  `B8DebugImportBoundaryReport` へ渡し、import boundary / helper boundary projection も loader
+  assembly で作った同じ Mach-O executable image snapshot を入口にするようにした。
+- 意図は `image_mapping` 以外の projection も snapshot-backed 境界へ寄せ、debug DTO 側が
+  `MachOEntryFunctionInput` から `ProgramImageMetadata` を直接受け取る経路を減らすこと。
+- helper boundary request は snapshot metadata から existing downstream materialization 用の
+  `ProgramImageMetadata` view を作る。これは既存 Objective-C materialization / continuation
+  logic の JSON output と behavior を維持するための互換 boundary であり、import/fixup semantics
+  は変えない。
+- `bara-oracle` からの loader domain 抽出、entry extraction / load command interpretation、
+  public Mach-O parser / resolver logic、import/fixup/symbol projection semantics の意味変更、
+  Objective-C/AppKit helper process execution、modeled continuation state、runtime dispatcher は
+  同じ PR では動かさない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。

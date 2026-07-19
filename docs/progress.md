@@ -142,10 +142,26 @@ B8-ARCH2ak review package で示すべきもの:
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-06-27 19:22 JST
+最終更新: 2026-07-08 12:01 JST
 
 状態:
 
+- active_work: completed。B8-ARCH2al Debug Import Boundary MachO Snapshot Boundary を
+  `task/b8-arch2al-import-boundary-macho-snapshot` で実施した。関連 TODO は
+  `TODO.md` の `B8-ARCH2al Debug Import Boundary MachO Snapshot Boundary`、関連設計メモは
+  `docs/design-todo.md` の `B8-ARCH2al result`。意図は B8 debug
+  bundle loader plan で一度作った `MachOExecutableImageSnapshot` を import boundary /
+  helper boundary projection へ渡し、`image_mapping` 以外の projection も同じ Mach-O
+  executable image snapshot を入口にできるようにすること。`B8DebugLoaderPlanReport` は
+  `B8DebugImportBoundaryReport` へ borrowed snapshot を渡し、helper boundary request は
+  snapshot metadata から existing downstream materialization 用の `ProgramImageMetadata` view を
+  作る。existing B8 debug bundle behavior と `loader.plan.json` output は維持。`bara-oracle` からの
+  loader domain 抽出、public Mach-O parser / resolver logic、import/fixup/symbol projection
+  semantics、helper bridge、runtime dispatcher は未移動。依存・lockfile・toolchain 変更はない。
+  remaining work は commit / push / draft PR 作成。verification は
+  `nix develop -c cargo fmt --check`、
+  `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`、
+  `nix develop -c ./scripts/verify`。
 - active_work: completed。B8-ARCH2ak Debug Loader MachO Snapshot Boundary を
   `task/b8-arch2ak-loader-macho-snapshot-boundary` で実施した。関連 TODO は
   `TODO.md` の `B8-ARCH2ak Debug Loader MachO Snapshot Boundary`、関連設計メモは
