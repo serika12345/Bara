@@ -4857,6 +4857,8 @@ review gate:
 #### 中マイルストーン: B8-LAUNCH2 Executable Image Preparation
 
 - [ ] public Mach-O metadata から segment mapping plan と initial entry state を構築する。
+  - [x] `B8-LAUNCH2a` で code range 全体を裏付ける owned mapped bytes と `LC_MAIN`
+    由来の typed initial PC を一つの static preparation として構築する。
 - [ ] self-authored fixture に必要な relocation / rebase / bind を段階的に適用する。
 - [ ] import identity を runtime helper address または stable unsupported blocker へ解決する。
 - [ ] W^X、code signing、mapped memory ownership failure を typed loader error として report する。
@@ -4865,6 +4867,51 @@ review gate:
 `B8-LAUNCH2` は self-authored fixture の entry block を dispatcher へ渡せる最小 mapped image で
 停止する。relocation / bind / import を一括実装せず、`B8-LAUNCH3` / `B8-LAUNCH4` の実行で
 観測された blocker に応じて loader 側の focused PR Gate へ戻る。
+
+#### PR Gate: B8-LAUNCH2a Mach-O Entry Image Static Preparation
+
+branch: `task/b8-launch2a-prepared-macho-entry-image`
+
+目的:
+
+- `MachOExecutableImageSnapshot` から、code range 全体を owned mapped bytes で裏付けた
+  executable code と `LC_MAIN` 由来の typed initial PC を一つの
+  `MachOExecutableImagePreparation` として構築する。
+- loader 出力を dispatcher が受け取る前に、code materialization failure と raw / sentinel PC を
+  typed construction error へ閉じ込める。実 memory mapping 完了を表す型にはしない。
+
+完了条件:
+
+- [x] runtime に pure `MachOExecutableImagePreparation` constructor を追加し、snapshot の code
+  range 全体が一つの owned mapped-byte segmentで裏付けられていることを検証する。
+- [x] constructor 成功後は executable code bytes と `GuestProgramCounter` を infallible accessor で
+  取得でき、不完全な mapped bytes は typed error で拒否される。
+- [x] B8 real-entry loader が preparation を一度だけ構築し、guest image mapping report と import
+  boundary が同じ preparation を source of truth として参照する。
+- [x] existing `loader.plan.json`、debug bundle sidecar、expected / actual JSON、blocker semantics、
+  public primitive baseline を変更しない。
+- [x] full-range success、partial mapped bytes rejection、typed initial PC、B8 production consumer 接続を
+  focused regression test で固定する。
+- [x] `docs/design-todo.md` と `docs/progress.md` に、保証する invariant、除外範囲、次の blocker を記録する。
+
+PR に含めない:
+
+- relocation / rebase / bind 適用、import address解決、helper execution。
+- executable memory allocation、W^X、code signing、mapped memory ownership。
+- full `GuestRuntimeState`、initial stack / process environment、runtime dispatcher。
+- JSON schema変更、dependency / lockfile変更、cross-platform personality、PE / ELF / Wine。
+
+検証:
+
+- `nix develop -c cargo test -p bara-runtime guest_image`
+- `nix develop -c cargo test -p btbc-cli b8_debug_bundle`
+- `nix develop -c ./scripts/check-domain-types`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- Mach-O entry image static preparationとB8 production consumer接続をcommit / push / draft PR作成で
+  停止する。relocation / bind、executable memory、full runtime state、dispatcherへ進まない。
 
 #### 中マイルストーン: B8-LAUNCH3 Runtime Dispatcher Core
 

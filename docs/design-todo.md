@@ -767,6 +767,24 @@ B8-LAUNCH1c implementation result:
 - deserialization、generic serializer、cache storage、loader / fixup適用、dispatcher、runtime state、
   helper service execution、standalone linker migrationはB8-LAUNCH1の完了範囲に含めない。
 
+B8-LAUNCH2a implementation result:
+
+- 2026-07-19 に runtime-owned `MachOExecutableImagePreparation` を追加した。constructor は
+  `MachOExecutableImageSnapshot` をconsumeし、code range全体を一つのowned mapped-byte segmentで
+  裏付けられることとdomain byte lengthを一度だけ検証し、entry pointから
+  `GuestProgramCounter`を導出する。成功後のexecutable code、byte length、initial PC取得は
+  infallibleであり、不完全なmapped bytesは`GuestImageError`として拒否する。
+- 名前は実memory mapping完了を示す`PreparedMachOExecutableImage`を避け、staticな検証・材料化の
+  段階であることを示す`MachOExecutableImagePreparation`とした。snapshot自体は公開せず、loader /
+  report / import / helper projectionに必要なcode segment、mapped bytes source、program image
+  metadataだけをnarrow accessorで返す。
+- B8 debug bundleは`MachOEntryFunctionInput`からpreparationを一度だけ構築し、lift用image metadata、
+  loader mapping report、import / helper boundaryが同じaggregateをsource of truthとして参照する。
+  reportは検証済みbyte lengthとtyped initial PCを投影し、再度fallibleなcode range計算へ戻らない。
+- `loader.plan.json`、existing sidecar、expected / actual、blocker semantics、public primitive baseline、
+  dependency / lockfileは変更しない。relocation / rebase / bind、import address解決、executable memory /
+  W^X、full runtime state / stack、dispatcherは後続のobserved blockerに残す。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。

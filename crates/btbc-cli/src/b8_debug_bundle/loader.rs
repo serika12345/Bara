@@ -1,10 +1,9 @@
-use bara_oracle::{BinaryFormatProbeReport, BinaryInput, MachOEntryFunctionInput};
+use bara_isa_x86::X86Bytes;
+use bara_oracle::{BinaryFormatProbeReport, BinaryInput};
+use bara_runtime::MachOExecutableImagePreparation;
 use serde::Serialize;
 
-use super::guest_image::{
-    mach_o_executable_snapshot_from_entry_input, B8DebugGuestImageMappingError,
-    B8DebugGuestImageMappingReport,
-};
+use super::guest_image::B8DebugGuestImageMappingReport;
 use super::helper_boundary::B8DebugHelperBoundaryRequestReport;
 use super::import_boundary::B8DebugImportBoundaryReport;
 use super::report::{B8DebugDecodeReport, B8DebugEntrySource, B8DebugStageStatus};
@@ -25,20 +24,19 @@ pub(super) struct B8DebugLoaderPlanReport {
 impl B8DebugLoaderPlanReport {
     pub(super) fn real_lc_main_attempted(
         input: &BinaryInput,
-        entry_input: &MachOEntryFunctionInput,
+        image_preparation: &MachOExecutableImagePreparation,
         input_probe: &BinaryFormatProbeReport,
         decode_report: &B8DebugDecodeReport,
-    ) -> Result<Self, B8DebugLoaderPlanError> {
-        let code = entry_input.executable_image().code_segment().x86_bytes();
-        let mach_o_snapshot = mach_o_executable_snapshot_from_entry_input(entry_input)
-            .map_err(B8DebugLoaderPlanError::ImageMapping)?;
-        Ok(Self {
+        code: &X86Bytes,
+    ) -> Self {
+        Self {
             schema: "b8_debug_loader_plan_v0",
             source: "bara_runtime_user_space_launch_plan",
             status: B8DebugStageStatus::Executed,
             input_metadata: B8DebugLoaderInputMetadata::PublicMachOProbe,
-            image_mapping: B8DebugGuestImageMappingReport::from_mach_o_snapshot(&mach_o_snapshot)
-                .map_err(B8DebugLoaderPlanError::ImageMapping)?,
+            image_mapping: B8DebugGuestImageMappingReport::from_mach_o_preparation(
+                image_preparation,
+            ),
             relocation_binding: B8DebugLoaderDeferredStepReport {
                 status: B8DebugStageStatus::Skipped,
                 reason: "public rebase/bind/import application is represented as import_boundary and remains blocked until chained fixups are decoded",
@@ -49,21 +47,16 @@ impl B8DebugLoaderPlanReport {
                 input_probe,
                 decode_report,
                 code,
-                &mach_o_snapshot,
+                image_preparation,
             ),
             entry_source_for_this_bundle: B8DebugEntrySource::PublicLcMainEntryoff,
             next_entry_source: B8DebugLoaderNextEntrySource::FirstUnsupportedBoundary,
-        })
+        }
     }
 
     pub(super) fn helper_boundary_request(&self) -> B8DebugHelperBoundaryRequestReport {
         self.import_boundary.helper_boundary_request()
     }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum B8DebugLoaderPlanError {
-    ImageMapping(B8DebugGuestImageMappingError),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]

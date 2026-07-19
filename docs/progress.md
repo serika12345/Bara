@@ -62,27 +62,46 @@
    B8-ARCH1 responsibility split audit と、`D4a: x86_64 ISA semantic coverage strategy`
 4. この `docs/progress.md` の現在の作業スナップショット
 
-B8-LAUNCH1c completion 後の次候補:
+B8-LAUNCH2a completion 後の次候補:
 
-- `B8-LAUNCH1c Executed Translation Artifact Debug Export`のdraft PRをreview / mergeする。
-- review後は`B8-LAUNCH2 Executable Image Preparation`を、self-authored fixtureのentry blockを
-  dispatcherへ渡せる最小mapped image / initial entry stateのPR Gateへ分割する。
+- `B8-LAUNCH2a Mach-O Entry Image Static Preparation`のdraft PRをreview / mergeする。
+- review後は同じstatic preparationと`TranslationArtifact`を受け取るdispatcher前段の最小境界を、
+  debug bundleで観測されたblockerに基づいて次のfocused PR Gateへ分割する。
 - existing expected / actual JSON、public primitive baseline、B8の既存sidecar schemaを維持し、
   debug bundle の blocker を実装順の source of truth にする。
 
-B8-LAUNCH1c completion 後にすぐ始めないもの:
+B8-LAUNCH2a completion 後にすぐ始めないもの:
 
 - relocation / rebase / bind 適用、import address 解決、runtime dispatcher loop
 - Objective-C / AppKit host service execution、process environment、一般 GUI app 起動
 - cross-platform personality selection、Wine thunk、PE / ELF interface、translation cache
-- B8-LAUNCH1c の review gate を越えた次 gateまたはB8-LAUNCH2の一括実装
+- B8-LAUNCH2a の review gate を越えた次 gateまたはB8-LAUNCH2の一括実装
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-07-19 17:43 JST
+最終更新: 2026-07-19 18:04 JST
 
 状態:
 
+- active_work: completed。`B8-LAUNCH2a Mach-O Entry Image Static Preparation`を
+  `task/b8-launch2a-prepared-macho-entry-image`で完了した。baseはPR #95 merge後のmain
+  `3c9b89a`。関連TODOは`TODO.md`の同PR Gate、関連roadmapは
+  `docs/runtime-architecture-roadmap.md`の`R4 / B8-LAUNCH2`。このgateでは
+  `MachOExecutableImageSnapshot`からcode range全体を裏付けるowned mapped bytesと
+  `LC_MAIN`由来のtyped initial PCを一つのstatic preparationとして構築する。意図はloaderが
+  dispatcherへ渡す前にcode materialization failureとraw / sentinel PCをtyped construction
+  boundaryへ閉じ込めること。実memory mapping完了を過大表現しないため、型名は
+  `MachOExecutableImagePreparation`とした。B8 production pathはこれを一度だけ構築し、lift metadata、
+  loader mapping、import / helper projectionが同じaggregateを参照する。constructor成功後のcode、
+  domain byte length、initial PCはinfallibleで、不完全なmapped bytesはtyped errorになる。existing
+  JSON、blocker、public primitive baseline、dependency / lockfileは変更していない。relocation / bind、
+  import address解決、executable memory / W^X、full runtime state / stack、dispatcherは未着手。
+  remaining workはdraft PRのreview / merge。next actionはreview後にdebug bundleのcurrent blockerと
+  R5 dispatcher入力要件を照合し、追加loader preparationが必要な場合だけ次のfocused R4 gateを切ること。
+  verificationはtest-first red、runtime preparation focused 2 tests、B8 focused 8 tests、通常fixture
+  15 tests、Clippy `-D warnings`、domain type / dependency / schema / responsibility auditがpassし、
+  repository-wide `./scripts/verify`もinvisible character、RustSec、cargo-deny、Nix package、workspace
+  test、blackbox expected / actualを含めてpassした。
 - active_work: completed。`B8-LAUNCH1c Executed Translation Artifact Debug Export`を
   `task/b8-launch1c-artifact-debug-export`で完了した。baseはPR #94 merge後のmain `5a3b94e`。
   関連TODOは`TODO.md`の同PR Gate、関連設計メモは`docs/design-todo.md`の

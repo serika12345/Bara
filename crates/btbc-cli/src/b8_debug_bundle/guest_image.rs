@@ -1,8 +1,7 @@
 use bara_oracle::MachOEntryFunctionInput;
 use bara_runtime::{
     GuestImageAddressSpace, GuestImageError, GuestImageMappedBytesSource, GuestImageSegmentSource,
-    MachOExecutableEntryPoint, MachOExecutableImageMapping, MachOExecutableImageSnapshot,
-    MachOImage,
+    MachOExecutableEntryPoint, MachOExecutableImagePreparation, MachOImage,
 };
 use serde::Serialize;
 
@@ -20,61 +19,41 @@ pub(super) struct B8DebugGuestImageMappingReport {
 }
 
 impl B8DebugGuestImageMappingReport {
-    pub(super) fn from_mach_o_snapshot(
-        snapshot: &MachOExecutableImageSnapshot,
-    ) -> Result<Self, B8DebugGuestImageMappingError> {
-        Self::from_mach_o_mapping_parts(
-            snapshot.mapping(),
-            snapshot.metadata().mapped_bytes().source(),
-        )
-    }
-
-    #[cfg(test)]
-    fn from_mach_o_mapping(
-        mapping: MachOExecutableImageMapping,
-    ) -> Result<Self, B8DebugGuestImageMappingError> {
-        Self::from_mach_o_mapping_parts(&mapping, mapping.mapped_bytes_source())
-    }
-
-    fn from_mach_o_mapping_parts(
-        mapping: &MachOExecutableImageMapping,
-        mapped_bytes_source: GuestImageMappedBytesSource,
-    ) -> Result<Self, B8DebugGuestImageMappingError> {
-        let code_segment = mapping.code_segment();
-        let code_segment_byte_len = code_segment
-            .byte_len()
-            .map_err(B8DebugGuestImageMappingError::GuestImage)?;
-
-        Ok(Self {
+    pub(super) fn from_mach_o_preparation(preparation: &MachOExecutableImagePreparation) -> Self {
+        let code_segment = preparation.code_segment();
+        Self {
             status: B8DebugStageStatus::Executed,
             segment_source: code_segment.source().into(),
             address_space: code_segment.address_space().into(),
             code_segment_vmaddr: code_segment.vmaddr().value(),
-            code_segment_byte_len: code_segment_byte_len.as_usize(),
-            entry_pc: mapping.entry_point().address().value(),
-            mapped_bytes_source: mapped_bytes_source.into(),
-        })
+            code_segment_byte_len: preparation.executable_code_byte_len().as_usize(),
+            entry_pc: preparation.initial_program_counter().address().value(),
+            mapped_bytes_source: preparation.mapped_bytes_source().into(),
+        }
     }
 }
 
 fn mach_o_image_from_entry_input(
     entry_input: &MachOEntryFunctionInput,
-) -> Result<MachOImage, B8DebugGuestImageMappingError> {
+) -> Result<MachOImage, B8DebugGuestImagePreparationError> {
     MachOImage::executable_from_program_image_metadata(
         MachOExecutableEntryPoint::new(entry_input.executable_image().entry().offset()),
         entry_input.program_image_metadata(),
     )
-    .map_err(B8DebugGuestImageMappingError::GuestImage)
+    .map_err(B8DebugGuestImagePreparationError::GuestImage)
 }
 
-pub(super) fn mach_o_executable_snapshot_from_entry_input(
+pub(super) fn mach_o_executable_image_preparation_from_entry_input(
     entry_input: &MachOEntryFunctionInput,
-) -> Result<MachOExecutableImageSnapshot, B8DebugGuestImageMappingError> {
-    Ok(mach_o_image_from_entry_input(entry_input)?.executable_snapshot())
+) -> Result<MachOExecutableImagePreparation, B8DebugGuestImagePreparationError> {
+    MachOExecutableImagePreparation::try_from_snapshot(
+        mach_o_image_from_entry_input(entry_input)?.executable_snapshot(),
+    )
+    .map_err(B8DebugGuestImagePreparationError::GuestImage)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum B8DebugGuestImageMappingError {
+pub(crate) enum B8DebugGuestImagePreparationError {
     GuestImage(GuestImageError),
 }
 
@@ -128,6 +107,7 @@ mod tests {
         ProgramImageSectionKind, ProgramImageSections, ProgramImageSymbols, ProgramUnwindMetadata,
         X86Va,
     };
+    use bara_runtime::MachOExecutableImagePreparation;
 
     use super::*;
 
@@ -155,46 +135,17 @@ mod tests {
     }
 
     #[test]
-    fn image_mapping_report_uses_typed_mach_o_code_segment() {
+    fn image_mapping_report_uses_mach_o_executable_image_preparation() {
         let image = MachOImage::executable_from_program_image_metadata(
             MachOExecutableEntryPoint::new(X86Va::new(0x1_0000_0008)),
             &program_image_metadata(),
         )
         .expect("test Mach-O image is valid");
 
-        let report =
-            B8DebugGuestImageMappingReport::from_mach_o_mapping(image.executable_mapping())
-                .expect("test mapping report is valid");
-
-        assert_eq!(report.status, B8DebugStageStatus::Executed);
-        assert_eq!(
-            report.segment_source,
-            B8DebugGuestImageSegmentSource::LcSegment64FileRange
-        );
-        assert_eq!(
-            report.address_space,
-            B8DebugGuestImageAddressSpace::MachOVirtualAddress
-        );
-        assert_eq!(report.code_segment_vmaddr, 0x1_0000_0000);
-        assert_eq!(report.code_segment_byte_len, 0x10);
-        assert_eq!(report.entry_pc, 0x1_0000_0008);
-        assert_eq!(
-            report.mapped_bytes_source,
-            B8DebugGuestImageMappedBytesSource::ProgramImageMetadata
-        );
-    }
-
-    #[test]
-    fn image_mapping_report_uses_mach_o_executable_image_snapshot() {
-        let image = MachOImage::executable_from_program_image_metadata(
-            MachOExecutableEntryPoint::new(X86Va::new(0x1_0000_0008)),
-            &program_image_metadata(),
-        )
-        .expect("test Mach-O image is valid");
-
-        let snapshot = image.executable_snapshot();
-        let report = B8DebugGuestImageMappingReport::from_mach_o_snapshot(&snapshot)
-            .expect("test mapping report is valid");
+        let preparation =
+            MachOExecutableImagePreparation::try_from_snapshot(image.executable_snapshot())
+                .expect("test Mach-O image preparation is valid");
+        let report = B8DebugGuestImageMappingReport::from_mach_o_preparation(&preparation);
 
         assert_eq!(report.status, B8DebugStageStatus::Executed);
         assert_eq!(

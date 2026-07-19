@@ -3,8 +3,10 @@ use super::{
     GuestImageImports, GuestImageMappedBytes, GuestImageMappedBytesSource, GuestImageMetadata,
     GuestImageRelocations, GuestImageSections, GuestImageSegment, GuestImageSegmentKind,
     GuestImageSegmentSource, GuestImageSegments, GuestImageSymbols, GuestImageUnwindMetadata,
-    MachOExecutableCodeRange, MachOExecutableCodeSegment, MachOExecutableEntryPoint, MachOImage,
+    MachOExecutableCodeRange, MachOExecutableCodeSegment, MachOExecutableEntryPoint,
+    MachOExecutableImagePreparation, MachOImage,
 };
+use crate::GuestProgramCounter;
 use bara_ir::{
     ExternalSymbolId, ExternalSymbolImport, ProgramImageImport, ProgramImageImports,
     ProgramImageMappedByteSegment, ProgramImageMappedBytes, ProgramImageMetadata,
@@ -589,6 +591,86 @@ fn mach_o_executable_image_snapshot_rejects_unmapped_code_range() {
             bara_ir::ProgramImageMetadataError::MappedBytesRangeUnavailable
         ))
     );
+}
+
+#[test]
+fn mach_o_executable_image_preparation_owns_code_bytes_and_typed_initial_pc() {
+    let source_range = image_range(0x1_0000_0000, 0x1_0000_0010);
+    let mapped_segment = ProgramImageMappedByteSegment::new(
+        source_range,
+        vec![
+            0x55, 0x48, 0x89, 0xe5, 0xb8, 0x2a, 0x00, 0x00, 0x00, 0x5d, 0xc3, 0x90, 0x90, 0x90,
+            0x90, 0x90,
+        ],
+    )
+    .expect("test mapped bytes match code range");
+    let expected_segment = mapped_segment.clone();
+    let executable_metadata = GuestImageMetadata::new(
+        GuestImageMappedBytes::new(
+            GuestImageMappedBytesSource::ProgramImageMetadata,
+            ProgramImageMappedBytes::from_segments([mapped_segment]),
+        ),
+        GuestImageSections::new(ProgramImageSections::from_items([
+            ProgramImageSection::new(ProgramImageSectionKind::Code, source_range),
+        ])),
+        guest_image_symbols(),
+        guest_image_relocations(),
+        guest_image_imports(),
+        guest_image_unwind(),
+    );
+    let image = MachOImage::executable_from_code_range(
+        MachOExecutableEntryPoint::new(X86Va::new(0x1_0000_0004)),
+        MachOExecutableCodeRange::new(source_range),
+        executable_metadata,
+    )
+    .expect("entry is inside code segment");
+
+    let preparation =
+        MachOExecutableImagePreparation::try_from_snapshot(image.executable_snapshot())
+            .expect("code range is backed by mapped bytes");
+
+    assert_eq!(
+        preparation.executable_code_bytes().source_range(),
+        MachOExecutableCodeRange::new(source_range)
+    );
+    assert_eq!(
+        preparation.executable_code_bytes().mapped_segment(),
+        &expected_segment
+    );
+    assert_eq!(preparation.executable_code_byte_len().as_usize(), 0x10);
+    assert_eq!(
+        preparation.code_segment(),
+        MachOExecutableCodeSegment::new(MachOExecutableCodeRange::new(source_range))
+    );
+    assert_eq!(
+        preparation.mapped_bytes_source(),
+        GuestImageMappedBytesSource::ProgramImageMetadata
+    );
+    assert_eq!(
+        preparation.program_image_metadata().sections().items()[0].range(),
+        source_range
+    );
+    assert_eq!(
+        preparation.initial_program_counter(),
+        GuestProgramCounter::new(X86Va::new(0x1_0000_0004))
+    );
+}
+
+#[test]
+fn mach_o_executable_image_preparation_rejects_unmapped_code_range() {
+    let image = MachOImage::executable(
+        MachOExecutableEntryPoint::new(X86Va::new(0x1_0000_0010)),
+        mach_o_code_segment(),
+        metadata(),
+    )
+    .expect("entry is inside code segment");
+
+    assert!(matches!(
+        MachOExecutableImagePreparation::try_from_snapshot(image.executable_snapshot()),
+        Err(GuestImageError::MachOExecutableCodeBytesUnavailable(
+            bara_ir::ProgramImageMetadataError::MappedBytesRangeUnavailable
+        ))
+    ));
 }
 
 #[test]

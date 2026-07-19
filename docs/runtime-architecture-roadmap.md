@@ -617,6 +617,13 @@ public Mach-O metadata から実行直前の mapped image と initial entry stat
 R4 は self-authored fixture の entry block を dispatcher へ渡せる最小 mapped image で停止する。
 R5 / R6 で新しい loader blocker が観測された場合は、R4 の focused PR Gate へ戻って解消する。
 
+最初のfocused PR Gateでは、実memory mappingの前段として
+`MachOExecutableImagePreparation`を追加する。snapshotのcode range全体がowned mapped bytesで
+裏付けられることを構築時に検証し、`LC_MAIN`由来のinitial PCを`GuestProgramCounter`として保持する。
+B8 production pathはこのaggregateを一度だけ構築し、lift metadata、loader mapping、import / helper
+projectionへ共有する。relocation / bind、import resolution、executable memory / W^X、full runtime stateは
+このgateでは実装せず、R5へ渡す最小入力境界または実行時blockerが具体化してから次のR4 gateを切る。
+
 ### R5 / B8-LAUNCH3: Runtime Dispatcher Core
 
 translation artifact と typed runtime state を使って guest control flow を継続実行する。
