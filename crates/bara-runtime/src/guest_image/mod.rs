@@ -1,5 +1,6 @@
 mod image;
 mod mach_o;
+mod mach_o_preparation;
 mod metadata;
 
 pub use image::{
@@ -11,6 +12,7 @@ pub use mach_o::{
     MachOExecutableCodeSegment, MachOExecutableEntryPoint, MachOExecutableImageMapping,
     MachOExecutableImageMetadata, MachOExecutableImageSnapshot, MachOImage,
 };
+pub use mach_o_preparation::MachOExecutableImagePreparation;
 pub use metadata::{
     GuestImageImports, GuestImageMappedBytes, GuestImageMappedBytesSource, GuestImageMetadata,
     GuestImageRelocations, GuestImageSections, GuestImageSymbols, GuestImageUnwindMetadata,

@@ -32,6 +32,9 @@ mod translation_artifact;
 mod translation_source;
 
 use self::attempt::B8RealEntryAttempt;
+use self::guest_image::{
+    mach_o_executable_image_preparation_from_entry_input, B8DebugGuestImagePreparationError,
+};
 use self::helper_boundary::{
     B8DebugHelperArgumentRole, B8DebugHelperBoundaryBlockedReason, B8DebugHelperBoundaryBlocker,
     B8DebugHelperCallingConvention, B8DebugHelperMarshalingReport, B8DebugHelperReturnRole,
@@ -40,7 +43,7 @@ use self::io::{
     create_dir, read_binary_file, write_binary_file, write_json_file, write_text_file,
     B8DebugBundleOutputPaths, B8DebugReproScript,
 };
-use self::loader::{B8DebugLoaderPlanError, B8DebugLoaderPlanReport};
+use self::loader::B8DebugLoaderPlanReport;
 use self::report::{
     B8DebugDecodeReport, B8DebugDecodedInstructionKindReport, B8DebugDecodedInstructionReport,
     B8DebugEntryBytesReport, B8DebugMemoryReadWidthReport, B8DebugProcessedPcRange,
@@ -71,6 +74,8 @@ pub(crate) fn generate_b8_debug_bundle(
 
     let entry_input =
         mach_o_entry_function_input(case_id.clone(), &input).map_err(B8DebugBundleError::Entry)?;
+    let image_preparation = mach_o_executable_image_preparation_from_entry_input(&entry_input)
+        .map_err(B8DebugBundleError::ImagePreparation)?;
     let entry_test_case = entry_input.test_case().clone();
     let paths = B8DebugBundleOutputPaths::from_dir(&bundle_dir);
 
@@ -84,11 +89,8 @@ pub(crate) fn generate_b8_debug_bundle(
         &B8DebugEntryBytesReport::real_lc_main_entry(&entry_test_case),
     )?;
 
-    let attempt = B8RealEntryAttempt::run(
-        &entry_test_case,
-        entry_input.program_image_metadata(),
-        source_identity,
-    );
+    let image_metadata = image_preparation.program_image_metadata();
+    let attempt = B8RealEntryAttempt::run(&entry_test_case, &image_metadata, source_identity);
     write_json_file(&paths.decode_report_path(), &attempt.decode_report)?;
     write_json_file(&paths.lift_ir_path(), &attempt.lift_ir)?;
     write_json_file(&paths.emit_report_path(), &attempt.emit_report)?;
@@ -101,11 +103,11 @@ pub(crate) fn generate_b8_debug_bundle(
     write_json_file(&paths.helpers_path(), &attempt.helpers)?;
     let loader_plan = B8DebugLoaderPlanReport::real_lc_main_attempted(
         &input,
-        &entry_input,
+        &image_preparation,
         &input_probe,
         &attempt.decode_report,
-    )
-    .map_err(B8DebugBundleError::Loader)?;
+        entry_test_case.x86_bytes(),
+    );
     let launch_report = attempt
         .launch_report
         .with_helper_boundary_request(loader_plan.helper_boundary_request());
@@ -6266,7 +6268,7 @@ pub(crate) enum B8DebugBundleError {
     Probe(BinaryFormatProbeError),
     Entry(MachOEntryFunctionTestCaseError),
     LcMainTranslationSourceIdentity(B8LcMainTranslationSourceIdentityError),
-    Loader(B8DebugLoaderPlanError),
+    ImagePreparation(B8DebugGuestImagePreparationError),
     B8CaseId(X8664MachOFixtureError),
     Json(JsonError),
 }
@@ -6305,7 +6307,9 @@ impl fmt::Display for B8DebugBundleError {
                     "B8 LC_MAIN translation source identity failed: {error}"
                 )
             }
-            Self::Loader(error) => write!(formatter, "B8 debug loader plan failed: {error:?}"),
+            Self::ImagePreparation(error) => {
+                write!(formatter, "B8 debug image preparation failed: {error:?}")
+            }
             Self::B8CaseId(error) => write!(formatter, "B8 debug case id error: {error}"),
             Self::Json(error) => write!(formatter, "B8 debug JSON error: {error}"),
         }

@@ -15,7 +15,8 @@ pub use guest_image::{
     GuestImageSegmentSource, GuestImageSegments, GuestImageSymbols, GuestImageUnwindMetadata,
     MachOExecutableCodeByteLen, MachOExecutableCodeBytes, MachOExecutableCodeRange,
     MachOExecutableCodeSegment, MachOExecutableEntryPoint, MachOExecutableImageMapping,
-    MachOExecutableImageMetadata, MachOExecutableImageSnapshot, MachOImage,
+    MachOExecutableImageMetadata, MachOExecutableImagePreparation, MachOExecutableImageSnapshot,
+    MachOImage,
 };
 pub use host_trap::{HostTrapPlan, RunStdout, RunStdoutError};
 pub use launch::{

@@ -1,7 +1,7 @@
 use bara_ir::ProgramImageMetadata;
 use bara_isa_x86::X86Bytes;
 use bara_oracle::{BinaryFormatProbeReport, BinaryInput, MachOChainedImportIdentityReport};
-use bara_runtime::MachOExecutableImageSnapshot;
+use bara_runtime::MachOExecutableImagePreparation;
 use serde::Serialize;
 
 use super::report::{B8DebugDecodeReport, B8DebugMemoryReadWidthReport, B8DebugSourceIsa};
@@ -44,7 +44,7 @@ impl B8DebugHelperBoundaryRequestReport {
         input_probe: &BinaryFormatProbeReport,
         decode_report: &B8DebugDecodeReport,
         code_bytes: &X86Bytes,
-        mach_o_snapshot: &MachOExecutableImageSnapshot,
+        image_preparation: &MachOExecutableImagePreparation,
     ) -> Self {
         let request = B8DebugImportHelperRequestReport::from_boundary_and_import(
             call_boundary,
@@ -53,7 +53,7 @@ impl B8DebugHelperBoundaryRequestReport {
             input_probe,
             decode_report,
             code_bytes,
-            mach_o_snapshot,
+            image_preparation,
         );
         let reason = request.boundary_blocked_reason();
         let blockers = request.boundary_blockers();
@@ -102,9 +102,9 @@ impl B8DebugImportHelperRequestReport {
         input_probe: &BinaryFormatProbeReport,
         decode_report: &B8DebugDecodeReport,
         code_bytes: &X86Bytes,
-        mach_o_snapshot: &MachOExecutableImageSnapshot,
+        image_preparation: &MachOExecutableImagePreparation,
     ) -> Self {
-        let image_metadata = mach_o_snapshot.program_image_metadata();
+        let image_metadata = image_preparation.program_image_metadata();
         let required_marshaling = B8DebugHelperMarshalingReport::blocked(
             call_boundary,
             input,

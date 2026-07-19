@@ -4,7 +4,7 @@ use bara_oracle::{
     MachOChainedFixupTargetAddress, MachOChainedFixupsTargetReport, MachODyldInfoCommandKind,
     MachODylibImportCommandKind, MachOLinkeditDataCommandKind,
 };
-use bara_runtime::MachOExecutableImageSnapshot;
+use bara_runtime::MachOExecutableImagePreparation;
 use serde::Serialize;
 
 use super::helper_boundary::{
@@ -34,7 +34,7 @@ impl B8DebugImportBoundaryReport {
         input_probe: &BinaryFormatProbeReport,
         decode_report: &B8DebugDecodeReport,
         code_bytes: &X86Bytes,
-        mach_o_snapshot: &MachOExecutableImageSnapshot,
+        image_preparation: &MachOExecutableImagePreparation,
     ) -> Self {
         let public_metadata = B8DebugPublicImportMetadataReport::from_probe(input_probe);
         let call_boundary = decode_report.register_indirect_call_r14_boundary();
@@ -66,7 +66,7 @@ impl B8DebugImportBoundaryReport {
                             input_probe,
                             decode_report,
                             code_bytes,
-                            mach_o_snapshot,
+                            image_preparation,
                         ),
                     )
                     } else {
