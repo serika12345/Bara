@@ -55,18 +55,18 @@
    `B8-ARCH2al Debug Import Boundary MachO Snapshot Boundary`、
    `B8-ARCH2am Runtime MachO Program Metadata View`、
    `B8-ARCH2an Runtime MachO Snapshot Program Metadata View`、
-   `B8-ARCH2 Guest Image Model Extraction`
+   `B8-TYPE1 Typed Runtime Execution Foundation`、`B8-LAUNCH1`〜`B8-LAUNCH7`
 2. [runtime-architecture-roadmap.md](runtime-architecture-roadmap.md) の `R1` / `R1a` と
    `Instruction Coverage Strategy`
 3. [design-todo.md](design-todo.md) の `D1: CLI と command 境界` にある
    B8-ARCH1 responsibility split audit と、`D4a: x86_64 ISA semantic coverage strategy`
 4. この `docs/progress.md` の現在の作業スナップショット
 
-B8-ARCH2ak review / merge 後の次候補:
+B8-ARCH2an review / merge 後の次候補:
 
 - `main` を最新化したうえで、TODO-backed PR Gate を追加または選び、dedicated branch を作る。
-- 候補は B8-ARCH2 Guest Image Model Extraction の次の小さい slice、または helper process /
-  Objective-C bridge 境界を `b8_debug_bundle.rs` から分ける preparatory PR Gate である。
+- `B8-TYPE1` の最初の unfinished boundary である executable code bytes domain value と
+  snapshot 接続を、次の小さい PR Gate 候補にする。
 - B8-ARCH2a では report DTO split、B8-ARCH2b では bundle file I/O split、B8-ARCH2c では
   real-entry attempt orchestration split、B8-ARCH2d では loader plan shell split、
   B8-ARCH2e では import boundary projection split、B8-ARCH2f では helper boundary
@@ -145,10 +145,36 @@ B8-ARCH2ak review package で示すべきもの:
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-07-19 12:58 JST
+最終更新: 2026-07-19 15:07 JST
 
 状態:
 
+- active_work: completed。B8 roadmap phase separation の監査指摘を documentation-only で
+  反映した。`B8-TYPE1` は cross-platform personality selection、Wine thunk、PE / ELF interface、
+  executable memory identity を除外し、`GuestCall -> MacOsHostServiceRequest -> GuestReturn`、
+  pure `TranslationArtifact` / runtime state construction、typed blocker に限定した。
+  production 接続条件は既存 GuestImage snapshot path だけとし、artifact / state / service の
+  execution path は `B8-LAUNCH1` 以降へ残した。`B8-LAUNCH2` は最小 mapped image で停止し、
+  dispatcher / service 実行で観測した blocker に応じて loader PR Gate へ戻る。旧 B8-WINE0 は
+  本流から削除して B10 へ統合し、B8-LAUNCH7 review 前の先行抽象化を禁止した。remaining work は
+  次の `/advance-pr` で executable code bytes domain value の PR Gate を具体化すること。
+  verification は documentation consistency、`git diff --check`、
+  `nix develop -c ./scripts/check-no-invisible-chars`。code tests と aggregate verify は
+  documentation-only のため deliberately skipped。
+- active_work: completed。B8 roadmap の phase separation を documentation-only で実施した。
+  関連 TODO は `TODO.md` の `B8-TYPE1 Typed Runtime Execution Foundation` と
+  `B8-LAUNCH1`〜`B8-LAUNCH7`、関連設計メモは `docs/design-todo.md` の
+  `B8 roadmap phase separation decision`、runtime 対応は
+  `docs/runtime-architecture-roadmap.md` の `R2`〜`R9`。意図は、現在進めている型強化に
+  明確な完了条件と停止条件を与え、その前提上にアプリ起動実装の大まかな順序を先に固定すること。
+  `B8-TYPE1` は executable code bytes、translation artifact、runtime state、helper / OS service
+  contract、typed error / blocker の initial scope を対象とし、relocation 適用、
+  dispatcher execution、host service execution は除外した。起動実装は artifact execution、
+  loader/linker、dispatcher、ABI/service、process environment、sentinel-free GUI、OSS GUI の順。
+  remaining work は次の `/advance-pr` で `B8-TYPE1` の最初の unfinished boundary を具体的な
+  PR Gate に分割すること。verification は documentation consistency、`git diff --check`、
+  `nix develop -c ./scripts/check-no-invisible-chars`。code tests と aggregate verify は
+  documentation-only のため deliberately skipped。
 - active_work: completed。B8-ARCH2an Runtime MachO Snapshot Program Metadata View を
   `task/b8-arch2an-snapshot-program-metadata-view` で実施した。関連 TODO は
   `TODO.md` の `B8-ARCH2an Runtime MachO Snapshot Program Metadata View`、関連設計メモは

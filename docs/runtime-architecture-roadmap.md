@@ -489,18 +489,28 @@ helper-required、fallback-required、stable blocker の状態を分ける。
   Bara の clean-room domain model として保持する。採用は別 PR Gate とし、
   license / NOTICE / transitive dependency / Nix packaging / supply-chain verification を必須にする。
 
-### R2: Guest Image Model
+### R2 / B8-TYPE1: Typed Runtime Execution Foundation
 
-Mach-O parsing / probing から runtime が使える `GuestImage` / `MachOImage` model を
-切り出す。将来の PE / ELF を同じ interface に載せられるようにする。
+型と責務境界の強化を、アプリ起動機能とは独立した中マイルストーンとして完了させる。
+Guest image だけでなく、translation artifact、runtime state、macOS host service request までを
+typed boundary で接続する。ただし、それらを使った relocation 適用、dispatcher execution、
+host service execution は後続 R3 以降に置く。
 
 完了条件:
 
-- entry point、segments、mapped bytes、imports、fixups、symbol identity が domain type で表現される
-- `bara-oracle` の external observation 責務と loader domain が分離される
-- B8 debug bundle は新しい image model を使う
+- entry point、segments、mapped bytes、executable code bytes、imports、fixups、symbol identity、
+  unwind が domain type で表現される
+- `TranslationArtifact` と dispatcher state を pure に構築・検証でき、cache identity は
+  source hash / translator version / target の最小値に限る
+- `GuestCall -> MacOsHostServiceRequest -> GuestReturn` の具体的な最小 contract が型で定義される
+- loader / dispatcher / helper の failure と unsupported state が typed error / blocker になる
+- production の B8 debug bundle GuestImage path が snapshot 境界を使い、primitive / nested DTO
+  依存を増やさない。artifact / state / service contract の実経路接続は R3 以降に残す
+- `bara-oracle` の external observation 責務と loader domain construction の依存方向が分離される
+- cross-platform personality selection、Wine thunk abstraction、PE / ELF interface を先行実装せず、
+  public primitive baseline を増やさない
 
-進捗:
+既存 Guest Image Model Extraction の進捗:
 
 - B8-ARCH2h で runtime-facing `GuestImage` shell を追加した。現時点では entry point、
   code segment range、segment source、address space、mapped bytes source だけを扱い、
@@ -543,58 +553,78 @@ Mach-O parsing / probing から runtime が使える `GuestImage` / `MachOImage`
 - B8-ARCH2aj で `MachOExecutableImageSnapshot` を追加し、Mach-O specific executable
   image snapshot から mapping snapshot と metadata snapshot を同じ boundary で扱えるようにした。
 
-### R3: Translation Artifact And Debug Export
+- B8-ARCH2ak〜B8-ARCH2an で、loader plan が一度作った executable image snapshot を
+  image mapping、import、helper projection の共通入口にし、metadata compatibility view の
+  assembly と snapshot-level access を runtime domain 側へ寄せた。
 
-ARM64 block bytes、pcmap、fixups、helper requirements、source identity を
-`TranslationArtifact` としてまとめる。debug export は可能にするが、ユーザー visible
-app 生成を主経路にしない。
+停止条件:
 
-完了条件:
+- production GuestImage consumer が snapshot 境界を通り、その他の新しい型が focused
+  construction / validation test を持った時点で完了する。artifact execution は R3 に残す。
+- cache / JIT / fallback、PE / ELF implementation、一般アプリ実行を型マイルストーンへ含めない。
+- 完了後の型追加は、R3 以降の concrete blocker を解消する範囲に限定する。
 
-- artifact model が source identity と cache validation identity を持つ
-- debug export command が artifact bytes / metadata を保存できる
-- existing fixture actual/expected tests が artifact 経由でも通る
+### R3 / B8-LAUNCH1: Translation Artifact Execution Path
 
-### R4: Runtime Dispatcher Foundation
-
-modeled continuation chain を、typed runtime state と dispatcher 境界へ置き換える。
-
-完了条件:
-
-- guest PC / register / stack / helper return state が domain type で表現される
-- direct fallthrough、direct call、return、helper return writeback の最小 dispatcher path がある
-- unsupported indirect target は stable blocker として残る
-
-### R5: Helper / ABI Bridge Generalization
-
-B8 fixture 専用の Objective-C / AppKit helper を、typed `GuestCall -> HostService -> GuestReturn`
-contract に一般化する。
+typed `TranslationArtifact` を compile、debug export、runtime input の実経路へ接続する。
 
 完了条件:
 
-- x86_64 macOS SysV argument materialization と return writeback が reusable contract になる
-- Objective-C helper、libSystem helper、future Wine thunk が同じ boundary model に載る
-- B8-HWGUI は specialized path ではなく generic helper bridge の fixture case になる
+- ARM64 bytes、PC map、fixups、helper requirements、source/cache identity が artifact 経由で渡る
+- existing fixture expected / actual が artifact execution path でも通る
+- CLI report DTO を runtime input として使わない
 
-### R6: B8-OSS0 Source-Built GUI App
+### R4 / B8-LAUNCH2: Executable Image Preparation
 
-source-built OSS GUI app を対象に、B8-HWGUI で作った cycle を一般 app に広げる。
-downloaded binary ではなく、license / supply-chain / reproducible build を scope 化してから
-実装する。
+public Mach-O metadata から実行直前の mapped image と initial entry state を準備する。
 
 完了条件:
 
-- target app、license、build inputs、success criteria が固定される
-- expected / actual / debug bundle 保存場所が決まる
-- first unsupported boundary が stable report される
+- segment mapping、relocation / rebase / bind、import resolution を fixture 必要分だけ適用する
+- W^X、ownership、unresolved import が typed loader result になる
+- sentinel-free `LC_MAIN` entry execution の直前状態を debug bundle に保存する
 
-### R7: Wine Bridge Planning
+R4 は self-authored fixture の entry block を dispatcher へ渡せる最小 mapped image で停止する。
+R5 / R6 で新しい loader blocker が観測された場合は、R4 の focused PR Gate へ戻って解消する。
 
-Wine との接続を、Windows x64 OS personality として設計する。実装開始前に Wine 側が
-担う責務と Bara 側が担う責務を分ける。
+### R5 / B8-LAUNCH3: Runtime Dispatcher Core
+
+translation artifact と typed runtime state を使って guest control flow を継続実行する。
 
 完了条件:
 
-- PE / Wine / Bara の責務分担が文書化される
-- callback、exception、TLS、thread、thunk call boundary の最小 plan がある
-- 最初の CLI-level Windows x64 fixture target が定義される
+- entry、fallthrough、direct call、return、helper suspend / return writeback が動く
+- indirect target は resolved target または stable blocker になる
+- cache / interpreter / JIT は交換可能な future strategy として保つ
+
+### R6 / B8-LAUNCH4: macOS ABI And Service Bridge
+
+x86_64 macOS SysV と public Objective-C / AppKit / libSystem service を generic host service
+contract 経由で実行する。
+
+完了条件:
+
+- argument materialization と return writeback が reusable contract になる
+- Objective-C / libSystem service が同じ boundary model に載る
+- B8-HWGUI 専用 helper path を generic contract 上の fixture case にできる
+
+### R7 / B8-LAUNCH5: Process Environment
+
+initial stack、argv / envp、process metadata を target に必要な範囲で追加する。TLS、thread、
+signal、exception、file descriptor、`.app` resource は blocker になった順に扱う。
+
+### R8 / B8-LAUNCH6: Sentinel-Free Self-Authored GUI
+
+self-authored x86_64 Mach-O GUI executable を B8-G1 sentinel なしで `LC_MAIN` から起動し、
+loader、dispatcher、service bridge を通って window と label を表示する。
+
+### R9 / B8-LAUNCH7: Source-Built OSS GUI Expansion
+
+license、build inputs、success criteria を固定した OSS GUI app を reproducible build し、first
+unsupported boundary を ISA / loader / helper / dispatcher の focused PR Gate へ分解する。
+
+### R10: B10 PE / Wine Planning
+
+R9 / B8-LAUNCH7 の review gate 後に、macOS で実際に検証できた loader / dispatcher / ABI /
+service boundary を根拠として PE / Wine / Bara の責務を計画する。それまでは callback、TLS、
+thread、exception、thunk や personality selection を先行抽象化しない。

@@ -4603,86 +4603,145 @@ review gate:
 
 - runtime Mach-O snapshot program metadata view を commit / push / draft PR 作成で停止する。
 
-#### Future Target: B8-ARCH2 Guest Image Model Extraction
+### B8 中マイルストーン構成
 
-- [ ] public Mach-O metadata から runtime が使う `GuestImage` / `MachOImage` domain model を
-  切り出す。
-- [ ] entry point、segments、mapped bytes、imports、relocations/fixups、symbol identity、
-  unwind metadata を domain type で表現する。
-- [ ] `bara-oracle` は external observation / expected generation / comparison の責務に寄せ、
-  loader domain logic を分離する。
-- [ ] B8 debug bundle は新しい image model API を使い、既存 JSON output を維持する。
-- [ ] 将来 PE / ELF を同じ interface に載せる前提を document する。
+B8-G2 以降は、型と責務境界を整える段階と、その型を使ってアプリ起動能力を追加する
+段階を分ける。型強化を無期限に続けず、`B8-TYPE1` の完了条件を満たしたら、残る型改善は
+具体的な起動 blocker に必要な範囲へ限定する。
 
-#### Future Target: B8-ARCH3 Translation Artifact And Debug Export
+#### 中マイルストーン: B8-TYPE1 Typed Runtime Execution Foundation
 
-- [ ] ARM64 block bytes、pcmap、fixups、helper requirements、source identity、
-  cache validation identity を `TranslationArtifact` としてまとめる。
-- [ ] translation artifact は内部 runtime / cache 用の domain object とし、ユーザー visible
-  converted app output を主経路にしない。
-- [ ] debug / review 用 export command で artifact bytes と metadata を保存できるようにする。
-- [ ] simple fixture expected/actual は artifact path 経由でも通るようにする。
-- [ ] B8-HWGUI では変換済み app ではなく artifact / launch report / debug bundle を見る、
-  という運用を明文化する。
+状態: `in_progress`
 
-#### Future Target: B8-ARCH4 Runtime Dispatcher Foundation
+目的:
 
-- [ ] modeled continuation chain を、typed runtime state と dispatcher boundary へ移す。
-- [ ] guest PC、register state、stack state、helper return state、host executable memory
-  handle を domain type で表現する。
-- [ ] direct fallthrough、direct call、return、helper return writeback の最小 path を
-  dispatcher で扱う。
-- [ ] indirect target、callback、exception、signal、thread、TLS は stable blocker として
-  分類し、silent fallback しない。
-- [ ] translation cache / fallback interpreter / JIT は dispatcher interface 上の
-  future capability として定義する。
+- binary input、guest image、translation artifact、runtime state、macOS host service request の
+  間を domain type で接続し、アプリ起動実装が primitive buffer や CLI report DTO を実行状態として
+  使わなくてよい基盤を完成させる。
+- 既存 B8-ARCH2 の Guest Image Model Extraction と、旧 B8-ARCH3〜ARCH5 のうち
+  「型と interface の定義」だけをこの中マイルストーンへまとめる。
 
-#### Future Target: B8-ARCH5 Helper And ABI Bridge Generalization
+完了済み:
 
-- [ ] B8 fixture 専用 Objective-C / AppKit helper を
-  `GuestCall -> HostService -> GuestReturn` contract に一般化する。
-- [ ] x86_64 macOS SysV argument materialization、return writeback、error classification を
-  reusable helper bridge model にする。
-- [ ] Objective-C helper、libSystem helper、future Wine thunk が同じ boundary model に載る
-  ようにする。
-- [ ] B8-HWGUI の `sharedApplication` / `setActivationPolicy:` / `setDelegate:` / `run` /
-  autorelease pool は generic helper bridge 上の fixture-specific case に移す。
+- [x] `GuestImage` / `MachOImage`、typed entry point / code segment / mapped bytes、sections、
+  imports、relocations、symbols、unwind metadata、mapping / metadata / executable snapshot。
+- [x] B8 debug bundle の image mapping / import / helper projection が runtime-facing Mach-O
+  snapshot を入口に使う。
 
-#### Future Target: B8-ARCH6 OS Personality Boundary
+残りの完了条件:
 
-- [ ] core translator が OS を知らない boundary を固定する。
-- [ ] macOS x86_64-on-macOS arm64 personality を最初の concrete personality として整理する。
-- [ ] Linux x86_64-on-Linux arm64 と Windows x64-on-Wine は同じ interface の future
-  personality として設計する。
-- [ ] loader、ABI、syscall / libc / Objective-C / Win32 helper、TLS、thread、signal、
-  exception の責務分担を document する。
+- [ ] executable code bytes と source address range を、bare `Vec<u8>` / `&[u8]` ではない
+  domain value として snapshot から取得できる。
+- [ ] ARM64 block bytes、PC map、fixups、helper requirements、source identity と、source hash /
+  translator version / target だけの最小 cache identity を typed `TranslationArtifact` として
+  pure に構築・検証できる。
+- [ ] guest PC、register state、stack state、helper suspend / return state を pure に
+  構築・検証できる最小 runtime state domain type として定義する。
+- [ ] `GuestCall -> MacOsHostServiceRequest -> GuestReturn` の最小 typed contract を定義する。
+  cross-platform personality selection、trait 抽出、future Wine thunk abstraction は実装しない。
+- [ ] loader / dispatcher / helper boundary の failure と unsupported state を typed error / blocker
+  として表し、string や sentinel value を実行判断に使わない。
+- [ ] `bara-oracle` の external observation / expected comparison と、runtime-facing loader
+  domain construction の責務境界を分ける。
+- [ ] B8 debug bundle の production GuestImage path は snapshot 境界を通り、nested metadata
+  または compatibility view への新規依存を増やさない。新しい artifact / runtime state /
+  macOS service contract は focused construction / validation test までとし、実経路接続は
+  `B8-LAUNCH1` 以降に残す。
+- [ ] public API の新しい primitive exposure を増やさず、必要な baseline exception は
+  domain-level reason を記録する。
+- [ ] B8 debug bundle と既存 expected / actual JSON output を維持し、各 domain boundary の
+  focused regression test と `nix develop -c ./scripts/verify` が通る。
 
-#### Future Target: B8-OSS0 Source-Built OSS GUI App Automation
+この中マイルストーンに含めない実行機能:
 
-B8-HWGUI と B8-ARCH0 が review / merge 済みになるまで開始しない。B8-ARCH1 以降の
-抽象化 milestone をどこまで先に進めるかは、review 後に判断する。
+- relocation / rebase / bind の適用、import address 解決、実 image mapping。
+- dispatcher loop、direct / indirect control-flow の継続実行。
+- Objective-C / AppKit / libSystem helper の一般実行。
+- thread、TLS、signal、exception、translation cache、fallback JIT/interpreter。
+- 一般 GUI application の起動成功。
 
-- [ ] public source から reproducible に x86_64 macOS binary を build できる、小さい OSS
-  GUI app を候補にする。最初は任意の downloaded binary ではなく source-built fixture を
-  優先する。
-- [ ] license、再配布可否、build input、expected/actual/debug bundle 保存場所を scope
-  document に固定する。
-- [ ] OSS app 実行は B8-HWGUI の debug bundle / blocker-driven cycle を流用し、
-  unsupported boundary を 1 つずつ stable report へ落とす。
-- [ ] OSS app target の最初の作業は実装ではなく、候補選定、scope、success criteria、
-  clean-room / supply-chain checklist の TODO 追加にする。
+停止条件:
 
-#### Future Target: B8-WINE0 Wine Bridge Planning
+- 上記の型境界が揃った時点で `B8-TYPE1` を完了とし、型の完全一般化を理由に
+  `B8-LAUNCH1` の開始を遅らせない。後続の型追加は debug bundle の concrete blocker を
+  解消する PR に含める。
 
-B8-ARCH1 以降で core / personality boundary が整理されるまで実装しない。
+### B8 アプリ起動実装マイルストーン
 
-- [ ] Wine が担う PE loader / Windows API / registry / filesystem / windowing semantics と、
-  Bara が担う x86_64 CPU/runtime backend の責務を分ける。
-- [ ] Windows x64 ABI、guest callbacks、exception handoff、TLS、thread、thunk call boundary を
-  first design scope として定義する。
-- [ ] 最初の Windows x64 CLI fixture target と success criteria を定義する。
-- [ ] Wine bridge は OS personality の 1 つとして扱い、Bara core に Win32 semantics を
-  埋め込まない。
+以下は `B8-TYPE1` 完了を開始条件とする大まかな実装順である。各中マイルストーンは、開始時に
+debug bundle の blocker を source of truth として複数の `PR Gate` へ分割する。
+
+#### 中マイルストーン: B8-LAUNCH1 Translation Artifact Execution Path
+
+- [ ] decode / lift / emit の結果を `TranslationArtifact` として runtime へ渡す。
+- [ ] artifact bytes、PC map、fixups、helper requirements、source/cache identity を debug export
+  できるようにする。
+- [ ] existing fixture expected / actual を artifact path 経由でも通し、CLI report DTO を
+  runtime input として使わない。
+
+#### 中マイルストーン: B8-LAUNCH2 Executable Image Preparation
+
+- [ ] public Mach-O metadata から segment mapping plan と initial entry state を構築する。
+- [ ] self-authored fixture に必要な relocation / rebase / bind を段階的に適用する。
+- [ ] import identity を runtime helper address または stable unsupported blocker へ解決する。
+- [ ] W^X、code signing、mapped memory ownership failure を typed loader error として report する。
+- [ ] sentinel を使わない `LC_MAIN` entry execution の直前状態を debug bundle に保存する。
+
+`B8-LAUNCH2` は self-authored fixture の entry block を dispatcher へ渡せる最小 mapped image で
+停止する。relocation / bind / import を一括実装せず、`B8-LAUNCH3` / `B8-LAUNCH4` の実行で
+観測された blocker に応じて loader 側の focused PR Gate へ戻る。
+
+#### 中マイルストーン: B8-LAUNCH3 Runtime Dispatcher Core
+
+- [ ] `TranslationArtifact` と typed runtime state から entry block を実行する dispatcher を作る。
+- [ ] direct fallthrough、direct call、return、helper suspend / return writeback を継続実行する。
+- [ ] indirect target は resolved target または stable blocker とし、silent fallback しない。
+- [ ] translation cache / interpreter / JIT は dispatcher interface 上の future strategy として保つ。
+
+#### 中マイルストーン: B8-LAUNCH4 macOS ABI And Service Bridge
+
+- [ ] x86_64 macOS SysV argument materialization と return writeback を実行可能にする。
+- [ ] Objective-C runtime と AppKit / libSystem の public API 呼び出しを generic host service
+  contract 経由で接続する。
+- [ ] autorelease pool、run loop、callback の最小 lifecycle を typed request / return として扱う。
+- [ ] 未対応 syscall、TLS、thread、signal、exception は stable blocker として維持する。
+
+#### 中マイルストーン: B8-LAUNCH5 Process Environment
+
+- [ ] initial stack、argv / envp、process metadata を self-authored target に必要な範囲で作る。
+- [ ] TLS、thread、signal、exception、file descriptor は target の blocker になった順に追加し、
+  最初の GUI 完了条件へ一括投入しない。
+- [ ] `.app` bundle / resource handling は single executable の限界が blocker になるまで扱わない。
+
+#### 中マイルストーン: B8-LAUNCH6 Sentinel-Free Self-Authored GUI Launch
+
+- [ ] Rosetta 確認済み self-authored x86_64 Mach-O GUI executable を、B8-G1 sentinel / host trap
+  なしで実 `LC_MAIN` から起動する。
+- [ ] translated entry、loader、dispatcher、helper bridge を通って window と label を表示する。
+- [ ] expected / actual / launch report / debug bundle が一致し、専用成功経路を使っていないことを
+  report で確認する。
+
+#### 中マイルストーン: B8-LAUNCH7 Source-Built OSS GUI Expansion
+
+- [ ] license、build inputs、success criteria を固定した小さい OSS GUI app を source から
+  reproducible に x86_64 macOS binary として build する。
+- [ ] first unsupported boundary を debug bundle で固定し、ISA、loader、helper、dispatcher の
+  focused PR Gate へ一つずつ分解する。
+- [ ] 任意アプリ対応を完了条件にせず、対象 app の deterministic lifecycle 到達で停止する。
+
+### 後続の cross-platform 設計
+
+- core translator が OS を知らない境界を維持し、macOS x86_64-on-macOS arm64 personality を
+  最初の concrete implementation とする。
+- Linux x86_64-on-Linux arm64 と Windows x64-on-Wine は、B8-LAUNCH6 までに得た loader / ABI /
+  service boundary を再利用する future personality として扱う。
+- Wine 接続、x86 32-bit、PE loader の実装順は B8 の review gate 後に改めて判断する。
+
+#### Superseded Target: B8-OSS0 Source-Built OSS GUI App Automation
+
+旧 B8-OSS0 の目的は `B8-LAUNCH7 Source-Built OSS GUI Expansion` へ統合した。候補選定、
+license / supply-chain、reproducible build、expected / actual / debug bundle、blocker-driven cycle は
+同中マイルストーンの開始時に PR Gate へ分割する。
 
 ### B9: 実 x86 32-bit アプリ対応
 
@@ -4701,10 +4760,14 @@ B8-ARCH1 以降で core / personality boundary が整理されるまで実装し
 
 ### B10: PE / Wine 接続前段
 
+- [ ] B8-LAUNCH7 の review gate までは Wine callback / TLS / thread / thunk abstraction の
+  先行設計を行わない。
 - [ ] B8/B9 の user-space loader / helper boundary を前提に、PE parser の最小 scope を決める。
 - [ ] `.text` / `.rdata` / import table の domain model を設計する。
 - [ ] Windows x64 ABI と helper boundary の対応を整理する。
 - [ ] Wine へ渡すべき責務と Bara が持つべき責務を文書化する。
+- [ ] Windows x64 ABI、guest callbacks、exception handoff、TLS、thread、thunk call boundary と
+  最初の CLI fixture success criteria を、macOS で検証済みの境界を根拠に定義する。
 - [ ] hello world 相当を PE fixture から native artifact へ変換する長期計画を立てる。
 - [ ] Wine 接続時に process-wide 互換性が必要な箇所を、kernel 統合ではなく user-space loader / runtime metadata として扱う。
 

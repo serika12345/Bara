@@ -668,6 +668,22 @@ B8-ARCH2an result:
 - method は `MachOExecutableImageMetadata::program_image_metadata()` へ明示委譲するだけとし、
   existing behavior、JSON output、metadata assembly semantics、dependency は変更しない。
 
+B8 roadmap phase separation decision:
+
+- 2026-07-19 に、B8-G2 以降を「型付き実行基盤」と「アプリ起動能力追加」の二段階へ分けた。
+  型強化は `B8-TYPE1 Typed Runtime Execution Foundation` という中マイルストーンとし、
+  guest image、translation artifact、runtime state、macOS host service request、typed error /
+  blocker の最小 contract を完了条件にする。production consumer 接続は既存 GuestImage path に
+  限定し、artifact / state / service contract の実経路接続は起動マイルストーンへ残す。
+- relocation / rebase / bind 適用、import 実解決、dispatcher loop、host service execution、
+  process environment、一般 GUI 起動は `B8-TYPE1` に含めない。型の完全一般化を待たず、完了後の
+  型追加は concrete launch blocker を解消する PR の範囲に限定する。
+- 起動実装は artifact execution、executable image preparation、dispatcher、macOS ABI / service
+  bridge、process environment、sentinel-free self-authored GUI、source-built OSS GUI の順に進める。
+- B8-TYPE1 では `MacOsHostServiceRequest` の具体型を優先し、OS personality selection、trait、
+  PE / ELF interface、Wine thunk abstraction は作らない。B8-LAUNCH7 後に複数の concrete
+  implementation が必要になった時点で B10 の責務として抽出を判断する。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。
