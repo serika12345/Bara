@@ -713,6 +713,24 @@ B8-TYPE1 implementation result:
   relocation / bind、dispatcher loop、host service execution は B8-LAUNCH1 以降の concrete blocker
   に残す。
 
+B8-LAUNCH1a implementation result:
+
+- 2026-07-19 に、image metadata を持たない通常 fixture の decode / lift / emit result から
+  source / cache identity 付き `TranslationArtifact` を構築し、no-args / one-u64 /
+  input-memory-ptr の typed runtime runner entry へ渡す最初の production path を追加した。
+  runtime entry は artifact が保持する emitted code を既存 executable memory / ABI runner へ
+  委譲し、CLI report DTO を runtime input にしない。
+- fixture source identity は domain tag、guest entry、source byte length、source bytes を canonical
+  SHA-256 へ入力して作る。translator version は `bara-arm64` package version、target は concrete
+  `Arm64MacOs` とし、固定値、zero sentinel、process-dependent hasher は使わない。SHA-256 実装は
+  private fixture adapter の責務として `btbc-cli` に閉じる。
+- `bara-runtime` は artifact の concrete owner である `bara-arm64` を normal dependency とするが、
+  `bara-oracle` には依存しない。raw machine code runner は executable memory / FFI boundary として
+  private delegation target に残し、artifact-facing public entry から raw bytes を受け取らない。
+- B8 debug export、Mach-O / B8 real-entry identity、standalone linker path は同じ identity を流用せず、
+  image metadata を含む source boundary を決める後続 gate に残す。dispatcher、runtime state、fixup、
+  helper service execution、translation cache storage もこの gate では開始しない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。

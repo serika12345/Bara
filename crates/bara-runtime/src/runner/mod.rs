@@ -1,4 +1,5 @@
 use crate::{ExecutableMemory, ExecutableMemoryError, HostTrapPlan, RunStdout};
+use bara_arm64::TranslationArtifact;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RunResult {
@@ -67,6 +68,33 @@ impl RunResult {
 pub enum RunError {
     ExecutableMemory(ExecutableMemoryError),
     UnsupportedHost,
+}
+
+pub fn run_translation_artifact_no_args_u64(
+    artifact: &TranslationArtifact,
+) -> Result<RunResult, RunError> {
+    run_no_args_u64(artifact.emitted_function().code().bytes())
+}
+
+pub fn run_translation_artifact_no_args_u64_with_host_traps(
+    artifact: &TranslationArtifact,
+    host_traps: HostTrapPlan,
+) -> Result<RunResult, RunError> {
+    run_no_args_u64_with_host_traps(artifact.emitted_function().code().bytes(), host_traps)
+}
+
+pub fn run_translation_artifact_one_u64(
+    artifact: &TranslationArtifact,
+    argument: RunArgumentU64,
+) -> Result<RunResult, RunError> {
+    run_one_u64(artifact.emitted_function().code().bytes(), argument)
+}
+
+pub fn run_translation_artifact_one_input_memory_ptr(
+    artifact: &TranslationArtifact,
+    memory: InputMemory,
+) -> Result<RunResult, RunError> {
+    run_one_input_memory_ptr(artifact.emitted_function().code().bytes(), memory)
 }
 
 pub fn run_no_args_u64(code: &[u8]) -> Result<RunResult, RunError> {
@@ -160,7 +188,14 @@ fn call_one_input_memory_ptr(
 
 #[cfg(test)]
 mod tests {
-    use crate::{InputMemory, InputMemoryError, RunArgumentU64, RunResult, RunStdout};
+    use std::str::FromStr;
+
+    use bara_arm64::{
+        Arm64MachineCode, EmittedFunction, TranslationArtifact, TranslationCacheIdentity,
+        TranslationSourceHash, TranslationSourceIdentity, TranslationTarget, TranslatorVersion,
+    };
+
+    use crate::{InputMemory, InputMemoryError, RunArgumentU64, RunError, RunResult, RunStdout};
 
     #[test]
     fn run_result_exposes_return_value() {
@@ -198,6 +233,45 @@ mod tests {
     }
 
     #[test]
+    fn translation_artifact_runner_preserves_supported_abi_results() {
+        let artifact = return_42_artifact();
+
+        assert_run_result(crate::run_translation_artifact_no_args_u64(&artifact));
+        assert_run_result(crate::run_translation_artifact_one_u64(
+            &artifact,
+            RunArgumentU64::new(123),
+        ));
+        assert_run_result(crate::run_translation_artifact_one_input_memory_ptr(
+            &artifact,
+            InputMemory::from_bytes(vec![0x48]).expect("input memory is non-empty"),
+        ));
+    }
+
+    #[test]
+    fn translation_artifact_runner_preserves_host_trap_output() {
+        let artifact = return_42_artifact();
+        let host_traps = crate::HostTrapPlan::stdout(
+            RunStdout::from_text(String::from("hello artifact\n"))
+                .expect("stdout trap text is ascii"),
+        );
+        let result =
+            crate::run_translation_artifact_no_args_u64_with_host_traps(&artifact, host_traps);
+
+        if cfg!(all(unix, target_arch = "aarch64")) {
+            let result = result.expect("supported host should execute the artifact");
+            assert_eq!(result.return_value(), 42);
+            assert_eq!(result.stdout(), "hello artifact\n");
+        } else {
+            assert_eq!(
+                result,
+                Err(RunError::ExecutableMemory(
+                    crate::ExecutableMemoryError::UnsupportedHost
+                ))
+            );
+        }
+    }
+
+    #[test]
     #[cfg(not(all(unix, target_arch = "aarch64")))]
     fn run_reports_unsupported_host_on_other_hosts() {
         use crate::{
@@ -232,5 +306,46 @@ mod tests {
                 ExecutableMemoryError::UnsupportedHost
             ))
         );
+    }
+
+    fn assert_run_result(result: Result<RunResult, RunError>) {
+        if cfg!(all(unix, target_arch = "aarch64")) {
+            assert_eq!(
+                result
+                    .expect("supported host should execute the artifact")
+                    .return_value(),
+                42
+            );
+        } else {
+            assert_eq!(
+                result,
+                Err(RunError::ExecutableMemory(
+                    crate::ExecutableMemoryError::UnsupportedHost
+                ))
+            );
+        }
+    }
+
+    fn return_42_artifact() -> TranslationArtifact {
+        const SOURCE_HASH: &str =
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        let source_hash =
+            TranslationSourceHash::from_str(SOURCE_HASH).expect("test source hash should be valid");
+
+        TranslationArtifact::new(
+            TranslationSourceIdentity::new(source_hash),
+            EmittedFunction::new(
+                Arm64MachineCode::new(vec![0x40, 0x05, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6])
+                    .expect("test ARM64 machine code should be valid"),
+                Vec::new(),
+            ),
+            TranslationCacheIdentity::new(
+                source_hash,
+                TranslatorVersion::from_str("0.1.0")
+                    .expect("test translator version should be valid"),
+                TranslationTarget::Arm64MacOs,
+            ),
+        )
+        .expect("matching source and cache identities should construct an artifact")
     }
 }

@@ -50,7 +50,9 @@ pub use macos_host_service::{
 };
 pub use runner::{
     run_no_args_u64, run_no_args_u64_with_host_traps, run_one_input_memory_ptr, run_one_u64,
-    InputMemory, InputMemoryError, RunArgumentU64, RunError, RunResult,
+    run_translation_artifact_no_args_u64, run_translation_artifact_no_args_u64_with_host_traps,
+    run_translation_artifact_one_input_memory_ptr, run_translation_artifact_one_u64, InputMemory,
+    InputMemoryError, RunArgumentU64, RunError, RunResult,
 };
 pub use runtime_blocker::{
     DispatcherBoundaryBlocker, DispatcherUnsupportedState, HelperBoundaryBlocker,

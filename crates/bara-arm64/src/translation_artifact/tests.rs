@@ -83,6 +83,14 @@ fn translator_version_rejects_empty_or_non_canonical_values() {
     );
 }
 
+#[test]
+fn current_translator_version_is_owned_by_the_arm64_backend() {
+    assert_eq!(
+        TranslatorVersion::current().to_string(),
+        env!("CARGO_PKG_VERSION")
+    );
+}
+
 fn source_identity(hash: &str) -> TranslationSourceIdentity {
     TranslationSourceIdentity::new(
         TranslationSourceHash::from_str(hash).expect("test source hash should be valid"),
