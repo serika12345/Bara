@@ -11,6 +11,7 @@ use super::report::{
     B8DebugProcessedPcRange, B8DebugRuntimeAttemptReport, B8DebugRuntimeRunScope,
     B8DebugUnsupportedInstructionReport,
 };
+use super::translation_artifact::B8DebugTranslationArtifactReport;
 
 use crate::function_run::{
     run_test_case_translation_artifact, FunctionArtifactReport, FunctionCompiledIrArtifact,
@@ -22,6 +23,7 @@ pub(super) struct B8RealEntryAttempt {
     pub(super) decode_report: B8DebugDecodeReport,
     pub(super) lift_ir: B8DebugArtifactReport<FunctionCompiledIrArtifact>,
     pub(super) emit_report: B8DebugArtifactReport<FunctionArtifactReport>,
+    pub(super) translation_artifact: B8DebugArtifactReport<B8DebugTranslationArtifactReport>,
     pub(super) pcmap: B8DebugArtifactReport<FunctionPcMapArtifact>,
     pub(super) fixups: B8DebugArtifactReport<FunctionFixupsArtifact>,
     pub(super) helpers: B8DebugArtifactReport<FunctionHelpersArtifact>,
@@ -84,6 +86,7 @@ impl B8RealEntryAttempt {
                 decode_report,
                 lift_ir,
                 emit_report: B8DebugArtifactReport::failed(run_error.to_string()),
+                translation_artifact: B8DebugArtifactReport::skipped("unsupported IR terminator"),
                 pcmap: B8DebugArtifactReport::skipped("unsupported IR terminator"),
                 fixups: B8DebugArtifactReport::skipped("unsupported IR terminator"),
                 helpers: B8DebugArtifactReport::skipped("unsupported IR terminator"),
@@ -111,6 +114,7 @@ impl B8RealEntryAttempt {
                     decode_report,
                     lift_ir,
                     emit_report: B8DebugArtifactReport::failed(run_error.to_string()),
+                    translation_artifact: B8DebugArtifactReport::skipped("emit failed"),
                     pcmap: B8DebugArtifactReport::skipped("emit failed"),
                     fixups: B8DebugArtifactReport::skipped("emit failed"),
                     helpers: B8DebugArtifactReport::skipped("emit failed"),
@@ -142,6 +146,7 @@ impl B8RealEntryAttempt {
                     decode_report,
                     lift_ir,
                     emit_report: B8DebugArtifactReport::failed(run_error.to_string()),
+                    translation_artifact: B8DebugArtifactReport::failed(run_error.to_string()),
                     pcmap: B8DebugArtifactReport::skipped(
                         "translation artifact construction failed",
                     ),
@@ -168,14 +173,14 @@ impl B8RealEntryAttempt {
         let emit_report = B8DebugArtifactReport::available(
             FunctionArtifactReport::from_source_and_emitted(test_case, emitted),
         );
-        let pcmap =
-            B8DebugArtifactReport::available(FunctionPcMapArtifact::from_entries(emitted.pc_map()));
-        let fixups = B8DebugArtifactReport::available(FunctionFixupsArtifact::from_fixups(
-            emitted.branch_fixups(),
-        ));
-        let helpers = B8DebugArtifactReport::available(FunctionHelpersArtifact::from_requests(
-            emitted.host_trap_requests(),
-        ));
+        let translation_artifact_report =
+            B8DebugTranslationArtifactReport::from_artifact(&artifact);
+        let pcmap = B8DebugArtifactReport::available(translation_artifact_report.pc_map().clone());
+        let fixups = B8DebugArtifactReport::available(translation_artifact_report.fixups().clone());
+        let helpers = B8DebugArtifactReport::available(
+            translation_artifact_report.helper_requirements().clone(),
+        );
+        let translation_artifact = B8DebugArtifactReport::available(translation_artifact_report);
         match run_test_case_translation_artifact(test_case, &artifact) {
             Ok(result) => {
                 let blocker_report = B8DebugBlockerReport::none();
@@ -183,6 +188,7 @@ impl B8RealEntryAttempt {
                     decode_report,
                     lift_ir,
                     emit_report,
+                    translation_artifact,
                     pcmap,
                     fixups,
                     helpers,
@@ -204,6 +210,7 @@ impl B8RealEntryAttempt {
                     decode_report,
                     lift_ir,
                     emit_report,
+                    translation_artifact,
                     pcmap,
                     fixups,
                     helpers,
@@ -234,6 +241,7 @@ impl B8RealEntryAttempt {
             decode_report,
             lift_ir: B8DebugArtifactReport::failed(reason.clone()),
             emit_report: B8DebugArtifactReport::skipped(reason.clone()),
+            translation_artifact: B8DebugArtifactReport::skipped(reason.clone()),
             pcmap: B8DebugArtifactReport::skipped(reason.clone()),
             fixups: B8DebugArtifactReport::skipped(reason.clone()),
             helpers: B8DebugArtifactReport::skipped(reason.clone()),
@@ -293,11 +301,38 @@ mod tests {
         );
         let runtime_report =
             serde_json::to_value(&attempt.runtime_report).expect("runtime report serializes");
+        let translation_artifact = serde_json::to_value(&attempt.translation_artifact)
+            .expect("translation artifact report serializes");
 
         assert_eq!(runtime_report["schema"], "b8_debug_runtime_attempt_v0");
         assert_eq!(
             runtime_report["run_scope"],
             "real_lc_main_entry_first_block"
+        );
+        assert_eq!(translation_artifact["status"], "available");
+        assert_eq!(
+            translation_artifact["value"]["schema"],
+            "b8_debug_translation_artifact_v0"
+        );
+        assert_eq!(
+            translation_artifact["value"]["source_identity"]["source_hash"],
+            "0000000000000000000000000000000000000000000000000000000000000001"
+        );
+        assert_eq!(
+            translation_artifact["value"]["cache_identity"]["source_hash"],
+            translation_artifact["value"]["source_identity"]["source_hash"]
+        );
+        assert_eq!(
+            translation_artifact["value"]["pc_map"],
+            serde_json::to_value(&attempt.pcmap).expect("pcmap report serializes")["value"]
+        );
+        assert_eq!(
+            translation_artifact["value"]["fixups"],
+            serde_json::to_value(&attempt.fixups).expect("fixups report serializes")["value"]
+        );
+        assert_eq!(
+            translation_artifact["value"]["helper_requirements"],
+            serde_json::to_value(&attempt.helpers).expect("helpers report serializes")["value"]
         );
         #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
         {

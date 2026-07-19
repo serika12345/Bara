@@ -592,9 +592,11 @@ target を持つ artifact を構築した。次の PR Gate では B8 real `LC_MA
 `&TranslationArtifact`を受け、CLI report DTOやraw ARM64 bytesをinputにしない。
 
 これにより通常fixtureとMach-O / B8 real-entryのproduction execution pathはartifact境界へ
-統一された。残るB8 debug exportは、実際に実行したartifactからbytes、PC map、fixups、helper
-requirements、source/cache identityをprojectする後続PR Gateとする。standalone linker、dispatcher、
-runtime state、fixup適用、helper service execution、cache storageは引き続き含めない。
+統一された。第三のPR Gateでは、実際にruntimeへ渡す同じartifactからbytes、PC map、fixups、
+helper requirements、source/cache identityを`b8_debug_translation_artifact_v0`へprojectし、既存
+sidecarも同じprojectionから導出した。これによりR3は完了し、次の実装境界はR4の最小executable
+image preparationとなる。standalone linker、dispatcher、runtime state、fixup適用、helper service
+execution、cache storageはR3に含めない。
 
 完了条件:
 

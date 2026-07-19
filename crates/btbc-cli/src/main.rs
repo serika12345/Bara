@@ -2383,7 +2383,7 @@ mod tests {
         assert_eq!(
             output,
             format!(
-                "{{\"bundle_dir\":\"{}\",\"input_probe\":\"{}\",\"entry_bytes_bin\":\"{}\",\"entry_bytes_json\":\"{}\",\"decode_report\":\"{}\",\"lift_ir\":\"{}\",\"emit_report\":\"{}\",\"pcmap\":\"{}\",\"fixups\":\"{}\",\"helpers\":\"{}\",\"loader_plan\":\"{}\",\"runtime_attempt\":\"{}\",\"launch_report\":\"{}\",\"blocker\":\"{}\",\"repro\":\"{}\"}}",
+                "{{\"bundle_dir\":\"{}\",\"input_probe\":\"{}\",\"entry_bytes_bin\":\"{}\",\"entry_bytes_json\":\"{}\",\"decode_report\":\"{}\",\"lift_ir\":\"{}\",\"emit_report\":\"{}\",\"translation_artifact\":\"{}\",\"pcmap\":\"{}\",\"fixups\":\"{}\",\"helpers\":\"{}\",\"loader_plan\":\"{}\",\"runtime_attempt\":\"{}\",\"launch_report\":\"{}\",\"blocker\":\"{}\",\"repro\":\"{}\"}}",
                 bundle_dir.display(),
                 bundle_dir.join("input.probe.json").display(),
                 bundle_dir.join("entry.bytes.bin").display(),
@@ -2391,6 +2391,7 @@ mod tests {
                 bundle_dir.join("decode.report.json").display(),
                 bundle_dir.join("lift.ir.json").display(),
                 bundle_dir.join("emit.report.json").display(),
+                bundle_dir.join("translation-artifact.json").display(),
                 bundle_dir.join("pcmap.json").display(),
                 bundle_dir.join("fixups.json").display(),
                 bundle_dir.join("helpers.json").display(),
@@ -2433,6 +2434,11 @@ mod tests {
         assert!(!decode_report.contains("DecodeUnsupportedOpcode { opcode: 65"));
         assert!(read_file(&bundle_dir.join("lift.ir.json")).contains("\"status\":"));
         assert!(read_file(&bundle_dir.join("emit.report.json")).contains("\"status\":"));
+        let translation_artifact: serde_json::Value =
+            serde_json::from_str(&read_file(&bundle_dir.join("translation-artifact.json")))
+                .expect("translation artifact report parses");
+        assert_eq!(translation_artifact["status"], "skipped");
+        assert_eq!(translation_artifact["reason"], "unsupported IR terminator");
         assert!(read_file(&bundle_dir.join("pcmap.json")).contains("\"status\":"));
         assert!(read_file(&bundle_dir.join("fixups.json")).contains("\"status\":"));
         assert!(read_file(&bundle_dir.join("helpers.json")).contains("\"status\":"));

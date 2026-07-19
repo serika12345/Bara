@@ -28,6 +28,7 @@ mod import_boundary;
 mod io;
 mod loader;
 mod report;
+mod translation_artifact;
 mod translation_source;
 
 use self::attempt::B8RealEntryAttempt;
@@ -91,6 +92,10 @@ pub(crate) fn generate_b8_debug_bundle(
     write_json_file(&paths.decode_report_path(), &attempt.decode_report)?;
     write_json_file(&paths.lift_ir_path(), &attempt.lift_ir)?;
     write_json_file(&paths.emit_report_path(), &attempt.emit_report)?;
+    write_json_file(
+        &paths.translation_artifact_path(),
+        &attempt.translation_artifact,
+    )?;
     write_json_file(&paths.pcmap_path(), &attempt.pcmap)?;
     write_json_file(&paths.fixups_path(), &attempt.fixups)?;
     write_json_file(&paths.helpers_path(), &attempt.helpers)?;

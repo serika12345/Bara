@@ -750,6 +750,23 @@ B8-LAUNCH1b implementation result:
 - artifact identity / ARM64 bytesのdebug export、loader / fixup適用、dispatcher、runtime state、
   helper service execution、cache storage、standalone linker、cross-platform abstractionは後続gateに残す。
 
+B8-LAUNCH1c implementation result:
+
+- 2026-07-19 に B8 real `LC_MAIN` first-blockでruntimeへ渡す同じ`TranslationArtifact`から、
+  ARM64 code、PC map、fixups、helper requirements、source/cache identityを一つの
+  `b8_debug_translation_artifact_v0` reportへpureにprojectするB8専用境界を追加した。意図は
+  後続loader / dispatcherが再変換結果やCLI compatibility DTOを監査の正本にしないことにある。
+- codeは`arm64_code.bytes_hex`、identityはlowercase source hash、backend-owned translator version、
+  concrete `arm64_macos` targetとしてexportする。hash algorithmは`TranslationArtifact`自体が保持する
+  fieldではないため推測して出力せず、public `bara-arm64` domain型へ`Serialize`を追加しない。
+- existing `pcmap.json`、`fixups.json`、`helpers.json`は同じartifact projectionの参照から導出し、
+  新manifestとのdriftを防ぐ。artifact構築済みならruntime failureでもreportは`available`に保ち、
+  artifact構築前は`skipped`、artifact invariant failureは`failed`としてempty sentinelを出さない。
+- B8 bundleへ`translation-artifact.json`とoutput-path fieldだけを追加した。existing emit / PC map /
+  fixup / helper / runtime / blocker schema、dependency、lockfile、public primitive baselineは変更しない。
+- deserialization、generic serializer、cache storage、loader / fixup適用、dispatcher、runtime state、
+  helper service execution、standalone linker migrationはB8-LAUNCH1の完了範囲に含めない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。

@@ -62,27 +62,42 @@
    B8-ARCH1 responsibility split audit と、`D4a: x86_64 ISA semantic coverage strategy`
 4. この `docs/progress.md` の現在の作業スナップショット
 
-B8-LAUNCH1b completion 後の次候補:
+B8-LAUNCH1c completion 後の次候補:
 
-- `B8-LAUNCH1b Mach-O Real-Entry Translation Artifact Runtime Input` の draft PR を review / mergeする。
-- 次の PR Gate はB8 debug exportに限定し、実際に実行した`TranslationArtifact`からcode、PC map、
-  fixups、helper requirements、source/cache identityをprojectする。
-- existing expected / actual JSON、public primitive baseline、B8 debug bundle schema を維持し、
+- `B8-LAUNCH1c Executed Translation Artifact Debug Export`のdraft PRをreview / mergeする。
+- review後は`B8-LAUNCH2 Executable Image Preparation`を、self-authored fixtureのentry blockを
+  dispatcherへ渡せる最小mapped image / initial entry stateのPR Gateへ分割する。
+- existing expected / actual JSON、public primitive baseline、B8の既存sidecar schemaを維持し、
   debug bundle の blocker を実装順の source of truth にする。
 
-B8-LAUNCH1b completion 後にすぐ始めないもの:
+B8-LAUNCH1c completion 後にすぐ始めないもの:
 
 - relocation / rebase / bind 適用、import address 解決、runtime dispatcher loop
 - Objective-C / AppKit host service execution、process environment、一般 GUI app 起動
 - cross-platform personality selection、Wine thunk、PE / ELF interface、translation cache
-- B8-LAUNCH1b の review gate を越えた次 gate または B8-LAUNCH2 以降の自動実装
+- B8-LAUNCH1c の review gate を越えた次 gateまたはB8-LAUNCH2の一括実装
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-07-19 17:23 JST
+最終更新: 2026-07-19 17:43 JST
 
 状態:
 
+- active_work: completed。`B8-LAUNCH1c Executed Translation Artifact Debug Export`を
+  `task/b8-launch1c-artifact-debug-export`で完了した。baseはPR #94 merge後のmain `5a3b94e`。
+  関連TODOは`TODO.md`の同PR Gate、関連設計メモは`docs/design-todo.md`の
+  `B8-LAUNCH1c implementation result`、関連roadmapは`docs/runtime-architecture-roadmap.md`の
+  `R3 / B8-LAUNCH1`。B8 real `LC_MAIN` first-blockでruntimeへ渡す同じartifactからARM64 code、
+  PC map、fixups、helper requirements、source/cache identityを`translation-artifact.json`へexport
+  できるようにした。意図は後続loader / dispatcherが実行対象artifactを監査のsource of truthに
+  できるようにすること。existing sidecarは同じprojectionから導出し、artifact構築前は`skipped`、
+  invariant failureは`failed`、構築後はruntime failureでも`available`に保つ。B8専用DTOに閉じ、
+  core domain型のserialization、dependency、lockfile、public primitive baselineは変更していない。
+  remaining workはdraft PRのreview / merge。next actionはreview後にB8-LAUNCH2を最小mapped imageの
+  PR Gateへ分割すること。verificationはtest-first red、B8 focused 9 tests、`btbc-cli` 107 tests、
+  Clippy `-D warnings`、domain type / schema / dependency / responsibility auditがpassし、
+  repository-wide `./scripts/verify`もinvisible character、RustSec、cargo-deny、Nix package、
+  workspace test、blackbox expected / actualを含めてpassした。
 - active_work: completed。`B8-LAUNCH1b Mach-O Real-Entry Translation Artifact Runtime Input`を
   `task/b8-launch1b-macho-artifact-runtime-input`で完了した。関連TODOは`TODO.md`の同PR Gate、関連
   設計メモは`docs/design-todo.md`の`B8-LAUNCH1b implementation result`、関連roadmapは
