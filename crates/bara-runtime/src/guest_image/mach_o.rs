@@ -1,4 +1,7 @@
-use bara_ir::{ProgramImageMetadata, ProgramImageRange, ProgramImageSectionKind, X86Va};
+use bara_ir::{
+    ProgramImageMappedByteSegment, ProgramImageMetadata, ProgramImageRange,
+    ProgramImageSectionKind, X86Va,
+};
 
 use super::{
     GuestImage, GuestImageAddressSpace, GuestImageEntryPoint, GuestImageError, GuestImageImports,
@@ -110,6 +113,37 @@ impl MachOExecutableImageSnapshot {
 
     pub fn program_image_metadata(&self) -> ProgramImageMetadata {
         self.metadata.program_image_metadata()
+    }
+
+    pub fn executable_code_bytes(&self) -> Result<MachOExecutableCodeBytes, GuestImageError> {
+        let source_range = self.mapping.code_segment().range();
+        let mapped_segment = self
+            .mapping
+            .mapped_bytes()
+            .payload()
+            .segment_for_range(source_range.range())
+            .map_err(GuestImageError::MachOExecutableCodeBytesUnavailable)?;
+
+        Ok(MachOExecutableCodeBytes::new(mapped_segment))
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MachOExecutableCodeBytes {
+    mapped_segment: ProgramImageMappedByteSegment,
+}
+
+impl MachOExecutableCodeBytes {
+    const fn new(mapped_segment: ProgramImageMappedByteSegment) -> Self {
+        Self { mapped_segment }
+    }
+
+    pub const fn source_range(&self) -> MachOExecutableCodeRange {
+        MachOExecutableCodeRange::new(self.mapped_segment.range())
+    }
+
+    pub const fn mapped_segment(&self) -> &ProgramImageMappedByteSegment {
+        &self.mapped_segment
     }
 }
 

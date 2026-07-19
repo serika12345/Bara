@@ -684,6 +684,35 @@ B8 roadmap phase separation decision:
   PE / ELF interface、Wine thunk abstraction は作らない。B8-LAUNCH7 後に複数の concrete
   implementation が必要になった時点で B10 の責務として抽出を判断する。
 
+B8-TYPE1 implementation result:
+
+- 2026-07-19 に `MachOExecutableCodeBytes` を追加し、Mach-O executable snapshot が
+  source range とその range に対応する owned mapped byte segment を一つの domain value として
+  返すようにした。range が mapped bytes に完全包含されない場合は
+  `MappedBytesRangeUnavailable` を runtime-facing `GuestImageError` として分類する。
+- `bara-arm64` に pure `TranslationArtifact` を追加し、existing `EmittedFunction` が持つ
+  ARM64 machine code、PC map、branch fixups、host helper requirements と、source identity / cache
+  identity を同じ aggregate で検証できるようにした。cache identity は source hash、translator
+  version、concrete `Arm64MacOs` target のみに限定し、cache 実装や OS personality version は
+  先行導入しない。
+- `bara-runtime` に guest PC、full-width register entries、stack bounds / pointer、helper suspend /
+  return phase を持つ pure `GuestRuntimeState` と validation error を追加した。register collection は
+  partial register と duplicate register を拒否し、helper phase と current PC の不一致を typed
+  error にする。
+- concrete macOS x86_64 境界として `GuestCall -> MacOsHostServiceRequest -> GuestReturn` を追加し、
+  helper return の register writeback は ABI destination を明示する `Rax` とした。host API 呼び出し、
+  process execution、cross-platform trait / selection は含めない。
+- loader / dispatcher / helper を `RuntimeBoundaryBlocker` で区別し、各 boundary の invalid state と
+  unsupported state を enum で保持する。existing debug report の文字列 schema は互換出力として
+  維持するが、新しい runtime execution judgment には使わない。
+- dependency direction は `bara-runtime` の normal dependency を `bara-ir` / `libc` のみに保ち、
+  `btbc-cli` adapter が `bara-oracle` の public Mach-O observation から metadata を受け取り、
+  runtime-owned `MachOImage` constructor へ渡す形を維持した。parser の物理移動や observation schema
+  変更は行わない。
+- public primitive baseline、dependency、lockfile、JSON schema は変更しない。artifact execution、
+  relocation / bind、dispatcher loop、host service execution は B8-LAUNCH1 以降の concrete blocker
+  に残す。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。

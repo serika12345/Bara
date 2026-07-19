@@ -156,6 +156,17 @@ impl ProgramImageMappedBytes {
         self.segments.is_empty()
     }
 
+    pub fn segment_for_range(
+        &self,
+        range: ProgramImageRange,
+    ) -> Result<ProgramImageMappedByteSegment, ProgramImageMetadataError> {
+        self.segments
+            .iter()
+            .find_map(|segment| segment.segment_for_range(range))
+            .transpose()?
+            .ok_or(ProgramImageMetadataError::MappedBytesRangeUnavailable)
+    }
+
     pub fn read_u64_le(&self, address: X86Va) -> Option<u64> {
         self.segments
             .iter()
@@ -191,6 +202,28 @@ impl ProgramImageMappedByteSegment {
 
     pub const fn range(&self) -> ProgramImageRange {
         self.range
+    }
+
+    fn segment_for_range(
+        &self,
+        range: ProgramImageRange,
+    ) -> Option<Result<Self, ProgramImageMetadataError>> {
+        if range.start() < self.range.start() || range.end() > self.range.end() {
+            return None;
+        }
+
+        Some((|| {
+            let start = usize::try_from(range.start().value() - self.range.start().value())
+                .map_err(|_| ProgramImageMetadataError::AddressOverflow)?;
+            let end = usize::try_from(range.end().value() - self.range.start().value())
+                .map_err(|_| ProgramImageMetadataError::AddressOverflow)?;
+            let bytes = self
+                .bytes
+                .get(start..end)
+                .ok_or(ProgramImageMetadataError::MappedBytesRangeUnavailable)?
+                .to_vec();
+            Self::new(range, bytes)
+        })())
     }
 
     fn read_u64_le(&self, address: X86Va) -> Option<u64> {
@@ -428,4 +461,5 @@ pub enum ProgramImageMetadataError {
     EmptyOrReversedRange,
     AddressOverflow,
     MappedBytesLengthMismatch,
+    MappedBytesRangeUnavailable,
 }
