@@ -4561,6 +4561,48 @@ review gate:
 
 - runtime Mach-O program metadata view を commit / push / draft PR 作成で停止する。
 
+#### PR Gate: B8-ARCH2an Runtime MachO Snapshot Program Metadata View
+
+branch: `task/b8-arch2an-snapshot-program-metadata-view`
+
+B8-ARCH2am が review / merge 済みになるまで開始しない。B8-ARCH2 Guest Image Model
+Extraction の次 slice として、`MachOExecutableImageSnapshot` 自体から downstream
+compatibility 用の `ProgramImageMetadata` view を取得できるようにする。production behavior、
+existing public API、B8 debug bundle の `loader.plan.json` output は維持する。
+
+完了条件:
+
+- [x] `MachOExecutableImageSnapshot` は nested metadata representation を caller に要求せず、
+  `ProgramImageMetadata` compatibility view を返す。
+- [x] B8 debug helper boundary は `snapshot.metadata()` を辿らず、snapshot-level typed API を使う。
+- [x] focused runtime regression test と existing B8 debug bundle regression test が通る。
+- [x] dependency、schema、metadata assembly semantics、helper bridge、runtime dispatcher は変更しない。
+
+completion evidence:
+
+- 意図: loader plan で一度作った Mach-O executable image snapshot を helper boundary の単一入口にし、
+  caller が snapshot の内部構成を知る必要をさらに減らす。
+- できるようになったこと: `MachOExecutableImageSnapshot::program_image_metadata()` が metadata
+  snapshot の existing compatibility view へ委譲し、CLI は snapshot-level API だけを使う。
+- existing B8 debug bundle behavior と `loader.plan.json` output は変えない。
+
+PR に含めない:
+
+- public Mach-O parser / resolver logic の `bara-oracle` からの移動。
+- entry code bytes、import/fixup/symbol projection semantics の変更または schema 変更。
+- helper boundary / Objective-C / AppKit helper bridge 一般化。
+- return-to continuation dispatcher、translation artifact/cache/dispatcher 実装。
+
+検証:
+
+- `nix develop -c cargo test -p bara-runtime mach_o_executable_image_snapshot_exposes_program_image_metadata_view -- --nocapture`
+- `nix develop -c cargo test -p btbc-cli generate_b8_debug_bundle -- --nocapture`
+- `nix develop -c ./scripts/verify`
+
+review gate:
+
+- runtime Mach-O snapshot program metadata view を commit / push / draft PR 作成で停止する。
+
 #### Future Target: B8-ARCH2 Guest Image Model Extraction
 
 - [ ] public Mach-O metadata から runtime が使う `GuestImage` / `MachOImage` domain model を

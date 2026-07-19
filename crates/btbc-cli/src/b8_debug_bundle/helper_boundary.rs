@@ -104,7 +104,7 @@ impl B8DebugImportHelperRequestReport {
         code_bytes: &X86Bytes,
         mach_o_snapshot: &MachOExecutableImageSnapshot,
     ) -> Self {
-        let image_metadata = mach_o_snapshot.metadata().program_image_metadata();
+        let image_metadata = mach_o_snapshot.program_image_metadata();
         let required_marshaling = B8DebugHelperMarshalingReport::blocked(
             call_boundary,
             input,
