@@ -153,3 +153,18 @@ fn stack_and_helper_phase_validation_return_typed_errors() {
         Err(GuestRuntimeStateError::ProgramCounterDoesNotMatchHelperReturn)
     );
 }
+
+#[test]
+fn runtime_state_can_preserve_an_explicitly_unmaterialized_guest_stack() {
+    let state = GuestRuntimeState::new(
+        pc(0x1000),
+        GuestRegisterState::empty(),
+        GuestStackState::unmaterialized(),
+        GuestRuntimePhase::Ready,
+    )
+    .expect("an unmaterialized stack is an explicit pre-process-state phase");
+
+    assert_eq!(state.stack(), GuestStackState::Unmaterialized);
+    assert_eq!(state.stack().pointer(), None);
+    assert_eq!(state.stack().bounds(), None);
+}

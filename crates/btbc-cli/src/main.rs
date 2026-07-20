@@ -3142,8 +3142,12 @@ mod tests {
             .contains("\"resolution\":\"resolved_public_dyld_chained_fixups_import\""));
         assert!(read_file(&bundle_dir.join("loader.plan.json"))
             .contains("\"next_entry_source\":\"first_unsupported_boundary\""));
-        assert!(read_file(&bundle_dir.join("runtime-attempt.json"))
-            .contains("\"run_scope\":\"real_lc_main_entry_first_block\""));
+        let runtime_attempt = read_file(&bundle_dir.join("runtime-attempt.json"));
+        assert!(runtime_attempt.contains("\"schema\":\"b8_debug_runtime_attempt_v1\""));
+        assert!(runtime_attempt.contains("\"run_scope\":\"real_lc_main_entry_first_block\""));
+        assert!(runtime_attempt.contains("\"dispatch\":"));
+        assert!(runtime_attempt.contains("\"schema\":\"b8_debug_entry_dispatch_v0\""));
+        assert!(runtime_attempt.contains("\"stack\":\"unmaterialized\""));
         let launch_report = read_file(&bundle_dir.join("launch.report.json"));
         assert!(launch_report.contains("\"schema\":\"b8_debug_real_entry_launch_report_v0\""));
         assert!(launch_report.contains("\"entry_source\":\"public_lc_main_entryoff\""));

@@ -1,3 +1,4 @@
+pub mod entry_dispatcher;
 pub mod executable_memory;
 pub mod guest_image;
 pub mod host_trap;
@@ -7,6 +8,11 @@ pub mod runner;
 pub mod runtime_blocker;
 pub mod runtime_state;
 
+pub use entry_dispatcher::{
+    dispatch_entry_once, dispatch_entry_without_artifact, EntryDispatchBlocked,
+    EntryDispatchContinuation, EntryDispatchHelperSuspend, EntryDispatchOutcome,
+    EntryDispatchReturn,
+};
 pub use executable_memory::{ExecutableMemory, ExecutableMemoryError};
 pub use guest_image::{
     GuestImage, GuestImageAddressSpace, GuestImageEntryPoint, GuestImageError, GuestImageFormat,

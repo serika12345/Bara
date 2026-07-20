@@ -4941,7 +4941,7 @@ review gate:
 - unsupported opcode、indirect target、callback、追加runtime serviceも、観測後に一責務・一semantic
   bucketのfocused PRを現在gate直後へ挿入する。
 
-#### PR Gate: B8-LAUNCH2b Fixture Import/Fixup Resolution（条件付き）
+#### Conditional PR Gate: B8-LAUNCH2b Fixture Import/Fixup Resolution
 
 branch: `task/b8-launch2b-fixture-import-fixup`
 
@@ -4971,11 +4971,13 @@ branch: `task/b8-launch3a-entry-dispatcher-spine`
 
 完了条件:
 
-- [ ] `MachOExecutableImagePreparation`、`TranslationArtifact`、sentinel-free initial
-  `GuestRuntimeState`を受け、実`LC_MAIN` entry blockを一度dispatchする。
-- [ ] outcomeを`Continue`、`HelperSuspend`、`Return`、`Blocked`のtyped resultとし、同じinput、
+- [x] `MachOExecutableImagePreparation`、`TranslationArtifact`、sentinel-free initial
+  `GuestRuntimeState`を受けるsingle-entry spineを作り、artifact-backed entry fixtureを一度dispatchする。
+  実B8 `LC_MAIN`がartifact construction前に止まる場合も同じspineへ接続し、typed unavailable outcomeを
+  保存する。
+- [x] outcomeを`Continue`、`HelperSuspend`、`Return`、`Blocked`のtyped resultとし、同じinput、
   終了state、next actionをdebug bundleへ保存する。
-- [ ] B8 production pathはraw runner直呼びをやめ、unsupported boundaryをstable blockerにする。
+- [x] B8 production pathはraw runner直呼びをやめ、unsupported boundaryをstable blockerにする。
 
 PRに含めない: relocation/import解決、複数block loop、call/return、host API実行。
 

@@ -79,10 +79,23 @@ B8-LAUNCH2a completion 後にすぐ始めないもの:
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-07-19 19:30 JST
+最終更新: 2026-07-20 09:25 JST
 
 状態:
 
+- active_work: completed。`B8-LAUNCH3a Entry Dispatcher Spine`を
+  `task/b8-launch3a-entry-dispatcher-spine`で完了した。baseはmain `f456fc1`。runtime-owned dispatcherは
+  prepared image、artifact、typed initial stateを受けるsingle-entry spineを作り、typed outcomeと
+  initial/final stateを返す。B8 production pathはraw runner直呼びをやめ、artifact-backed return
+  fixtureはRAX writeback済み
+  stateを、実GUI inputのregister-indirect call blockerは`TranslationArtifactUnavailable` outcomeを
+  `runtime-attempt.json`へ保存する。実B8 entry block自体はまだ実行せず、現在のartifact unavailableを
+  concrete blockerとして固定した。guest stackは架空addressではなく`Unmaterialized`として保持する。
+  direct loop/call/host serviceは未着手。remaining workはcommit/push/draft PR。next actionはreview。
+  test-first red、focused dispatcher 6 tests、`bara-runtime` 107 tests、`btbc-cli` 106 tests、実B8 bundle
+  integration、Clippy `-D warnings`、domain type/schema/responsibility auditがpassし、repository-wide
+  `./scripts/verify`もinvisible character、RustSec、cargo-deny、Nix package、workspace test、blackbox
+  expected/actualを含めてpassした。
 - active_work: completed。実アプリ反復へ到達するPR単位をmain `03ab1d3`上でdocs-only確定した。
   基本順序は`B8-LAUNCH3a -> 3b -> 3c -> 4a -> 4b -> 4c -> 6 -> 7a -> 7b-N -> 7z`。
   `B8-LAUNCH2b` loader/importと`B8-LAUNCH5a` process stateは観測時だけ挿入する。意図はloaderや

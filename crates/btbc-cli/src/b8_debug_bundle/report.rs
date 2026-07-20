@@ -4,8 +4,10 @@ use bara_isa_x86::{
     DecodeError, DecodedFunction, DecodedInstruction, DecodedInstructionKind, LiftError,
 };
 use bara_oracle::{FailureKind, TestCase};
+use bara_runtime::EntryDispatchOutcome;
 use serde::Serialize;
 
+use super::entry_dispatch_report::B8DebugEntryDispatchReport;
 use super::helper_boundary::B8DebugHelperBoundaryRequestReport;
 use super::{
     encode_lower_hex, B8DebugRegisterIndirectCallBoundaryReport,
@@ -13,7 +15,7 @@ use super::{
     B8DebugTargetPointerLoadReport,
 };
 
-use crate::function_run::{FunctionRunError, FunctionRunResult};
+use crate::function_run::FunctionRunError;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub(super) struct B8DebugUnsupportedInstructionReport {
@@ -609,42 +611,68 @@ pub(super) struct B8DebugRuntimeAttemptReport {
     return_value: Option<u64>,
     stdout: Option<String>,
     error: Option<String>,
+    dispatch: Option<B8DebugEntryDispatchReport>,
 }
 
 impl B8DebugRuntimeAttemptReport {
-    pub(super) fn from_result(
-        result: &FunctionRunResult,
+    pub(super) fn from_dispatch_outcome(
+        outcome: &EntryDispatchOutcome,
         run_scope: B8DebugRuntimeRunScope,
     ) -> Self {
+        let dispatch = B8DebugEntryDispatchReport::from_outcome(outcome);
+        let (status, return_value, stdout, error) = match outcome {
+            EntryDispatchOutcome::Return(returned) => (
+                B8DebugStageStatus::Executed,
+                returned
+                    .state()
+                    .registers()
+                    .value(bara_ir::X86Reg::Rax)
+                    .map(|value| value.as_guest_address().value()),
+                Some(String::new()),
+                None,
+            ),
+            EntryDispatchOutcome::Continue(_) | EntryDispatchOutcome::HelperSuspend(_) => {
+                (B8DebugStageStatus::Skipped, None, None, None)
+            }
+            EntryDispatchOutcome::Blocked(blocked) => (
+                B8DebugStageStatus::Failed,
+                None,
+                None,
+                Some(format!("{:?}", blocked.blocker())),
+            ),
+        };
         Self {
-            schema: "b8_debug_runtime_attempt_v0",
-            status: B8DebugStageStatus::Executed,
+            schema: "b8_debug_runtime_attempt_v1",
+            status,
             run_scope,
-            return_value: Some(result.return_value()),
-            stdout: Some(result.stdout().to_owned()),
-            error: None,
+            return_value,
+            stdout,
+            error,
+            dispatch: Some(dispatch),
         }
     }
 
     pub(super) fn skipped(reason: impl Into<String>, run_scope: B8DebugRuntimeRunScope) -> Self {
         Self {
-            schema: "b8_debug_runtime_attempt_v0",
+            schema: "b8_debug_runtime_attempt_v1",
             status: B8DebugStageStatus::Skipped,
             run_scope,
             return_value: None,
             stdout: None,
             error: Some(reason.into()),
+            dispatch: None,
         }
     }
 
     pub(super) fn failed(error: &FunctionRunError, run_scope: B8DebugRuntimeRunScope) -> Self {
         Self {
-            schema: "b8_debug_runtime_attempt_v0",
+            schema: "b8_debug_runtime_attempt_v1",
             status: B8DebugStageStatus::Failed,
             run_scope,
             return_value: None,
             stdout: None,
             error: Some(error.to_string()),
+            dispatch: None,
         }
     }
 }
@@ -733,6 +761,18 @@ impl B8DebugBlockerReport {
         )
     }
 
+    pub(super) fn from_dispatch_outcome(outcome: &EntryDispatchOutcome) -> Self {
+        let EntryDispatchOutcome::Blocked(blocked) = outcome else {
+            return Self::none();
+        };
+        Self::blocked_with_next_action(
+            B8DebugBlocker::RuntimeDispatcher,
+            FailureKind::RunError,
+            format!("{:?}", blocked.blocker()),
+            B8DebugNextAction::InspectRuntimeDispatcherBlocker,
+        )
+    }
+
     fn blocked(
         current_blocker: B8DebugBlocker,
         failure_kind: FailureKind,
@@ -784,6 +824,7 @@ enum B8DebugBlocker {
     UnsupportedInstruction,
     EmitError,
     RunError,
+    RuntimeDispatcher,
 }
 
 impl B8DebugBlocker {
@@ -817,6 +858,7 @@ enum B8DebugNextAction {
     AdvanceToNextIsaBlocker,
     ConnectPublicRebaseBindImportBoundary,
     InspectNextDebugBundleBlocker,
+    InspectRuntimeDispatcherBlocker,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]

@@ -47,6 +47,10 @@ pub enum DispatcherBoundaryBlocker {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DispatcherUnsupportedState {
+    EntryProgramCounterMismatch {
+        expected: GuestProgramCounter,
+        actual: GuestProgramCounter,
+    },
     TranslationArtifactUnavailable {
         at: GuestProgramCounter,
     },
@@ -55,6 +59,24 @@ pub enum DispatcherUnsupportedState {
         at: GuestProgramCounter,
     },
     HelperReturnContinuation {
+        at: GuestProgramCounter,
+    },
+    EntryExecutionUnavailable {
+        at: GuestProgramCounter,
+    },
+    EntryControlFlowContinuationUnavailable {
+        at: GuestProgramCounter,
+    },
+    EntryHelperMaterializationUnavailable {
+        at: GuestProgramCounter,
+    },
+    EntryRegisterMaterializationUnavailable {
+        at: GuestProgramCounter,
+    },
+    EntryStackMaterializationUnavailable {
+        at: GuestProgramCounter,
+    },
+    EntryPhaseUnsupported {
         at: GuestProgramCounter,
     },
 }
