@@ -4991,9 +4991,9 @@ branch: `task/b8-launch3b-direct-continuation-loop`
 
 完了条件:
 
-- [ ] PC map/terminatorからdirect fallthroughを次blockへ接続し、on-demand translate/executeを
+- [x] PC map/terminatorからdirect fallthroughを次blockへ接続し、on-demand translate/executeを
   typed execution budget付きで2 block以上継続する。
-- [ ] budget exhaustion、unknown target、indirect targetをstable blockerとして保存する。
+- [x] budget exhaustion、unknown target、indirect targetをstable blockerとして保存する。
 
 PRに含めない: guest call stack、direct/indirect call、helper実行、cache永続化。
 

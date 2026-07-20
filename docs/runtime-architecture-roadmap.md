@@ -644,6 +644,12 @@ typed final stateへRAXを書き戻し、artifact construction前に止まる実
 stable `TranslationArtifactUnavailable` outcomeを保存する。guest stackは未materializeを明示し、
 direct continuation loop、call/return、host serviceは後続gateへ進めない。
 
+次のPR Gate `B8-LAUNCH3b`では、current guest PCごとにstandalone artifactとtyped block exitを
+解決するprovider境界、およびnon-zero block budgetを導入した。direct fallthroughはPCを更新して
+2 block以上継続でき、returnまたはbudget exhaustion、unknown/indirect targetのstable blockerで停止する。
+debug bundleにはcontinuation outcomeを保存する。guest call stack、direct call、helper execution、
+cache persistenceは含めず、実GUI inputの既存register-indirect call blockerも維持する。
+
 ### R6 / B8-LAUNCH4: macOS ABI And Service Bridge
 
 x86_64 macOS SysV と public Objective-C / AppKit / libSystem service を generic host service

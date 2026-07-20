@@ -338,6 +338,18 @@ impl GuestRuntimeState {
             self.phase,
         )
     }
+
+    pub fn with_program_counter(
+        &self,
+        program_counter: GuestProgramCounter,
+    ) -> Result<Self, GuestRuntimeStateError> {
+        Self::new(
+            program_counter,
+            self.registers.clone(),
+            self.stack,
+            self.phase,
+        )
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

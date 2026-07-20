@@ -612,6 +612,7 @@ pub(super) struct B8DebugRuntimeAttemptReport {
     stdout: Option<String>,
     error: Option<String>,
     dispatch: Option<B8DebugEntryDispatchReport>,
+    continuation: Option<super::direct_continuation_report::B8DebugDirectContinuationReport>,
 }
 
 impl B8DebugRuntimeAttemptReport {
@@ -642,37 +643,52 @@ impl B8DebugRuntimeAttemptReport {
             ),
         };
         Self {
-            schema: "b8_debug_runtime_attempt_v1",
+            schema: "b8_debug_runtime_attempt_v2",
             status,
             run_scope,
             return_value,
             stdout,
             error,
             dispatch: Some(dispatch),
+            continuation: None,
         }
+    }
+
+    pub(super) fn with_continuation(
+        mut self,
+        outcome: &bara_runtime::DirectContinuationDispatchOutcome,
+    ) -> Self {
+        self.continuation = Some(
+            super::direct_continuation_report::B8DebugDirectContinuationReport::from_outcome(
+                outcome,
+            ),
+        );
+        self
     }
 
     pub(super) fn skipped(reason: impl Into<String>, run_scope: B8DebugRuntimeRunScope) -> Self {
         Self {
-            schema: "b8_debug_runtime_attempt_v1",
+            schema: "b8_debug_runtime_attempt_v2",
             status: B8DebugStageStatus::Skipped,
             run_scope,
             return_value: None,
             stdout: None,
             error: Some(reason.into()),
             dispatch: None,
+            continuation: None,
         }
     }
 
     pub(super) fn failed(error: &FunctionRunError, run_scope: B8DebugRuntimeRunScope) -> Self {
         Self {
-            schema: "b8_debug_runtime_attempt_v1",
+            schema: "b8_debug_runtime_attempt_v2",
             status: B8DebugStageStatus::Failed,
             run_scope,
             return_value: None,
             stdout: None,
             error: Some(error.to_string()),
             dispatch: None,
+            continuation: None,
         }
     }
 }

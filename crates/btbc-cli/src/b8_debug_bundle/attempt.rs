@@ -1,3 +1,5 @@
+use std::num::NonZeroUsize;
+
 use bara_arm64::{
     emit_program, EmitError, TranslationArtifact, TranslationCacheIdentity,
     TranslationSourceIdentity, TranslationTarget, TranslatorVersion,
@@ -6,8 +8,11 @@ use bara_ir::{Program, Terminator, UnsupportedReason};
 use bara_isa_x86::{decode_function, lift_decoded_function_with_image_metadata};
 use bara_oracle::TestCase;
 use bara_runtime::{
-    dispatch_entry_once, dispatch_entry_without_artifact, GuestRegisterState, GuestRuntimePhase,
-    GuestRuntimeState, GuestStackState, MachOExecutableImagePreparation,
+    dispatch_direct_continuations, dispatch_entry_once, dispatch_entry_without_artifact,
+    DirectBlockExit, DirectBlockInputContract, DirectContinuationArtifactProvider,
+    DirectContinuationBlock, DirectContinuationDispatchOutcome, DirectExecutionBudget,
+    GuestProgramCounter, GuestRegisterState, GuestRuntimePhase, GuestRuntimeState, GuestStackState,
+    MachOExecutableImagePreparation,
 };
 
 use super::report::{
@@ -90,6 +95,8 @@ impl B8RealEntryAttempt {
                 image_preparation,
                 entry_initial_runtime_state(image_preparation),
             );
+            let continuation_outcome =
+                continuation_without_artifact(entry_initial_runtime_state(image_preparation));
             return Self {
                 decode_report,
                 lift_ir,
@@ -101,7 +108,8 @@ impl B8RealEntryAttempt {
                 runtime_report: B8DebugRuntimeAttemptReport::from_dispatch_outcome(
                     &dispatch_outcome,
                     B8DebugRuntimeRunScope::RealLcMainEntryFirstBlock,
-                ),
+                )
+                .with_continuation(&continuation_outcome),
                 launch_report: B8DebugLaunchReport::from_attempt(
                     test_case,
                     processed_pc_range,
@@ -191,6 +199,11 @@ impl B8RealEntryAttempt {
         let translation_artifact = B8DebugArtifactReport::available(translation_artifact_report);
         let initial_state = entry_initial_runtime_state(image_preparation);
         let dispatch_outcome = dispatch_entry_once(image_preparation, &artifact, initial_state);
+        let continuation_outcome = continuation_from_program(
+            &program,
+            artifact.clone(),
+            entry_initial_runtime_state(image_preparation),
+        );
         let blocker_report = B8DebugBlockerReport::from_dispatch_outcome(&dispatch_outcome);
         Self {
             decode_report,
@@ -203,7 +216,8 @@ impl B8RealEntryAttempt {
             runtime_report: B8DebugRuntimeAttemptReport::from_dispatch_outcome(
                 &dispatch_outcome,
                 B8DebugRuntimeRunScope::RealLcMainEntryFirstBlock,
-            ),
+            )
+            .with_continuation(&continuation_outcome),
             launch_report: B8DebugLaunchReport::from_attempt(
                 test_case,
                 processed_pc_range,
@@ -253,6 +267,59 @@ fn entry_initial_runtime_state(
         GuestRuntimePhase::Ready,
     )
     .expect("entry preparation and explicit unmaterialized stack form a valid ready state")
+}
+
+struct SingleBlockProvider(Option<DirectContinuationBlock>);
+
+impl DirectContinuationArtifactProvider for SingleBlockProvider {
+    fn resolve_block(&mut self, at: GuestProgramCounter) -> Option<DirectContinuationBlock> {
+        self.0.take().filter(|block| block.entry() == at)
+    }
+}
+
+fn continuation_without_artifact(
+    initial_state: GuestRuntimeState,
+) -> DirectContinuationDispatchOutcome {
+    let mut provider = SingleBlockProvider(None);
+    dispatch_direct_continuations(&mut provider, initial_state, continuation_budget())
+}
+
+fn continuation_from_program(
+    program: &Program,
+    artifact: TranslationArtifact,
+    initial_state: GuestRuntimeState,
+) -> DirectContinuationDispatchOutcome {
+    let exit = if program.blocks().len() == 1 {
+        match program.blocks()[0].terminator() {
+            Terminator::Return => Some(DirectBlockExit::return_to_caller()),
+            Terminator::Fallthrough { target } | Terminator::DirectJump { target } => Some(
+                DirectBlockExit::fallthrough(GuestProgramCounter::new(*target)),
+            ),
+            Terminator::DirectCall { target, .. } => Some(DirectBlockExit::direct_call(
+                GuestProgramCounter::new(*target),
+            )),
+            Terminator::BoundaryRequest { .. }
+            | Terminator::CondJump { .. }
+            | Terminator::Unsupported { .. } => None,
+        }
+    } else {
+        None
+    };
+    let block = exit.and_then(|exit| {
+        DirectContinuationBlock::new(
+            initial_state.program_counter(),
+            artifact,
+            exit,
+            DirectBlockInputContract::NoRegisterOrStackLiveIns,
+        )
+        .ok()
+    });
+    let mut provider = SingleBlockProvider(block);
+    dispatch_direct_continuations(&mut provider, initial_state, continuation_budget())
+}
+
+fn continuation_budget() -> DirectExecutionBudget {
+    DirectExecutionBudget::new(NonZeroUsize::new(2).expect("continuation budget is non-zero"))
 }
 
 fn frontier_unsupported_terminator_reason(program: &Program) -> Option<&UnsupportedReason> {
@@ -307,7 +374,7 @@ mod tests {
         let translation_artifact = serde_json::to_value(&attempt.translation_artifact)
             .expect("translation artifact report serializes");
 
-        assert_eq!(runtime_report["schema"], "b8_debug_runtime_attempt_v1");
+        assert_eq!(runtime_report["schema"], "b8_debug_runtime_attempt_v2");
         assert_eq!(
             runtime_report["run_scope"],
             "real_lc_main_entry_first_block"
@@ -323,6 +390,10 @@ mod tests {
         assert_eq!(
             runtime_report["dispatch"]["initial_state"]["stack"],
             "unmaterialized"
+        );
+        assert_eq!(
+            runtime_report["continuation"]["schema"],
+            "b8_debug_direct_continuation_v0"
         );
         assert_eq!(translation_artifact["status"], "available");
         assert_eq!(
