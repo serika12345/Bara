@@ -79,10 +79,18 @@ B8-LAUNCH2a completion 後にすぐ始めないもの:
 
 ## 現在の作業スナップショット
 
-最終更新: 2026-07-20 09:25 JST
+最終更新: 2026-07-20 09:53 JST
 
 状態:
 
+- active_work: completed。`B8-LAUNCH3b Direct Continuation Loop`を
+  `task/b8-launch3b-direct-continuation-loop`で開始した。baseはPR #97 merge後のmain `ee711d7`。
+  artifactとtyped direct block exitをcurrent PCごとに取得し、non-zero execution budget内で2 block以上を
+  translate/execute継続するruntime境界を実装した。budget exhaustion、unknown direct target、indirect
+  target等はtyped blockerとなり、B8 runtime-attempt v2へstable continuation reportを保存する。現在の
+  GUI inputのregister-indirect call / artifact unavailable blockerは上書きしない。guest call stack、
+  direct call、helper、永続cacheは次gate以降。remaining workはcommit/push/draft PR、next actionはreview。
+  focused continuation tests、B8 return fixture regression、repository-wide `./scripts/verify`がpassした。
 - active_work: completed。`B8-LAUNCH3a Entry Dispatcher Spine`を
   `task/b8-launch3a-entry-dispatcher-spine`で完了した。baseはmain `f456fc1`。runtime-owned dispatcherは
   prepared image、artifact、typed initial stateを受けるsingle-entry spineを作り、typed outcomeと

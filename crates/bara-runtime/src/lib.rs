@@ -1,3 +1,4 @@
+pub mod direct_continuation;
 pub mod entry_dispatcher;
 pub mod executable_memory;
 pub mod guest_image;
@@ -8,6 +9,12 @@ pub mod runner;
 pub mod runtime_blocker;
 pub mod runtime_state;
 
+pub use direct_continuation::{
+    dispatch_direct_continuations, DirectBlockExit, DirectBlockInputContract,
+    DirectContinuationArtifactProvider, DirectContinuationBlock, DirectContinuationBlockError,
+    DirectContinuationBlocked, DirectContinuationDispatchOutcome, DirectContinuationReturn,
+    DirectExecutionBudget, ExecutedBlockCount,
+};
 pub use entry_dispatcher::{
     dispatch_entry_once, dispatch_entry_without_artifact, EntryDispatchBlocked,
     EntryDispatchContinuation, EntryDispatchHelperSuspend, EntryDispatchOutcome,

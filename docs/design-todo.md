@@ -816,6 +816,17 @@ B8-LAUNCH3a implementation result:
   call stack、host service実行は3b以降へ残す。実B8 entry block自体の実行はartifact unavailable
   blocker解消後であり、3aはそのblockerをdispatcher input/output境界で固定するところまでとする。
 
+B8-LAUNCH3b implementation result:
+
+- 2026-07-20 にruntime-owned direct continuation loopを追加した。providerはcurrent guest PCから
+  standalone `TranslationArtifact`とtyped exitをon-demand解決し、non-zero execution budget内で
+  direct fallthroughを継続する。self-authored fixtureでは2 blockを実行してreturnまで到達する。
+- block fragmentはregister/stack live-inなし、entry PC mapのARM offset 0、unresolved fixupなし、
+  helper requestなしを構築時に要求する。guest call stack、direct call、helper、永続cacheは後続gateへ残す。
+- budget exhaustion、unknown direct target、register-indirect target、provider entry mismatch、host execution
+  unavailableをtyped blockerにした。B8 runtime reportはstable continuation projectionを保存するが、現在の
+  GUI inputの最上位blockerであるregister-indirect call / artifact unavailableは上書きしない。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。

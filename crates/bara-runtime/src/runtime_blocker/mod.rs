@@ -79,6 +79,20 @@ pub enum DispatcherUnsupportedState {
     EntryPhaseUnsupported {
         at: GuestProgramCounter,
     },
+    ExecutionBudgetExhausted {
+        at: GuestProgramCounter,
+    },
+    UnknownDirectTarget {
+        at: GuestProgramCounter,
+    },
+    DirectCallContinuationUnavailable {
+        target: GuestProgramCounter,
+        at: GuestProgramCounter,
+    },
+    ResolvedBlockEntryMismatch {
+        requested: GuestProgramCounter,
+        resolved: GuestProgramCounter,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
