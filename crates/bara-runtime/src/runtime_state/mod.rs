@@ -108,6 +108,27 @@ impl GuestRegisterState {
             .find(|entry| entry.register() == register)
             .map(GuestRegisterStateEntry::value)
     }
+
+    pub fn with_value(
+        &self,
+        register: X86Reg,
+        value: GuestRegisterValue,
+    ) -> Result<Self, GuestRuntimeStateError> {
+        if register.is_partial_view() {
+            return Err(GuestRuntimeStateError::PartialRegisterUnsupported(register));
+        }
+
+        let mut entries = self.entries.clone();
+        if let Some(existing) = entries
+            .iter_mut()
+            .find(|entry| entry.register() == register)
+        {
+            *existing = GuestRegisterStateEntry::new(register, value);
+        } else {
+            entries.push(GuestRegisterStateEntry::new(register, value));
+        }
+        Self::from_entries(entries)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -158,9 +179,12 @@ impl GuestStackBounds {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct GuestStackState {
-    pointer: GuestStackPointer,
-    bounds: GuestStackBounds,
+pub enum GuestStackState {
+    Materialized {
+        pointer: GuestStackPointer,
+        bounds: GuestStackBounds,
+    },
+    Unmaterialized,
 }
 
 impl GuestStackState {
@@ -172,15 +196,25 @@ impl GuestStackState {
             return Err(GuestRuntimeStateError::StackPointerOutsideBounds);
         }
 
-        Ok(Self { pointer, bounds })
+        Ok(Self::Materialized { pointer, bounds })
     }
 
-    pub const fn pointer(self) -> GuestStackPointer {
-        self.pointer
+    pub const fn unmaterialized() -> Self {
+        Self::Unmaterialized
     }
 
-    pub const fn bounds(self) -> GuestStackBounds {
-        self.bounds
+    pub const fn pointer(self) -> Option<GuestStackPointer> {
+        match self {
+            Self::Materialized { pointer, .. } => Some(pointer),
+            Self::Unmaterialized => None,
+        }
+    }
+
+    pub const fn bounds(self) -> Option<GuestStackBounds> {
+        match self {
+            Self::Materialized { bounds, .. } => Some(bounds),
+            Self::Unmaterialized => None,
+        }
     }
 }
 
@@ -290,6 +324,19 @@ impl GuestRuntimeState {
 
     pub const fn phase(&self) -> GuestRuntimePhase {
         self.phase
+    }
+
+    pub fn with_register_value(
+        &self,
+        register: X86Reg,
+        value: GuestRegisterValue,
+    ) -> Result<Self, GuestRuntimeStateError> {
+        Self::new(
+            self.program_counter,
+            self.registers.with_value(register, value)?,
+            self.stack,
+            self.phase,
+        )
     }
 }
 

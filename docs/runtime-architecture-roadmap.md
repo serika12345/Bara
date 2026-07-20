@@ -639,6 +639,11 @@ translation artifact と typed runtime state を使って guest control flow を
 - indirect target は resolved target または stable blocker になる
 - cache / interpreter / JIT は交換可能な future strategy として保つ
 
+最初のPR Gate `B8-LAUNCH3a`ではsingle-entry dispatcher spineを接続する。artifactが実行可能なら
+typed final stateへRAXを書き戻し、artifact construction前に止まる実B8 inputも同じinitial stateから
+stable `TranslationArtifactUnavailable` outcomeを保存する。guest stackは未materializeを明示し、
+direct continuation loop、call/return、host serviceは後続gateへ進めない。
+
 ### R6 / B8-LAUNCH4: macOS ABI And Service Bridge
 
 x86_64 macOS SysV と public Objective-C / AppKit / libSystem service を generic host service

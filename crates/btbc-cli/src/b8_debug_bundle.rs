@@ -22,6 +22,7 @@ use bara_oracle::{
 use serde::{Deserialize, Serialize};
 
 mod attempt;
+mod entry_dispatch_report;
 mod guest_image;
 mod helper_boundary;
 mod import_boundary;
@@ -89,8 +90,7 @@ pub(crate) fn generate_b8_debug_bundle(
         &B8DebugEntryBytesReport::real_lc_main_entry(&entry_test_case),
     )?;
 
-    let image_metadata = image_preparation.program_image_metadata();
-    let attempt = B8RealEntryAttempt::run(&entry_test_case, &image_metadata, source_identity);
+    let attempt = B8RealEntryAttempt::run(&entry_test_case, &image_preparation, source_identity);
     write_json_file(&paths.decode_report_path(), &attempt.decode_report)?;
     write_json_file(&paths.lift_ir_path(), &attempt.lift_ir)?;
     write_json_file(&paths.emit_report_path(), &attempt.emit_report)?;

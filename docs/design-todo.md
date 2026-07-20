@@ -798,6 +798,24 @@ B8 launch PR boundary decision:
   semantic blockerだけを解消する反復、`7z`は新機能を含まないlifecycle acceptanceとする。
   `7a` merge後から実アプリ入力による反復を開始し、`7b-N`ではone-blocker/one-PRを維持する。
 
+B8-LAUNCH3a implementation result:
+
+- 2026-07-20 にruntime-owned `entry_dispatcher`を追加し、prepared Mach-O image、実行対象artifact、
+  typed initial stateを受けるsingle-entry境界を作った。outcomeは`Continue`、`HelperSuspend`、`Return`、
+  `Blocked`に分け、成功したno-fixup/no-helper artifactはRAX writeback済み`Return`、entry mismatch、
+  artifact missing、host execution unavailableはtyped dispatcher blockerになる。
+- B8 production attemptはartifactがある場合にdispatcher経由で実行し、raw runnerを直接呼ばない。
+  現在のself-authored GUI `LC_MAIN`はregister-indirect callでartifact construction前に停止するため、
+  同じsentinel-free initial stateを`TranslationArtifactUnavailable`としてdispatchし、既存ISA/import
+  blockerを上書きせずruntime outcomeへ保存する。
+- no-args entry spineが実materializeできるinputは`Ready`、empty registers、unmaterialized guest stackに
+  限定する。live-in registers、materialized stack、helper phaseをsilentに無視せずtyped blockerへする。
+- guest stackは3aで実materializeしない。架空addressを作らず`GuestStackState::Unmaterialized`として
+  明示し、initial/final PC、phase、stack materialization、RAX、next actionを
+  `b8_debug_runtime_attempt_v1` / `b8_debug_entry_dispatch_v0`へ保存する。direct continuation、guest
+  call stack、host service実行は3b以降へ残す。実B8 entry block自体の実行はartifact unavailable
+  blocker解消後であり、3aはそのblockerをdispatcher input/output境界で固定するところまでとする。
+
 ## D2: Artifact domain model
 
 - [ ] raw ARM64 code、assembly source、object file、linked executable、execution report を別の domain type として扱う。
